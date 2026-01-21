@@ -13,6 +13,11 @@ from sqlalchemy.orm.attributes import flag_modified
 # Use SQLite for local development default, can be overridden by env var
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aodev.db")
 
+if "sqlite" in DATABASE_URL:
+    print("⚠️  [DATABASE STATUS] USING LOCAL SQLITE (DATA WILL BE LOST ON DEPLOY) ⚠️")
+else:
+    print("✅  [DATABASE STATUS] USING EXTERNAL DATABASE (PERSISTENT) ✅")
+
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
