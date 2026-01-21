@@ -353,22 +353,27 @@ async def auth_middleware(request: Request, call_next):
 async def startup_event():
     # root_path = get_root_path() # Removed
     # root_path = get_root_path() # Removed
-    if True:
-        # Check if users exist
-        users = get_users()
-        if not users:
-            print("No users found. Creating default Administrator.")
-            # Create Default Admin
-            admin = User(
-                id="admin_01",
-                name="Administrador",
-                email="admin@ao.com",
-                role="admin",
-                is_active=True,
-                hashed_password=get_password_hash("admin123")
-            )
-            save_user(admin)
-            print("Default Admin Created: admin@ao.com / admin123")
+    try:
+        if True:
+            # Check if users exist
+            users = get_users()
+            if not users:
+                print("No users found. Creating default Administrator.")
+                # Create Default Admin
+                admin = User(
+                    id="admin_01",
+                    name="Administrador",
+                    email="admin@ao.com",
+                    role="admin",
+                    is_active=True,
+                    hashed_password=get_password_hash("admin123"),
+                    permissions={},
+                    assigned_projects=[]
+                )
+                save_user(admin)
+                print("Default Admin Created: admin@ao.com / admin123")
+    except Exception as e:
+        print(f"Startup Error (Non-Critical): {e}")
 
 # ==========================================
 # AUTH ROUTES
