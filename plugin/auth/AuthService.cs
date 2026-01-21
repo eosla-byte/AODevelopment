@@ -38,6 +38,17 @@ namespace RevitCivilConnector.Auth
         public event Action<bool> OnBlockStatusChanged; // true = Blocked, false = Unblocked
         public event Action OnLogin;
 
+        // Visualizer
+        public Services.VisualizerHandler VizHandler { get; private set; }
+        public ExternalEvent VizEvent { get; private set; }
+        private CancellationTokenSource _pollCts;
+
+        public void InitVisualizer(Services.VisualizerHandler handler, ExternalEvent exEvent)
+        {
+            VizHandler = handler;
+            VizEvent = exEvent;
+        }
+
         private AuthService()
         {
             // Enforce TLS 1.2 due to Railway/Modern HTTPS requirements
@@ -159,6 +170,7 @@ namespace RevitCivilConnector.Auth
 
                     // Start Heartbeat
                     StartHeartbeat();
+                    StartCommandPolling(); // Start polling for commands (Visualizer)
                     
                     // Unblock
                     OnBlockStatusChanged?.Invoke(false);
@@ -264,6 +276,64 @@ namespace RevitCivilConnector.Auth
                 {
                      // Connection lost -> Block
                      OnBlockStatusChanged?.Invoke(true);
+                }
+            }
+        }
+
+        private void StartCommandPolling()
+        {
+            StopCommandPolling();
+            _pollCts = new CancellationTokenSource();
+            Task.Run(() => CommandPollingLoop(_pollCts.Token));
+        }
+
+        private void StopCommandPolling()
+        {
+            _pollCts?.Cancel();
+            _pollCts = null;
+        }
+
+        private async Task CommandPollingLoop(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    if (string.IsNullOrEmpty(SessionId) || VizHandler == null || VizEvent == null)
+                    {
+                         await Task.Delay(2000, token);
+                         continue;
+                    }
+
+                    // Poll Bridge
+                    // Using separate try-catch to avoid breaking loop on single fail
+                    try 
+                    {
+                        var response = await _client.GetAsync($"{BASE_URL}/cloud/commands/{SessionId}");
+                        if (response.IsSuccessStatusCode)
+                        {
+                            var respString = await response.Content.ReadAsStringAsync();
+                            dynamic respData = JsonConvert.DeserializeObject(respString);
+                            var commands = respData.commands; // JArray
+
+                            if (commands != null && commands.Count > 0)
+                            {
+                                foreach (var cmd in commands)
+                                {
+                                    VizHandler.CommandQueue.Enqueue(cmd);
+                                }
+                                VizEvent.Raise();
+                            }
+                        }
+                    }
+                    catch { }
+
+                    await Task.Delay(1000, token); // 1 sec poll
+                }
+                catch (TaskCanceledException) { break; }
+                catch (Exception) 
+                {
+                     await Task.Delay(5000, token);
                 }
             }
         }

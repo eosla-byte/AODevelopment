@@ -118,7 +118,8 @@ namespace RevitCivilConnector
                      // 3. Open Browser
                      // Production URL
                      // Production URL
-                     string frontendUrl = "https://aodevelopment-production.up.railway.app/cloud-quantify?session_id=" + sessionId + "&token=" + AuthService.Instance.AccessToken;
+                     string token = Uri.EscapeDataString(AuthService.Instance.AccessToken ?? "");
+                     string frontendUrl = "https://aodevelopment-production.up.railway.app/cqt-tool?session_id=" + sessionId + "&token=" + token;
                      Process.Start(new ProcessStartInfo(frontendUrl) { UseShellExecute = true });
                 }
                 else

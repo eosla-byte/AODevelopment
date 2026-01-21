@@ -37,6 +37,11 @@ namespace RevitCivilConnector
             // Subscribe to Auth Login Event to update UI
             AuthService.Instance.OnLogin += UpdateUserInfo;
 
+            // Init Visualizer
+            var vizHandler = new Services.VisualizerHandler();
+            var vizEvent = ExternalEvent.Create(vizHandler);
+            AuthService.Instance.InitVisualizer(vizHandler, vizEvent);
+
             // Create Ribbon Tab
             string tabName = "AOdev";
             try
