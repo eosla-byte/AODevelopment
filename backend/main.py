@@ -74,26 +74,44 @@ app.add_middleware(
 
 # Mount Static
 app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/assets", StaticFiles(directory="static/public_site/assets"), name="frontend_assets")
 templates = Jinja2Templates(directory="templates")
 
 # Auth Middleware
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        token = request.cookies.get("access_token")
+        # 1. Allow CORS Preflight
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        path = request.url.path
         
-        # Checking Header as fallback (for external API calls)
-        if not token:
-            auth_header = request.headers.get("Authorization")
-            if auth_header and auth_header.startswith("Bearer "):
-                token = auth_header.split(" ")[1]
+        # 2. Block Protected Routes
+        # Implicitly allow / (landing), /assets, /static, /api, /login
+        protected_prefixes = [
+            "/admin", "/cloud-quantify", "/estimaciones", "/cotizaciones", 
+            "/projects", "/project", "/calendar"
+        ]
         
-        request.state.user = None
+        is_protected = any(path.startswith(p) for p in protected_prefixes)
         
-        if token:
+        if is_protected:
+            token = request.cookies.get("access_token")
+            # Fallback Header
+            if not token:
+                auth_header = request.headers.get("Authorization")
+                if auth_header and auth_header.startswith("Bearer "):
+                    token = auth_header.split(" ")[1]
+            
+            if not token:
+                return RedirectResponse("/login")
+            
             payload = decode_access_token(token)
-            if payload:
-                request.state.user = payload
+            if not payload:
+                return RedirectResponse("/login")
                 
+            request.state.user = payload
+
         response = await call_next(request)
         return response
 
@@ -101,9 +119,18 @@ app.add_middleware(AuthMiddleware)
 
 
 
-@app.get("/")
-async def root():
-    return RedirectResponse("/cloud-quantify")
+@app.get("/", response_class=HTMLResponse)
+async def serve_landing(request: Request):
+    # Check if logged in -> App
+    token = request.cookies.get("access_token")
+    if token and decode_access_token(token):
+         return RedirectResponse("/cloud-quantify")
+             
+    # Else -> Landing Page
+    index_path = "static/public_site/index.html"
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return HTMLResponse("<h1>AO Development</h1><p>Frontend not found.</p>")
 
 @app.get("/cloud-quantify", response_class=HTMLResponse)
 async def view_cloud_quantify(request: Request):
@@ -2385,3 +2412,11 @@ async def admin_add_project(
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
+# CATCH ALL FOR STATIC SITE ASSETS
+@app.get('/{file_path:path}')
+async def serve_static_root(file_path: str):
+    if '..' in file_path: return JSONResponse({'error': 'Invalid path'}, status_code=400)
+    path = f'static/public_site/{file_path}'
+    if os.path.exists(path) and os.path.isfile(path): return FileResponse(path)
+    return JSONResponse({'error': 'Not Found'}, status_code=404)
