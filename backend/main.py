@@ -620,7 +620,14 @@ async def login(request: Request, username: str = Form(...), password: str = For
         data={"sub": user.email, "role": user.role, "name": user.name}
     )
     
-    response = RedirectResponse("/", status_code=303)
+    redirect_target = "/projects"
+    if user.role == "admin":
+        redirect_target = "/admin/users"
+    elif user.role == "cliente":
+        # Clients also go to projects for now (or a specific client view if strict)
+        redirect_target = "/projects"
+        
+    response = RedirectResponse(redirect_target, status_code=303)
     response.set_cookie(key="access_token", value=access_token, httponly=True)
     return response
 
@@ -2319,6 +2326,24 @@ async def delete_template_route(tpl_id: int):
 # ==========================================
 # ADMIN ROUTES (New)
 # ==========================================
+
+
+@app.get("/projects", response_class=HTMLResponse)
+async def view_projects(request: Request):
+    projects = get_projects()
+    # Optional: Filter by user permissions if needed
+    # For now, show all projects (Staff view)
+    user = getattr(request.state, "user", None)
+    
+    # If client, filter only assigned?
+    # Logic for client filtering could go here.
+    # Assuming get_projects returns all.
+    
+    return templates.TemplateResponse("projects.html", {
+        "request": request, 
+        "projects": projects,
+        "root_path": "Railway"
+    })
 
 @app.get("/admin", response_class=HTMLResponse)
 async def admin_dashboard(request: Request):
