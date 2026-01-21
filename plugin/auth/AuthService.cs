@@ -280,7 +280,7 @@ namespace RevitCivilConnector.Auth
             }
         }
 
-        private void StartCommandPolling()
+        public void StartCommandPolling()
         {
             StopCommandPolling();
             _pollCts = new CancellationTokenSource();

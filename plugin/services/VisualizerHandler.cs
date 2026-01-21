@@ -26,9 +26,15 @@ namespace RevitCivilConnector.Services
                         // Parse IDs
                         foreach(var idStr in payload.elementIds)
                         {
-                            if (int.TryParse((string)idStr, out int idInt))
+                            // Revit 2024 uses long IDs
+                            if (long.TryParse((string)idStr, out long idLong))
                             {
-                                // Revit 2024 uses long or ElementId constructor
+                                // Using generic constructor or long depending on SDK
+                                // For 2024, ElementId(long) is preferred
+                                try { uids.Add(new ElementId(idLong)); } catch { uids.Add(new ElementId((int)idLong)); }
+                            }
+                            else if (int.TryParse((string)idStr, out int idInt))
+                            {
                                 uids.Add(new ElementId(idInt));
                             }
                         }
@@ -38,8 +44,7 @@ namespace RevitCivilConnector.Services
                             // 1. Select
                             app.ActiveUIDocument.Selection.SetElementIds(uids);
 
-                            // 2. Color Override (Optional)
-                            // Requires Transaction
+                            // 2. Color Override
                             using (Transaction t = new Transaction(app.ActiveUIDocument.Document, "Visualize Cloud Elements"))
                             {
                                 t.Start();
@@ -51,11 +56,6 @@ namespace RevitCivilConnector.Services
                                 var solidFill = GetSolidFillKey(app.ActiveUIDocument.Document);
                                 if (solidFill != null) ogs.SetSurfaceForegroundPatternId(solidFill.Id);
                                 
-                                // Reset first? Or just apply
-                                // Iterate view?
-                                // For simplicity, just selection for now as requested "select geometry"
-                                // User asked for "apply color" too.
-                                
                                 foreach(var eid in uids)
                                 {
                                     app.ActiveUIDocument.ActiveView.SetElementOverrides(eid, ogs);
@@ -64,8 +64,11 @@ namespace RevitCivilConnector.Services
                                 t.Commit();
                             }
                             
-                            // Zoom?
-                            // app.ActiveUIDocument.ShowElements(uids);
+                            // 3. Zoom / Show
+                            app.ActiveUIDocument.ShowElements(uids);
+
+                            // Debug Confirmation
+                            // TaskDialog.Show("Viz", $"Visualized {uids.Count} elements.");
                         }
                     }
                     else if (action == "clean")
