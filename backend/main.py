@@ -73,13 +73,18 @@ app.add_middleware(
 )
 
 # Mount Static
-app.mount("/static", StaticFiles(directory="static"), name="static")
-assets_path = "static/public_site/assets"
+# Mount Static
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+
+assets_path = os.path.join(BASE_DIR, "static/public_site/assets")
 if os.path.exists(assets_path):
     app.mount("/assets", StaticFiles(directory=assets_path), name="frontend_assets")
 else:
     print(f"Warning: Assets directory not found at {assets_path}")
-templates = Jinja2Templates(directory="templates")
+
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # Auth Middleware
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -2425,7 +2430,16 @@ if __name__ == "__main__":
 @app.get('/{file_path:path}')
 async def serve_static_root(file_path: str):
     if '..' in file_path: return JSONResponse({'error': 'Invalid path'}, status_code=400)
-    path = f'static/public_site/{file_path}'
-    if os.path.exists(path) and os.path.isfile(path): return FileResponse(path)
+    
+    # Use BASE_DIR for absolute path resolution
+    path = os.path.join(BASE_DIR, 'static/public_site', file_path)
+    
+    if os.path.exists(path) and os.path.isfile(path):
+        # Explicitly handle common MIME types if needed (though FileResponse usually does well)
+        media_type = None
+        if path.endswith(".css"): media_type = "text/css"
+        if path.endswith(".js"): media_type = "application/javascript"
+        return FileResponse(path, media_type=media_type)
+        
     # Redirect 404s to Home (Landing Page)
     return RedirectResponse("/")
