@@ -1966,12 +1966,17 @@ function renderLiveCompilation(groupId) {
 }
 
 // 3. Export Logic (Enhanced Modal)
+// 3. Export Logic (Enhanced Modal)
 function exportToExcel() {
-    openExportModal();
+    openExportModal('excel');
 }
 
-function openExportModal() {
-    console.log("DEBUG: Attempting to open Export Modal (v2)");
+function exportToPDF() {
+    openExportModal('pdf');
+}
+
+function openExportModal(defaultType = 'excel') {
+    console.log("DEBUG: Opening Export Modal");
     try {
         // Check if modal template exists, if not, inject it
         if (!document.getElementById('export-modal')) {
@@ -1990,23 +1995,39 @@ function openExportModal() {
                             <!-- Injected Checkboxes -->
                         </div>
 
-                        <div class="space-y-3">
-                             <label class="block text-xs uppercase text-slate-500 font-bold">Formato de Salida</label>
-                             <div class="flex gap-4">
-                                 <label class="flex items-center gap-2 cursor-pointer p-3 rounded border border-slate-600 bg-[#0b0c12] hover:border-green-500 flex-1 group">
-                                     <input type="radio" name="export-format" value="excel" checked class="accent-green-500">
-                                     <div>
-                                         <div class="font-bold text-white text-sm group-hover:text-green-400"><i class="fas fa-file-excel text-green-500 mr-2"></i>Excel (.xls)</div>
-                                         <div class="text-[10px] text-slate-400">Formato tabular con estilos.</div>
-                                     </div>
-                                 </label>
-                                 <label class="flex items-center gap-2 cursor-pointer p-3 rounded border border-slate-600 bg-[#0b0c12] hover:border-red-500 flex-1 group">
-                                     <input type="radio" name="export-format" value="pdf" class="accent-red-500">
-                                      <div>
-                                         <div class="font-bold text-white text-sm group-hover:text-red-400"><i class="fas fa-file-pdf text-red-500 mr-2"></i>PDF</div>
-                                         <div class="text-[10px] text-slate-400">Documento listo para imprimir.</div>
-                                     </div>
-                                 </label>
+                        <div class="space-y-4">
+                             <div>
+                                 <label class="block text-xs uppercase text-slate-500 font-bold mb-2">Formato de Salida</label>
+                                 <div class="flex gap-4">
+                                     <label class="flex items-center gap-2 cursor-pointer p-3 rounded border border-slate-600 bg-[#0b0c12] hover:border-green-500 flex-1 group">
+                                         <input type="radio" name="export-format" value="excel" class="accent-green-500" onchange="toggleOrientation(false)">
+                                         <div>
+                                             <div class="font-bold text-white text-sm group-hover:text-green-400"><i class="fas fa-file-excel text-green-500 mr-2"></i>Excel (.xls)</div>
+                                             <div class="text-[10px] text-slate-400">Formato tabular con estilos.</div>
+                                         </div>
+                                     </label>
+                                     <label class="flex items-center gap-2 cursor-pointer p-3 rounded border border-slate-600 bg-[#0b0c12] hover:border-red-500 flex-1 group">
+                                         <input type="radio" name="export-format" value="pdf" class="accent-red-500" onchange="toggleOrientation(true)">
+                                          <div>
+                                             <div class="font-bold text-white text-sm group-hover:text-red-400"><i class="fas fa-file-pdf text-red-500 mr-2"></i>PDF</div>
+                                             <div class="text-[10px] text-slate-400">Documento listo para imprimir.</div>
+                                         </div>
+                                     </label>
+                                 </div>
+                             </div>
+
+                             <div id="export-orientation-opt" class="hidden">
+                                 <label class="block text-xs uppercase text-slate-500 font-bold mb-2">Orientación (PDF)</label>
+                                 <div class="flex gap-4">
+                                     <label class="flex items-center gap-2 cursor-pointer p-2 rounded border border-slate-600 bg-[#0b0c12] hover:border-indigo-500 flex-1">
+                                         <input type="radio" name="export-orientation" value="portrait" checked class="accent-indigo-500">
+                                         <span class="text-sm text-slate-300">Vertical (Portrait)</span>
+                                     </label>
+                                     <label class="flex items-center gap-2 cursor-pointer p-2 rounded border border-slate-600 bg-[#0b0c12] hover:border-indigo-500 flex-1">
+                                         <input type="radio" name="export-orientation" value="landscape" class="accent-indigo-500">
+                                         <span class="text-sm text-slate-300">Horizontal (Landscape)</span>
+                                     </label>
+                                 </div>
                              </div>
                         </div>
                     </div>
@@ -2021,6 +2042,13 @@ function openExportModal() {
             </div>`;
             document.body.insertAdjacentHTML('beforeend', modalHtml);
         }
+
+        // Set Format Selection
+        const radios = document.getElementsByName('export-format');
+        radios.forEach(r => {
+            r.checked = (r.value === defaultType);
+        });
+        toggleOrientation(defaultType === 'pdf');
 
         const container = document.getElementById('export-group-list');
         if (container) {
@@ -2054,7 +2082,13 @@ function openExportModal() {
     }
 }
 
-
+function toggleOrientation(show) {
+    const el = document.getElementById('export-orientation-opt');
+    if (el) {
+        if (show) el.classList.remove('hidden');
+        else el.classList.add('hidden');
+    }
+}
 
 function closeExportModal() {
     const modal = document.getElementById('export-modal');
@@ -2072,19 +2106,17 @@ function confirmExport() {
     }
 
     const format = document.querySelector('input[name="export-format"]:checked').value;
+    const orientation = document.querySelector('input[name="export-orientation"]:checked')?.value || 'portrait';
     const selectedGroups = groups.filter(g => selectedIds.includes(g.id));
 
     // 2. Generate Global HTML
     let fullHtml = '';
 
-    // Determine Global Columns (Union of all columns? Or Standard Report Columns?)
-    // Requirement: "Code, Desc, Unit, Total, Sheet" (Standard Compilation View)
-
     selectedGroups.forEach(group => {
-        // Group Header
+        // Group Header (Black Background, White Text)
         fullHtml += `
         <tr>
-             <td colspan="5" style="background-color: #000; color: #fff; font-weight: bold; font-size: 14pt; padding: 10px; text-transform: uppercase;">
+             <td colspan="5" style="background-color: #000000; color: #ffffff; font-weight: bold; font-size: 14pt; padding: 12px; text-transform: uppercase; border: 1px solid #000000;">
                 ${group.name}
              </td>
         </tr>`;
@@ -2096,27 +2128,26 @@ function confirmExport() {
 
         subgroups.forEach(sub => {
             const groupCards = activeCards.filter(c => c.subgroupId === sub.id);
-            if (groupCards.length === 0) return; // Skip empty subgroups? Or show empty? Let's skip to be clean.
+            if (groupCards.length === 0) return;
 
-            // Subgroup Header
+            // Subgroup Header (Blue-Gray Background)
             fullHtml += `
             <tr>
-                <td colspan="5" style="background-color: #e2e8f0; color: #0f172a; font-weight: bold; font-size: 11pt; padding: 5px; text-transform: uppercase; border: 1px solid #cbd5e1;">
+                <td colspan="5" style="background-color: #94a3b8; color: #0f172a; font-weight: bold; font-size: 11pt; padding: 6px 12px; text-transform: uppercase; border: 1px solid #64748b;">
                     ${sub.name}
                 </td>
             </tr>
             <!-- HEADERS -->
-            <tr style="background-color: #fff; color: #000; font-weight: bold; font-size: 10pt; text-align: center;">
-                <td style="width: 100px; border: 1px solid #cbd5e1; padding: 5px;">CODIGO</td>
-                <td style="border: 1px solid #cbd5e1; padding: 5px;">DESCRIPCION</td>
-                <td style="width: 80px; border: 1px solid #cbd5e1; padding: 5px;">UNIDAD</td>
-                <td style="width: 100px; border: 1px solid #cbd5e1; padding: 5px;">TOTAL</td>
-                <td style="width: 80px; border: 1px solid #cbd5e1; padding: 5px;">HOJA</td>
+            <tr style="background-color: #ffffff; color: #000000; font-weight: bold; font-size: 10pt; text-align: center;">
+                <td style="width: 100px; border: 1px solid #e2e8f0; padding: 6px;">CODIGO</td>
+                <td style="border: 1px solid #e2e8f0; padding: 6px;">DESCRIPCION</td>
+                <td style="width: 80px; border: 1px solid #e2e8f0; padding: 6px;">UNIDAD</td>
+                <td style="width: 100px; border: 1px solid #e2e8f0; padding: 6px;">TOTAL</td>
+                <td style="width: 150px; border: 1px solid #e2e8f0; padding: 6px;">HOJA</td>
             </tr>
             `;
 
             groupCards.forEach(card => {
-                // Calculation Logic (Same as Render)
                 let total = 0;
                 if (card.rows && card.rows.length > 0) {
                     const outCol = (card.outputCols && card.outputCols.length > 0) ? card.outputCols[0] : null;
@@ -2131,23 +2162,27 @@ function confirmExport() {
                 const desc = (card.descriptions || []).map(d => d.text).join('<br>');
 
                 fullHtml += `
-                <tr style="font-size: 10pt; vertical-align: top;">
-                    <td style="border: 1px solid #cbd5e1; padding: 5px; text-align: center;">${card.code || '-'}</td>
-                    <td style="border: 1px solid #cbd5e1; padding: 5px; text-align: left;">
+                <tr style="font-size: 10pt; vertical-align: top; background-color: #ffffff;">
+                    <td style="border: 1px solid #e2e8f0; padding: 6px; text-align: center;">${card.code || ''}</td>
+                    <td style="border: 1px solid #e2e8f0; padding: 6px; text-align: left;">
                          <strong>${card.name}</strong><br>
-                         <span style="color: #64748b;">${desc}</span>
+                         <span style="color: #64748b; font-size: 9pt;">${desc}</span>
                     </td>
-                    <td style="border: 1px solid #cbd5e1; padding: 5px; text-align: center;">${card.unit || '-'}</td>
-                    <td style="border: 1px solid #cbd5e1; padding: 5px; text-align: right; font-family: monospace; font-weight: bold;">${totalFormatted}</td>
-                    <td style="border: 1px solid #cbd5e1; padding: 5px; text-align: center;">${card.linkedSheet || '-'}</td>
+                    <td style="border: 1px solid #e2e8f0; padding: 6px; text-align: center;">${card.unit || ''}</td>
+                    <td style="border: 1px solid #e2e8f0; padding: 6px; text-align: right; font-family: monospace; font-weight: bold;">${totalFormatted}</td>
+                    <td style="border: 1px solid #e2e8f0; padding: 6px; text-align: center; font-size: 9pt;">${card.linkedSheet || ''}</td>
                 </tr>
                 `;
             });
         });
 
-        // Spacer between Groups
         fullHtml += `<tr><td colspan="5" style="height: 20px;"></td></tr>`;
     });
+
+    // Page styling for PDF
+    const pageStyle = orientation === 'landscape' ?
+        '@page { size: landscape; margin: 1cm; }' :
+        '@page { size: portrait; margin: 1cm; }';
 
     const finalHtml = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
@@ -2158,7 +2193,7 @@ function confirmExport() {
             <x:ExcelWorkbook>
                 <x:ExcelWorksheets>
                     <x:ExcelWorksheet>
-                        <x:Name>Compilacion Master</x:Name>
+                        <x:Name>Compilacion</x:Name>
                         <x:WorksheetOptions>
                             <x:DisplayGridlines/>
                         </x:WorksheetOptions>
@@ -2168,14 +2203,21 @@ function confirmExport() {
         </xml>
         <![endif]-->
         <style>
-            body { font-family: Arial, sans-serif; }
-            table { border-collapse: collapse; width: 100%; }
+            body { font-family: 'Arial', sans-serif; -webkit-print-color-adjust: exact; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+            ${pageStyle}
+            @media print {
+                body { padding: 0; }
+                table { page-break-inside: auto; }
+                tr { page-break-inside: avoid; page-break-after: auto; }
+            }
         </style>
     </head>
     <body>
-        <h1 style="text-transform: uppercase; font-size: 18pt;">Reporte de Compilación Cloud Quantify</h1>
-        <p>Generado el: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
-        <br>
+        <div style="margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px;">
+            <h1 style="text-transform: uppercase; font-size: 18pt; margin: 0;">Reporte de Compilación Cloud Quantify</h1>
+            <p style="margin: 5px 0 0 0; color: #666; font-size: 10pt;">Generado el: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+        </div>
         <table>
             ${fullHtml}
         </table>
@@ -2190,7 +2232,7 @@ function confirmExport() {
         a.download = `CloudQuantify_Compilacion_${Date.now()}.xls`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast("Excel generado correctamente");
+        showToast("Excel generado con formato.");
     } else {
         // PDF Logic (Print Window)
         const printWindow = window.open('', '', 'height=800,width=1000');
@@ -2199,8 +2241,7 @@ function confirmExport() {
         printWindow.focus();
         setTimeout(() => {
             printWindow.print();
-            printWindow.close();
-        }, 500);
+        }, 1000); // 1s delay to ensure styles load
     }
 
     closeExportModal();
@@ -2208,46 +2249,7 @@ function confirmExport() {
 
 
 // 3. Export Logic (Basic HTML Download)
-function exportToExcel() {
-    const table = document.getElementById('excel-export-table');
-    if (!table) {
-        alert("No hay datos para exportar. Seleccione un grupo.");
-        return;
-    }
-
-    // HTML Table to Excel (Blob trick)
-    // This preserves styling (colors) reasonably well in Excel
-    const html = `
-    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-    <head>
-        <meta charset="utf-8">
-        <!--[if gte mso 9]>
-        <xml>
-            <x:ExcelWorkbook>
-                <x:ExcelWorksheets>
-                    <x:ExcelWorksheet>
-                        <x:Name>Hoja 1</x:Name>
-                        <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
-                    </x:ExcelWorksheet>
-                </x:ExcelWorksheets>
-            </x:ExcelWorkbook>
-        </xml>
-        <![endif]-->
-    </head>
-    <body>
-        ${table.outerHTML}
-    </body>
-    </html>`;
-
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Compilacion_${new Date().toISOString().slice(0, 10)}.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-}
+// Duplicate legacy function removed. Using the modal-based export above.
 
 // Update switchTab to init view
 // --- NAVIGATION ---
