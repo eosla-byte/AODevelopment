@@ -497,7 +497,7 @@ async def admin_plugin_users_page(request: Request):
         all_collabs = get_collaborators()
         for c in all_collabs:
             # Case insensitive match and strip whitespace
-            if c.email.lower().strip() == u.email.lower().strip():
+            if c.email and u.email and c.email.lower().strip() == u.email.lower().strip():
                 collab_id = c.id
                 break
                 
