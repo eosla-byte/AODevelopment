@@ -5,6 +5,7 @@ import uuid
 from typing import List, Optional
 from sqlalchemy.orm import Session, sessionmaker, joinedload
 from sqlalchemy import create_engine
+from sqlalchemy.sql import func
 from models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard
 import models
 from sqlalchemy.orm.attributes import flag_modified
