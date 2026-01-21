@@ -173,6 +173,24 @@ async def delete_folder_endpoint(folder_id: str = Body(..., embed=True)):
         return {"status": "success", "message": "Folder deleted"}
     return {"status": "error", "message": "Failed to delete folder"}
 
+@router.post("/rename-folder")
+async def rename_folder_endpoint(folder_id: str = Body(..., embed=True), new_name: str = Body(..., embed=True)):
+    # Imports inside to avoid circular dependency issues if any, or ensuring they are available.
+    # We need to update the import at top of file, but for now assuming these will be available via 'database' module import.
+    from database import rename_project_folder
+    success = rename_project_folder(folder_id, new_name)
+    if success:
+        return {"status": "success", "message": "Folder renamed"}
+    return {"status": "error", "message": "Failed to rename folder"}
+
+@router.post("/rename-session")
+async def rename_session_endpoint(session_id: str = Body(..., embed=True), new_name: str = Body(..., embed=True)):
+    from database import rename_cloud_session
+    success = rename_cloud_session(session_id, new_name)
+    if success:
+        return {"status": "success", "message": "Session renamed"}
+    return {"status": "error", "message": "Failed to rename session"}
+
 @router.get("/session/{session_id}")
 async def get_session_data(session_id: str):
     """

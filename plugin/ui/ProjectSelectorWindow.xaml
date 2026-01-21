@@ -62,6 +62,9 @@
                                         <Button Content="+ Sub" Width="50" Height="25" Background="#4f46e5" Margin="0,0,5,0"
                                                 ToolTip="Crear Subproyecto en esta carpeta" FontSize="10"
                                                 Click="BtnCreateSub_Click" Tag="{Binding id}"/>
+                                        <Button Content="✎" Width="25" Height="25" Background="#d97706" Margin="0,0,5,0"
+                                                ToolTip="Renombrar Carpeta" FontSize="10"
+                                                Click="BtnRenameFolder_Click" Tag="{Binding id}"/>
                                         <Button Content="🗑" Width="25" Height="25" Background="#b91c1c" 
                                                 ToolTip="Eliminar Carpeta y sus contenidos" FontSize="10"
                                                 Click="BtnDeleteFolder_Click" Tag="{Binding id}"/>
@@ -88,6 +91,8 @@
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                                                     <Button Content="Unirse" FontSize="10" Background="#10b981" Margin="0,0,5,0"
                                                             Click="BtnJoin_Click" Tag="{Binding}"/> <!-- Parses object -->
+                                                    <Button Content="✎" FontSize="10" Background="#d97706" Margin="0,0,5,0"
+                                                            Click="BtnRenameSession_Click" Tag="{Binding session_id}"/>
                                                     <Button Content="🗑" FontSize="10" Background="#b91c1c"
                                                             Click="BtnArchiveSession_Click" Tag="{Binding session_id}"/>
                                                 </StackPanel>

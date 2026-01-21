@@ -198,5 +198,86 @@ namespace RevitCivilConnector.UI
                 txtNewInput.Foreground = System.Windows.Media.Brushes.Gray;
             }
         }
-    }
-}
+
+        private async void BtnRenameFolder_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is string fId)
+            {
+                string newName = ShowInput("Renombrar Carpeta", "Ingresa el nuevo nombre:");
+                if (!string.IsNullOrWhiteSpace(newName))
+                {
+                    try {
+                        using (HttpClient client = new HttpClient()) {
+                             if (AuthService.Instance.IsLoggedIn)
+                                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthService.Instance.AccessToken);
+
+                             var payload = new { folder_id = fId, new_name = newName };
+                             var json = JsonConvert.SerializeObject(payload);
+                             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                             
+                             var res = await client.PostAsync("https://aodevelopment-production.up.railway.app/api/plugin/cloud/rename-folder", content);
+                             if (res.IsSuccessStatusCode)
+                                LoadProjects();
+                             else
+                                MessageBox.Show("Error al renombrar.");
+                        }
+                    } catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+                }
+            }
+        }
+
+        private async void BtnRenameSession_Click(object sender, RoutedEventArgs e)
+        {
+             if (sender is Button btn && btn.Tag is string sId)
+            {
+                string newName = ShowInput("Renombrar Proyecto", "Ingresa el nuevo nombre:");
+                if (!string.IsNullOrWhiteSpace(newName))
+                {
+                    try {
+                        using (HttpClient client = new HttpClient()) {
+                             if (AuthService.Instance.IsLoggedIn)
+                                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthService.Instance.AccessToken);
+
+                             var payload = new { session_id = sId, new_name = newName };
+                             var json = JsonConvert.SerializeObject(payload);
+                             var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                             
+                             var res = await client.PostAsync("https://aodevelopment-production.up.railway.app/api/plugin/cloud/rename-session", content);
+                             if (res.IsSuccessStatusCode)
+                                LoadProjects();
+                             else
+                                MessageBox.Show("Error al renombrar.");
+                        }
+                    } catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+                }
+            }
+        }
+
+        private string ShowInput(string title, string prompt)
+        {
+            Window win = new Window()
+            {
+                Width = 300, Height = 150, Title = title,
+                WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStyle = WindowStyle.ToolWindow,
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(43, 45, 56))
+            };
+            
+            StackPanel sp = new StackPanel() { Margin = new Thickness(20) };
+            
+            TextBlock lbl = new TextBlock() { Text = prompt, Foreground = System.Windows.Media.Brushes.White, Margin = new Thickness(0,0,0,10), FontSize=14 };
+            TextBox txt = new TextBox() { Margin = new Thickness(0,0,0,15), Height=25, VerticalContentAlignment=VerticalAlignment.Center };
+            
+            Button btn = new Button() { Content = "Confirmar", IsDefault = true, Height=30, Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(79, 70, 229)), Foreground = System.Windows.Media.Brushes.White, BorderThickness=new Thickness(0) };
+            btn.Click += (s, ev) => { win.DialogResult = true; win.Close(); };
+            
+            sp.Children.Add(lbl);
+            sp.Children.Add(txt);
+            sp.Children.Add(btn);
+            win.Content = sp;
+            
+            bool? result = win.ShowDialog();
+            if (result == true) return txt.Text;
+            return null;
+        }

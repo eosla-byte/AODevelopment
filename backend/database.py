@@ -1643,6 +1643,36 @@ def delete_project_folder(folder_id: str):
     finally:
         db.close()
 
+def rename_project_folder(folder_id: str, new_name: str):
+    db = SessionLocal()
+    try:
+        f = db.query(models.PluginProjectFolder).filter(models.PluginProjectFolder.id == folder_id).first()
+        if f:
+            f.name = new_name
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error renaming folder: {e}")
+        return False
+    finally:
+        db.close()
+
+def rename_cloud_session(session_id: str, new_name: str):
+    db = SessionLocal()
+    try:
+        s = db.query(models.PluginCloudSession).filter(models.PluginCloudSession.id == session_id).first()
+        if s:
+            s.project_name = new_name
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error renaming session: {e}")
+        return False
+    finally:
+        db.close()
+
 def get_session_by_id(session_id: str):
     db = SessionLocal()
     try:
