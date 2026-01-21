@@ -42,6 +42,11 @@ namespace RevitCivilConnector.Services
             return new List<string>(_sessionLog);
         }
 
+        public void LogEvent(string message)
+        {
+            if (_isRecording) _sessionLog.Add(message);
+        }
+
         private void OnDocumentChanged(object sender, Autodesk.Revit.DB.Events.DocumentChangedEventArgs e)
         {
             if (!_isRecording) return;
