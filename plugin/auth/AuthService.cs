@@ -24,6 +24,7 @@ namespace RevitCivilConnector.Auth
         
         // State
         public string AccessToken { get; private set; }
+        public string ActiveCommandSessionId { get; set; } // Set by CloudQuantifysCommand
         public string SessionId { get; private set; }
         public string CurrentUserEmail { get; private set; }
         public string CurrentUserName { get; private set; }
@@ -299,9 +300,11 @@ namespace RevitCivilConnector.Auth
             {
                 try
                 {
-                    if (string.IsNullOrEmpty(SessionId) || VizHandler == null || VizEvent == null)
+                    string targetSessionId = !string.IsNullOrEmpty(ActiveCommandSessionId) ? ActiveCommandSessionId : SessionId;
+
+                    if (string.IsNullOrEmpty(targetSessionId) || VizHandler == null || VizEvent == null)
                     {
-                         await Task.Delay(2000, token);
+                         await Task.Delay(1000, token);
                          continue;
                     }
 
@@ -309,7 +312,7 @@ namespace RevitCivilConnector.Auth
                     // Using separate try-catch to avoid breaking loop on single fail
                     try 
                     {
-                        var response = await _client.GetAsync($"{BASE_URL}/cloud/commands/{SessionId}");
+                        var response = await _client.GetAsync($"{BASE_URL}/cloud/commands/{targetSessionId}");
                         if (response.IsSuccessStatusCode)
                         {
                             var respString = await response.Content.ReadAsStringAsync();
@@ -328,7 +331,7 @@ namespace RevitCivilConnector.Auth
                     }
                     catch { }
 
-                    await Task.Delay(1000, token); // 1 sec poll
+                    await Task.Delay(500, token); // 0.5 sec poll for faster response
                 }
                 catch (TaskCanceledException) { break; }
                 catch (Exception) 
