@@ -20,13 +20,14 @@ let DETAIL_STATE = {
 };
 
 const DEFAULT_GROUPS = [
-    { id: 'g00', name: '00-Arquitectura', icon: 'fa-building', subgroups: [] },
-    { id: 'g01', name: '01-Estructuras', icon: 'fa-cubes', subgroups: [] },
-    { id: 'g02', name: '02-Sanitario', icon: 'fa-tint', subgroups: [] },
-    { id: 'g03', name: '03-Pluvial', icon: 'fa-cloud-rain', subgroups: [] },
-    { id: 'g04', name: '04-AguaPotable', icon: 'fa-faucet', subgroups: [] },
-    { id: 'g05', name: '05-Electricidad', icon: 'fa-bolt', subgroups: [] },
-    { id: 'g06', name: '06-Especiales', icon: 'fa-star', subgroups: [] }
+    { id: 'g00', name: 'ARQ-Arquitectura', icon: 'fa-building', subgroups: [] },
+    { id: 'g01', name: 'EST-Estructuras', icon: 'fa-cubes', subgroups: [] },
+    { id: 'g02', name: 'SAN-Sanitario', icon: 'fa-tint', subgroups: [] },
+    { id: 'g03', name: 'PLU-Pluvial', icon: 'fa-cloud-rain', subgroups: [] },
+    { id: 'g04', name: 'APO-AguaPotable', icon: 'fa-faucet', subgroups: [] },
+    { id: 'g05', name: 'ELE-Electricidad', icon: 'fa-bolt', subgroups: [] },
+    { id: 'g06', name: 'ESP-Especiales', icon: 'fa-star', subgroups: [] },
+    { id: 'g07', name: 'MEC-Mecanicas', icon: 'fa-cogs', subgroups: [] }
 ];
 
 let groups = JSON.parse(JSON.stringify(DEFAULT_GROUPS));
@@ -102,6 +103,7 @@ async function loadSessionData() {
     }
 
     // Initial Render
+    recalculateSpectrumCodes();
     renderTodo();
     renderGroups();
     renderKanbanBoard();
@@ -159,13 +161,76 @@ function switchTab(tabId) {
 // EXPORT - Legacy function removed. 
 // New exportToExcel implementation is located in the AUTOMATIC COMPILATION section.
 
-function updateStatus(text, color) {
-    const el = document.getElementById('connection-status');
-    if (el) {
-        el.innerText = text;
-        el.parentElement.className = `flex items-center gap-2 px-3 py-1 bg-slate-800 rounded-full border border-slate-700 text-${color}-400`;
-    }
+if (el) {
+    el.innerText = text;
+    el.parentElement.className = `flex items-center gap-2 px-3 py-1 bg-slate-800 rounded-full border border-slate-700 text-${color}-400`;
 }
+}
+
+// --- SPECTRUM CODING LOGIC ---
+function getGroupPrefix(groupName) {
+    if (!groupName) return "GEN";
+    const parts = groupName.split('-');
+    if (parts.length > 0 && parts[0].length === 3) return parts[0];
+    return groupName.substring(0, 3).toUpperCase();
+}
+
+function recalculateSpectrumCodes() {
+    // 1. Groups & Subgroups
+    groups.forEach(g => {
+        const prefix = getGroupPrefix(g.name);
+        g.subgroups.forEach((sg, idx) => {
+            // Format: PRE-01 (1-based index, padded)
+            const num = (idx + 1).toString().padStart(2, '0');
+            const code = `${prefix}-${num}`;
+
+            // Update Subgroup Code property (if we want to store it, or just name)
+            // User requested name update: "ARQ-01", "ARQ-02"
+            // We assume the name might be "ARQ-01 Nivel 1" or similar.
+            // If the name ALREADY starts with code, replace it. If not, prepend.
+
+            // Regex to check if starts with XXX-XX
+            const codeRegex = /^[A-Z]{3}-\d{2}/;
+            if (codeRegex.test(sg.name)) {
+                // Update existing code
+                sg.name = sg.name.replace(codeRegex, code);
+                sg.code = code;
+            } else {
+                // Prepend
+                sg.name = `${code} ${sg.name}`;
+                sg.code = code;
+            }
+        });
+    });
+
+    // 2. Cards (Spectrum Code)
+    activeCards.forEach(c => {
+        if (!c.subgroupId) {
+            c.spectrumCode = "N/A";
+            return;
+        }
+
+        // Find parent subgroup
+        let foundSg = null;
+        groups.some(g => {
+            const sg = g.subgroups.find(x => x.id === c.subgroupId);
+            if (sg) { foundSg = sg; return true; }
+            return false;
+        });
+
+        if (foundSg && foundSg.code) {
+            // Find index of card in this subgroup (based on UI order or array order)
+            // We use array order for simplicity. Ideally UI order.
+            const siblings = activeCards.filter(x => x.subgroupId === c.subgroupId);
+            // Sort siblings if needed? Assuming activeCards order roughly matches UI for now.
+            const idx = siblings.findIndex(x => x.id === c.id);
+            c.spectrumCode = `${foundSg.code}.${idx + 1}`;
+        } else {
+            c.spectrumCode = "ERR";
+        }
+    });
+}
+
 
 // --- GROUPS LOGIC ---
 function renderGroups() {
@@ -237,6 +302,8 @@ function moveSubgroup(e, groupId, subgroupId, dir) {
     if (newIdx >= 0 && newIdx < g.subgroups.length) {
         const item = g.subgroups.splice(idx, 1)[0];
         g.subgroups.splice(newIdx, 0, item);
+        g.subgroups.splice(newIdx, 0, item);
+        recalculateSpectrumCodes(); // Update codes on move
         renderGroups();
         saveProject();
     }
@@ -252,11 +319,19 @@ function toggleGroupAccordion(groupId) {
 
 function createNewSubgroup(e, groupId) {
     e.stopPropagation();
-    const name = prompt("Nombre del Subgrupo:");
-    if (!name) return;
+    // Auto-Generate Name
     const g = groups.find(x => x.id === groupId);
+    const prefix = getGroupPrefix(g.name);
+    const nextNum = (g.subgroups.length + 1).toString().padStart(2, '0');
+    const defaultName = `${prefix}-${nextNum}`;
+
+    const name = prompt("Nombre del Subgrupo (Puedes agregar descripción):", defaultName);
+    if (!name) return;
+
     g.subgroups.push({ id: `sg${Date.now()}`, name: name });
     g.open = true;
+
+    recalculateSpectrumCodes(); // Update codes
     renderGroups();
 }
 
@@ -270,6 +345,7 @@ function deleteSubgroup(e, groupId, subgroupId) {
         renderKanbanBoard();
     }
     renderGroups();
+    recalculateSpectrumCodes();
 }
 
 function selectSubgroup(subgroupId) {
@@ -459,6 +535,10 @@ function renderKanbanCard(c) {
             <h4 class="font-bold text-white mb-2 pr-6">${c.name}</h4>
             
             <!-- Metadata -->
+            <div class="flex gap-2 items-center mb-1">
+                 <span class="text-[9px] font-mono text-emerald-400 bg-emerald-900/30 px-1 rounded border border-emerald-500/30" title="Código Spectrum">${c.spectrumCode || '-'}</span>
+            </div>
+            
             <div class="flex gap-2 items-center">
                <span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 font-mono">${c.rows ? c.rows.length : 0} Rows</span>
                <span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 font-mono">${c.selectedParams ? c.selectedParams.length : 0} Cols</span>
@@ -480,6 +560,7 @@ function dropCard(ev, status) {
     if (card) {
         card.status = status;
         renderKanbanBoard();
+        recalculateSpectrumCodes(); // Update codes on move status
         saveProject(); // Just stub
     }
 }
@@ -549,43 +630,126 @@ function openImportScheduleModal() {
                 <button onclick="document.getElementById('${modalId}').remove()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
             </div>
             
-            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-4">
+            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-4" id="import-step-1">
                 <div>
                     <label class="block text-xs uppercase text-slate-500 font-bold mb-2">Selecciona una Tabla</label>
                     <div class="space-y-2">
                         ${REVIT_DATA.schedules.map(sched => `
-                            <div onclick="importScheduleFromRevit('${sched.id}')" 
+                            <div onclick="showImportConfig('${sched.id}')" 
                                  class="p-3 bg-slate-800/50 border border-slate-700 hover:border-emerald-500 hover:bg-slate-800 rounded cursor-pointer transition-all flex items-center justify-between group">
                                 <span class="text-slate-300 font-medium group-hover:text-white">${sched.name}</span>
-                                <i class="fas fa-plus-circle text-slate-600 group-hover:text-emerald-400"></i>
+                                <i class="fas fa-chevron-right text-slate-600 group-hover:text-emerald-400"></i>
                             </div>
                         `).join('')}
                     </div>
                 </div>
             </div>
+
+            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-4 hidden" id="import-step-2">
+                <input type="hidden" id="imp-sched-id">
+                
+                <div>
+                   <label class="block text-xs uppercase text-slate-500 font-bold mb-1">Nombre de la Tarjeta</label>
+                   <input type="text" id="imp-card-name" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white focus:border-indigo-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs uppercase text-slate-500 font-bold mb-1">Grupo</label>
+                        <select id="imp-group-select" onchange="updateImportSubgroups()" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none">
+                            <option value="">Seleccionar...</option>
+                            ${groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs uppercase text-slate-500 font-bold mb-1">Subgrupo</label>
+                        <select id="imp-subgroup-select" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white outline-none" disabled>
+                            <option value="">Seleccionar Grupo primero</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-indigo-900/20 p-3 rounded border border-indigo-500/30 text-xs text-indigo-200">
+                    <i class="fas fa-info-circle mr-1"></i> Se mantendrán los filtros y agrupaciones originales de Revit.
+                </div>
+
+                <div class="flex gap-2 pt-4">
+                    <button onclick="backToImportStep1()" class="px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600">Atrás</button>
+                    <button onclick="confirmImportSchedule()" class="flex-1 px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-500 font-bold">Crear Tarjeta</button>
+                </div>
+            </div>
+
         </div>
     </div>`;
 
     document.body.insertAdjacentHTML('beforeend', html);
 }
 
-function importScheduleFromRevit(scheduleId) {
+function showImportConfig(scheduleId) {
     const sched = REVIT_DATA.schedules.find(s => s.id === scheduleId);
     if (!sched) return;
 
-    if (!selectedSubgroupId) {
-        alert("Por favor selecciona un Subgrupo donde importar la tabla primero.");
-        document.getElementById('import-schedule-modal').remove();
-        return;
+    document.getElementById('import-step-1').classList.add('hidden');
+    document.getElementById('import-step-2').classList.remove('hidden');
+
+    document.getElementById('imp-sched-id').value = scheduleId;
+    document.getElementById('imp-card-name').value = sched.name;
+
+    // Use current selection if available
+    const groupSelect = document.getElementById('imp-group-select');
+
+    // Try to find group of selectedSubgroupId
+    if (selectedSubgroupId) {
+        const parentGroup = groups.find(g => g.subgroups.some(sg => sg.id === selectedSubgroupId));
+        if (parentGroup) {
+            groupSelect.value = parentGroup.id;
+            updateImportSubgroups();
+            document.getElementById('imp-subgroup-select').value = selectedSubgroupId;
+        }
     }
+}
+
+function backToImportStep1() {
+    document.getElementById('import-step-2').classList.add('hidden');
+    document.getElementById('import-step-1').classList.remove('hidden');
+}
+
+function updateImportSubgroups() {
+    const groupId = document.getElementById('imp-group-select').value;
+    const sgSelect = document.getElementById('imp-subgroup-select');
+
+    sgSelect.innerHTML = '<option value="">Seleccionar...</option>';
+    sgSelect.disabled = true;
+
+    if (!groupId) return;
+
+    const group = groups.find(g => g.id === groupId);
+    if (group && group.subgroups.length > 0) {
+        sgSelect.disabled = false;
+        sgSelect.innerHTML += group.subgroups.map(sg => `<option value="${sg.id}">${sg.name}</option>`).join('');
+    } else {
+        sgSelect.innerHTML = '<option value="">Sin Subgrupos (Crear uno primero)</option>';
+    }
+}
+
+function confirmImportSchedule() {
+    const scheduleId = document.getElementById('imp-sched-id').value;
+    const name = document.getElementById('imp-card-name').value;
+    const subgroupId = document.getElementById('imp-subgroup-select').value;
+
+    if (!name) return alert("Ingresa un nombre para la tarjeta");
+    if (!subgroupId) return alert("Selecciona un Subgrupo válido");
+
+    const sched = REVIT_DATA.schedules.find(s => s.id === scheduleId);
+    if (!sched) return;
 
     // Adapt Revit Data to Card Format
     const newCard = {
         id: "c_imp_" + Date.now(),
-        name: sched.name,
+        name: name,
         status: 'process',
         source: 'REVIT_SCHEDULE',
-        subgroupId: selectedSubgroupId,
+        subgroupId: subgroupId,
         rows: sched.rows || [],
         selectedParams: [], // Will autofill from data keys
         columnFormats: {},
@@ -597,21 +761,40 @@ function importScheduleFromRevit(scheduleId) {
     if (newCard.rows.length > 0) {
         newCard.selectedParams = Object.keys(newCard.rows[0]);
         // Simple type detection for formatting
-        newCard.selectedParams.forEach(col => {
-            const val = newCard.rows[0][col];
-            if (typeof val === 'number') newCard.columnFormats[col] = 'number';
-            if (col.toLowerCase().includes('costo') || col.toLowerCase().includes('precio')) newCard.columnFormats[col] = 'currency';
-            if (col.toLowerCase().includes('area')) newCard.columnFormats[col] = 'number'; // Sqm usually number
+        if (typeof newCard.rows[0][col] === 'string' && newCard.rows[0][col].includes('$')) {
+            newCard.columnFormats[col] = 'currency';
+        } else if (typeof newCard.rows[0][col] === 'number') {
+            newCard.columnFormats[col] = 'number';
+        }
+    });
+}
+
+activeCards.push(newCard);
+document.getElementById('import-schedule-modal').remove();
+
+// Switch to Groups Tab if not already
+if (CURRENT_TAB !== 'groups') switchTab('groups');
+
+// Select the subgroup we just added to
+selectSubgroup(subgroupId);
+
+saveProject();
+updateStatus("Tabla Importada", "emerald");
+}
+const val = newCard.rows[0][col];
+if (typeof val === 'number') newCard.columnFormats[col] = 'number';
+if (col.toLowerCase().includes('costo') || col.toLowerCase().includes('precio')) newCard.columnFormats[col] = 'currency';
+if (col.toLowerCase().includes('area')) newCard.columnFormats[col] = 'number'; // Sqm usually number
         });
     }
 
-    activeCards.push(newCard);
+activeCards.push(newCard);
 
-    document.getElementById('import-schedule-modal').remove();
-    showToast(`Tabla "${sched.name}" importada exitosamente`);
+document.getElementById('import-schedule-modal').remove();
+showToast(`Tabla "${sched.name}" importada exitosamente`);
 
-    renderKanbanBoard();
-    saveProject();
+renderKanbanBoard();
+saveProject();
 }
 
 // --- MODAL LOGIC (FIXED) ---
