@@ -496,7 +496,8 @@ async def admin_plugin_users_page(request: Request):
         collab_id = None
         all_collabs = get_collaborators()
         for c in all_collabs:
-            if c.email == u.email:
+            # Case insensitive match and strip whitespace
+            if c.email.lower().strip() == u.email.lower().strip():
                 collab_id = c.id
                 break
                 
@@ -560,6 +561,36 @@ async def toggle_plugin_user(request: Request, uid: str):
 @app.post("/admin/plugin/users/{uid}/delete")
 async def delete_plugin_user_route(request: Request, uid: str):
     delete_user(uid)
+    return RedirectResponse("/admin/plugin/users", status_code=303)
+
+@app.post("/admin/plugin/users/{uid}/update")
+async def update_plugin_user_route(
+    request: Request, 
+    uid: str,
+    name: str = Form(...),
+    email: str = Form(...),
+    role: str = Form(...),
+    password: str = Form(None)
+):
+    # Find user by ID
+    users = get_users()
+    target_user = None
+    for u in users:
+        if u.id == uid:
+            target_user = u
+            break
+            
+    if target_user:
+        # Update fields (Note: verify if email change affects PK in database.py save_user)
+        # Assuming save_user handles updates via ORM merge or lookup
+        target_user.name = name
+        target_user.email = email
+        target_user.role = role
+        if password and password.strip():
+            target_user.hashed_password = get_password_hash(password)
+            
+        save_user(target_user)
+        
     return RedirectResponse("/admin/plugin/users", status_code=303)
 
 @app.post("/admin/plugin/users/{uid}/permissions")
@@ -1455,7 +1486,7 @@ async def upload_hr_picture(collab_id: str, file: UploadFile = File(...)):
 
 
 @app.get("/hr/{collab_id}/plugin_logs", response_class=HTMLResponse)
-async def read_hr_plugin_logs(request: Request, collab_id: str):
+async def read_hr_plugin_logs(request: Request, collab_id: str, start_date: str = None, end_date: str = None):
     # root_path = get_root_path() # Removed
     collab = get_collaborator_details(collab_id)
     if not collab: return RedirectResponse("/hr")
@@ -1465,9 +1496,20 @@ async def read_hr_plugin_logs(request: Request, collab_id: str):
     # 1. Stats
     stats = get_user_plugin_stats(collab.email)
     
-    # 2. Detailed Logs from DB helper (Avoids manual ORM attribute errors)
+    # 2. Detailed Logs from DB helper
     from database import get_user_plugin_logs
-    session_logs = get_user_plugin_logs(collab.email)
+    
+    # Parse Dates
+    dt_start = None
+    dt_end = None
+    if start_date:
+        try: dt_start = datetime.datetime.strptime(start_date, "%Y-%m-%d").date()
+        except: pass
+    if end_date:
+        try: dt_end = datetime.datetime.strptime(end_date, "%Y-%m-%d").date()
+        except: pass
+        
+    session_logs = get_user_plugin_logs(collab.email, start_date=dt_start, end_date=dt_end)
         
     return templates.TemplateResponse("plugin_user_logs.html", {
         "request": request, 

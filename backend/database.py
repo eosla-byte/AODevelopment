@@ -1010,14 +1010,28 @@ def end_revit_session(session_id):
     finally:
         db.close()
 
-def get_user_plugin_logs(email):
+def get_user_plugin_logs(email, start_date: datetime.date = None, end_date: datetime.date = None):
     db = SessionLocal()
     try:
-        sessions = db.query(models.PluginSession)\
-            .filter(models.PluginSession.user_email == email)\
-            .order_by(models.PluginSession.start_time.desc())\
-            .limit(50)\
-            .all()
+        q = db.query(models.PluginSession).filter(models.PluginSession.user_email == email)
+        
+        if start_date:
+            # Combine date with min time
+            dt_start = datetime.datetime.combine(start_date, datetime.time.min)
+            q = q.filter(models.PluginSession.start_time >= dt_start)
+            
+        if end_date:
+            # Combine date with max time
+            dt_end = datetime.datetime.combine(end_date, datetime.time.max)
+            q = q.filter(models.PluginSession.start_time <= dt_end)
+            
+        q = q.order_by(models.PluginSession.start_time.desc())
+        
+        # If filtering by specific date range, we might want ALL logs, not just limit 50
+        if not start_date and not end_date:
+            q = q.limit(50)
+            
+        sessions = q.all()
         
         logs = []
         for s in sessions:
