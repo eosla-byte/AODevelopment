@@ -20,6 +20,9 @@ namespace RevitCivilConnector
         private static Autodesk.Revit.UI.TextBox _tbStatus;
         private static Autodesk.Revit.UI.TextBox _tbRole;
 
+        // Dynamic Panel Management
+        private static Dictionary<string, RibbonPanel> _managedPanels = new Dictionary<string, RibbonPanel>();
+
         private static string ICONS_PATH;
 
         public Result OnStartup(UIControlledApplication application)
@@ -48,6 +51,7 @@ namespace RevitCivilConnector
             // PANEL: CivilConnection
             // ====================================================
             RibbonPanel pCivil = application.CreateRibbonPanel(tabName, "CivilConnection");
+            _managedPanels["CivilConnection"] = pCivil;
             
             PushButtonData btnCivil = new PushButtonData("cmdCivil", "Civil 3D\nImport", assemblyPath, "RevitCivilConnector.Command");
             btnCivil.LargeImage = GetIcon("icono1.png");
@@ -60,6 +64,7 @@ namespace RevitCivilConnector
             // PANEL: Graficos
             // ====================================================
             RibbonPanel pGraph = application.CreateRibbonPanel(tabName, "Graficos");
+            _managedPanels["Graficos"] = pGraph;
 
             // Apply Halftone
             PushButtonData btnApplyH = new PushButtonData("cmdApplyH", "Apply\nHalftone", assemblyPath, "RevitCivilConnector.ApplyHalftoneCommand");
@@ -98,6 +103,7 @@ namespace RevitCivilConnector
             // PANEL: Documentacion
             // ====================================================
             RibbonPanel pDoc = application.CreateRibbonPanel(tabName, "Documentacion");
+            _managedPanels["Documentacion"] = pDoc;
 
             // Generate Details
             PushButtonData btnGenDet = new PushButtonData("cmdGenDet", "Generate\nDetails", assemblyPath, "RevitCivilConnector.CreateDetailViewsCommand");
@@ -117,6 +123,7 @@ namespace RevitCivilConnector
             // PANEL: Topografia
             // ====================================================
             RibbonPanel pTopo = application.CreateRibbonPanel(tabName, "Topografia");
+            _managedPanels["Topografia"] = pTopo;
 
             // Profile Grid
             PushButtonData btnProf = new PushButtonData("cmdProf", "Profile\nGrid", assemblyPath, "RevitCivilConnector.CreateProfileGridCommand");
@@ -136,6 +143,7 @@ namespace RevitCivilConnector
             // PANEL: Vegetacion
             // ====================================================
             RibbonPanel pVeg = application.CreateRibbonPanel(tabName, "Vegetacion");
+            _managedPanels["Vegetacion"] = pVeg;
 
             // Vegetation Scatter
             PushButtonData btnVeg = new PushButtonData("cmdVeg", "Vegetation\nScatter", assemblyPath, "RevitCivilConnector.VegetationScatterCommand");
@@ -149,6 +157,7 @@ namespace RevitCivilConnector
             // PANEL: DWGImport
             // ====================================================
             RibbonPanel pDwg = application.CreateRibbonPanel(tabName, "DWGImport");
+            _managedPanels["DWGImport"] = pDwg;
 
             // DWG Transformer
             PushButtonData btnDwg = new PushButtonData("cmdDwg", "DWG\nTransformer", assemblyPath, "RevitCivilConnector.DWGToNativeCommand");
@@ -159,10 +168,10 @@ namespace RevitCivilConnector
 
 
             // ====================================================
-            // ====================================================
             // PANEL: Cuantificaciones
             // ====================================================
             RibbonPanel pQuant = application.CreateRibbonPanel(tabName, "Cuantificaciones");
+            _managedPanels["Cuantificaciones"] = pQuant;
             
             // Button 1: Cloud Quantifys
             PushButtonData btnCloud = new PushButtonData("cmdCloudQ", "Cloud\nQuantifys", assemblyPath, "RevitCivilConnector.CloudQuantifysCommand");
@@ -184,6 +193,7 @@ namespace RevitCivilConnector
             // PANEL: Management model
             // ====================================================
             RibbonPanel pMgmt = application.CreateRibbonPanel(tabName, "Management model");
+            _managedPanels["Management"] = pMgmt;
 
             // IA Assistant Button
             PushButtonData btnIA = new PushButtonData("cmdIA", "AO\niA", assemblyPath, "RevitCivilConnector.IACommand");
@@ -192,6 +202,48 @@ namespace RevitCivilConnector
             btnIA.AvailabilityClassName = "RevitCivilConnector.Auth.MgmtAuthAvailability";
             
             pMgmt.AddItem(btnIA);
+
+            // ====================================================
+            // PANEL: AO Labs (Experimental)
+            // ====================================================
+            RibbonPanel pLabs = application.CreateRibbonPanel(tabName, "AO Labs");
+            _managedPanels["Labs"] = pLabs;
+            pLabs.Visible = false; // Hidden by default
+
+            // Experimental AI or new tools here
+            // Re-using IA button as an example of what could be here, or a new placeholder
+            PushButtonData btnExp = new PushButtonData("cmdExp", "Experimental\nTool", assemblyPath, "RevitCivilConnector.IACommand");
+            btnExp.LargeImage = GetIcon("ia.png");
+            btnExp.ToolTip = "Herramienta experimental (Solo Devs).";
+            
+            // AI MONITOR (Admin Only)
+            PushButtonData btnMon = new PushButtonData("cmdAIMonitor", "AI\nMonitor", assemblyPath, "RevitCivilConnector.AIMonitorCommand");
+            btnMon.LargeImage = GetIcon("ia.png"); // Reuse or new icon
+            btnMon.ToolTip = "Monitor de Actividad de IA (Admin).";
+            
+            pLabs.AddItem(btnExp);
+            pLabs.AddItem(btnMon);
+            pLabs.AddSeparator();
+
+            // 15 Generic Buttons (Stacked in groups of 3 -> 5 Columns)
+            for (int i = 1; i <= 15; i += 3)
+            {
+                 // Create 3 buttons
+                 PushButtonData b1 = new PushButtonData($"cmdExp{i}", $"Exp {i:00}", assemblyPath, "RevitCivilConnector.IACommand"); // Reuse command for now
+                 b1.Image = GetIcon("icono7.png"); // Small Image
+                 b1.ToolTip = $"Experimental Function {i}";
+
+                 PushButtonData b2 = new PushButtonData($"cmdExp{i+1}", $"Exp {i+1:00}", assemblyPath, "RevitCivilConnector.IACommand");
+                 b2.Image = GetIcon("icono7.png");
+                 b2.ToolTip = $"Experimental Function {i+1}";
+
+                 PushButtonData b3 = new PushButtonData($"cmdExp{i+2}", $"Exp {i+2:00}", assemblyPath, "RevitCivilConnector.IACommand");
+                 b3.Image = GetIcon("icono7.png");
+                 b3.ToolTip = $"Experimental Function {i+2}";
+                 
+                 pLabs.AddStackedItems(b1, b2, b3);
+            }
+
 
             // ====================================================
             // PANEL: Usuario (Right Side)
@@ -212,16 +264,8 @@ namespace RevitCivilConnector
             // User Info TextBoxes (Stacked)
             
             TextBoxData tdUser = new TextBoxData("txtUser");
-
-            // Width set later on instance
-            
             TextBoxData tdStatus = new TextBoxData("txtStatus");
-
-            // Width set later on instance
-
             TextBoxData tdRole = new TextBoxData("txtRole");
-
-            // Width set later on instance
             
             // We can stack 3 items.
             IList<RibbonItem> stacked = pUser.AddStackedItems(tdUser, tdStatus, tdRole);
@@ -280,7 +324,10 @@ namespace RevitCivilConnector
         {
             try 
             {
-                if (AuthService.Instance.IsLoggedIn)
+                bool loggedIn = AuthService.Instance.IsLoggedIn;
+
+                // Update UI TextBoxes
+                if (loggedIn)
                 {
                     if (_tbUser != null) _tbUser.Value = AuthService.Instance.CurrentUserName;
                     if (_tbStatus != null) _tbStatus.Value = $"En Linea - {DateTime.Now:dd/MM/yyyy}";
@@ -291,6 +338,58 @@ namespace RevitCivilConnector
                     if (_tbUser != null) _tbUser.Value = "Desconectado";
                     if (_tbStatus != null) _tbStatus.Value = "Offline";
                     if (_tbRole != null) _tbRole.Value = "--";
+                }
+
+                // Update Panel Visibility Logic
+                foreach (var kvp in _managedPanels)
+                {
+                    string permKey = kvp.Key;
+                    RibbonPanel panel = kvp.Value;
+
+                    if (!loggedIn)
+                    {
+                        // If Logged Out -> Hide everything except Login?
+                        // Or hide everything. 
+                        // But wait, the Login button is in the "Usuario" panel whch is NOT in _managedPanels.
+                        // So panels like "Graficos", "CivilConnection" etc will be HIDDEN.
+                        panel.Visible = false; 
+                    }
+                    else
+                    {
+                        if (permKey == "Labs")
+                        {
+                            // "Labs" special Check: Role = Developer/Admin or specific perm
+                            // We check if "Labs" permission is explicitly true OR Role is special
+                            string role = AuthService.Instance.CurrentUserRole ?? "";
+                            bool isDev = role.IndexOf("Admin", StringComparison.OrdinalIgnoreCase) >= 0 || 
+                                         role.IndexOf("Dev", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                         role.IndexOf("Arquitecto", StringComparison.OrdinalIgnoreCase) >= 0; // Assuming Arqui is Dev for now
+
+                            // Or check AuthService.Instance.HasPermission("Labs") if backend sends it
+                            // For now, let's trust the permissions dict if it has it, else callback to Role
+                            if (AuthService.Instance.HasPermission("Labs") && AuthService.Instance.UserPermissions != null && AuthService.Instance.UserPermissions.ContainsKey("Labs"))
+                            {
+                                // Explicitly allowed
+                                panel.Visible = true;
+                            }
+                            else
+                            {
+                                // Fallback role check
+                                panel.Visible = isDev; 
+                            }
+                        }
+                        else
+                        {
+                            // Standard Panels
+                            // If userPermissions is NULL or empty, HasPermission returns True.
+                            // However, if we want to RESTRICT, we need to know if the user specifically HAS access.
+                            // The backend should send the list of allowed modules.
+                            // If `HasPermission` returns true for everything if the dict is missing, that's a security/UX risk if we want to hide things.
+                            // But usually, Admin sets "Allowed Modules".
+                            // Let's assume standard behavior: Show if allowed.
+                            panel.Visible = AuthService.Instance.HasPermission(permKey);
+                        }
+                    }
                 }
             } 
             catch { }

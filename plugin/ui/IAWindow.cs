@@ -146,13 +146,28 @@ namespace RevitCivilConnector.UI
 
             // --- Input Area ---
             Grid inputGrid = new Grid();
+            inputGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(30) }); // Attach Button
             inputGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             inputGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
             inputGrid.Background = new SolidColorBrush(Color.FromRgb(40, 40, 40));
+            
+            // Attach Button
+            Button btnAttach = new Button
+            {
+                Content = "📎",
+                Margin = new Thickness(5, 10, 0, 10),
+                Background = Brushes.Transparent,
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                ToolTip = "Adjuntar Archivo (Excel, Img, Code)"
+            };
+            btnAttach.Click += BtnAttach_Click;
+            Grid.SetColumn(btnAttach, 0);
+            inputGrid.Children.Add(btnAttach);
 
             _txtInput = new System.Windows.Controls.TextBox 
             { 
-                Margin = new Thickness(10), 
+                Margin = new Thickness(5, 10, 10, 10), 
                 Padding = new Thickness(5),
                 Background = new SolidColorBrush(Color.FromRgb(60, 60, 60)),
                 Foreground = Brushes.White,
@@ -161,7 +176,7 @@ namespace RevitCivilConnector.UI
                 VerticalContentAlignment = VerticalAlignment.Center
             };
             _txtInput.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) SendMessage(); };
-            Grid.SetColumn(_txtInput, 0);
+            Grid.SetColumn(_txtInput, 1);
             inputGrid.Children.Add(_txtInput);
 
             Button btnSend = new Button 
@@ -174,7 +189,7 @@ namespace RevitCivilConnector.UI
                 BorderThickness = new Thickness(0)
             };
             btnSend.Click += (s, e) => SendMessage();
-            Grid.SetColumn(btnSend, 1);
+            Grid.SetColumn(btnSend, 2);
             inputGrid.Children.Add(btnSend);
 
             Grid.SetRow(inputGrid, 2);
@@ -183,10 +198,63 @@ namespace RevitCivilConnector.UI
             this.Content = mainGrid;
         }
 
+        // Attachments Logic
+        private System.Collections.Generic.List<dynamic> _currentAttachments = new System.Collections.Generic.List<dynamic>();
+
+        private void BtnAttach_Click(object sender, RoutedEventArgs e)
+        {
+            Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
+            dlg.Filter = "Todos los archivos|*.*|Imagenes|*.png;*.jpg|Excel|*.xlsx;*.csv";
+            if (dlg.ShowDialog() == true)
+            {
+                string path = dlg.FileName;
+                string ext = System.IO.Path.GetExtension(path).ToLower().Replace(".", "");
+                string name = System.IO.Path.GetFileName(path);
+                
+                try
+                {
+                    string content = "";
+                    if (ext == "png" || ext == "jpg" || ext == "jpeg")
+                    {
+                         byte[] bytes = File.ReadAllBytes(path);
+                         content = Convert.ToBase64String(bytes);
+                    }
+                    else
+                    {
+                         // Text based
+                         // Warning: Simple read. If binary xlsx, this might fail or produce garbage if not handled.
+                         // But python side expects string content for text/code.
+                         // For Excel (xlsx), reading as bytes -> base64 is safer.
+                         // Let's rely on backend to parse if needed or just treat everything as Base64?
+                         // Python script assumed "content" is string. 
+                         // Let's stick to reading as text for csv/py/txt.
+                         if (ext == "xlsx" || ext == "xls")
+                         {
+                              // For Excel, backend can't easily parse raw bits unless we send as base64 and use pandas.read_excel(BytesIO)
+                              // Let's send as Base64 for everything to be safe.
+                              byte[] bytes = File.ReadAllBytes(path);
+                              content = Convert.ToBase64String(bytes);
+                         }
+                         else
+                         {
+                              content = File.ReadAllText(path);
+                         }
+                    }
+
+                    _currentAttachments.Add(new { name = name, content = content, type = ext });
+                    AddMessage("Sistema", $"Archivo adjuntado: {name}");
+                }
+                catch (Exception ex)
+                {
+                    AddMessage("Sistema", "Error leyendo archivo: " + ex.Message);
+                }
+            }
+        }
+
         private async void SendMessage()
         {
             string msg = _txtInput.Text.Trim();
-            if (string.IsNullOrEmpty(msg)) return;
+            if (string.IsNullOrEmpty(msg) && _currentAttachments.Count == 0) return;
 
             // User Message
             AddMessage("Tú", msg);
@@ -200,19 +268,24 @@ namespace RevitCivilConnector.UI
                 using (System.Net.Http.HttpClient client = new System.Net.Http.HttpClient())
                 {
                     // PRODUCTION URL
-                    string url = "https://www.somosao.com/api/ai/chat"; 
+                    string url = "https://aodevelopment-production.up.railway.app/api/ai/chat"; 
                     
                     var payload = new 
                     {
                         message = msg,
                         context = "Revit Plugin 2024", // Context info
-                        user_email = AuthService.Instance.CurrentUserEmail ?? "unknown"
+                        user_email = AuthService.Instance.CurrentUserEmail ?? "unknown",
+                        attachments = _currentAttachments
                     };
 
                     string json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
                     var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
                     var response = await client.PostAsync(url, content);
+                    
+                    // Clear attachments after send
+                    _currentAttachments.Clear();
+
                     if (response.IsSuccessStatusCode)
                     {
                         string resJson = await response.Content.ReadAsStringAsync();
