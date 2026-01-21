@@ -72,6 +72,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Debug Logging Middleware
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"REQUEST START: {request.method} {request.url.path}")
+    response = await call_next(request)
+    print(f"REQUEST END: {request.method} {request.url.path} -> {response.status_code}")
+    return response
+
+@app.on_event("startup")
+async def startup_event():
+    print("----- REGISTERED ROUTES -----")
+    for route in app.routes:
+        if hasattr(route, "path"):
+            print(f"Route: {route.path}")
+    print("-----------------------------")
+
 # Mount Static
 # Mount Static
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
