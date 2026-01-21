@@ -103,7 +103,7 @@
 
 
         <!-- Video Carousel Container -->
-        <!-- Video Carousel Container -->
+
         <div class="carousel-track">
           <!-- Video A -->
           <video class="hero-video active" autoplay muted playsinline data-index="0" data-text="LET IT BIM">
@@ -111,11 +111,11 @@
           </video>
           <!-- Video C -->
           <video class="hero-video" muted playsinline data-index="1" data-text="BIM IS HERE">
-            <source src="/VIDEO%20C.mp4" type="video/mp4">
+            <source src="/VIDEO_C.mp4" type="video/mp4">
           </video>
           <!-- Video D -->
           <video class="hero-video" muted playsinline data-index="2" data-text="WE CREATE WHAT WE PLAN">
-            <source src="/VIDEO%20D.mp4" type="video/mp4">
+            <source src="/VIDEO_D.mp4" type="video/mp4">
           </video>
         </div>
 
@@ -128,7 +128,7 @@
               header.style.width = '100%';
               header.style.top = '0';
               header.style.zIndex = '1000';
-              header.style.background = 'transparent';
+              // Allow CSS hover effect by NOT forcing background here
             }
 
             /* --- VIDEO CAROUSEL LOGIC --- */
@@ -137,6 +137,7 @@
             let currentIndex = 0;
 
             function playNext() {
+              console.log("Switching video from index", currentIndex);
               // Stop current
               videos[currentIndex].classList.remove('active');
               videos[currentIndex].pause();
@@ -148,7 +149,11 @@
               // Play next
               const nextVideo = videos[currentIndex];
               nextVideo.classList.add('active');
-              nextVideo.play().catch(e => console.error("Video play failed:", e));
+              nextVideo.play().catch(e => {
+                console.error("Video play failed:", e);
+                // If fail, try next immediately
+                playNext();
+              });
 
               // Update Text
               if (title && nextVideo.dataset.text) {
@@ -159,9 +164,8 @@
             // Initialize listeners
             videos.forEach((video, index) => {
               video.onended = playNext;
-              // Fallback if video stalls or doesn't play
-              video.onerror = () => {
-                console.error(`Error playing video ${index}, skipping.`);
+              video.onerror = (e) => {
+                console.error(`Error playing video ${index}:`, e);
                 playNext();
               };
             });
@@ -174,13 +178,23 @@
           });
         </script>
         <style>
-          /* Force Header Styles to prevent white bar */
+          /* Reset Body to prevent white bar */
+          body,
+          html {
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+
+          /* Header Styles - Allow Hover Effect */
           #main-header {
             position: absolute !important;
-            background: transparent !important;
             width: 100%;
             top: 0;
+            left: 0;
             z-index: 1000;
+            background: transparent;
+            /* Default */
+            transition: background 0.3s, height 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
           }
 
           .header-top {
