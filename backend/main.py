@@ -107,8 +107,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if is_protected:
             token = request.cookies.get("access_token")
             # Fallback Header
-                if auth_header and auth_header.startswith("Bearer "):
-                    token = auth_header.split(" ")[1]
+            # Fallback Header
+            auth_header = request.headers.get("Authorization")
+            if not token and auth_header and auth_header.startswith("Bearer "):
+                token = auth_header.split(" ")[1]
             
             # Fallback Query Param (Bulletproof for WebViews/Iframes)
             if not token:
