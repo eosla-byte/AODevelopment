@@ -1437,7 +1437,10 @@ async def upload_hr_picture(collab_id: str, file: UploadFile = File(...)):
         safe_filename = file.filename
         # Save to Profile folder
         target_path = os.path.join(os.path.abspath("Collaborators"), collab.id, "Profile", safe_filename)
-        
+        profile_dir = os.path.dirname(target_path)
+        if not os.path.exists(profile_dir):
+            os.makedirs(profile_dir)
+            
         try:
             with open(target_path, "wb") as buffer:
                 content = await file.read()
@@ -2464,6 +2467,44 @@ async def download_database_backup(request: Request):
             return FileResponse(db_path, filename=filename)
         else:
             return HTMLResponse("Database file not found (Local)", status_code=404)
+
+@app.get("/admin/files/download")
+async def download_files_backup(request: Request):
+    user = getattr(request.state, "user", None)
+    if not user or user["role"] != "admin":
+        return RedirectResponse("/")
+
+    import zipfile
+    from io import BytesIO
+
+    memory_file = BytesIO()
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
+    filename = f"backup_ao_files_{timestamp}.zip"
+
+    with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Define folders that store user uploaded content
+        folders_to_zip = ["Collaborators", "Projects", "Expenses"]
+        
+        for folder_name in folders_to_zip:
+             folder_path = os.path.abspath(folder_name)
+             if os.path.exists(folder_path):
+                 for root, dirs, files in os.walk(folder_path):
+                     for file in files:
+                         file_path = os.path.join(root, file)
+                         # Create relative path for the zip archive
+                         # This preserves the folder structure (e.g., Projects/123/file.pdf)
+                         try:
+                             arcname = os.path.relpath(file_path, os.getcwd())
+                             zf.write(file_path, arcname)
+                         except Exception as ie:
+                             print(f"Skipping file {file}: {ie}")
+    
+    memory_file.seek(0)
+    return StreamingResponse(
+        memory_file, 
+        media_type="application/zip", 
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

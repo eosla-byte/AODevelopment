@@ -745,8 +745,8 @@ def update_collaborator(root_path, id, **kwargs):
     finally:
         db.close()
 
-def update_collaborator_picture(root_path, id, pic_filename):
-    update_collaborator(root_path, id, profile_picture=pic_filename)
+def update_collaborator_picture(id, pic_filename):
+    update_collaborator(id, profile_picture=pic_filename)
 
 def add_adjustment(root_path, id, type, desc, amt):
     db = SessionLocal()
