@@ -106,7 +106,8 @@ async function loadSessionData() {
     recalculateSpectrumCodes();
     renderTodo();
     renderGroups();
-    renderKanbanBoard();
+    renderGroups();
+    renderCardGrid();
     switchTab('compilation'); // Default view for testing
 }
 
@@ -148,7 +149,7 @@ function switchTab(tabId) {
     if (tabId === 'todo') {
         renderTodo(document.getElementById('search-input')?.value || "");
     } else if (tabId === 'groups') {
-        renderKanbanBoard();
+        renderCardGrid();
     } else if (tabId === 'compilation') {
         setupCompilationView();
     }
@@ -341,7 +342,7 @@ function deleteSubgroup(e, groupId, subgroupId) {
     g.subgroups = g.subgroups.filter(sg => sg.id !== subgroupId);
     if (selectedSubgroupId === subgroupId) {
         selectedSubgroupId = null;
-        renderKanbanBoard();
+        renderCardGrid();
     }
     renderGroups();
     recalculateSpectrumCodes();
@@ -350,11 +351,13 @@ function deleteSubgroup(e, groupId, subgroupId) {
 function selectSubgroup(subgroupId) {
     selectedSubgroupId = subgroupId;
     renderGroups();
-    renderKanbanBoard();
+    selectedSubgroupId = subgroupId;
+    renderGroups();
+    renderCardGrid();
 }
 
-// --- KANBAN LOGIC ---
-function renderKanbanBoard() {
+// --- CARD GRID LOGIC ---
+function renderCardGrid() {
     const container = document.getElementById('cards-grid');
     if (!container) return;
 
@@ -364,30 +367,17 @@ function renderKanbanBoard() {
     }
 
     const cards = activeCards.filter(c => c.subgroupId === selectedSubgroupId);
-    const processCards = cards.filter(c => c.status !== 'done');
-    const doneCards = cards.filter(c => c.status === 'done');
+    // Sort by code if possible
+    cards.sort((a, b) => (a.spectrumCode || '').localeCompare(b.spectrumCode || ''));
+
+    if (cards.length === 0) {
+        container.innerHTML = `<div class="flex-1 flex flex-col items-center justify-center text-slate-600 opacity-30"><i class="fas fa-box-open text-5xl mb-3"></i><p>No hay tarjetas. Importa una tabla.</p></div>`;
+        return;
+    }
 
     container.innerHTML = `
-        <!-- EN PROCESO -->
-        <div class="flex-1 flex flex-col min-w-[300px] bg-[#0f111a] rounded-xl border border-dashed border-slate-800">
-            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
-                <span class="font-bold text-slate-300">EN PROCESO</span>
-                <span class="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded">${processCards.length}</span>
-            </div>
-            <div class="flex-1 overflow-y-auto p-3 space-y-3" ondrop="dropCard(event, 'process')" ondragover="allowDrop(event)">
-                ${processCards.map(c => renderKanbanCard(c)).join('')}
-            </div>
-        </div>
-
-        <!-- LISTAS -->
-        <div class="flex-1 flex flex-col min-w-[300px] bg-[#0f111a] rounded-xl border border-dashed border-slate-800">
-            <div class="p-4 border-b border-slate-800 flex justify-between items-center">
-                <span class="font-bold text-slate-300">LISTAS</span>
-                <span class="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded">${doneCards.length}</span>
-            </div>
-            <div class="flex-1 overflow-y-auto p-3 space-y-3" ondrop="dropCard(event, 'done')" ondragover="allowDrop(event)">
-                ${doneCards.map(c => renderKanbanCard(c)).join('')}
-            </div>
+        <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min pb-20 overflow-y-auto custom-scrollbar">
+            ${cards.map(c => renderCard(c)).join('')}
         </div>
     `;
 }
@@ -497,50 +487,61 @@ function getCardOutputSummary(c) {
     return `<div class="mt-3 pt-2 border-t border-slate-700/50 space-y-1">${summary}</div>`;
 }
 
-function renderKanbanCard(c) {
+function renderCard(c) {
     // State Classes
-    const isLocked = c.isLocked;
+    const isLocked = c.isLocked || false;
     const hasChanges = c.hasChanges; // Yellow warning
 
     let borderClass = "border-slate-700 hover:border-indigo-500";
     let bgClass = "bg-[#1e2230]";
+    let lockIconColor = "text-slate-400 hover:text-white";
 
     if (hasChanges) {
         borderClass = "border-yellow-500 shadow-[0_0_15px_-3px_rgba(234,179,8,0.3)]";
-        bgClass = "bg-[#1e2230]"; // Keeping dark bg, but border highlights
+        bgClass = "bg-[#1e2230]";
+    }
+
+    // GREEN LOCK OVERRIDE
+    if (isLocked) {
+        borderClass = "border-emerald-500 shadow-[0_0_20px_-5px_rgba(16,185,129,0.3)]";
+        bgClass = "bg-[#064e3b]/20"; // Dark green tint
+        lockIconColor = "bg-emerald-600 text-white";
     }
 
     // Output Summary
     const outputSummary = getCardOutputSummary(c);
 
+    // Spectrum Code Prefix
+    const displayName = c.spectrumCode && c.spectrumCode !== 'N/A' && c.spectrumCode !== 'ERR'
+        ? `<span class="text-emerald-400 font-mono mr-2">${c.spectrumCode}</span><span class="text-white">${c.name}</span>`
+        : `<span class="text-white">${c.name}</span>`;
+
     return `
         <div draggable="${!isLocked}" ondragstart="dragCardStart(event, '${c.id}')" onclick="openCardDetails('${c.id}')"
-             class="${bgClass} p-4 rounded-lg border ${borderClass} shadow-lg cursor-pointer group/card relative transition-all">
+             class="${bgClass} p-5 rounded-xl border ${borderClass} shadow-xl cursor-pointer group/card relative transition-all hover:translate-y-[-2px]">
             
-            <!-- Top Right Actions (Sync, Hold, Duplicate, Delete) -->
-            <div class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity z-10">
-                <button onclick="syncCardData(event, '${c.id}')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" title="Sincronizar Tabla"><i class="fas fa-sync-alt text-[10px]"></i></button>
-                <button onclick="toggleCardLock(event, '${c.id}')" class="w-6 h-6 flex items-center justify-center rounded ${isLocked ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}" title="${isLocked ? 'Desbloquear' : 'Congelar Data (Hold)'}"><i class="fas ${isLocked ? 'fa-lock' : 'fa-lock-open'} text-[10px]"></i></button>
-                <button onclick="openDuplicateCardModal(event, '${c.id}')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" title="Duplicar Tarjeta"><i class="fas fa-copy text-[10px]"></i></button>
-                <button onclick="deleteCard('${c.id}', event)" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 text-red-400 hover:text-red-300 hover:bg-slate-700" title="Eliminar"><i class="fas fa-trash text-[10px]"></i></button>
+            <!-- Top Right Actions -->
+            <div class="absolute top-3 right-3 flex gap-2 z-10">
+                <button onclick="syncCardData(event, '${c.id}')" class="opacity-0 group-hover/card:opacity-100 transition-opacity w-7 h-7 flex items-center justify-center rounded bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" title="Sincronizar Tabla"><i class="fas fa-sync-alt text-xs"></i></button>
+                <button onclick="toggleCardLock(event, '${c.id}')" class="w-7 h-7 flex items-center justify-center rounded ${isLocked ? lockIconColor : 'opacity-0 group-hover/card:opacity-100 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}" title="${isLocked ? 'Desbloquear' : 'Congelar Data'}"><i class="fas ${isLocked ? 'fa-lock' : 'fa-lock-open'} text-xs"></i></button>
+                <button onclick="openDuplicateCardModal(event, '${c.id}')" class="opacity-0 group-hover/card:opacity-100 transition-opacity w-7 h-7 flex items-center justify-center rounded bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" title="Duplicar Tarjeta"><i class="fas fa-copy text-xs"></i></button>
+                <button onclick="deleteCard('${c.id}', event)" class="opacity-0 group-hover/card:opacity-100 transition-opacity w-7 h-7 flex items-center justify-center rounded bg-slate-800 text-red-500 hover:text-red-300 hover:bg-slate-700" title="Eliminar"><i class="fas fa-trash text-xs"></i></button>
             </div>
 
             <!-- Header -->
-            <div class="flex justify-between items-start mb-2">
-                <span class="text-[10px] uppercase font-bold text-slate-500">${c.source || 'ITEM'}</span>
-                 ${hasChanges ? '<i class="fas fa-exclamation-triangle text-yellow-500 text-xs animate-pulse" title="Cambios detectados en el modelo"></i>' : ''}
+            <div class="flex justify-between items-start mb-3">
+                <span class="text-[10px] uppercase font-bold text-slate-500 tracking-wider">${c.source || 'ITEM'}</span>
+                 ${hasChanges ? '<i class="fas fa-exclamation-triangle text-yellow-500 text-sm animate-pulse" title="Cambios detectados en el modelo"></i>' : ''}
             </div>
             
-            <h4 class="font-bold text-white mb-2 pr-6">${c.name}</h4>
+            <h4 class="font-bold text-lg mb-4 truncate pr-8 flex items-center">
+                ${displayName}
+            </h4>
             
-            <!-- Metadata -->
-            <div class="flex gap-2 items-center mb-1">
-                 <span class="text-[9px] font-mono text-emerald-400 bg-emerald-900/30 px-1 rounded border border-emerald-500/30" title="Código Spectrum">${c.spectrumCode || '-'}</span>
-            </div>
-            
-            <div class="flex gap-2 items-center">
-               <span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 font-mono">${c.rows ? c.rows.length : 0} Rows</span>
-               <span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-400 font-mono">${c.selectedParams ? c.selectedParams.length : 0} Cols</span>
+            <!-- Metadata Clean -->
+            <div class="flex gap-2 items-center mb-2">
+               <span class="text-[10px] bg-slate-800/80 px-2 py-1 rounded text-slate-400 font-mono border border-slate-700">${c.rows ? c.rows.length : 0} Rows</span>
+               <span class="text-[10px] bg-slate-800/80 px-2 py-1 rounded text-slate-400 font-mono border border-slate-700">${c.selectedParams ? c.selectedParams.length : 0} Cols</span>
             </div>
 
             <!-- Output Summary -->
@@ -558,7 +559,7 @@ function dropCard(ev, status) {
     const card = activeCards.find(c => c.id === id);
     if (card) {
         card.status = status;
-        renderKanbanBoard();
+        renderCardGrid();
         recalculateSpectrumCodes(); // Update codes on move status
         saveProject(); // Just stub
     }
@@ -567,7 +568,18 @@ function deleteCard(id, e) {
     e.stopPropagation();
     if (confirm("Confirmar borrado")) {
         activeCards = activeCards.filter(c => c.id !== id);
-        renderKanbanBoard();
+        renderCardGrid();
+        recalculateSpectrumCodes();
+    }
+}
+
+function toggleCardLock(e, id) {
+    e.stopPropagation();
+    const card = activeCards.find(c => c.id === id);
+    if (card) {
+        card.isLocked = !card.isLocked;
+        renderCardGrid(); // Re-render to update Green Lock style
+        saveProject();
     }
 }
 
