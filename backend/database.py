@@ -733,7 +733,7 @@ def toggle_archive_collaborator(root_path, collab_id):
     finally:
         db.close()
 
-def update_collaborator(root_path, id, **kwargs):
+def update_collaborator(id, **kwargs):
     db = SessionLocal()
     try:
         c = db.query(models.Collaborator).filter(models.Collaborator.id == id).first()

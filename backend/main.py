@@ -1449,7 +1449,16 @@ async def update_hr_details(collab_id: str,
     print(f"DEBUG: Received fields: role={role}, base={base_salary}, bonus={bonus_incentive}, bday={birthday}, start={start_date}, status={status}, email={email}")
 
     try:
-        success = update_collaborator(collab_id, role, base_salary_float, bonus_incentive_float, birthday, start_date, status, email)
+        success = update_collaborator(
+            collab_id, 
+            role=role, 
+            base_salary=base_salary_float, 
+            bonus_incentive=bonus_incentive_float, 
+            birthday=birthday, 
+            start_date=start_date, 
+            status=status, 
+            email=email
+        )
         print(f"DEBUG: update_collaborator returned: {success}")
     except Exception as e:
         print(f"CRITICAL ERROR in update_hr_details: {e}")
