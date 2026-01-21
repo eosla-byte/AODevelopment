@@ -1,0 +1,1689 @@
+﻿:root {
+  --font-display: 'Generic Sans', sans-serif;
+  /* Fallback until verified font */
+  --font-body: 'Outfit', sans-serif;
+
+  --color-terracotta: #E89A7B;
+  --color-text-light: #ffffff;
+  --color-text-dark: #333333;
+
+  --cursor-size: 20px;
+  --cursor-outline-size: 40px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  cursor: none;
+  /* Hide default cursor */
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  font-family: var(--font-body);
+  background-color: #fff;
+  color: var(--color-text-dark);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+  cursor: none;
+}
+
+/* Custom Cursor */
+.cursor-dot {
+  width: 10px;
+  height: 10px;
+  background-color: white;
+  position: fixed;
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  mix-blend-mode: difference;
+}
+
+.cursor-outline {
+  width: 50px;
+  height: 50px;
+  border: 1px solid white;
+  background-color: rgba(255, 255, 255, 0.1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9998;
+  transition: width 0.2s, height 0.2s, background-color 0.2s;
+  mix-blend-mode: difference;
+}
+
+/* Header */
+#main-header {
+  background-color: transparent;
+  color: var(--color-text-light);
+  height: 100px;
+  min-height: auto;
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  transition: all 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+  overflow: visible;
+  /* Changed to visible for logo safety */
+  z-index: 100;
+}
+
+#main-header:hover {
+  background-color: #000000;
+  height: 55vh;
+}
+
+.header-top {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 3rem;
+  align-items: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  width: 100%;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.center-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.right-nav {
+  position: absolute;
+  right: 3rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.nav-link {
+  color: white;
+  margin: 0 1.5rem;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+  font-size: 1rem;
+  transition: opacity 0.3s;
+}
+
+.nav-link:hover {
+  opacity: 0.8;
+}
+
+/* Static Logo Style for Banner - Moved Up */
+.static-logo-container {
+  position: absolute;
+  top: 28px;
+  /* Centered visually with nav */
+  left: 3rem;
+  pointer-events: none;
+  z-index: 1000;
+  display: block !important;
+}
+
+.hero-logo {
+  width: 110px;
+  /* Reduced size as requested */
+  height: auto;
+  display: block;
+  /* Ensure it doesn't get hidden */
+  position: relative;
+  z-index: 1001;
+}
+
+/* Services Header */
+.services-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 4rem;
+  flex-direction: column;
+  text-align: center;
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.service-card {
+  background-color: #0c0c0c;
+  /* Black background */
+  color: #fff;
+  border-radius: 12px;
+  padding: 0;
+  /* Removed padding to allow full bleed images */
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  /* Stack from top */
+  position: relative;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+}
+
+.card-content {
+  z-index: 2;
+  padding: 2rem 2rem 0 2rem;
+  /* Add padding just to text area */
+}
+
+.service-card h3 {
+  font-family: 'Barlow', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  /* Bolder */
+  margin-bottom: 1rem;
+  color: #e0e0e0;
+  /* Slightly darker/greyer white for readability/contrast */
+  line-height: 1.2;
+}
+
+.card-visual {
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.card-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Cover the area */
+  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.05));
+  transition: transform 0.5s ease;
+}
+
+.video-container {
+  position: relative;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background-color: black;
+}
+
+.carousel-track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 1s ease-in-out;
+  z-index: 1;
+}
+
+.hero-video.active {
+  opacity: 1;
+  z-index: 2;
+}
+
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.25));
+  pointer-events: none;
+  z-index: 3;
+}
+
+.hero-text-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  width: 100%;
+  z-index: 10;
+}
+
+.main-title {
+  font-family: 'Barlow', sans-serif;
+  font-weight: 600;
+  font-size: 5rem;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  line-height: 1.1;
+  text-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Hero Bottom Bar & Search (Restored) */
+.hero-bottom-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  padding-top: 1rem;
+}
+
+.scroll-label {
+  font-size: 1.2rem;
+}
+
+.search-container {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  padding-bottom: 5px;
+}
+
+.search-input {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 1rem;
+  outline: none;
+  width: 200px;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.search-arrow {
+  margin-left: 10px;
+}
+
+/* Header Hero Container (needed for spacing) */
+.header-hero {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0 3rem 2rem 3rem;
+  position: relative;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.4s ease 0s, transform 0.4s ease 0s;
+  pointer-events: none;
+}
+
+#main-header:hover .header-hero {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.2s;
+  pointer-events: auto;
+}
+
+/* Responsive Text */
+@media (max-width: 768px) {
+  .main-title {
+    font-size: 2.5rem;
+  }
+}
+
+/* Sections */
+section .container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 4rem 2rem;
+}
+
+h2 {
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  color: var(--color-terracotta);
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.project-image {
+  height: 300px;
+  background-size: cover;
+}
+
+/* Footer */
+footer {
+  background-color: #f9f9f9;
+  padding: 2rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* Scroll Reveal Text Section */
+#vision-scroll-section {
+  height: 250vh;
+  /* Reduced from 350vh for 30% speedup */
+  position: relative;
+  background-color: #fff;
+}
+
+.sticky-vision-wrapper {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.vision-content {
+  max-width: 1000px;
+  text-align: center;
+  padding: 2rem;
+}
+
+#reveal-text {
+  font-family: 'Barlow', sans-serif;
+  font-size: 3.5rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #a0a0a0;
+  /* Darker gray for better visibility on white */
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  /* Center the block of words */
+  gap: 0.3em;
+  /* Space between words */
+}
+
+/* Words span generated by JS */
+.reveal-word {
+  transition: all 0.2s ease;
+  color: #d1d1d1;
+  /* Light gray inactive */
+  opacity: 1;
+  /* Fully visible but light color */
+}
+
+.reveal-word.active {
+  color: var(--color-terracotta);
+  opacity: 1;
+  transform: scale(1.05);
+  /* Subtle pop */
+}
+
+@media (max-width: 768px) {
+  #reveal-text {
+    font-size: 2rem;
+  }
+}
+
+#reveal-signature {
+  font-family: 'Barlow', sans-serif;
+  font-size: 6.8rem;
+  /* Reduced by ~15% from 8rem */
+  font-weight: 800;
+  margin-top: 2rem;
+  /* Increased spacing */
+  margin-bottom: 2rem;
+  /* Spacing below */
+  opacity: 0.1;
+  transform: translateY(20px);
+  color: #000;
+  transition: opacity 0.8s ease, transform 0.8s ease;
+  line-height: 1;
+}
+
+#reveal-signature.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Statistics Counter Styles */
+.stats-grid {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 4rem;
+  gap: 2rem;
+  opacity: 0.1;
+  /* Initial state same as signature */
+  transform: translateY(20px);
+  transition: opacity 0.8s ease 0.2s, transform 0.8s ease 0.2s;
+  /* Delayed slightly after signature */
+}
+
+.stats-grid.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.stat-item {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stat-number {
+  font-family: 'Barlow', sans-serif;
+  font-size: 3.5rem;
+  /* Large and bold */
+  font-weight: 800;
+  color: #1a1a1a;
+  line-height: 1;
+}
+
+.stat-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 400;
+}
+
+.stat-separator {
+  width: 1px;
+  height: 60px;
+  background-color: #333;
+  /* Dark separator */
+  opacity: 0.5;
+}
+
+/* Responsive stats */
+@media (max-width: 900px) {
+  .stats-grid {
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .stat-separator {
+    display: none;
+    /* Hide separators on mobile wrap */
+  }
+
+  .stat-item {
+    width: 45%;
+    /* 2 per row */
+    margin-bottom: 1rem;
+  }
+
+  .stat-number {
+    font-size: 2.5rem;
+  }
+}
+
+#company-intro {
+  background-color: #fff;
+  padding: 8rem 2rem;
+  text-align: center;
+}
+
+.intro-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.intro-title {
+  font-family: 'Barlow', sans-serif;
+  font-size: 2.5rem;
+  color: var(--color-terracotta);
+  margin-bottom: 2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.intro-text {
+  font-size: 1.5rem;
+  color: #555;
+  line-height: 1.8;
+  font-weight: 300;
+}
+
+/* Scroll Reveal Video Section */
+#video-reveal-section {
+  height: 300vh;
+  /* Long scroll area to facilitate the animation time */
+  position: relative;
+  background-color: #000;
+}
+
+.sticky-wrapper {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  /* Full screen view */
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.reveal-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+.mask-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  background-color: #000;
+
+  /* The Magic: Create a hole using the logo */
+  mask-image: url('/logo.png'), linear-gradient(black, black);
+  mask-size: 400px, 100%;
+  /* Size of the cutout */
+  mask-repeat: no-repeat, no-repeat;
+  mask-position: center, center;
+
+  /* Punch out the first image (logo) from the second (black layer) */
+  mask-composite: exclude;
+  -webkit-mask-image: url('/logo.png'), linear-gradient(black, black);
+  -webkit-mask-size: 400px, 100%;
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-position: center, center;
+  -webkit-mask-composite: destination-out;
+  /* Equivalent to exclude for webkit */
+}
+
+/* The solid logo that appears after the mask fades */
+.solid-logo-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* Start centered exactly like mask */
+  z-index: 3;
+  opacity: 0;
+  /* Hidden initially */
+  pointer-events: none;
+}
+
+.reveal-logo {
+  width: 400px;
+  /* Must match the mask-size */
+  height: auto;
+  filter: brightness(0) invert(1);
+  /* Make it white if it's black */
+}
+
+/* =========================================
+   CLIENT PORTAL STYLES
+   ========================================= */
+
+.clients-page {
+  background-color: #f4f4f4;
+  /* Softer background for dashboard */
+  color: var(--color-text-dark);
+  min-height: 100vh;
+}
+
+#client-header {
+  background-color: #000;
+  color: #fff;
+  padding: 1rem 0;
+}
+
+#client-header .brand-link {
+  font-family: 'Barlow', sans-serif;
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: 0.1em;
+  padding-left: 2rem;
+}
+
+.clients-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+  min-height: 80vh;
+}
+
+/* Login Section */
+#login-section {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 70vh;
+}
+
+.login-card {
+  background: white;
+  padding: 3rem;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  max-width: 450px;
+  text-align: center;
+}
+
+.login-header h2 {
+  font-family: 'Barlow', sans-serif;
+  margin-bottom: 0.5rem;
+  font-size: 2rem;
+}
+
+.login-header p {
+  color: #777;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
+}
+
+.input-group {
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fafafa;
+  font-family: var(--font-body);
+  transition: border 0.3s;
+}
+
+.input-group input:focus {
+  border-color: var(--color-terracotta);
+  outline: none;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 14px;
+  background-color: #000;
+  color: white;
+  border: none;
+  font-weight: 600;
+  border-radius: 4px;
+  transition: background 0.3s;
+  margin-top: 1rem;
+}
+
+.btn-primary:hover {
+  background-color: #333;
+}
+
+.login-footer {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.login-footer a {
+  color: #888;
+  text-decoration: underline;
+}
+
+/* Dashboard Section */
+.dashboard-hidden {
+  display: none;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 1rem;
+}
+
+.user-welcome h1 {
+  font-family: 'Barlow', sans-serif;
+  font-size: 2rem;
+}
+
+.subtitle {
+  color: #666;
+}
+
+.btn-secondary {
+  padding: 8px 16px;
+  border: 1px solid #000;
+  background: transparent;
+  color: #000;
+  font-weight: 500;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.btn-secondary:hover {
+  background: #000;
+  color: #fff;
+}
+
+.project-selector-wrapper {
+  margin-bottom: 2rem;
+}
+
+.project-selector-wrapper label {
+  font-weight: 600;
+  margin-right: 10px;
+}
+
+#project-select {
+  padding: 8px;
+  font-size: 1rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  min-width: 300px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-bottom: 2rem;
+}
+
+.card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+}
+
+.card h3 {
+  font-size: 1.1rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1.5rem;
+  font-weight: 500;
+  border-left: 3px solid var(--color-terracotta);
+  padding-left: 10px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.metric-row .value {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.metric-row .highlight {
+  color: var(--color-terracotta);
+}
+
+/* Progress Bars */
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background-color: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #000;
+  transition: width 1s ease-out;
+}
+
+.subtext {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+/* Chart Comparison (Simple CSS Bars) */
+.chart-comparison {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  height: 100px;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+.bar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  width: 30px;
+}
+
+.bar-group .bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  transition: height 1s ease-out;
+}
+
+.bar-group .projected {
+  background-color: #ccc;
+}
+
+.bar-group .real {
+  background-color: var(--color-terracotta);
+}
+
+.bar-group span {
+  font-size: 0.8rem;
+  margin-top: 5px;
+}
+
+.status-tag {
+  background: #e0f7fa;
+  color: #006064;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ACC Viewer Placeholder */
+.viewer-card {
+  height: 500px;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.live-indicator {
+  background: red;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  animation: pulse 2s infinite;
+}
+
+.viewer-placeholder {
+  flex-grow: 1;
+  background: #222;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  border-radius: 4px;
+  background-image: radial-gradient(#333 1px, transparent 0);
+  background-size: 20px 20px;
+}
+
+.viewer-message {
+  text-align: center;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Restore default cursor for specific pages (Admin/Clients) for better usability */
+.clients-page,
+.clients-page *,
+.admin-container,
+.admin-container * {
+  cursor: auto !important;
+}
+
+/* =========================================
+   ANIMATIONS & GLOBAL BEHAVIORS
+   ========================================= */
+html {
+  scroll-behavior: smooth;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+/* Section Transitions */
+.fade-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 1s ease-out, transform 1s ease-out;
+}
+
+.fade-on-scroll.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Enhanced Project Cards */
+.project-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  cursor: pointer;
+  /* Use none if custom cursor handles it, but semantic cursor is good */
+}
+
+/* Parent container for the image to allow zooming */
+.project-image-wrapper {
+  overflow: hidden;
+  width: 100%;
+  height: 400px;
+  /* Taller images */
+}
+
+.project-image {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  transition: transform 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.project-card:hover .project-image {
+  transform: scale(1.1);
+}
+
+.project-info {
+  margin-top: 1rem;
+  transition: transform 0.3s ease;
+}
+
+.project-card:hover .project-info {
+  transform: translateX(10px);
+}
+
+.project-card h3 {
+  font-family: 'Barlow', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+  color: var(--color-text-dark);
+}
+
+.project-card p {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 1.1rem;
+  color: #666;
+}
+
+/* Client Login Background Enhancement */
+/* Client Login Background Enhancement - REMOVED IMAGE */
+.clients-page #login-section {
+  background: transparent;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  /* Center the card horizontally if needed */
+  align-items: center;
+  /* Center the card vertically if needed */
+  min-height: 80vh;
+  /* Ensure it takes up space */
+}
+
+/* Dark overlay removed */
+.clients-page #login-section::before {
+  display: none;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  /* Brings card above overlay */
+  background: rgba(255, 255, 255, 0.95);
+  /* Slightly transparent */
+  backdrop-filter: blur(10px);
+}
+
+/* =========================================
+   NEW SECTION 3: PROJECT CATEGORIES
+   ========================================= */
+#project-categories {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  /* Full screen */
+  background-color: #000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.categories-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.category-card {
+  flex: 1;
+  /* Equal width initially */
+  position: relative;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  transition: flex 0.5s ease;
+  /* Smooth expansion */
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-end;
+  /* Text at bottom */
+  justify-content: center;
+  padding-bottom: 4rem;
+}
+
+.category-card:last-child {
+  border-right: none;
+}
+
+/* Hover Effect: Expand */
+.category-card:hover {
+  flex: 3;
+  /* Grow significantly */
+}
+
+/* Background Images */
+.cat-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.3;
+  /* Dim default */
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  z-index: 1;
+  /* Placeholder grayscale filter */
+  filter: grayscale(100%);
+}
+
+/* Specific Backgrounds */
+.category-card[data-category="residential"] .cat-bg {
+  background-image: url('/vivienda.jpg');
+}
+
+.category-card[data-category="commercial"] .cat-bg {
+  background-image: url('/comercial.jpg');
+}
+
+.category-card[data-category="industrial"] .cat-bg {
+  background-image: url('/industrial.jpg');
+}
+
+.category-card[data-category="recreational"] .cat-bg {
+  background-image: url('/recreativo.jpg');
+}
+
+.category-card[data-category="educational"] .cat-bg {
+  background-image: url('/educativo.jpg');
+}
+
+.category-card:hover .cat-bg {
+  opacity: 0.8;
+  filter: grayscale(0%);
+  /* Color on hover */
+  transform: scale(1.05);
+}
+
+.cat-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  transition: transform 0.3s ease;
+}
+
+.cat-content h3 {
+  font-family: 'Barlow', sans-serif;
+  font-size: 2rem;
+  color: #fff;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  white-space: nowrap;
+}
+
+.view-link {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.9rem;
+  color: var(--color-terracotta);
+  /* Orange accent */
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s ease;
+  display: block;
+}
+
+.category-card:hover .view-link {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Background Sparkles Container */
+.interactive-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(circle at center, transparent 0%, #000 100%);
+}
+
+/* =========================================
+   NEW SECTION 4: CAREERS
+   ========================================= */
+#careers-section {
+  background-color: #000;
+  color: #fff;
+  padding: 6rem 2rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+}
+
+.careers-layout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.careers-visual {
+  flex: 1;
+  height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+}
+
+.abstract-lines {
+  width: 80%;
+  height: 80%;
+  animation: floatLines 10s ease-in-out infinite alternate;
+}
+
+@keyframes floatLines {
+  from {
+    transform: rotate(0deg) scale(1);
+  }
+
+  to {
+    transform: rotate(5deg) scale(1.05);
+  }
+}
+
+.careers-text {
+  flex: 1;
+  padding-left: 4rem;
+}
+
+.careers-text h2 {
+  font-family: 'Barlow', sans-serif;
+  font-size: 4rem;
+  color: #fff;
+  /* White per request */
+  line-height: 1.1;
+  margin-bottom: 2rem;
+  text-transform: uppercase;
+}
+
+.arrow-icon {
+  color: var(--color-terracotta);
+  display: inline-block;
+  transform: rotate(-45deg);
+  /* Arrow pointing up-right */
+}
+
+.say-hello-btn {
+  display: inline-block;
+  font-family: 'Barlow', sans-serif;
+  font-size: 2rem;
+  color: #fff;
+  border-bottom: 2px solid var(--color-terracotta);
+  padding-bottom: 0.5rem;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.say-hello-btn:hover {
+  color: var(--color-terracotta);
+}
+
+.social-links-display {
+  position: absolute;
+  bottom: 2rem;
+  right: 4rem;
+  display: flex;
+  gap: 2rem;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.9rem;
+  opacity: 0.6;
+}
+
+/* Mobile Tweaks */
+@media (max-width: 768px) {
+  .categories-container {
+    flex-direction: column;
+  }
+
+  .category-card {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    min-height: 15vh;
+  }
+
+  .careers-layout {
+    flex-direction: column-reverse;
+    /* Text on top? or bottom? */
+    text-align: center;
+  }
+
+  .careers-text {
+    padding-left: 0;
+    margin-bottom: 3rem;
+  }
+
+  .careers-text h2 {
+    font-size: 2.5rem;
+  }
+}
+
+/* Liquid Glass Button Style */
+.btn-liquid-glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 8px 20px !important;
+  margin-left: 15px !important;
+  color: #fff;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-liquid-glass::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: 0.5s;
+}
+
+.btn-liquid-glass:hover {
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.3), 0 0 30px rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.btn-liquid-glass:hover::before {
+  left: 100%;
+}
+
+/* ============================
+   CLIENTS PAGE OVERRIDES
+   ============================ */
+.clients-page {
+  background-color: #0c0c0c;
+  /* Fallback color */
+}
+
+.clients-page #client-header .brand-link {
+  font-size: 3.5rem;
+  /* LETRAS GRANDES */
+  font-weight: 900;
+  letter-spacing: 2px;
+  font-family: 'Barlow', sans-serif;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  text-transform: uppercase;
+}
+
+.clients-page .login-card {
+  /* Liquid Glass Effect */
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  color: #fff;
+  /* White text for contrast on dark glass */
+  border-radius: 16px;
+}
+
+.clients-page .login-card h2,
+.clients-page .login-card p,
+.clients-page .login-card label {
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.clients-page .login-card .btn-primary {
+  /* Make button pop more */
+  box-shadow: 0 0 15px rgba(232, 154, 123, 0.5);
+}
+
+/* =========================================
+   SERVICES SECTION STYLES
+   ========================================= */
+
+#services {
+  padding: 6rem 2rem;
+  background-color: #fff;
+  color: #000;
+}
+
+/* Widen the container specifically for services to allow wider cards */
+#services .services-container-wide {
+  max-width: 95vw;
+  /* Use 95% of viewport width */
+  padding: 0 2rem;
+  /* Ensure some padding on edges */
+}
+
+.services-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 4rem;
+  flex-direction: column;
+  text-align: center;
+  gap: 1.5rem;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.services-title {
+  font-family: 'Barlow', sans-serif;
+  font-size: 3.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: #000;
+  margin: 0;
+  max-width: 600px;
+  text-transform: none;
+  /* Override default uppercase if set */
+  letter-spacing: -0.02em;
+}
+
+.services-subtitle {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: #333;
+  max-width: 400px;
+  margin-top: 5px;
+}
+
+.services-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+}
+
+.service-card {
+  background-color: #0c0c0c;
+  color: #fff;
+  border-radius: 12px;
+  padding: 0;
+  min-height: 500px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.service-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.card-content {
+  position: relative;
+  z-index: 3;
+  padding: 2.5rem;
+  width: 100%;
+}
+
+.service-card h3 {
+  font-family: 'Barlow', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.service-card p {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1rem;
+  color: #e0e0e0;
+  line-height: 1.5;
+  margin-bottom: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  max-width: 90%;
+}
+
+/* Image acts as background now */
+.card-visual {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  margin-top: 0;
+}
+
+.card-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.7s ease;
+  filter: none;
+  /* Reset drop shadow if any */
+}
+
+.service-card:hover .card-visual img {
+  transform: scale(1.05);
+}
+
+/* Gradient Overlay for Text Readability */
+.service-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom,
+      rgba(0, 0, 0, 0.8) 0%,
+      rgba(0, 0, 0, 0.4) 40%,
+      rgba(0, 0, 0, 0.0) 100%);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.card-arrow {
+  position: absolute;
+  bottom: 2rem;
+  right: 2rem;
+  font-size: 1.8rem;
+  color: #fff;
+  z-index: 3;
+  opacity: 0.8;
+  transition: transform 0.3s ease;
+}
+
+.service-card:hover .card-arrow {
+  transform: translateX(5px);
+  opacity: 1;
+}
+
+.service-btn {
+  background-color: #fcefe7;
+  /* Light beige button */
+  color: #000;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 20px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: background-color 0.3s ease;
+}
+
+.service-btn:hover {
+  background-color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .services-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .services-title {
+    font-size: 2.5rem;
+  }
+
+  .services-header {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}
+
+/* CLIENTS PAGE OVERRIDES */
+.clients-page {
+  /* Image + 40% Dark Overlay as requested */
+  background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('/client-login-bg-v2.jpg') !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+#client-header .header-top {
+  justify-content: flex-start !important;
+  /* Align content to the left */
+}
+
+#client-header .brand-link {
+  margin-left: 0 !important;
+  margin-right: auto;
+  /* Push nav to right if needed, though they are separate */
+  padding-left: 0;
+}
+
+/* Main Title Transitions */
+.main-title {
+  font-family: 'Barlow', sans-serif;
+  font-weight: 600;
+  font-size: 5rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin: 0;
+  text-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.5s ease;
+  color: #ffffff;
+}
