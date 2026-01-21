@@ -107,16 +107,21 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if is_protected:
             token = request.cookies.get("access_token")
             # Fallback Header
-            if not token:
-                auth_header = request.headers.get("Authorization")
                 if auth_header and auth_header.startswith("Bearer "):
                     token = auth_header.split(" ")[1]
             
+            # Fallback Query Param (Bulletproof for WebViews/Iframes)
             if not token:
-                return RedirectResponse("/", status_code=303) # Use 303 to distinguish from CatchAll(307)
+                token = request.query_params.get("token") or request.query_params.get("access_token")
+
+            if not token:
+                # Redirect to login instead of landing if unauthorized?
+                # Or just keep behavior but now query param works.
+                return RedirectResponse("/", status_code=303) 
             
             payload = decode_access_token(token)
             if not payload:
+                # If token invalid, also redirect
                 return RedirectResponse("/", status_code=303)
                 
             request.state.user = payload
