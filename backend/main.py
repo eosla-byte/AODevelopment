@@ -111,12 +111,19 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         path = request.url.path
         
+        # DEBUG LOGGING FOR AUTH MIDDLEWARE
+        # print(f"AUTH CHECK: {path}")
+        
         # 2. Block Protected Routes
         # Implicitly allow / (landing), /assets, /static, /api, /login
         protected_prefixes = [
             "/admin", "/cloud-quantify", "/estimaciones", "/cotizaciones", 
             "/projects", "/project", "/calendar"
         ]
+        
+        # Exact match whitelist for debug/assets to prevent accidents
+        if path.startswith("/debug-info") or path.startswith("/assets") or path.startswith("/static"):
+             return await call_next(request)
         
         is_protected = any(path.startswith(p) for p in protected_prefixes)
         
@@ -129,11 +136,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     token = auth_header.split(" ")[1]
             
             if not token:
-                return RedirectResponse("/") # Redirect to Landing Page to hide backend
+                print(f"AUTH BLOCK: Redirecting {path} to /")
+                return RedirectResponse("/", status_code=303) # Use 303 to distinguish from CatchAll(307)
             
             payload = decode_access_token(token)
             if not payload:
-                return RedirectResponse("/") # Redirect to Landing Page
+                print(f"AUTH INVALID TOKEN: Redirecting {path} to /")
+                return RedirectResponse("/", status_code=303)
                 
             request.state.user = payload
 
@@ -2493,5 +2502,7 @@ async def serve_static_root(file_path: str):
         if path.endswith(".js"): media_type = "application/javascript"
         return FileResponse(path, media_type=media_type)
         
+    print(f"CATCH ALL REDIRECT: {file_path} -> /")
     # Redirect 404s to Home (Landing Page)
-    return RedirectResponse("/")
+    # Use 302 to distinguish from Auth(303) and Default(307)
+    return RedirectResponse("/", status_code=302)
