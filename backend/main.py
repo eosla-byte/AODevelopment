@@ -130,6 +130,20 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 
             request.state.user = payload
 
+            # --- ROLE BASED ACCESS CONTROL ---
+            role = payload.get("role")
+            
+            if role == "plugin_user":
+                # STRICT: Plugin Users can ONLY access /cloud-quantify
+                # (API routes are not in protected_prefixes so they bypass this check)
+                if not path.startswith("/cloud-quantify"):
+                     return HTMLResponse("<h1>Acceso Restringido</h1><p>Su usuario es exclusivo para el Plugin de Revit y herramientas vinculadas (Cloud Quantify). No tiene acceso al Panel Administrativo.</p>", status_code=403)
+            
+            elif role == "cliente":
+                 # Clients cannot access Admin or HR
+                 if path.startswith("/admin") or path.startswith("/hr") or path.startswith("/estimaciones") or path.startswith("/cotizaciones"):
+                     return RedirectResponse("/projects", status_code=303)
+
         response = await call_next(request)
         return response
 
@@ -655,6 +669,11 @@ async def login(request: Request, username: str = Form(...), password: str = For
         
     if not user.is_active:
          return RedirectResponse("/ao-access?error=locked", status_code=303)
+
+    # BLOCK PLUGIN USERS FROM WEB LOGIN
+    if user.role == "plugin_user":
+        # They should not be logging in via web form
+        return RedirectResponse("/ao-access?error=restricted_role", status_code=303)
 
     # Create Token
     access_token = create_access_token(
