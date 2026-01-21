@@ -169,7 +169,12 @@ namespace RevitCivilConnector.Auth
             }
             catch (Exception ex)
             {
-                TaskDialog.Show("Login Error", $"Connection failed: {ex.Message}");
+                var sb = new StringBuilder();
+                sb.AppendLine($"Main: {ex.Message}");
+                if (ex.InnerException != null) sb.AppendLine($"Inner: {ex.InnerException.Message}");
+                // sb.AppendLine($"Stack: {ex.StackTrace}"); // Optional, maybe too long for dialog
+                
+                TaskDialog.Show("Login Error", $"Connection details:\n{sb.ToString()}");
                 return false;
             }
         }
