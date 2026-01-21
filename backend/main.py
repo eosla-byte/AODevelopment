@@ -98,6 +98,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
 app.add_middleware(AuthMiddleware)
 
 
+
+@app.get("/")
+async def root():
+    return RedirectResponse("/cloud-quantify")
+
 @app.get("/cloud-quantify", response_class=HTMLResponse)
 async def view_cloud_quantify(request: Request):
     return templates.TemplateResponse("cloud_quantify.html", {"request": request})
