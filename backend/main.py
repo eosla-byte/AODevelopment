@@ -166,10 +166,7 @@ async def serve_landing(request: Request):
 async def serve_landing_alias(request: Request):
     return await serve_landing(request)
     
-@app.get("/login", response_class=HTMLResponse)
-async def serve_landing_alias(request: Request):
-    return await serve_landing(request)
-    
+
 @app.get("/debug-info")
 async def debug_info_route():
     # DIAGNOSTIC ROUTE
@@ -422,35 +419,7 @@ async def save_template_route(request: Request):
 
 # Config Store functions moved to database.py
 
-# ==========================================
-# AUTH MIDDLEWARE
-# ==========================================
 
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    # 1. Allow CORS Preflight (OPTIONS) to pass through to CORSMiddleware
-    if request.method == "OPTIONS":
-        return await call_next(request)
-
-    # 2. Public Routes & API Routes (API handles its own Auth)
-    if request.url.path.startswith("/static") or \
-       request.url.path.startswith("/api") or \
-       request.url.path.startswith("/cloud-quantify") or \
-       request.url.path in ["/login", "/logout"] or \
-       request.url.path.endswith("favicon.ico"):
-        return await call_next(request)
-    
-    token = request.cookies.get("access_token")
-    if not token:
-        return RedirectResponse("/login")
-    
-    payload = decode_access_token(token)
-    if not payload:
-        return RedirectResponse("/login")
-        
-    request.state.user = payload
-    response = await call_next(request)
-    return response
 
 @app.on_event("startup")
 async def startup_event():
