@@ -125,11 +125,9 @@ app.add_middleware(AuthMiddleware)
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_landing(request: Request):
-    # Check if logged in -> App
-    token = request.cookies.get("access_token")
-    if token and decode_access_token(token):
-         return RedirectResponse("/cloud-quantify")
-             
+    # Auto-redirect disabled to prevent loops. 
+    # User must manually go to dashboard if logged in.
+    
     # Else -> Landing Page
     index_path = "static/public_site/index.html"
     if os.path.exists(index_path):
