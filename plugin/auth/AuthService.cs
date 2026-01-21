@@ -40,8 +40,11 @@ namespace RevitCivilConnector.Auth
 
         private AuthService()
         {
+            // Enforce TLS 1.2 due to Railway/Modern HTTPS requirements
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12; 
+
             _client = new HttpClient();
-            _client.Timeout = TimeSpan.FromSeconds(10);
+            _client.Timeout = TimeSpan.FromSeconds(30); // Increased timeout to 30s
         }
 
         public async Task<bool> LoginAsync(string username, string password)
