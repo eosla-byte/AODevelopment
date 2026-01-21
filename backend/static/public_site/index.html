@@ -26,14 +26,34 @@
   </style>
   <script type="module" src="/assets/index-BZXfHe2v.js?v=999"></script>
   <link rel="stylesheet" href="/assets/index-N3r3Gy9x.css?v=999">
+  <link rel="stylesheet" href="/mobile.css">
 </head>
 
 <body>
   <div class="cursor-dot" data-cursor-dot></div>
   <div class="cursor-outline" data-cursor-outline></div>
 
+  <!-- Mobile Menu Overlay -->
+  <div id="mobile-nav-overlay">
+    <a href="#project-categories" class="mobile-link">Proyectos</a>
+    <a href="#services" class="mobile-link">Recursos</a>
+    <a href="#careers-section" class="mobile-link">Trabaja con Nosotros</a>
+    <a href="/clients.html" class="mobile-link" style="color: var(--primary-blue);">Clientes</a>
+    <a href="/contact.html" class="mobile-link">Contacto</a>
+    <div class="mt-8 text-xs text-slate-500 font-mono tracking-widest">EST. 2019</div>
+  </div>
+
   <div id="app">
     <header id="main-header">
+      <!-- Mobile Toggle -->
+      <button id="mobile-menu-toggle" aria-label="Menu" style="display:none;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+
       <!-- Logo moved inside header for fixed positioning -->
       <div class="static-logo-container">
         <img src="/logo.png" alt="AO Development Logo" class="hero-logo">
@@ -282,6 +302,36 @@
     <p>&copy; 2026 AO Arquitectura. Todos los derechos reservados.</p>
   </footer>
   </div>
+  </div>
+
+  <script>
+    /* Mobile Menu Logic */
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.getElementById('mobile-menu-toggle');
+      const overlay = document.getElementById('mobile-nav-overlay');
+      const links = document.querySelectorAll('.mobile-link');
+
+      if (toggle && overlay) {
+        toggle.addEventListener('click', () => {
+          overlay.classList.toggle('active');
+          // Toggle Icon (Simple)
+          if (overlay.classList.contains('active')) {
+            toggle.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+          } else {
+            toggle.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>';
+          }
+        });
+
+        // Close on link click
+        links.forEach(l => {
+          l.addEventListener('click', () => {
+            overlay.classList.remove('active');
+            toggle.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>';
+          });
+        });
+      }
+    });
+  </script>
 </body>
 
 </html>

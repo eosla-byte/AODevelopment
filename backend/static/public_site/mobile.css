@@ -1,0 +1,150 @@
+/* Mobile Optimization for AO Landing Page */
+
+/* Base Logic: Only apply on screens smaller than 768px */
+@media screen and (max-width: 768px) {
+
+    /* --- HEADER & NAV --- */
+    #main-header {
+        padding: 1rem;
+    }
+
+    .static-logo-container {
+        width: 120px; /* Smaller logo */
+    }
+
+    /* Hide Desktop Navs */
+    .center-nav,
+    .right-nav,
+    .hero-bottom-bar {
+        display: none !important;
+    }
+
+    /* Show Mobile Toggle (You need to add this button in HTML) */
+    #mobile-menu-toggle {
+        display: block !important;
+        position: absolute;
+        right: 20px;
+        top: 25px;
+        z-index: 2000;
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 10px;
+    }
+
+    /* Mobile Nav Overlay */
+    #mobile-nav-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.95);
+        backdrop-filter: blur(10px);
+        z-index: 1005;
+        display: none; /* Toggled via JS */
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 2rem;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    #mobile-nav-overlay.active {
+        display: flex;
+        opacity: 1;
+    }
+
+    #mobile-nav-overlay a {
+        color: white;
+        font-family: 'Outfit', sans-serif;
+        font-size: 1.5rem;
+        font-weight: 300;
+        text-decoration: none;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+    }
+
+    /* --- HERO --- */
+    .main-title {
+        font-size: 3.5rem !important; /* Smaller than desktop giant font */
+        line-height: 1.1;
+        padding: 0 1rem;
+    }
+
+    /* --- VISION --- */
+    .sticky-vision-wrapper {
+        height: auto;
+        min-height: 100vh;
+        position: relative;
+    }
+    
+    #reveal-signature {
+        font-size: 3rem !important;
+    }
+
+    /* Stack Stats */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* 2x2 Grid */
+        gap: 2rem;
+        width: 100%;
+        margin-top: 3rem;
+    }
+
+    .stat-separator {
+        display: none;
+    }
+
+    /* --- CATEGORIES --- */
+    .categories-container {
+        display: flex !important;
+        flex-direction: column;
+        height: auto !important; /* Remove fixed height/horizontal logic */
+    }
+
+    .category-card {
+        height: 300px !important; /* Stacked cards height */
+        width: 100% !important;
+        flex: none !important;
+    }
+
+    /* --- SERVICES --- */
+    .services-grid {
+        grid-template-columns: 1fr !important; /* Single column */
+        gap: 1.5rem;
+    }
+
+    .service-card {
+        min-height: auto;
+        padding: 1.5rem;
+    }
+
+    .services-title {
+        font-size: 2.5rem !important;
+    }
+
+    /* --- CAREERS --- */
+    .careers-layout {
+        grid-template-columns: 1fr !important;
+        text-align: center;
+        gap: 3rem;
+    }
+
+    .careers-visual {
+        display: none; /* Hide abstract lines on mobile to save space */
+    }
+    
+    .social-links-display {
+        justify-content: center;
+    }
+
+    /* --- CLIENTS PAGE FIXES (If applicable here) --- */
+    .login-card {
+        width: 90% !important;
+        padding: 1.5rem;
+    }
+}
