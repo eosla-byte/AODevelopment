@@ -278,6 +278,12 @@
                     <input type="checkbox" id="perm_quant"
                         class="w-5 h-5 text-blue-600 rounded bg-gray-100 border-gray-300 focus:ring-blue-500">
                 </label>
+                <label
+                    class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <span class="font-medium text-slate-700">AO Labs (Experimental)</span>
+                    <input type="checkbox" id="perm_labs"
+                        class="w-5 h-5 text-purple-600 rounded bg-gray-100 border-gray-300 focus:ring-purple-500">
+                </label>
             </div>
 
             <div class="pt-6 flex justify-end gap-3">
@@ -378,6 +384,7 @@
         check('perm_veg', 'Vegetacion');
         check('perm_dwg', 'DWGImport');
         check('perm_quant', 'Cuantificaciones');
+        check('perm_labs', 'Labs');
     }
 
     function closePermsModal() {
@@ -393,7 +400,8 @@
             Topografia: document.getElementById('perm_topo').checked,
             Vegetacion: document.getElementById('perm_veg').checked,
             DWGImport: document.getElementById('perm_dwg').checked,
-            Cuantificaciones: document.getElementById('perm_quant').checked
+            Cuantificaciones: document.getElementById('perm_quant').checked,
+            Labs: document.getElementById('perm_labs').checked
         };
 
         try {
