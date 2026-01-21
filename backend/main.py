@@ -2423,4 +2423,5 @@ async def serve_static_root(file_path: str):
     if '..' in file_path: return JSONResponse({'error': 'Invalid path'}, status_code=400)
     path = f'static/public_site/{file_path}'
     if os.path.exists(path) and os.path.isfile(path): return FileResponse(path)
-    return JSONResponse({'error': 'Not Found'}, status_code=404)
+    # Redirect 404s to Home (Landing Page)
+    return RedirectResponse("/")
