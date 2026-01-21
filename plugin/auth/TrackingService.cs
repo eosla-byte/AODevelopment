@@ -73,7 +73,7 @@ namespace RevitCivilConnector.Auth
                     var json = JsonConvert.SerializeObject(payload);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
                     var client = new HttpClient(); // Or reuse shared
-                    await client.PostAsync("http://localhost:8000/api/plugin/sync", content);
+                    await client.PostAsync("https://aodevelopment-production.up.railway.app/api/plugin/sync", content);
                 }
                 catch { }
             });
@@ -210,7 +210,7 @@ namespace RevitCivilConnector.Auth
                     var json = JsonConvert.SerializeObject(payload);
                     var content = new StringContent(json, Encoding.UTF8, "application/json");
                     var client = new HttpClient();
-                    await client.PostAsync("http://localhost:8000/api/plugin/track", content);
+                    await client.PostAsync("https://aodevelopment-production.up.railway.app/api/plugin/track", content);
                 }
                 catch { }
             });

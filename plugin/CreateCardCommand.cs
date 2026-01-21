@@ -59,7 +59,7 @@ namespace RevitCivilConnector
                 SendToBackend(json);
 
                 // Open Browser
-                string frontendUrl = "http://localhost:5173/cloud_quantify.html?session_id=" + sessionId;
+                string frontendUrl = "https://aodevelopment-production.up.railway.app/cloud-quantify?session_id=" + sessionId;
                 Process.Start(new ProcessStartInfo(frontendUrl) { UseShellExecute = true });
 
                 return Result.Succeeded;
@@ -73,13 +73,16 @@ namespace RevitCivilConnector
 
         private void SendToBackend(string json)
         {
-             string backendUrl = "http://localhost:8000/api/plugin/cloud/sync-quantities";
+             string backendUrl = "https://aodevelopment-production.up.railway.app/api/plugin/cloud/sync-quantities";
              Task.Run(async () => 
              {
                 try 
                 {
                     using (HttpClient client = new HttpClient())
                     {
+                        if (AuthService.Instance.IsLoggedIn)
+                            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthService.Instance.AccessToken);
+                            
                         var content = new StringContent(json, Encoding.UTF8, "application/json");
                         await client.PostAsync(backendUrl, content);
                     }

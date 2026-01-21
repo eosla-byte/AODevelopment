@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>AOdev</Name>
+    <Assembly>AOdev.dll</Assembly>
+    <FullClassName>RevitCivilConnector.App</FullClassName>
+    <ClientId>B244682C-4A42-4357-9304-4694468E7765</ClientId>
+    <VendorId>ANTIGRAVITY</VendorId>
+    <VendorDescription>Antigravity AI Assistant</VendorDescription>
+  </AddIn>
+</RevitAddIns>

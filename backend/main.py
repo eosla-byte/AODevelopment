@@ -326,6 +326,7 @@ async def auth_middleware(request: Request, call_next):
     # 2. Public Routes & API Routes (API handles its own Auth)
     if request.url.path.startswith("/static") or \
        request.url.path.startswith("/api") or \
+       request.url.path.startswith("/cloud-quantify") or \
        request.url.path in ["/login", "/logout"] or \
        request.url.path.endswith("favicon.ico"):
         return await call_next(request)

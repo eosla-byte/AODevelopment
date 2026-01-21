@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using Newtonsoft.Json;
 using System.Threading.Tasks;
+using RevitCivilConnector.Auth;
 
 namespace RevitCivilConnector.UI
 {
@@ -46,7 +47,11 @@ namespace RevitCivilConnector.UI
             {
                 using (HttpClient client = new HttpClient())
                 {
-                    string url = "http://localhost:8000/api/plugin/cloud/list-folders";
+                    // Add Auth
+                    if (AuthService.Instance.IsLoggedIn)
+                        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthService.Instance.AccessToken);
+
+                    string url = "https://aodevelopment-production.up.railway.app/api/plugin/cloud/list-folders";
                     var json = await client.GetStringAsync(url);
                     var response = JsonConvert.DeserializeObject<FolderListResponse>(json);
                     
@@ -72,7 +77,11 @@ namespace RevitCivilConnector.UI
             {
                 using (HttpClient client = new HttpClient())
                 {
-                    string url = "http://localhost:8000/api/plugin/cloud/create-folder";
+                    // Add Auth
+                    if (AuthService.Instance.IsLoggedIn)
+                        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthService.Instance.AccessToken);
+
+                    string url = "https://aodevelopment-production.up.railway.app/api/plugin/cloud/create-folder";
                     var payload = new { name = name };
                     var content = new StringContent(JsonConvert.SerializeObject(payload), System.Text.Encoding.UTF8, "application/json");
                     
@@ -137,13 +146,16 @@ namespace RevitCivilConnector.UI
                 {
                     try {
                         using (HttpClient client = new HttpClient()) {
+                             if (AuthService.Instance.IsLoggedIn)
+                                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthService.Instance.AccessToken);
+
                              var payload = new { folder_id = fId };
                              // Request expects JSON for embed=True check in FastAPI? 
                              // FastAPI Body(embed=True) means: { "folder_id": "..." }
                              var json = JsonConvert.SerializeObject(payload);
                              var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
                              
-                             await client.PostAsync("http://localhost:8000/api/plugin/cloud/delete-folder", content);
+                             await client.PostAsync("https://aodevelopment-production.up.railway.app/api/plugin/cloud/delete-folder", content);
                              LoadProjects();
                         }
                     } catch {}
@@ -159,7 +171,10 @@ namespace RevitCivilConnector.UI
                 {
                     using (HttpClient client = new HttpClient())
                     {
-                         await client.PostAsync($"http://localhost:8000/api/plugin/cloud/archive-project?session_id={sId}", null);
+                         if (AuthService.Instance.IsLoggedIn)
+                            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthService.Instance.AccessToken);
+
+                         await client.PostAsync($"https://aodevelopment-production.up.railway.app/api/plugin/cloud/archive-project?session_id={sId}", null);
                          LoadProjects();
                     }
                 }
