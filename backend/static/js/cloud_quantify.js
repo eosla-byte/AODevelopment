@@ -376,7 +376,7 @@ function renderCardGrid() {
     }
 
     container.innerHTML = `
-        <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min pb-20 overflow-y-auto custom-scrollbar">
+        <div class="p-4 grid grid-cols-1 xl:grid-cols-2 gap-6 auto-rows-min pb-20 overflow-y-auto custom-scrollbar">
             ${cards.map(c => renderCard(c)).join('')}
         </div>
     `;

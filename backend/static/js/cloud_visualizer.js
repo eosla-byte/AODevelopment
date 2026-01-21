@@ -10,29 +10,35 @@ const VISUALIZER = {
      * @param {string} action - 'select', 'color', 'clean'
      * @param {object} payload - Data to send
      */
-    sendToRevit: function (action, payload) {
-        // Bridge Object might be 'window.chrome.webview' (WebView2) or 'window.external' (Old)
-        // or a custom injected object 'RevitPlugin'.
+    /**
+     * Send command to Revit Plugin via Backend Bridge (Polling)
+     * @param {string} action - 'select', 'color', 'clean'
+     * @param {object} payload - Data to send
+     */
+    sendToRevit: async function (action, payload) {
+        console.log("Sending to Revit (Bridge):", action, payload);
 
-        const message = {
-            action: action,
-            payload: payload
-        };
-
-        console.log("Sending to Revit:", message);
+        if (!SESSION_ID) {
+            alert("No hay sesión activa. No se puede comunicar con Revit.");
+            return;
+        }
 
         try {
-            if (window.chrome && window.chrome.webview) {
-                window.chrome.webview.postMessage(message);
-            } else if (window.external && window.external.notify) {
-                window.external.notify(JSON.stringify(message));
+            const res = await fetch(`${API_BASE}/command/${SESSION_ID}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: action, payload: payload })
+            });
+
+            if (res.ok) {
+                // console.log("Command queued");
+                // Optional: Show toast
             } else {
-                console.warn("Revit Bridge not found. Are you running in Browser?");
-                // Mock behavior for browser testing
-                // showToast(`Revit Command: ${action}`, "info");
+                console.error("Failed to queue command");
             }
+
         } catch (e) {
-            console.error("Failed to send to Revit:", e);
+            console.error("Bridge Error:", e);
         }
     },
 
