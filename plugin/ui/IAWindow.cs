@@ -7,6 +7,8 @@ using System.IO;
 using System.Reflection;
 using Autodesk.Revit.UI;
 
+using RevitCivilConnector.Auth;
+
 namespace RevitCivilConnector.UI
 {
     public class IAWindow : Window
@@ -107,6 +109,25 @@ namespace RevitCivilConnector.UI
                 Fill = Brushes.LightGreen,
                 ToolTip = "Conectado"
             };
+            // Watch & Learn Button
+            Button btnRecord = new Button
+            {
+                Content = "🔴",
+                Width = 30, Height = 25,
+                Margin = new Thickness(0,0,10,0),
+                Background = Brushes.Transparent,
+                Foreground = Brushes.Red,
+                BorderThickness = new Thickness(0),
+                ToolTip = "Aprender (Watch & Learn)"
+            };
+            btnRecord.Click += (s, e) => 
+            {
+                // Toggle via RequestHandler
+                _requestHandler.Request = IARequestType.ToggleRecording;
+                _externalEvent.Raise();
+            };
+            headerStack.Children.Add(btnRecord);
+
             headerStack.Children.Add(status);
             headerBorder.Child = headerStack;
             Grid.SetRow(headerBorder, 0);

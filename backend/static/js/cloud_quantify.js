@@ -522,6 +522,7 @@ function renderCard(c) {
             
             <!-- Top Right Actions -->
             <div class="absolute top-3 right-3 flex gap-2 z-10">
+                <button onclick="VISUALIZER.visualizeCard('${c.id}'); event.stopPropagation();" class="opacity-0 group-hover/card:opacity-100 transition-opacity w-7 h-7 flex items-center justify-center rounded bg-slate-800 text-purple-400 hover:text-purple-300 hover:bg-slate-700" title="Visualizar en Modelo"><i class="fas fa-eye text-xs"></i></button>
                 <button onclick="syncCardData(event, '${c.id}')" class="opacity-0 group-hover/card:opacity-100 transition-opacity w-7 h-7 flex items-center justify-center rounded bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" title="Sincronizar Tabla"><i class="fas fa-sync-alt text-xs"></i></button>
                 <button onclick="toggleCardLock(event, '${c.id}')" class="w-7 h-7 flex items-center justify-center rounded ${isLocked ? lockIconColor : 'opacity-0 group-hover/card:opacity-100 bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}" title="${isLocked ? 'Desbloquear' : 'Congelar Data'}"><i class="fas ${isLocked ? 'fa-lock' : 'fa-lock-open'} text-xs"></i></button>
                 <button onclick="openDuplicateCardModal(event, '${c.id}')" class="opacity-0 group-hover/card:opacity-100 transition-opacity w-7 h-7 flex items-center justify-center rounded bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700" title="Duplicar Tarjeta"><i class="fas fa-copy text-xs"></i></button>
@@ -989,6 +990,7 @@ const DETAIL_MODAL_TEMPLATE = `
              <span class="bg-indigo-500/20 text-indigo-300 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider" id="detail-card-source">SOURCE</span>
         </div>
         <div>
+            <button onclick="VISUALIZER.visualizeCard(DETAIL_STATE.cardId)" class="mr-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-1.5 rounded text-xs font-bold shadow-lg shadow-purple-500/20" title="Visualizar en Modelo"><i class="fas fa-eye mr-2"></i>Visualizar</button>
             <button id="btn-ack-changes" onclick="acknowledgeCardChanges()" class="hidden mr-2 bg-yellow-600 hover:bg-yellow-500 text-white px-4 py-1.5 rounded text-xs font-bold shadow-lg shadow-yellow-500/20 animate-pulse">Aprobar Cambios</button>
             <button onclick="saveCardDetails()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded text-xs font-bold shadow-lg shadow-indigo-500/20">Guardar Cambios</button>
         </div>

@@ -2,7 +2,7 @@
 <RevitAddIns>
   <AddIn Type="Application">
     <Name>AOdev</Name>
-    <Assembly>AOdev.dll</Assembly>
+    <Assembly>AOdev\AOdev.dll</Assembly>
     <FullClassName>RevitCivilConnector.App</FullClassName>
     <ClientId>B244682C-4A42-4357-9304-4694468E7765</ClientId>
     <VendorId>ANTIGRAVITY</VendorId>

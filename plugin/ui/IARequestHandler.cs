@@ -14,7 +14,8 @@ namespace RevitCivilConnector.UI
         GenerateShopDrawings,
         GenerateMEPFromLines,
         CountElements,
-        CreateSheet
+        CreateSheet,
+        ToggleRecording
     }
 
     public class IARequestHandler : IExternalEventHandler
@@ -41,6 +42,9 @@ namespace RevitCivilConnector.UI
                         break;
                     case IARequestType.CountElements:
                         // CountElements(uiapp);
+                        break;
+                    case IARequestType.ToggleRecording:
+                        ToggleRecording();
                         break;
                     default:
                         break;
@@ -411,6 +415,25 @@ namespace RevitCivilConnector.UI
             if (duplicateCount > 0)
             {
                 uidoc.Selection.SetElementIds(duplicates);
+            }
+        }
+        private void ToggleRecording()
+        {
+            if (App.Recorder.IsRecording)
+            {
+                App.Recorder.StopRecording();
+                var logs = App.Recorder.GetSessionLog();
+                // In a real system, we would send this 'logs' list to the backend
+                // For now, we just show it to the user.
+                string summary = string.Join("\n", logs);
+                if(string.IsNullOrEmpty(summary)) summary = "No actions recorded.";
+                
+                TaskDialog.Show("IA Learning", "Recording Stopped. Actions Learned:\n\n" + summary);
+            }
+            else
+            {
+                App.Recorder.StartRecording();
+                TaskDialog.Show("IA Learning", "Recording Started... Perform your actions in Revit (Create walls, dimensions, etc). Press the button again to stop.");
             }
         }
     }

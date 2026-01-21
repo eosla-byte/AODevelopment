@@ -12,6 +12,7 @@ namespace RevitCivilConnector
     public class App : IExternalApplication
     {
         private static TrackingService _tracker;
+        public static Services.TransactionRecorder Recorder; // Public static for access from IAWindow
         private static bool _hasPromptedLogin = false;
         
         // UI Handler references for dynamic update (Explicit Namespace to avoid Ambiguity)
@@ -25,6 +26,7 @@ namespace RevitCivilConnector
         {
             // Init Auth & Tracking
             _tracker = new TrackingService(application);
+            Recorder = new Services.TransactionRecorder(application.ControlledApplication);
             
             // Subscribe to Idling for First Run Login Check
             application.Idling += OnIdling;
@@ -252,6 +254,7 @@ namespace RevitCivilConnector
         public Result OnShutdown(UIControlledApplication application)
         {
             if (_tracker != null) _tracker.Stop();
+            if (Recorder != null) Recorder.StopRecording();
             return Result.Succeeded;
         }
 
