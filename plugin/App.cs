@@ -187,6 +187,7 @@ namespace RevitCivilConnector
             PushButtonData btnIA = new PushButtonData("cmdIA", "AO\niA", assemblyPath, "RevitCivilConnector.IACommand");
             btnIA.LargeImage = GetIcon("ia.png");
             btnIA.ToolTip = "Asistente IA para revisión y documentación";
+            btnIA.AvailabilityClassName = "RevitCivilConnector.Auth.MgmtAuthAvailability";
             
             pMgmt.AddItem(btnIA);
 

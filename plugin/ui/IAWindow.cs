@@ -162,7 +162,7 @@ namespace RevitCivilConnector.UI
             this.Content = mainGrid;
         }
 
-        private void SendMessage()
+        private async void SendMessage()
         {
             string msg = _txtInput.Text.Trim();
             if (string.IsNullOrEmpty(msg)) return;
@@ -174,75 +174,77 @@ namespace RevitCivilConnector.UI
             // Simulate AI Processing
             AddMessage("IA", "Procesando solicitud...");
 
-            // --- Simple NLP Simulation ---
-            // In a real scenario, this 'msg' goes to OpenAI/Gemini API, and returns a JSON intent.
-            // Here we look for keywords.
+            try 
+            {
+                using (System.Net.Http.HttpClient client = new System.Net.Http.HttpClient())
+                {
+                    // PRODUCTION URL
+                    string url = "https://www.somosao.com/api/ai/chat"; 
+                    
+                    var payload = new 
+                    {
+                        message = msg,
+                        context = "Revit Plugin 2024", // Context info
+                        user_email = AuthService.Instance.CurrentUserEmail ?? "unknown"
+                    };
 
-            if (msg.ToLower().Contains("audit") || msg.ToLower().Contains("auditar") || msg.ToLower().Contains("duplicado"))
-            {
-                System.Threading.Tasks.Task.Delay(1500).ContinueWith(t => 
-                {
-                    Dispatcher.Invoke(() => 
+                    string json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+                    var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await client.PostAsync(url, content);
+                    if (response.IsSuccessStatusCode)
                     {
-                        AddMessage("IA", "Detecté que quieres auditar duplicados en el modelo. Ejecutando análisis ahora...");
+                        string resJson = await response.Content.ReadAsStringAsync();
+                        dynamic resObj = Newtonsoft.Json.JsonConvert.DeserializeObject(resJson);
                         
-                        // Trigger Revit Action
-                        _requestHandler.Request = IARequestType.AuditWalls;
-                        _externalEvent.Raise();
-                    });
-                });
-            }
-            else if (msg.ToLower().Contains("acotar") || msg.ToLower().Contains("dimensionar") || msg.ToLower().Contains("cotas"))
-            {
-               System.Threading.Tasks.Task.Delay(1500).ContinueWith(t => 
-                {
-                    Dispatcher.Invoke(() => 
+                        string text = resObj.text;
+                        string action = resObj.action;
+
+                        AddMessage("IA", text);
+
+                        if (!string.IsNullOrEmpty(action))
+                        {
+                            Dispatcher.Invoke(() => 
+                            {
+                                ExecuteAction(action);
+                            });
+                        }
+                    }
+                    else
                     {
-                        AddMessage("IA", "Entendido. Generando cotas automáticas para los ejes visibles en esta vista...");
-                        
-                        // Trigger Revit Action
-                        _requestHandler.Request = IARequestType.AutoDimension;
-                        _externalEvent.Raise();
-                    });
-                });
+                         AddMessage("IA", "Error conectando con el cerebro de AO. (Status: " + response.StatusCode + ")");
+                    }
+                }
             }
-            else if (msg.ToLower().Contains("despiece") || msg.ToLower().Contains("agrupar") || msg.ToLower().Contains("assembly"))
+            catch (Exception ex)
             {
-               System.Threading.Tasks.Task.Delay(1500).ContinueWith(t => 
-                {
-                    Dispatcher.Invoke(() => 
-                    {
-                        AddMessage("IA", "Entendido. Analizando geometría para agrupar elementos idénticos y generar montajes (assemblies)...");
-                        
-                        // Trigger Revit Action
-                        _requestHandler.Request = IARequestType.GenerateShopDrawings;
-                        _externalEvent.Raise();
-                    });
-                });
+                AddMessage("IA", "Error crítico: " + ex.Message);
             }
-            else if (msg.ToLower().Contains("tubería") || msg.ToLower().Contains("ducto") || msg.ToLower().Contains("mep") || msg.ToLower().Contains("sanitaria"))
+        }
+
+        private void ExecuteAction(string actionKey)
+        {
+            switch(actionKey.ToUpper())
             {
-               System.Threading.Tasks.Task.Delay(1500).ContinueWith(t => 
-                {
-                    Dispatcher.Invoke(() => 
-                    {
-                        AddMessage("IA", "Entendido. Convirtiendo líneas seleccionadas en elementos MEP (Tuberías/Ductos)...");
-                        
-                        // Trigger Revit Action
-                        _requestHandler.Request = IARequestType.GenerateMEPFromLines;
-                        _externalEvent.Raise();
-                    });
-                });
-            }
-            else
-            {
-                 System.Threading.Tasks.Task.Delay(1000).ContinueWith(t => 
-                {
-                    Dispatcher.Invoke(() => 
-                    {
-                        AddMessage("IA", "Entendido. Por favor prueba con comandos como 'auditar muros' para ver una demostración de mis capacidades.");
-                    });
-                });
+                case "AUDIT_WALLS":
+                    _requestHandler.Request = IARequestType.AuditWalls;
+                    _externalEvent.Raise();
+                    break;
+                case "AUTO_DIMENSION":
+                    _requestHandler.Request = IARequestType.AutoDimension;
+                    _externalEvent.Raise();
+                    break;
+                case "GENERATE_SHOP_DRAWINGS":
+                    _requestHandler.Request = IARequestType.GenerateShopDrawings;
+                    _externalEvent.Raise();
+                    break;
+                case "GENERATE_MEP":
+                    _requestHandler.Request = IARequestType.GenerateMEPFromLines;
+                    _externalEvent.Raise();
+                    break;
+                default:
+                    // Just chat or unknown action
+                    break;
             }
         }
 

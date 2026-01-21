@@ -67,4 +67,10 @@ namespace RevitCivilConnector.Auth
     {
         protected override string RequiredPermission => "Cuantificaciones";
     }
+
+    public class MgmtAuthAvailability : BaseAuthAvailability
+    {
+        // Use a generic permission or reusing one, but 'Management' implies login check + maybe license
+        protected override string RequiredPermission => "General"; // Or just rely on IsLoggedIn check if permission system is too granular
+    }
 }
