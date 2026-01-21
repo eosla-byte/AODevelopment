@@ -200,6 +200,16 @@ class PluginCloudSession(Base):
     data_json = Column(JSON, default={}) # Stores { cards: [], groups: [], sheets: [], revit_data: ... }
     timestamp = Column(DateTime, default=func.now(), onupdate=func.now())
 
+class CloudCommand(Base):
+    __tablename__ = 'plugin_cloud_commands'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String, index=True)
+    action = Column(String)
+    payload = Column(JSON)
+    created_at = Column(DateTime, default=func.now())
+    is_consumed = Column(Boolean, default=False)
+
 
 class ExpenseCard(Base):
     __tablename__ = 'resources_expense_cards'

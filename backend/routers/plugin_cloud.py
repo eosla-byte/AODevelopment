@@ -53,7 +53,8 @@ async def calculate_quantities_cloud(payload: GeometryPayload):
 # ==========================================
 # COMMAND QUEUE (BRIDGE)
 # ==========================================
-COMMAND_QUEUE = {} # { session_id: [ {action, payload} ] }
+# Replaced In-Memory with DB Queue to handle multiple workers (Gunicorn)
+from database import queue_command, get_pending_commands
 
 class CommandPayload(BaseModel):
     action: str
@@ -61,19 +62,12 @@ class CommandPayload(BaseModel):
 
 @router.post("/command/{session_id}")
 async def send_command_to_revit(session_id: str, cmd: CommandPayload):
-    if session_id not in COMMAND_QUEUE:
-        COMMAND_QUEUE[session_id] = []
-    
-    COMMAND_QUEUE[session_id].append(cmd.dict())
+    queue_command(session_id, cmd.action, cmd.payload)
     return {"status": "queued"}
 
 @router.get("/commands/{session_id}")
 async def get_commands_for_revit(session_id: str):
-    cmds = COMMAND_QUEUE.get(session_id, [])
-    # Clear after read (Popping)
-    if session_id in COMMAND_QUEUE:
-        COMMAND_QUEUE[session_id] = []
-    
+    cmds = get_pending_commands(session_id)
     return {"commands": cmds}
 
 # ==========================================
