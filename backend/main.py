@@ -134,6 +134,12 @@ async def serve_landing(request: Request):
         return FileResponse(index_path)
     return HTMLResponse("<h1>AO Development</h1><p>Frontend not found.</p>")
 
+@app.get("/login", response_class=HTMLResponse)
+async def serve_landing_alias(request: Request):
+    # ALIAS for /login to BREAK REDIRECT LOOPS. 
+    # Instead of redirecting to /, we just show / here.
+    return await serve_landing(request)
+
 @app.get("/cloud-quantify", response_class=HTMLResponse)
 async def view_cloud_quantify(request: Request):
     return templates.TemplateResponse("cloud_quantify.html", {"request": request})
