@@ -760,40 +760,28 @@ function confirmImportSchedule() {
     if (newCard.rows.length > 0) {
         newCard.selectedParams = Object.keys(newCard.rows[0]);
         // Simple type detection for formatting
-        if (typeof newCard.rows[0][col] === 'string' && newCard.rows[0][col].includes('$')) {
-            newCard.columnFormats[col] = 'currency';
-        } else if (typeof newCard.rows[0][col] === 'number') {
-            newCard.columnFormats[col] = 'number';
-        }
-    });
-}
+        newCard.selectedParams.forEach(col => {
+            const val = newCard.rows[0][col];
+            if (typeof val === 'number') newCard.columnFormats[col] = 'number';
+            else if (typeof val === 'string' && val.includes('$')) newCard.columnFormats[col] = 'currency';
 
-activeCards.push(newCard);
-document.getElementById('import-schedule-modal').remove();
-
-// Switch to Groups Tab if not already
-if (CURRENT_TAB !== 'groups') switchTab('groups');
-
-// Select the subgroup we just added to
-selectSubgroup(subgroupId);
-
-saveProject();
-updateStatus("Tabla Importada", "emerald");
-}
-const val = newCard.rows[0][col];
-if (typeof val === 'number') newCard.columnFormats[col] = 'number';
-if (col.toLowerCase().includes('costo') || col.toLowerCase().includes('precio')) newCard.columnFormats[col] = 'currency';
-if (col.toLowerCase().includes('area')) newCard.columnFormats[col] = 'number'; // Sqm usually number
+            if (col.toLowerCase().includes('costo') || col.toLowerCase().includes('precio')) newCard.columnFormats[col] = 'currency';
+            if (col.toLowerCase().includes('area')) newCard.columnFormats[col] = 'number';
         });
     }
 
-activeCards.push(newCard);
+    activeCards.push(newCard);
 
-document.getElementById('import-schedule-modal').remove();
-showToast(`Tabla "${sched.name}" importada exitosamente`);
+    document.getElementById('import-schedule-modal').remove();
 
-renderKanbanBoard();
-saveProject();
+    // Switch to Groups Tab if not already
+    if (CURRENT_TAB !== 'groups') switchTab('groups');
+
+    // Select the subgroup we just added to
+    selectSubgroup(subgroupId);
+
+    saveProject();
+    updateStatus("Tabla Importada", "emerald");
 }
 
 // --- MODAL LOGIC (FIXED) ---
