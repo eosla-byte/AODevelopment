@@ -119,12 +119,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if not token:
                 # Redirect to login instead of landing if unauthorized?
                 # Or just keep behavior but now query param works.
-                return RedirectResponse("/", status_code=303) 
+                # Redirect to login instead of landing
+                return RedirectResponse("/ao-access", status_code=303) 
             
             payload = decode_access_token(token)
             if not payload:
                 # If token invalid, also redirect
-                return RedirectResponse("/", status_code=303)
+                # If token invalid, also redirect
+                return RedirectResponse("/ao-access", status_code=303)
                 
             request.state.user = payload
 
@@ -148,11 +150,12 @@ async def serve_landing(request: Request):
 async def serve_landing_alias(request: Request):
     return await serve_landing(request)
 
-@app.get("/cloud-quantify", response_class=HTMLResponse)
-
-@app.get("/cloud-quantify", response_class=HTMLResponse)
 async def view_cloud_quantify(request: Request):
-    return templates.TemplateResponse("cloud_quantify.html", {"request": request})
+    token = request.query_params.get("token")
+    response = templates.TemplateResponse("cloud_quantify.html", {"request": request})
+    if token:
+         response.set_cookie(key="access_token", value=token, httponly=True)
+    return response
 
 @app.get("/estimaciones", response_class=HTMLResponse)
 async def view_estimaciones(request: Request):
