@@ -130,20 +130,29 @@ app.add_middleware(AuthMiddleware)
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_landing(request: Request):
-    # Auto-redirect disabled to prevent loops. 
-    # User must manually go to dashboard if logged in.
-    
-    # Else -> Landing Page
-    index_path = "static/public_site/index.html"
+    # Auto-redirect disabled.
+    # Use BASE_DIR for robustness
+    index_path = os.path.join(BASE_DIR, "static/public_site/index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return HTMLResponse("<h1>AO Development</h1><p>Frontend not found.</p>")
 
 @app.get("/login", response_class=HTMLResponse)
 async def serve_landing_alias(request: Request):
-    # ALIAS for /login to BREAK REDIRECT LOOPS. 
-    # Instead of redirecting to /, we just show / here.
     return await serve_landing(request)
+    
+@app.get("/debug-css")
+async def debug_css_route():
+    # Diagnostic Route to check if CSS is readable
+    css_path = os.path.join(BASE_DIR, "static/public_site/assets/index-N3r3Gy9x.css")
+    if not os.path.exists(css_path):
+        return JSONResponse({"status": "Missing", "path": css_path})
+    try:
+        with open(css_path, 'r', encoding='utf-8') as f:
+            content = f.read(100) # First 100 chars
+        return JSONResponse({"status": "Found", "preview": content})
+    except Exception as e:
+        return JSONResponse({"status": "Error", "detail": str(e)})
 
 @app.get("/cloud-quantify", response_class=HTMLResponse)
 async def view_cloud_quantify(request: Request):
