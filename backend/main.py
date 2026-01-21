@@ -2418,6 +2418,53 @@ async def admin_add_project(
     except Exception as e:
         return RedirectResponse(f"/admin?error={str(e)}", status_code=303)
 
+@app.get("/admin/backup/download")
+async def download_database_backup(request: Request):
+    user = getattr(request.state, "user", None)
+    if not user or user["role"] != "admin":
+        return RedirectResponse("/")
+
+    # Identify DB Type
+    db_url = os.getenv("DATABASE_URL", "")
+    
+    # Filename
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
+    
+    if "postgres" in db_url:
+        filename = f"backup_ao_full_{timestamp}.sql"
+        try:
+            # Use pg_dump
+            # PGPASSWORD env var is needed for non-interactive auth
+            # URL parsing
+            from urllib.parse import urlparse
+            p = urlparse(db_url)
+            
+            # Construct pg_dump command
+            # Using --no-owner --no-acl to avoid restore permission issues on different users
+            cmd = ["pg_dump", "--no-owner", "--no-acl", "--clean", "--if-exists", db_url]
+            
+            # Run process
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # Stream response
+            return StreamingResponse(
+                proc.stdout, 
+                media_type="application/octet-stream", 
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+        except Exception as e:
+            print(f"Backup Error: {e}")
+            return HTMLResponse(f"Error creating backup: {e}", status_code=500)
+            
+    else:
+        # Fallback to SQLite (Local)
+        filename = f"backup_ao_local_{timestamp}.db"
+        db_path = "sql_app.db" # Default local
+        if os.path.exists(db_path):
+            return FileResponse(db_path, filename=filename)
+        else:
+            return HTMLResponse("Database file not found (Local)", status_code=404)
+
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
 
