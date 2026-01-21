@@ -72,23 +72,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Debug Logging Middleware
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    print(f"REQUEST START: {request.method} {request.url.path}")
-    response = await call_next(request)
-    print(f"REQUEST END: {request.method} {request.url.path} -> {response.status_code}")
-    return response
 
-@app.on_event("startup")
-async def startup_event():
-    print("----- REGISTERED ROUTES -----")
-    for route in app.routes:
-        if hasattr(route, "path"):
-            print(f"Route: {route.path}")
-    print("-----------------------------")
-
-# Mount Static
 # Mount Static
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -111,19 +95,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         path = request.url.path
         
-        # DEBUG LOGGING FOR AUTH MIDDLEWARE
-        # print(f"AUTH CHECK: {path}")
-        
         # 2. Block Protected Routes
         # Implicitly allow / (landing), /assets, /static, /api, /login
         protected_prefixes = [
             "/admin", "/cloud-quantify", "/estimaciones", "/cotizaciones", 
             "/projects", "/project", "/calendar"
         ]
-        
-        # Exact match whitelist for debug/assets to prevent accidents
-        if path.startswith("/debug-info") or path.startswith("/assets") or path.startswith("/static"):
-             return await call_next(request)
         
         is_protected = any(path.startswith(p) for p in protected_prefixes)
         
@@ -136,12 +113,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     token = auth_header.split(" ")[1]
             
             if not token:
-                print(f"AUTH BLOCK: Redirecting {path} to /")
                 return RedirectResponse("/", status_code=303) # Use 303 to distinguish from CatchAll(307)
             
             payload = decode_access_token(token)
             if not payload:
-                print(f"AUTH INVALID TOKEN: Redirecting {path} to /")
                 return RedirectResponse("/", status_code=303)
                 
             request.state.user = payload
@@ -165,41 +140,6 @@ async def serve_landing(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 async def serve_landing_alias(request: Request):
     return await serve_landing(request)
-    
-
-@app.get("/debug-info")
-async def debug_info_route():
-    # DIAGNOSTIC ROUTE
-    try:
-        # Check files content
-        css_path = os.path.join(BASE_DIR, "static/public_site/assets/index-N3r3Gy9x.css")
-        css_exists = os.path.exists(css_path)
-        
-        dir_listing = []
-        if os.path.exists(BASE_DIR):
-             dir_listing = os.listdir(BASE_DIR)
-             
-        static_listing = []
-        static_path = os.path.join(BASE_DIR, "static/public_site")
-        if os.path.exists(static_path):
-            static_listing = os.listdir(static_path)
-            
-        assets_listing = []
-        assets_dir = os.path.join(static_path, "assets")
-        if os.path.exists(assets_dir):
-            assets_listing = os.listdir(assets_dir)
-            
-        return JSONResponse({
-            "version": "1.0.1 (Absolute Paths)",
-            "base_dir": BASE_DIR,
-            "root_files": dir_listing,
-            "static_files": static_listing,
-            "assets_files": assets_listing,
-            "css_found": css_exists,
-            "cwd": os.getcwd()
-        })
-    except Exception as e:
-        return JSONResponse({"status": "Error", "detail": str(e)})
 
 @app.get("/cloud-quantify", response_class=HTMLResponse)
 
