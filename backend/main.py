@@ -98,7 +98,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # 2. Block Protected Routes
         # Implicitly allow / (landing), /assets, /static, /api, /login
         protected_prefixes = [
-            "/admin", "/cloud-quantify", "/estimaciones", "/cotizaciones", 
+            "/admin", "/estimaciones", "/cotizaciones", 
             "/projects", "/project", "/calendar", "/hr", "/create_project"
         ]
         
@@ -164,11 +164,25 @@ async def serve_landing(request: Request):
 async def serve_landing_alias(request: Request):
     return await serve_landing(request)
 
-async def view_cloud_quantify(request: Request):
+@app.get("/cqt-tool", response_class=HTMLResponse)
+async def view_cqt_tool(request: Request):
+    # Manual Auth Check to bypass Middleware caching/redirect issues
     token = request.query_params.get("token")
+    if not token:
+         return HTMLResponse("<h1>Error: Access Token Missing (CQT-501)</h1><p>Please update your plugin.</p>", status_code=403)
+    
+    payload = decode_access_token(token)
+    if not payload:
+         return HTMLResponse("<h1>Error: Invalid/Expired Token (CQT-502)</h1><p>Please restart Revit/Login again.</p>", status_code=403)
+         
+    # Check Role?
+    role = payload.get("role")
+    # Plugin Users and Admins allowed. Clients? Maybe not.
+    # Logic in Middleware blocked clients from admin but not cloud-quantify.
+    # We allow Plugin User & Admin.
+    
     response = templates.TemplateResponse("cloud_quantify.html", {"request": request})
-    if token:
-         response.set_cookie(key="access_token", value=token, httponly=True)
+    response.set_cookie(key="access_token", value=token, httponly=True)
     return response
 
 @app.get("/estimaciones", response_class=HTMLResponse)
