@@ -1,6 +1,6 @@
 [Setup]
 AppName=AOdev Plugin
-AppVersion=1.3.0
+AppVersion=1.3.1
 DefaultDirName={userappdata}\Autodesk\Revit\Addins\2024
 OutputDir=A:\AO_DEVELOPMENT\AO-Instaladores
 OutputBaseFilename=Install_AOdev_Plugin
