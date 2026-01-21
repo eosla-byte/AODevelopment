@@ -112,6 +112,7 @@
             font-weight: 700;
             background: linear-gradient(135deg, #fff, #94a3b8);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
@@ -213,7 +214,7 @@
 
         <div id="error-msg" class="alert alert-error"></div>
 
-        <form action="/login" method="POST" id="loginForm">
+        <form action="/ao-login-auth" method="POST" id="loginForm">
             <div class="form-group">
                 <label for="username">Email</label>
                 <input type="text" id="username" name="username" placeholder="name@example.com" required>

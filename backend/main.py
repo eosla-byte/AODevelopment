@@ -108,11 +108,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     token = auth_header.split(" ")[1]
             
             if not token:
-                return RedirectResponse("/login")
+                return RedirectResponse("/") # Redirect to Landing Page to hide backend
             
             payload = decode_access_token(token)
             if not payload:
-                return RedirectResponse("/login")
+                return RedirectResponse("/") # Redirect to Landing Page
                 
             request.state.user = payload
 
@@ -413,7 +413,7 @@ async def startup_event():
 # ==========================================
 
 
-@app.get("/login", response_class=HTMLResponse)
+@app.get("/ao-access", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
@@ -620,21 +620,21 @@ async def update_plugin_user_permissions(request: Request, uid: str):
 
 
 
-@app.post("/login")
+@app.post("/ao-login-auth")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
     # root_path = get_root_path() # Removed
     user = get_user_by_email(username)
     print(f"Login attempt: {username}")
     
     if not user:
-        return RedirectResponse("/login?error=1", status_code=303)
+        return RedirectResponse("/ao-access?error=1", status_code=303)
         
     if not verify_password(password, user.hashed_password):
         print("Invalid password")
-        return RedirectResponse("/login?error=1", status_code=303)
+        return RedirectResponse("/ao-access?error=1", status_code=303)
         
     if not user.is_active:
-         return RedirectResponse("/login?error=locked", status_code=303)
+         return RedirectResponse("/ao-access?error=locked", status_code=303)
 
     # Create Token
     access_token = create_access_token(
@@ -647,7 +647,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
 
 @app.get("/logout")
 async def logout():
-    response = RedirectResponse("/login", status_code=303)
+    response = RedirectResponse("/", status_code=303)
     response.delete_cookie("access_token")
     return response
 
