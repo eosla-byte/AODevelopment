@@ -156,15 +156,14 @@ function switchTab(tabId) {
 
 
 // EXPORT
-// EXPORT - Legacy function removed. 
-// New exportToExcel implementation is located in the AUTOMATIC COMPILATION section.
-// EXPORT - Legacy function removed. 
 // New exportToExcel implementation is located in the AUTOMATIC COMPILATION section.
 
-if (el) {
-    el.innerText = text;
-    el.parentElement.className = `flex items-center gap-2 px-3 py-1 bg-slate-800 rounded-full border border-slate-700 text-${color}-400`;
-}
+function updateStatus(text, color) {
+    const el = document.getElementById('connection-status');
+    if (el) {
+        el.innerText = text;
+        el.parentElement.className = `flex items-center gap-2 px-3 py-1 bg-slate-800 rounded-full border border-slate-700 text-${color}-400`;
+    }
 }
 
 // --- SPECTRUM CODING LOGIC ---
