@@ -1749,3 +1749,47 @@ def get_session_by_id(session_id: str):
         return None
     finally:
         db.close()
+
+# -----------------------------------------------------------------------------
+# CLOUD COMMANDS
+# -----------------------------------------------------------------------------
+
+def queue_command(session_id: str, action: str, payload: dict):
+    db = SessionLocal()
+    try:
+        cmd = models.CloudCommand(
+            session_id=session_id,
+            action=action,
+            payload=payload
+        )
+        db.add(cmd)
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+def get_pending_commands(session_id: str):
+    db = SessionLocal()
+    try:
+        # Get unconsumed commands
+        cmds = db.query(models.CloudCommand).filter(
+            models.CloudCommand.session_id == session_id,
+            models.CloudCommand.is_consumed == False
+        ).order_by(models.CloudCommand.created_at.asc()).all()
+        
+        result = []
+        for c in cmds:
+            result.append({
+                "action": c.action,
+                "payload": c.payload
+            })
+            # Mark consumed
+            c.is_consumed = True
+            
+        if result:
+            db.commit()
+            
+        return result
+    finally:
+        db.close()
+
