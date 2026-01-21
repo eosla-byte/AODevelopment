@@ -8,3 +8,4 @@ passlib[bcrypt]
 requests
 pydantic
 python-dotenv
+jinja2
