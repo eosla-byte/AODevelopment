@@ -2327,11 +2327,11 @@ async def admin_dashboard(request: Request):
 
 @app.post("/admin/users/add")
 async def admin_add_user(
+    request: Request,
     full_name: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
-    role: str = Form("Member"),
-    request: Request
+    role: str = Form("Member")
 ):
     try:
         hashed = get_password_hash(password)
@@ -2351,7 +2351,7 @@ async def admin_add_user(
         return RedirectResponse(f"/admin?error={str(e)}", status_code=303)
 
 @app.post("/admin/users/delete")
-async def admin_delete_user(email: str = Form(...), request: Request):
+async def admin_delete_user(request: Request, email: str = Form(...)):
     try:
         delete_user(email)
         return RedirectResponse("/admin?success=Usuario eliminado", status_code=303)
@@ -2360,12 +2360,12 @@ async def admin_delete_user(email: str = Form(...), request: Request):
 
 @app.post("/admin/projects/add")
 async def admin_add_project(
+    request: Request,
     name: str = Form(...),
     client: str = Form(""),
     amount: str = Form("0"),
     emoji: str = Form("📁"),
-    category: str = Form("Residencial"),
-    request: Request
+    category: str = Form("Residencial")
 ):
     try:
         amt_float = float(amount) if amount else 0.0
