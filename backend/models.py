@@ -252,3 +252,16 @@ class QuotationTemplate(Base):
     name = Column(String, nullable=False)
     content_json = Column(JSON, default=[])
     created_at = Column(DateTime, default=func.now())
+
+class PluginRoutine(Base):
+    __tablename__ = 'plugin_routines'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+    description = Column(Text) # The 'Prompt' or Explanation
+    category = Column(String, default="General") # Documentacion, Modelado
+    actions_json = Column(JSON, default=[]) # The recorded steps
+    is_global = Column(Boolean, default=False)
+    user_email = Column(String)
+    created_at = Column(DateTime, default=func.now())
+

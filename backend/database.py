@@ -1793,3 +1793,40 @@ def get_pending_commands(session_id: str):
     finally:
         db.close()
 
+
+# -----------------------------------------------------------------------------
+# ROUTINES (KNOWLEDGE BASE)
+# -----------------------------------------------------------------------------
+def save_routine(title, description, category, actions_json, user_email, is_global=False):
+    db = SessionLocal()
+    try:
+        new_routine = models.PluginRoutine(
+            title=title,
+            description=description,
+            category=category,
+            actions_json=actions_json,
+            user_email=user_email,
+            is_global=is_global
+        )
+        db.add(new_routine)
+        db.commit()
+        db.refresh(new_routine)
+        return new_routine
+    except Exception as e:
+        print(f"Error saving routine: {e}")
+        return None
+    finally:
+        db.close()
+
+def get_all_routines(user_email=None):
+    db = SessionLocal()
+    try:
+        query = db.query(models.PluginRoutine)
+        if user_email:
+            # Return Globals + My Personal
+            query = query.filter((models.PluginRoutine.is_global == True) | (models.PluginRoutine.user_email == user_email))
+        
+        return query.order_by(models.PluginRoutine.category, models.PluginRoutine.title).all()
+    finally:
+        db.close()
+

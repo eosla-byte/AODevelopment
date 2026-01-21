@@ -167,3 +167,50 @@ async def get_takeoff(project_id: str, token: str = Depends(verify_token_dep)):
 def verify_token_dep():
    # Implementation assumed from auth_utils or similar, or just allow for now if not strictly enforced in this snippet
    pass
+
+# -----------------------------------------------------------------------------
+# ROUTINES (KNOWLEDGE BASE)
+# -----------------------------------------------------------------------------
+from database import save_routine, get_all_routines
+
+class RoutineCreate(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    category: str
+    actions_json: List[str] # List of strings for now
+    user_email: str
+    is_global: bool = False
+
+@router.post("/routines")
+def create_routine_endpoint(routine: RoutineCreate):
+    try:
+        r = save_routine(
+            title=routine.title,
+            description=routine.description,
+            category=routine.category,
+            actions_json=routine.actions_json,
+            user_email=routine.user_email,
+            is_global=routine.is_global
+        )
+        if r: return {"status": "success", "id": r.id}
+        else: raise HTTPException(status_code=500, detail="DB Error")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/routines")
+def get_routines_endpoint(user_email: Optional[str] = None):
+    # If called from Admin Dashboard (no email param usually), return ALL (handled by get_all_routines if email is None)
+    routines = get_all_routines(user_email)
+    return [
+        {
+            "id": r.id,
+            "title": r.title,
+            "description": r.description,
+            "category": r.category,
+            "actions": r.actions_json,
+            "is_global": r.is_global,
+            "author": r.user_email
+        }
+        for r in routines
+    ]
+

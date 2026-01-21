@@ -2649,3 +2649,8 @@ async def serve_static_root(file_path: str):
     # Redirect 404s to Home (Landing Page)
     # Use 302 to distinguish from Auth(303) and Default(307)
     return RedirectResponse("/", status_code=302)
+
+@app.get("/knowledge", response_class=HTMLResponse)
+async def knowledge_page(request: Request):
+    return templates.TemplateResponse("knowledge_base.html", {"request": request})
+
