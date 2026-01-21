@@ -74,7 +74,11 @@ app.add_middleware(
 
 # Mount Static
 app.mount("/static", StaticFiles(directory="static"), name="static")
-app.mount("/assets", StaticFiles(directory="static/public_site/assets"), name="frontend_assets")
+assets_path = "static/public_site/assets"
+if os.path.exists(assets_path):
+    app.mount("/assets", StaticFiles(directory=assets_path), name="frontend_assets")
+else:
+    print(f"Warning: Assets directory not found at {assets_path}")
 templates = Jinja2Templates(directory="templates")
 
 # Auth Middleware
