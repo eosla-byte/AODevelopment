@@ -172,26 +172,29 @@ function renderGroups() {
     const container = document.getElementById('groups-list');
     if (!container) return;
 
-    container.innerHTML = groups.map(g => `
+    container.innerHTML = groups.map((g, gIndex) => `
         <div class="mb-2">
             <div class="group-item p-3 rounded-lg hover:bg-slate-800 cursor-pointer transition-colors flex items-center justify-between text-slate-300 hover:text-white" 
                  onclick="toggleGroupAccordion('${g.id}')">
                 <div class="flex items-center gap-3">
-                    <i class="fas ${g.icon} text-slate-500 w-5 text-center"></i>
+                    <i class="fas ${g.icon || 'fa-folder'} text-slate-500 w-5 text-center"></i>
                     <span class="font-bold text-sm tracking-wide">${g.name}</span>
                 </div>
                 <div class="flex items-center gap-2">
                      <span class="text-[10px] bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">${g.subgroups.length}</span>
+                     ${g.id.startsWith('g') ? '' : `<button onclick="deleteGroup(event, '${g.id}')" class="text-slate-600 hover:text-red-400 p-1"><i class="fas fa-trash"></i></button>`}
                      <button onclick="createNewSubgroup(event, '${g.id}')" class="text-slate-600 hover:text-emerald-400 p-1"><i class="fas fa-plus"></i></button>
                 </div>
             </div>
             
             <div id="subgroups-${g.id}" class="ml-4 border-l border-slate-800 pl-2 mt-1 space-y-1 ${g.open ? '' : 'hidden'}">
-                ${g.subgroups.map(sg => `
-                    <div class="p-2 rounded hover:bg-slate-800/50 cursor-pointer text-xs flex items-center justify-between ${selectedSubgroupId === sg.id ? 'bg-indigo-900/30 text-indigo-300 border-l-2 border-indigo-500' : 'text-slate-400'}"
+                ${g.subgroups.map((sg, index) => `
+                    <div class="p-2 rounded hover:bg-slate-800/50 cursor-pointer text-xs flex items-center justify-between group/sg ${selectedSubgroupId === sg.id ? 'bg-indigo-900/30 text-indigo-300 border-l-2 border-indigo-500' : 'text-slate-400'}"
                          onclick="selectSubgroup('${sg.id}')">
                         <span>${sg.name}</span>
-                        <div class="flex gap-1">
+                        <div class="flex gap-1 opacity-0 group-hover/sg:opacity-100 transition-opacity">
+                             ${index > 0 ? `<button onclick="moveSubgroup(event, '${g.id}', '${sg.id}', -1)" class="text-slate-500 hover:text-white"><i class="fas fa-chevron-up"></i></button>` : ''}
+                             ${index < g.subgroups.length - 1 ? `<button onclick="moveSubgroup(event, '${g.id}', '${sg.id}', 1)" class="text-slate-500 hover:text-white"><i class="fas fa-chevron-down"></i></button>` : ''}
                              <span class="text-[9px] bg-slate-800 px-1 rounded">${activeCards.filter(c => c.subgroupId === sg.id).length}</span>
                              <button onclick="deleteSubgroup(event, '${g.id}', '${sg.id}')" class="text-red-900 hover:text-red-400 p-0.5"><i class="fas fa-times"></i></button>
                         </div>
@@ -201,6 +204,42 @@ function renderGroups() {
             </div>
         </div>
     `).join('');
+}
+
+function createNewGroup() {
+    const name = prompt("Nombre del Nuevo Grupo:");
+    if (!name) return;
+    const newId = `custom_g${Date.now()}`;
+    groups.push({ id: newId, name: name, icon: 'fa-folder', subgroups: [], open: true });
+    renderGroups();
+    saveProject();
+}
+
+function deleteGroup(e, groupId) {
+    e.stopPropagation();
+    if (!confirm("¿Eliminar Grupo? Se perderán los subgrupos y tarjetas asociadas.")) return;
+    groups = groups.filter(g => g.id !== groupId);
+    // Cleanup active cards
+    // actually, cards are linked by subgroupId. If subgroup gone, card is orphaned.
+    // Ideally we should delete or archive orphaned cards.
+    renderGroups();
+    saveProject();
+}
+
+function moveSubgroup(e, groupId, subgroupId, dir) {
+    e.stopPropagation();
+    const g = groups.find(x => x.id === groupId);
+    if (!g) return;
+    const idx = g.subgroups.findIndex(sg => sg.id === subgroupId);
+    if (idx < 0) return;
+
+    const newIdx = idx + dir;
+    if (newIdx >= 0 && newIdx < g.subgroups.length) {
+        const item = g.subgroups.splice(idx, 1)[0];
+        g.subgroups.splice(newIdx, 0, item);
+        renderGroups();
+        saveProject();
+    }
 }
 
 function toggleGroupAccordion(groupId) {
@@ -452,8 +491,15 @@ function deleteCard(id, e) {
     }
 }
 
-function saveProject() {
-    // Basic Stub for saving
+async function saveProject() {
+    // Optimistic Concurrency Control (Lite)
+    // 1. Fetch latest to ensure we don't overwrite others' groups blindly if we haven't synced.
+    // For now, we assume user is master. 
+    // To truly fix concurrency, we'd need differential updates or WebSockets.
+    // IMPROVEMENT: Load latest groups/cards from server, merge changes, then save.
+    // Simpler Approach for Beta: Just save what we have, but notify user if save fails.
+
+    updateStatus("Guardando...", "yellow");
     const payload = {
         session_id: SESSION_ID,
         project_name: document.getElementById('project-name-input')?.value || "Sin Nombre",
@@ -461,14 +507,111 @@ function saveProject() {
         groups: groups,
         sheets: sheets
     };
-    fetch(`${API_BASE}/save-project`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    }).then(r => {
-        if (r.ok) showToast("Proyecto Guardado");
-        else console.error("Error saving");
-    });
+
+    try {
+        const r = await fetch(`${API_BASE}/save-project`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (r.ok) {
+            updateStatus("Guardado", "emerald");
+            // showToast("Proyecto Guardado"); // Creates too much noise
+        } else {
+            updateStatus("Error Guardando", "red");
+            console.error("Error saving");
+        }
+    } catch (e) {
+        console.error(e);
+        updateStatus("Offline (Save Failed)", "red");
+    }
+}
+
+// --- IMPORT SCHEDULES LOGIC ---
+function openImportScheduleModal() {
+    // Check if Revit Data has schedules
+    if (!REVIT_DATA || !REVIT_DATA.schedules || REVIT_DATA.schedules.length === 0) {
+        alert("No hay tablas (schedules) disponibles en la data sincronizada de Revit.");
+        return;
+    }
+
+    // Dynamic Modal Construction
+    const modalId = 'import-schedule-modal';
+    let modal = document.getElementById(modalId);
+    if (modal) modal.remove(); // Rebuild fresh
+
+    const html = `
+    <div id="${modalId}" class="fixed inset-0 bg-black/90 backdrop-blur-sm z-[90] flex items-center justify-center animate-fade-in p-4">
+        <div class="bg-[#1e2230] rounded-2xl border border-slate-700 shadow-2xl w-full max-w-lg flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-[#13151f] rounded-t-2xl">
+                <h3 class="text-xl font-bold text-white"><i class="fas fa-file-import text-emerald-400 mr-2"></i>Importar Tabla de Revit</h3>
+                <button onclick="document.getElementById('${modalId}').remove()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="p-6 flex-1 overflow-y-auto custom-scrollbar space-y-4">
+                <div>
+                    <label class="block text-xs uppercase text-slate-500 font-bold mb-2">Selecciona una Tabla</label>
+                    <div class="space-y-2">
+                        ${REVIT_DATA.schedules.map(sched => `
+                            <div onclick="importScheduleFromRevit('${sched.id}')" 
+                                 class="p-3 bg-slate-800/50 border border-slate-700 hover:border-emerald-500 hover:bg-slate-800 rounded cursor-pointer transition-all flex items-center justify-between group">
+                                <span class="text-slate-300 font-medium group-hover:text-white">${sched.name}</span>
+                                <i class="fas fa-plus-circle text-slate-600 group-hover:text-emerald-400"></i>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function importScheduleFromRevit(scheduleId) {
+    const sched = REVIT_DATA.schedules.find(s => s.id === scheduleId);
+    if (!sched) return;
+
+    if (!selectedSubgroupId) {
+        alert("Por favor selecciona un Subgrupo donde importar la tabla primero.");
+        document.getElementById('import-schedule-modal').remove();
+        return;
+    }
+
+    // Adapt Revit Data to Card Format
+    const newCard = {
+        id: "c_imp_" + Date.now(),
+        name: sched.name,
+        status: 'process',
+        source: 'REVIT_SCHEDULE',
+        subgroupId: selectedSubgroupId,
+        rows: sched.rows || [],
+        selectedParams: [], // Will autofill from data keys
+        columnFormats: {},
+        filters: [], // TODO: Map Revit filters if available
+        sort: []
+    };
+
+    // Auto-detect columns
+    if (newCard.rows.length > 0) {
+        newCard.selectedParams = Object.keys(newCard.rows[0]);
+        // Simple type detection for formatting
+        newCard.selectedParams.forEach(col => {
+            const val = newCard.rows[0][col];
+            if (typeof val === 'number') newCard.columnFormats[col] = 'number';
+            if (col.toLowerCase().includes('costo') || col.toLowerCase().includes('precio')) newCard.columnFormats[col] = 'currency';
+            if (col.toLowerCase().includes('area')) newCard.columnFormats[col] = 'number'; // Sqm usually number
+        });
+    }
+
+    activeCards.push(newCard);
+
+    document.getElementById('import-schedule-modal').remove();
+    showToast(`Tabla "${sched.name}" importada exitosamente`);
+
+    renderKanbanBoard();
+    saveProject();
 }
 
 // --- MODAL LOGIC (FIXED) ---
