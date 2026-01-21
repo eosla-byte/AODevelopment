@@ -11,8 +11,8 @@ namespace RevitCivilConnector.services
 {
     public class TakeoffCloudService
     {
-        // TODO: Update this URL with your Railway domain (e.g., https://web-production-xyz.up.railway.app/api/plugin/takeoff)
-        private const string BASE_URL = "https://YOUR-RAILWAY-APP.up.railway.app/api/plugin/takeoff";
+        // Production URL
+        private const string BASE_URL = "https://aodevelopment-production.up.railway.app/api/plugin/takeoff";
 
         public static async Task<bool> UploadPackages(string projectId, List<TakeoffPackage> packages)
         {
