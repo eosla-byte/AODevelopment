@@ -99,7 +99,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Implicitly allow / (landing), /assets, /static, /api, /login
         protected_prefixes = [
             "/admin", "/cloud-quantify", "/estimaciones", "/cotizaciones", 
-            "/projects", "/project", "/calendar"
+            "/projects", "/project", "/calendar", "/hr", "/create_project"
         ]
         
         is_protected = any(path.startswith(p) for p in protected_prefixes)
@@ -2418,6 +2418,33 @@ async def admin_add_project(
             category=category
         )
         return RedirectResponse("/admin?success=Proyecto creado", status_code=303)
+    except Exception as e:
+        return RedirectResponse(f"/admin?error={str(e)}", status_code=303)
+
+@app.post("/create_project")
+async def staff_create_project(
+    request: Request,
+    name: str = Form(...),
+    client: str = Form(""),
+    amount: str = Form("0"),
+    emoji: str = Form("📁"),
+    status: str = Form("Activo"),
+    root_path: str = Form(None) # Ignore legacy param
+):
+    try:
+        amt_float = float(amount) if amount else 0.0
+        create_project(
+            name=name,
+            client=client,
+            amount=amt_float,
+            emoji=emoji,
+            status=status, 
+            category="Residencial" # Default for now
+        )
+        return RedirectResponse("/projects", status_code=303)
+    except Exception as e:
+        print(f"Error creating project: {e}")
+        return RedirectResponse(f"/projects?error={str(e)}", status_code=303)
     except Exception as e:
         return RedirectResponse(f"/admin?error={str(e)}", status_code=303)
 
