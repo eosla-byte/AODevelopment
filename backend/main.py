@@ -41,9 +41,11 @@ from pydantic import BaseModel
 app = FastAPI()
 
 # Include Plugin API
-from routers import plugin_api, plugin_cloud
+# Include Plugin API
+from routers import plugin_api, plugin_cloud, ai
 app.include_router(plugin_api.router)
 app.include_router(plugin_cloud.router)
+app.include_router(ai.router)
 
 # Input Models
 class LoginRequest(BaseModel):
