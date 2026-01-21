@@ -46,7 +46,9 @@ AVAILABLE ACTIONS:
 - AUTO_DIMENSION: Automatically dimensions visible grids in the current view.
 - GENERATE_SHOP_DRAWINGS: Groups selected elements by geometry and prepares assembly/shop drawings.
 - GENERATE_MEP: Converts selected model lines into MEP Pipes/Ducts based on smart detection.
+- GENERATE_MEP: Converts selected model lines into MEP Pipes/Ducts based on smart detection.
 - COUNT_ELEMENTS: Counts selected elements or visible elements.
+- CREATE_SHEET_LIST: Creates a Schedule View (Tabla de Planificación) listing all Sheets in the project.
 
 INSTRUCTIONS:
 1. Analyze the USER MESSAGE to understand intent.

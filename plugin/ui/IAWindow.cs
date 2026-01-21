@@ -88,7 +88,8 @@ namespace RevitCivilConnector.UI
             };
             headerStack.Children.Add(title);
 
-            // Provider Selector
+            // Provider Selector Removed (Always use Backend)
+            /*
             System.Windows.Controls.ComboBox comboProvider = new System.Windows.Controls.ComboBox  
             { 
                 Width = 100,
@@ -101,6 +102,7 @@ namespace RevitCivilConnector.UI
             comboProvider.Items.Add("Claude (Browser)");
             comboProvider.SelectedIndex = 0;
             headerStack.Children.Add(comboProvider);
+            */
 
             // Status Indicator
             System.Windows.Shapes.Ellipse status = new System.Windows.Shapes.Ellipse
@@ -334,6 +336,10 @@ namespace RevitCivilConnector.UI
                     break;
                 case "GENERATE_MEP":
                     _requestHandler.Request = IARequestType.GenerateMEPFromLines;
+                    _externalEvent.Raise();
+                    break;
+                case "CREATE_SHEET_LIST":
+                    _requestHandler.Request = IARequestType.CreateSheetList;
                     _externalEvent.Raise();
                     break;
                 default:

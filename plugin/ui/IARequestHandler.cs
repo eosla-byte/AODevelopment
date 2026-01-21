@@ -15,6 +15,7 @@ namespace RevitCivilConnector.UI
         GenerateMEPFromLines,
         CountElements,
         CreateSheet,
+        CreateSheetList,
         ToggleRecording
     }
 
@@ -45,6 +46,9 @@ namespace RevitCivilConnector.UI
                         break;
                     case IARequestType.ToggleRecording:
                         ToggleRecording();
+                        break;
+                    case IARequestType.CreateSheetList:
+                        CreateSheetList(uiapp);
                         break;
                     default:
                         break;
@@ -434,6 +438,46 @@ namespace RevitCivilConnector.UI
             {
                 App.Recorder.StartRecording();
                 TaskDialog.Show("IA Learning", "Recording Started... Perform your actions in Revit (Create walls, dimensions, etc). Press the button again to stop.");
+            }
+        }
+        private void CreateSheetList(UIApplication uiapp)
+        {
+            UIDocument uidoc = uiapp.ActiveUIDocument;
+            Document doc = uidoc.Document;
+
+            using (Transaction t = new Transaction(doc, "IA Create Sheet List"))
+            {
+                t.Start();
+                try
+                {
+                    // Create Schedule for Sheets
+                    ElementId categoryId = new ElementId(BuiltInCategory.OST_Sheets);
+                    ViewSchedule schedule = ViewSchedule.CreateSchedule(doc, categoryId);
+                    schedule.Name = "Listado de Planos (IA Generated)";
+
+                    // Add Fields: Sheet Number, Sheet Name
+                    // We need to find the specific fields from SchedulableFields
+                    foreach (SchedulableField sf in schedule.Definition.GetSchedulableFields())
+                    {
+                        if (sf.ParameterId == new ElementId(BuiltInParameter.SHEET_NUMBER) || 
+                            sf.ParameterId == new ElementId(BuiltInParameter.SHEET_NAME))
+                        {
+                            schedule.Definition.AddField(sf);
+                        }
+                    }
+
+                    t.Commit();
+                    
+                    // Activate View
+                    uidoc.ActiveView = schedule;
+                    
+                    TaskDialog.Show("IA Result", "Listado de Planos creado con éxito.");
+                }
+                catch (Exception ex)
+                {
+                    t.RollBack();
+                    TaskDialog.Show("IA Error", "No se pudo crear el listado: " + ex.Message);
+                }
             }
         }
     }
