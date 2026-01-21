@@ -1010,6 +1010,48 @@ def end_revit_session(session_id):
     finally:
         db.close()
 
+def get_user_plugin_stats(email):
+    db = SessionLocal()
+    try:
+        now = datetime.datetime.now()
+        start_month = datetime.datetime(now.year, now.month, 1)
+        
+        # Get sessions for this month
+        sessions = db.query(models.PluginSession)\
+            .filter(models.PluginSession.user_email == email)\
+            .filter(models.PluginSession.start_time >= start_month)\
+            .all()
+            
+        total_active_mins = 0
+        unique_files = set()
+        
+        for s in sessions:
+            activities = db.query(models.PluginActivity).filter(models.PluginActivity.session_id == s.id).all()
+            for a in activities:
+                total_active_mins += (a.active_minutes or 0)
+                if a.filename:
+                    unique_files.add(a.filename)
+                    
+        return {
+            "month_hours": round(total_active_mins / 60.0, 1),
+            "files_count": len(unique_files)
+        }
+    except Exception as e:
+        print(f"Error stats: {e}")
+        return {"month_hours": 0.0, "files_count": 0}
+    finally:
+        db.close()
+
+def get_plugin_sessions():
+    db = SessionLocal()
+    try:
+        return db.query(models.PluginSession).all()
+    except Exception as e:
+        print(f"Error getting sessions: {e}")
+        return []
+    finally:
+        db.close()
+
 def get_user_plugin_logs(email, start_date: datetime.date = None, end_date: datetime.date = None):
     db = SessionLocal()
     try:
