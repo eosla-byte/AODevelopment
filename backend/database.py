@@ -1055,7 +1055,11 @@ def get_plugin_sessions():
 def get_user_plugin_logs(email, start_date: datetime.date = None, end_date: datetime.date = None):
     db = SessionLocal()
     try:
-        q = db.query(models.PluginSession).filter(models.PluginSession.user_email == email)
+        # Robust case-insensitive search
+        if not email: return []
+        
+        q = db.query(models.PluginSession).filter(func.lower(models.PluginSession.user_email) == email.lower().strip())
+        
         
         if start_date:
             # Combine date with min time
