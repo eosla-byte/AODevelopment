@@ -11,6 +11,7 @@ import shutil
 import json
 import mimetypes
 import datetime
+import uuid
 # Database Imports
 from database import (
     get_projects, create_project, get_project_details, 
@@ -2291,6 +2292,84 @@ async def delete_template_route(tpl_id: int):
         else: return JSONResponse({"status": "error", "message": "Failed/Not Found"}, status_code=404)
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+# ==========================================
+# ADMIN ROUTES (New)
+# ==========================================
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    user = getattr(request.state, "user", None)
+    _users = get_users()
+    _projects = get_projects()
+    error = request.query_params.get("error")
+    success = request.query_params.get("success")
+
+    return templates.TemplateResponse("admin_dashboard.html", {
+        "request": request,
+        "users": _users,
+        "projects": _projects,
+        "user": user,
+        "error": error,
+        "success": success
+    })
+
+@app.post("/admin/users/add")
+async def admin_add_user(
+    full_name: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role: str = Form("Member"),
+    request: Request
+):
+    try:
+        hashed = get_password_hash(password)
+        new_user = User(
+            id=str(uuid.uuid4()),
+            name=full_name,
+            email=email,
+            role=role,
+            is_active=True,
+            hashed_password=hashed,
+            permissions={},
+            assigned_projects=[]
+        )
+        save_user(new_user)
+        return RedirectResponse("/admin?success=Usuario creado", status_code=303)
+    except Exception as e:
+        return RedirectResponse(f"/admin?error={str(e)}", status_code=303)
+
+@app.post("/admin/users/delete")
+async def admin_delete_user(email: str = Form(...), request: Request):
+    try:
+        delete_user(email)
+        return RedirectResponse("/admin?success=Usuario eliminado", status_code=303)
+    except Exception as e:
+        return RedirectResponse(f"/admin?error={str(e)}", status_code=303)
+
+@app.post("/admin/projects/add")
+async def admin_add_project(
+    name: str = Form(...),
+    client: str = Form(""),
+    amount: str = Form("0"),
+    emoji: str = Form("📁"),
+    category: str = Form("Residencial"),
+    request: Request
+):
+    try:
+        amt_float = float(amount) if amount else 0.0
+        create_project(
+            name=name,
+            client=client,
+            amount=amt_float,
+            emoji=emoji,
+            status="Activo",
+            category=category
+        )
+        return RedirectResponse("/admin?success=Proyecto creado", status_code=303)
+    except Exception as e:
+        return RedirectResponse(f"/admin?error={str(e)}", status_code=303)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

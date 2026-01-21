@@ -101,7 +101,7 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
     finally:
         db.close()
 
-def create_project(name: str, client: str = "", nit: str = "", legal_name: str = "", po_number: str = "", amount: float = 0.0, status: str = "Activo", emoji: str = "📁", custom_id: str = None) -> bool:
+def create_project(name: str, client: str = "", nit: str = "", legal_name: str = "", po_number: str = "", amount: float = 0.0, status: str = "Activo", emoji: str = "📁", custom_id: str = None, category: str = "Residencial") -> bool:
     db = SessionLocal()
     try:
         if custom_id:
@@ -119,6 +119,7 @@ def create_project(name: str, client: str = "", nit: str = "", legal_name: str =
             amount=amount,
             status=status,
             emoji=emoji,
+            category=category,
             start_date=datetime.datetime.now().isoformat()
         )
         db.add(new_proj)

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - AO Development</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #cbd5e1;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .btn-primary {
+            background: #4f46e5;
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .btn-primary:hover {
+            background: #4338ca;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .btn-danger:hover {
+            background: #b91c1c;
+        }
+
+        .input-field {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: white;
+            padding: 0.5rem 1rem;
+            rounded: 0.5rem;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-field:focus {
+            border-color: #6366f1;
+        }
+
+        .modal {
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .modal.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .modal:not(.hidden) {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col">
+    <!-- Navbar -->
+    <nav class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center font-bold text-white">AO
+                    </div>
+                    <span class="font-bold text-lg text-white">Admin Console</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="/" class="text-sm text-slate-400 hover:text-white transition-colors">Volver al Inicio</a>
+                    <div
+                        class="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-mono border border-slate-600">
+                        {{ user.name[:2].upper() if user else 'AD' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- Error/Success Messages -->
+        {% if error %}
+        <div class="mb-6 p-4 rounded-lg bg-red-900/50 border border-red-500/50 text-red-200">
+            <i class="fas fa-exclamation-triangle mr-2"></i> {{ error }}
+        </div>
+        {% endif %}
+        {% if success %}
+        <div class="mb-6 p-4 rounded-lg bg-green-900/50 border border-green-500/50 text-green-200">
+            <i class="fas fa-check-circle mr-2"></i> {{ success }}
+        </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+            <!-- Users Section -->
+            <section class="glass-panel rounded-xl overflow-hidden flex flex-col h-[600px]">
+                <div class="p-6 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/50">
+                    <div>
+                        <h2 class="text-xl font-bold text-white"><i
+                                class="fas fa-users text-indigo-400 mr-2"></i>Usuarios del Sistema</h2>
+                        <p class="text-xs text-slate-400 mt-1">Gestión de acceso y roles (Plugin y Web).</p>
+                    </div>
+                    <button onclick="openModal('user-modal')"
+                        class="btn-primary px-4 py-2 rounded-lg text-sm font-bold shadow-lg">
+                        <i class="fas fa-plus mr-2"></i>Nuevo Usuario
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-0">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-800/50 sticky top-0 text-xs uppercase text-slate-400 font-semibold">
+                            <tr>
+                                <th class="px-6 py-3">Usuario</th>
+                                <th class="px-6 py-3">Rol</th>
+                                <th class="px-6 py-3 text-center">Estado</th>
+                                <th class="px-6 py-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/50 text-sm">
+                            {% for u in users %}
+                            <tr class="hover:bg-slate-800/30 transition-colors group">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div
+                                            class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                                            {{ u.name[:2].upper() }}
+                                        </div>
+                                        <div>
+                                            <div class="font-bold text-white">{{ u.name }}</div>
+                                            <div class="text-xs text-slate-500">{{ u.email }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="px-2 py-1 rounded bg-slate-800 border border-slate-600 text-xs">{{
+                                        u.role }}</span>
+                                </td>
+                                <td class="px-6 py-4 text-center">
+                                    {% if u.is_active %}
+                                    <span class="text-green-400"><i
+                                            class="fas fa-circle text-[8px] mr-1"></i>Activo</span>
+                                    {% else %}
+                                    <span class="text-red-400"><i
+                                            class="fas fa-circle text-[8px] mr-1"></i>Inactivo</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <form action="/admin/users/delete" method="POST"
+                                        onsubmit="return confirm('¿Eliminar usuario irrevocablemente?');"
+                                        class="inline">
+                                        <input type="hidden" name="email" value="{{ u.email }}">
+                                        <button type="submit"
+                                            class="text-slate-500 hover:text-red-400 transition-colors p-2">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if users|length == 0 %}
+                            <tr>
+                                <td colspan="4" class="p-8 text-center text-slate-500 italic">No hay usuarios
+                                    registrados.</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Projects Section -->
+            <section class="glass-panel rounded-xl overflow-hidden flex flex-col h-[600px]">
+                <div class="p-6 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/50">
+                    <div>
+                        <h2 class="text-xl font-bold text-white"><i
+                                class="fas fa-folder-open text-emerald-400 mr-2"></i>Proyectos</h2>
+                        <p class="text-xs text-slate-400 mt-1">Base de datos de proyectos activos.</p>
+                    </div>
+                    <button onclick="openModal('project-modal')"
+                        class="btn-primary px-4 py-2 rounded-lg text-sm font-bold shadow-lg bg-emerald-600 hover:bg-emerald-500">
+                        <i class="fas fa-plus mr-2"></i>Nuevo Proyecto
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-0">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-800/50 sticky top-0 text-xs uppercase text-slate-400 font-semibold">
+                            <tr>
+                                <th class="px-6 py-3">Proyecto</th>
+                                <th class="px-6 py-3">Cliente</th>
+                                <th class="px-6 py-3 text-right">Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-700/50 text-sm">
+                            {% for p in projects %}
+                            <tr class="hover:bg-slate-800/30 transition-colors">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xl">{{ p.emoji }}</span>
+                                        <div>
+                                            <div class="font-bold text-white">{{ p.name }}</div>
+                                            <div class="text-xs text-slate-500">ID: {{ p.id }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-slate-300">{{ p.client }}</td>
+                                <td class="px-6 py-4 text-right font-mono text-slate-400">${{ "{:,.2f}".format(p.amount)
+                                    }}</td>
+                            </tr>
+                            {% endfor %}
+                            {% if projects|length == 0 %}
+                            <tr>
+                                <td colspan="3" class="p-8 text-center text-slate-500 italic">No hay proyectos
+                                    registrados.</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- User Modal -->
+    <div id="user-modal"
+        class="modal hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div
+            class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 p-0">
+            <div class="bg-slate-800 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                <h3 class="font-bold text-white">Nuevo Usuario</h3>
+                <button onclick="closeModal('user-modal')" class="text-slate-400 hover:text-white"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <form action="/admin/users/add" method="POST" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nombre Completo</label>
+                    <input type="text" name="full_name" required class="input-field" placeholder="Ej. Juan Pérez">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Email (Plugin ID)</label>
+                    <input type="email" name="email" required class="input-field" placeholder="juan@ao.com">
+                    <p class="text-[10px] text-slate-500 mt-1">Este email se usará para iniciar sesión en el Plugin
+                        Revit.</p>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Rol</label>
+                    <select name="role" class="input-field cursor-pointer">
+                        <option value="Member">Member (Estándar)</option>
+                        <option value="Admin">Admin (Control Total)</option>
+                        <option value="Reader">Reader (Solo Lectura)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Contraseña</label>
+                    <input type="password" name="password" required class="input-field" placeholder="••••••••">
+                </div>
+
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" onclick="closeModal('user-modal')"
+                        class="px-4 py-2 text-slate-400 hover:text-white text-sm font-bold">Cancelar</button>
+                    <button type="submit" class="btn-primary px-6 py-2 rounded-lg text-sm font-bold">Crear
+                        Usuario</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Project Modal -->
+    <div id="project-modal"
+        class="modal hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div
+            class="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-100 p-0">
+            <div class="bg-slate-800 px-6 py-4 border-b border-slate-700 flex justify-between items-center">
+                <h3 class="font-bold text-white">Nuevo Proyecto</h3>
+                <button onclick="closeModal('project-modal')" class="text-slate-400 hover:text-white"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <form action="/admin/projects/add" method="POST" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nombre del Proyecto</label>
+                    <input type="text" name="name" required class="input-field" placeholder="Ej. Torre Zentral 2">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Cliente</label>
+                    <input type="text" name="client" class="input-field" placeholder="Ej. Inmobiliaria XYZ">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Monto ($)</label>
+                        <input type="number" step="0.01" name="amount" class="input-field" placeholder="0.00">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Emoji</label>
+                        <input type="text" name="emoji" class="input-field" value="🏢" placeholder="🏢">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Categoría</label>
+                    <select name="category" class="input-field cursor-pointer">
+                        <option value="Residencial">Residencial</option>
+                        <option value="Comercial">Comercial</option>
+                        <option value="Industrial">Industrial</option>
+                        <option value="Recreativo">Recreativo</option>
+                        <option value="Educativo">Educativo</option>
+                    </select>
+                </div>
+
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" onclick="closeModal('project-modal')"
+                        class="px-4 py-2 text-slate-400 hover:text-white text-sm font-bold">Cancelar</button>
+                    <button type="submit"
+                        class="btn-primary bg-emerald-600 hover:bg-emerald-500 px-6 py-2 rounded-lg text-sm font-bold">Crear
+                        Proyecto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // Close on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal('user-modal');
+                closeModal('project-modal');
+            }
+        });
+    </script>
+</body>
+
+</html>
