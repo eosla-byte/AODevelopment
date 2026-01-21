@@ -18,7 +18,8 @@ namespace RevitCivilConnector.Auth
         public static AuthService Instance => _instance ?? (_instance = new AuthService());
 
         // Config
-        private const string BASE_URL = "http://localhost:8000/api/plugin";
+        // Production URL
+        private const string BASE_URL = "https://aodevelopment-production.up.railway.app/api/plugin";
         private readonly HttpClient _client;
         
         // State
