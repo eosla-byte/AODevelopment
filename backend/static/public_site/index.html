@@ -109,15 +109,99 @@
           <video class="hero-video active" autoplay muted playsinline data-index="0" data-text="LET IT BIM">
             <source src="/VIDEO-A.mp4" type="video/mp4">
           </video>
-          <!-- Video C (Now 2nd) -->
+          <!-- Video C -->
           <video class="hero-video" muted playsinline data-index="1" data-text="BIM IS HERE">
-            <source src="/VIDEO C.mp4" type="video/mp4">
+            <source src="/VIDEO%20C.mp4" type="video/mp4">
           </video>
-          <!-- Video D (Now 3rd) -->
+          <!-- Video D -->
           <video class="hero-video" muted playsinline data-index="2" data-text="WE CREATE WHAT WE PLAN">
-            <source src="/VIDEO D.mp4" type="video/mp4">
+            <source src="/VIDEO%20D.mp4" type="video/mp4">
           </video>
         </div>
+
+        <script>
+          document.addEventListener('DOMContentLoaded', () => {
+            /* --- HEADER FIX --- */
+            const header = document.getElementById('main-header');
+            if (header) {
+              header.style.position = 'absolute';
+              header.style.width = '100%';
+              header.style.top = '0';
+              header.style.zIndex = '1000';
+              header.style.background = 'transparent';
+            }
+
+            /* --- VIDEO CAROUSEL LOGIC --- */
+            const videos = document.querySelectorAll('.hero-video');
+            const title = document.querySelector('.main-title');
+            let currentIndex = 0;
+
+            function playNext() {
+              // Stop current
+              videos[currentIndex].classList.remove('active');
+              videos[currentIndex].pause();
+              videos[currentIndex].currentTime = 0;
+
+              // Next index
+              currentIndex = (currentIndex + 1) % videos.length;
+
+              // Play next
+              const nextVideo = videos[currentIndex];
+              nextVideo.classList.add('active');
+              nextVideo.play().catch(e => console.error("Video play failed:", e));
+
+              // Update Text
+              if (title && nextVideo.dataset.text) {
+                title.textContent = nextVideo.dataset.text;
+              }
+            }
+
+            // Initialize listeners
+            videos.forEach((video, index) => {
+              video.onended = playNext;
+              // Fallback if video stalls or doesn't play
+              video.onerror = () => {
+                console.error(`Error playing video ${index}, skipping.`);
+                playNext();
+              };
+            });
+
+            // Ensure first video plays
+            const first = videos[0];
+            if (first.paused) {
+              first.play().catch(e => console.log("Autoplay blocked:", e));
+            }
+          });
+        </script>
+        <style>
+          /* Force Header Styles to prevent white bar */
+          #main-header {
+            position: absolute !important;
+            background: transparent !important;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+          }
+
+          .header-top {
+            background: transparent !important;
+          }
+
+          /* Fix Active Video Visibility */
+          .hero-video {
+            display: none;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+          }
+
+          .hero-video.active {
+            display: block;
+          }
+        </style>
 
         <div class="video-overlay"></div>
         <div class="hero-text-overlay">
