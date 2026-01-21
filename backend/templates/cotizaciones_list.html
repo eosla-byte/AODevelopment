@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="h-full flex flex-col bg-slate-50 relative overflow-hidden">
+
+    <!-- HEADER -->
+    <div
+        class="flex-none bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between shadow-sm z-10">
+        <div>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tight">Cotizaciones</h1>
+            <p class="text-sm text-slate-500 font-medium">Gestiona y crea propuestas comerciales</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/cotizaciones/new"
+                class="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg shadow-slate-200 transition-all transform hover:-translate-y-0.5">
+                <span>+</span>
+                <span>Nueva Cotización</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- KANBAN CONTENT -->
+    <div class="flex-1 overflow-hidden flex">
+
+        <!-- MAIN BOARD (3 Cols) -->
+        <div class="flex-1 overflow-x-auto p-6">
+            <div class="flex h-full gap-6 min-w-[1000px]">
+
+                <!-- 1. BORRADORES -->
+                <div class="flex-1 flex flex-col bg-slate-100/50 rounded-xl border border-slate-200/60 min-w-[320px]"
+                    ondrop="drop(event, 'Borrador')" ondragover="allowDrop(event)">
+                    <div
+                        class="p-4 border-b border-slate-200 flex items-center justify-between bg-white rounded-t-xl sticky top-0 z-10">
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-black text-slate-700 uppercase tracking-wide text-xs">Borradores</h2>
+                            <span class="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{{
+                                quotations|selectattr('status', 'equalto', 'Borrador')|list|length }}</span>
+                        </div>
+                        <div class="h-1 w-full bg-slate-300 h-0.5 w-16 rounded-full"></div>
+                    </div>
+                    <div class="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
+                        {% for q in quotations if q.status == 'Borrador' %}
+                        {% with q=q %}{% include 'quotation_card_kanban.html' %}{% endwith %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 2. CREADAS Y ENVIADAS -->
+                <div class="flex-1 flex flex-col bg-slate-100/50 rounded-xl border border-slate-200/60 min-w-[320px]"
+                    ondrop="drop(event, 'Enviada')" ondragover="allowDrop(event)">
+                    <div
+                        class="p-4 border-b border-slate-200 flex items-center justify-between bg-white rounded-t-xl sticky top-0 z-10">
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-black text-slate-700 uppercase tracking-wide text-xs">Creadas y Enviadas
+                            </h2>
+                            <span class="bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{{
+                                quotations|selectattr('status', 'equalto', 'Enviada')|list|length }}</span>
+                        </div>
+                        <div class="h-1 w-full bg-blue-500 h-0.5 w-16 rounded-full"></div>
+                    </div>
+                    <div class="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
+                        {% for q in quotations if q.status == 'Enviada' %}
+                        {% with q=q %}{% include 'quotation_card_kanban.html' %}{% endwith %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 3. SEGUIMIENTO -->
+                <div class="flex-1 flex flex-col bg-slate-100/50 rounded-xl border border-slate-200/60 min-w-[320px]"
+                    ondrop="drop(event, 'Seguimiento')" ondragover="allowDrop(event)">
+                    <div
+                        class="p-4 border-b border-slate-200 flex items-center justify-between bg-white rounded-t-xl sticky top-0 z-10">
+                        <div class="flex items-center gap-2">
+                            <h2 class="font-black text-slate-700 uppercase tracking-wide text-xs">Seguimiento</h2>
+                            <span class="bg-amber-50 text-amber-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{{
+                                quotations|selectattr('status', 'equalto', 'Seguimiento')|list|length }}</span>
+                        </div>
+                        <div class="h-1 w-full bg-amber-500 h-0.5 w-16 rounded-full"></div>
+                    </div>
+                    <div class="flex-1 p-3 overflow-y-auto space-y-3 custom-scrollbar">
+                        {% for q in quotations if q.status == 'Seguimiento' %}
+                        {% with q=q %}{% include 'quotation_card_kanban.html' %}{% endwith %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- RIGHT ARCHIVE LIST -->
+        <div class="w-80 bg-white border-l border-slate-200 flex flex-col z-20 shadow-xl overflow-hidden">
+            <div class="p-5 border-b border-slate-100 bg-slate-50">
+                <h3 class="font-bold text-slate-700 text-xs uppercase mb-1">Archivo Global</h3>
+                <p class="text-[10px] text-slate-400">Historial de todas las cotizaciones creadas.</p>
+            </div>
+            <div class="flex-1 overflow-y-auto p-0">
+                {% for q in quotations %}
+                <div onclick="window.location.href='/cotizaciones/{{ q.id }}/edit'"
+                    class="px-5 py-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer group transition-colors flex items-center gap-3">
+                    <div
+                        class="w-2 h-2 rounded-full 
+                        {% if q.status == 'Borrador' %}bg-slate-300{% elif q.status == 'Enviada' %}bg-blue-400{% elif q.status == 'Seguimiento' %}bg-amber-400{% else %}bg-green-400{% endif %}">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div
+                            class="font-bold text-slate-700 text-xs truncate group-hover:text-indigo-600 transition-colors">
+                            {{ q.title }}</div>
+                        <div class="text-[10px] text-slate-400 truncate">{{ q.client_name or 'Sin cliente' }}</div>
+                    </div>
+                    <div class="text-[10px] font-mono text-slate-300">{{ q.updated_at.strftime('%d/%m') }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Inline Template for Kanban Card -->
+    <script type="text/template" id="quotation-card-template">
+         <!-- This is just for reference as we use include -->
+    </script>
+</div>
+
+<style>
+    /* Custom Scrollbar for columns */
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+</style>
+</style>
+
+<script>
+    function allowDrop(ev) {
+        ev.preventDefault();
+    }
+
+    function drag(ev) {
+        ev.dataTransfer.setData("text", ev.target.dataset.id);
+    }
+
+    function drop(ev, newStatus) {
+        ev.preventDefault();
+        var quotId = ev.dataTransfer.getData("text");
+
+        // Optimistic UI Update (optional, or just reload)
+        // For simplicity, we'll reload after fetch
+
+        const payload = {
+            id: quotId,
+            updates: {
+                status: newStatus,
+                updated_at: new Date().toISOString()
+            }
+        };
+
+        fetch('/cotizaciones/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    location.reload();
+                } else {
+                    alert("Error al mover cotización");
+                }
+            });
+    }
+</script>
+{% endblock %}

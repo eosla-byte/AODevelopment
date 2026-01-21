@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+venv/
+env/
+.venv/
+*.db
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# C# / Visual Studio
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.pdb
+*.dll
+!plugin/**/*.dll  # Ignore compiled DLLs generally, unless specifically needed (usually we don't commit dlls, but for plugins we might release them elsewhere)
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Railway / Deployment
+.railway/

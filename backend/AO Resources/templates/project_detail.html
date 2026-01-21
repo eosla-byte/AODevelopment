@@ -1,0 +1,1012 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col h-full">
+    <!-- Header -->
+    <div class="flex items-center gap-4 mb-6 pb-6 border-b border-slate-200">
+        <a href="/" class="btn bg-slate-100 text-slate-600 hover:bg-slate-200">← Volver</a>
+        <div class="flex items-center gap-3">
+            <span class="text-4xl">{{ p.emoji }}</span>
+            <div>
+                <h1 class="text-3xl font-bold text-slate-800">{{ p.name }}</h1>
+                <div class="flex gap-3 text-sm text-slate-500">
+                    <span>ID: {{ p.id }}</span>
+                    <span
+                        class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-xs flex items-center">{{
+                        p.status }}</span>
+                    {% if p.client %}<span>👤 {{ p.client }}</span>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="ml-auto flex gap-2">
+            <button onclick="document.getElementById('editModal').classList.remove('hidden')"
+                class="btn btn-primary">Editar Perfil</button>
+            <button onclick="document.getElementById('profitModal').classList.remove('hidden')"
+                class="btn bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-lg shadow-emerald-200 flex items-center gap-2">
+                <span>💸</span> Utilidades
+            </button>
+        </div>
+    </div>
+
+    <!-- Financial Dashboards (Computed on the fly in Template) -->
+
+    {% set total = p.amount %}
+    {% set paid = p.paid_amount|default(0) %}
+
+    {% if total > 0 %}{% set avance_fin = (paid / total) * 100 %}{% else %}{% set avance_fin = 0 %}{% endif %}
+    {% set saldo_pendiente = total - paid %}
+
+    {% set dur_plan = p.duration_months|default(1) %}
+    {% set dur_extra = p.additional_time_months|default(0) %}
+    {% set dur_real = dur_plan + dur_extra %}
+
+    {% if dur_plan > 0 %}{% set extension_pct = (dur_extra / dur_plan) * 100 %}{% else %}{% set extension_pct = 0 %}{%
+    endif %}
+
+    {% if dur_plan > 0 %}{% set val_mensual_plan = total / dur_plan %}{% else %}{% set val_mensual_plan = 0 %}{% endif
+    %}
+    {% if dur_real > 0 %}{% set val_mensual_real = total / dur_real %}{% else %}{% set val_mensual_real = 0 %}{% endif
+    %}
+
+    {% set perdida_mensual = val_mensual_plan - val_mensual_real %}
+    {% set perdida_total = perdida_mensual * dur_real %}
+
+    {% if dur_real > 0 %}{% set indice_eficiencia = dur_plan / dur_real %}{% else %}{% set indice_eficiencia = 0 %}{%
+    endif %}
+
+    {% if total > 0 %}{% set penalizacion = (perdida_total / total) * 100 %}{% else %}{% set penalizacion = 0 %}{% endif
+    %}
+
+    <!-- 1. Variables Financieras Básicas (Directas) -->
+
+    <!-- Calculate Totals from Files -->
+    {% set paid = p.paid_amount|default(0) %}
+    {% if total > 0 %}{% set avance_fin = (paid / total) * 100 %}{% else %}{% set avance_fin = 0 %}{% endif %}
+    {% set saldo_pendiente = total - paid %}
+
+    {% set util_bruta = paid * (p.real_profit_margin / 100.0) %}
+
+    <!-- Header Summary Section: Contracted vs Collected -->
+    <!-- Header Summary Section: Contracted vs Collected -->
+    <!-- Header Summary Section: Contracted vs Collected -->
+    <div
+        class="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-8 md:p-10 text-white mb-6 shadow-xl relative group min-h-[250px] flex flex-col justify-between">
+
+        <!-- Decorative Background (Adjusted to not block resize) -->
+        <div
+            class="absolute right-0 top-0 h-full w-1/3 bg-white/5 skew-x-12 transform translate-x-12 pointer-events-none overflow-hidden rounded-r-2xl">
+        </div>
+
+        <!-- Utility Buttons (Top Right) -->
+        <div class="absolute top-4 right-4 flex gap-2 z-20">
+            <button onclick="document.getElementById('editModal').classList.remove('hidden')"
+                class="p-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
+                title="Editar Proyecto">
+                ✎
+            </button>
+            <button onclick="document.getElementById('remindersModal').classList.remove('hidden')"
+                class="p-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors relative"
+                title="Recordatorios">
+                🔔
+                {% set active_reminders = p.reminders|selectattr('completed', 'equalto', false)|list|length %}
+                {% if active_reminders > 0 %}
+                <span class="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900"></span>
+                {% endif %}
+            </button>
+
+            {% if p.archived %}
+            <form action="/project/{{ p.id }}/restore" method="post"
+                onsubmit="return confirm('¿Restaurar este proyecto?');">
+                <button type="submit"
+                    class="p-2 bg-green-500/20 hover:bg-green-500/40 border border-green-500/50 rounded-lg text-green-200 transition-colors"
+                    title="Restaurar Proyecto">
+                    ♻️ Restaurar
+                </button>
+            </form>
+            {% else %}
+            <form action="/project/{{ p.id }}/delete" method="post"
+                onsubmit="return confirm('¿Archivar este proyecto?');">
+                <button type="submit"
+                    class="p-2 bg-red-500/20 hover:bg-red-500/40 border border-red-500/50 rounded-lg text-red-200 transition-colors"
+                    title="Archivar Proyecto">
+                    🗑️
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        {% set ratio = 0 %}
+        {% set m2 = p.square_meters|default(0) %}
+        {% if m2 > 0 %}
+        {% set ratio = total / m2 %}
+        {% endif %}
+
+        <div class="flex flex-col xl:flex-row justify-between items-start xl:items-end relative z-10 gap-8 mt-4">
+            <div class="flex-1 w-full relative z-10">
+                <p class="text-slate-400 font-bold uppercase text-xs tracking-wider mb-2">Monto Total Contratado</p>
+
+                <!-- Main amount and metrics container -->
+                <div class="flex flex-col gap-6">
+                    <!-- Title Amount (Allow wrap) -->
+                    <h2
+                        class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight break-words">
+                        Q{{ "{:,.2f}".format(total) }}
+                    </h2>
+
+                    <!-- Metrics Badges -->
+                    <div
+                        class="flex flex-wrap gap-6 bg-white/5 rounded-xl p-4 backdrop-blur-sm border border-white/10 w-fit">
+                        {% if total > 0 %}
+                        <div class="flex flex-col">
+                            <div class="flex items-baseline gap-2">
+                                <span class="text-2xl font-bold text-emerald-400">{{ "{:.1f}".format(avance_fin)
+                                    }}%</span>
+                                <span
+                                    class="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Cobrado</span>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if m2 > 0 %}
+                        <div class="w-px bg-white/10 hidden sm:block"></div>
+                        <div class="flex flex-col">
+                            <span class="text-xl font-bold text-blue-400">{{ "{:,.2f}".format(m2) }} m²</span>
+                            <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Area Total</span>
+                        </div>
+                        <div class="w-px bg-white/10 hidden sm:block"></div>
+                        <div class="flex flex-col">
+                            <span class="text-xl font-bold text-blue-400">Q{{ "{:,.2f}".format(ratio) }}</span>
+                            <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Ratio / m²</span>
+                        </div>
+                        {% else %}
+                        <div class="w-px bg-white/10 hidden sm:block"></div>
+                        <div class="flex flex-col opacity-50">
+                            <span class="text-xl font-bold text-slate-400">--</span>
+                            <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Area Total</span>
+                        </div>
+                        <div class="w-px bg-white/10 hidden sm:block"></div>
+                        <div class="flex flex-col opacity-50">
+                            <span class="text-xl font-bold text-slate-400">--</span>
+                            <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wide">Ratio / m²</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full xl:w-auto mt-4 xl:mt-0 relative z-20">
+                <div class="bg-emerald-900/40 p-4 rounded-xl border border-emerald-500/30 backdrop-blur-md shadow-lg">
+                    <p class="text-emerald-400/80 font-bold uppercase text-xs tracking-wider mb-1">Utilidad Proyectada
+                        ({{ p.projected_profit_margin }}%)</p>
+                    <p class="text-2xl sm:text-3xl font-black text-emerald-100">Q{{ "{:,.2f}".format(total *
+                        (p.projected_profit_margin/100.0)) }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="w-full bg-slate-700/50 h-3 rounded-full mt-6 overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000"
+                style="width: {{ avance_fin }}%"></div>
+        </div>
+    </div>
+
+    <div class="mb-6 grid grid-cols-1 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <!-- New Stats Row -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm col-span-2">
+            <div class="text-xs text-slate-400 font-bold uppercase mb-1">Monto Cobrado (Pagos)</div>
+            <div class="text-2xl font-black text-slate-800">Q{{ "{:,.2f}".format(paid) }}</div>
+            <div class="text-xs text-slate-400 mt-1">Total acumulado de archivos</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-xs text-slate-400 font-bold uppercase mb-1">IVA Pagado</div>
+            <div class="text-xl font-bold text-red-500">Q{{ "{:,.2f}".format(p.total_iva|default(0)) }}</div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div class="text-xs text-slate-400 font-bold uppercase mb-1">ISR Pagado</div>
+            <div class="text-xl font-bold text-red-500">Q{{ "{:,.2f}".format(p.total_isr|default(0)) }}</div>
+        </div>
+
+        <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200 shadow-sm col-span-2">
+            <div class="text-xs text-emerald-600 font-bold uppercase mb-1">Utilidad ({{ p.real_profit_margin }}%)</div>
+            <div class="text-2xl font-black text-emerald-700">Q{{ "{:,.2f}".format(util_bruta) }}</div>
+            <div class="text-xs text-emerald-600/70 mt-1">Margen Real s/ Cobrado</div>
+        </div>
+    </div>
+    <div class="mb-6">
+        <h3 class="text-sm font-bold text-slate-500 uppercase mb-3">1. Finanzas Directas</h3>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-xs text-slate-400 font-bold uppercase mb-1">Avance Financiero</div>
+                <div class="text-2xl font-bold text-blue-600">{{ "{:.1f}".format(avance_fin) }}%</div>
+                <div class="w-full bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden">
+                    <div class="h-full bg-blue-500 rounded-full" style="width: {{ avance_fin }}%"></div>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-xs text-slate-400 font-bold uppercase mb-1">Saldo Pendiente</div>
+                <div class="text-2xl font-bold text-slate-700">Q{{ "{:,.2f}".format(saldo_pendiente) }}</div>
+                <div class="text-xs text-slate-400 mt-1">Por cobrar</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-xs text-slate-400 font-bold uppercase mb-1">Duración Total Real</div>
+                <div class="text-2xl font-bold text-slate-700">{{ "{:.1f}".format(dur_real) }} <span
+                        class="text-sm font-normal text-slate-400">meses</span></div>
+                <div class="text-[10px] text-slate-400 mt-1">Plan: {{ dur_plan }} + Ext: {{ dur_extra }}</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="text-xs text-slate-400 font-bold uppercase mb-1">% Extensión</div>
+                <div
+                    class="text-2xl font-bold {% if extension_pct > 0 %}text-red-500{% else %}text-green-500{% endif %}">
+                    {{ "{:.1f}".format(extension_pct) }}%</div>
+                <div class="text-xs text-slate-400 mt-1">Sobre tiempo original</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar Section -->
+    <div class="mb-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex items-center gap-3">
+                <h3 class="text-sm font-bold text-slate-500 uppercase">📅 Calendario de Proyecto</h3>
+                <div class="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                    <button onclick="changeCalendarMonth(-1)"
+                        class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-white rounded shadow-sm transition-all font-bold">‹</button>
+                    <span id="calTitle" class="w-32 text-center text-sm font-bold text-slate-800">Enero 2026</span>
+                    <button onclick="changeCalendarMonth(1)"
+                        class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-white rounded shadow-sm transition-all font-bold">›</button>
+                </div>
+                <button onclick="jumpToToday()" class="text-xs font-bold text-blue-600 hover:underline">Hoy</button>
+            </div>
+
+            <div class="flex gap-4 text-xs font-bold text-slate-500">
+                <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                    Recordatorios</div>
+                <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Facturas
+                </div>
+                <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span> Pagos</div>
+            </div>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div class="grid grid-cols-7 gap-px bg-slate-200 border border-slate-200 rounded-lg overflow-hidden">
+            <!-- Headers -->
+            <div class="bg-slate-50 p-2 text-center text-[10px] uppercase font-bold text-slate-400">Lun</div>
+            <div class="bg-slate-50 p-2 text-center text-[10px] uppercase font-bold text-slate-400">Mar</div>
+            <div class="bg-slate-50 p-2 text-center text-[10px] uppercase font-bold text-slate-400">Mié</div>
+            <div class="bg-slate-50 p-2 text-center text-[10px] uppercase font-bold text-slate-400">Jue</div>
+            <div class="bg-slate-50 p-2 text-center text-[10px] uppercase font-bold text-slate-400">Vie</div>
+            <div class="bg-slate-50 p-2 text-center text-[10px] uppercase font-bold text-slate-400 text-red-400">Sáb
+            </div>
+            <div class="bg-slate-50 p-2 text-center text-[10px] uppercase font-bold text-slate-400 text-red-400">Dom
+            </div>
+
+            <!-- Days Container (JS Injected) -->
+        </div>
+        <div id="calendarGrid"
+            class="grid grid-cols-7 auto-rows-fr gap-px bg-slate-200 border-x border-b border-slate-200 rounded-b-lg overflow-hidden min-h-[850px]">
+            <!-- Generated via JS -->
+        </div>
+    </div>
+
+    <!-- 2. Rendimiento Financiero-Temporal -->
+    <div class="mb-6">
+        <h3 class="text-sm font-bold text-slate-500 uppercase mb-3">2. Rendimiento Financiero-Temporal</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="absolute right-0 top-0 p-4 opacity-5 text-4xl">📅</div>
+                <div class="text-xs text-slate-400 font-bold uppercase mb-1">Valor Promedio Mensual (Plan)</div>
+                <div class="text-xl font-bold text-slate-700">Q{{ "{:,.2f}".format(val_mensual_plan) }}</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="absolute right-0 top-0 p-4 opacity-5 text-4xl">📉</div>
+                <div class="text-xs text-slate-400 font-bold uppercase mb-1">Valor Mensual Real</div>
+                <div
+                    class="text-xl font-bold {% if val_mensual_real < val_mensual_plan %}text-orange-500{% else %}text-slate-700{% endif %}">
+                    Q{{ "{:,.2f}".format(val_mensual_real) }}</div>
+                <div class="text-[10px] text-slate-400 mt-1">Dilución por retrasos</div>
+            </div>
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="absolute right-0 top-0 p-4 opacity-5 text-4xl">💸</div>
+                <div class="text-xs text-slate-400 font-bold uppercase mb-1">Pérdida Mensual por Ext.</div>
+                <div class="text-xl font-bold text-red-500">Q{{ "{:,.2f}".format(perdida_mensual) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Variables Perdidas y Eficiencia -->
+    <div class="mb-8">
+        <h3 class="text-sm font-bold text-slate-500 uppercase mb-3">3. Variables Perdidas y Eficiencia</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
+                <div class="text-xs text-slate-500 font-bold uppercase mb-1">Pérdida Total Atribuible</div>
+                <div class="text-2xl font-bold text-red-600">Q{{ "{:,.2f}".format(perdida_total) }}</div>
+                <div class="text-xs text-slate-400 mt-1">Costo de oportunidad / Dilución total</div>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
+                <div class="text-xs text-slate-500 font-bold uppercase mb-1">Eficiencia Temporal</div>
+                <div class="flex items-center gap-2">
+                    <div
+                        class="text-2xl font-bold {% if indice_eficiencia < 1 %}text-amber-500{% else %}text-green-500{% endif %}">
+                        {{ "{:.2f}".format(indice_eficiencia) }}</div>
+                    {% if indice_eficiencia < 1 %}<span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">
+                        Ineficiente</span>{% endif %}
+                </div>
+                <div class="text-xs text-slate-400 mt-1">Ideal = 1.0</div>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-inner">
+                <div class="text-xs text-slate-500 font-bold uppercase mb-1">Penalización Implícita</div>
+                <div class="text-2xl font-bold text-slate-700">{{ "{:.1f}".format(penalizacion) }}%</div>
+                <div class="text-xs text-slate-400 mt-1">% del proyecto "comido" por retraso</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-6 w-96 shadow-2xl z-50 transform scale-100 transition-transform">
+            <h2 class="text-xl font-bold text-slate-800 mb-4">Editar Proyecto</h2>
+            <form action="/project/{{ p.id }}/edit" method="post" class="space-y-3">
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Cliente</label>
+                        <input type="text" name="client" value="{{ p.client }}" class="input-field"
+                            placeholder="Nombre Cliente">
+                    </div>
+                    <div class="w-20">
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Emoji</label>
+                        <input type="text" name="emoji" value="{{ p.emoji }}" class="input-field text-center">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Estado</label>
+                        <select name="status" class="input-field">
+                            <option value="Activo" {% if p.status=='Activo' %}selected{% endif %}>Activo</option>
+                            <option value="Pausa" {% if p.status=='Pausa' %}selected{% endif %}>Pausa</option>
+                            <option value="Cotizado" {% if p.status=='Cotizado' %}selected{% endif %}>Cotizado</option>
+                            <option value="Cerrado" {% if p.status=='Cerrado' %}selected{% endif %}>Cerrado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Categoría</label>
+                        <div class="flex gap-2">
+                            <select id="categorySelect" name="category" class="input-field flex-1"
+                                onchange="toggleNewCategory(this)">
+                                <option value="Residencial" {% if p.category=='Residencial' %}selected{% endif %}>
+                                    Residencial</option>
+                                <option value="Industrial" {% if p.category=='Industrial' %}selected{% endif %}>
+                                    Industrial</option>
+                                <option value="Comercial" {% if p.category=='Comercial' %}selected{% endif %}>Comercial
+                                </option>
+                                <option value="Educativo" {% if p.category=='Educativo' %}selected{% endif %}>Educativo
+                                </option>
+                                <option value="Recreativo" {% if p.category=='Recreativo' %}selected{% endif %}>
+                                    Recreativo</option>
+                                <option value="new" {% if p.category not in
+                                    ['Residencial','Industrial','Comercial','Educativo','Recreativo'] and p.category
+                                    !='' %}selected{% endif %}>+ Nueva...</option>
+                            </select>
+                            <input type="text" id="newCategoryInput" name="category"
+                                value="{{ p.category if p.category not in ['Residencial','Industrial','Comercial','Educativo','Recreativo'] else '' }}"
+                                class="input-field flex-1 hidden" placeholder="Nueva Categoría" disabled>
+                        </div>
+                        <script>
+                            function toggleNewCategory(select) {
+                                const input = document.getElementById('newCategoryInput');
+                                if (select.value === 'new') {
+                                    select.classList.add('hidden');
+                                    select.disabled = true;
+                                    input.classList.remove('hidden');
+                                    input.disabled = false;
+                                    input.focus();
+                                }
+                            }
+                            // Init Check
+                            (function () {
+                                const cat = "{{ p.category }}";
+                                const defaults = ['Residencial', 'Industrial', 'Comercial', 'Educativo', 'Recreativo'];
+                                if (cat && !defaults.includes(cat)) {
+                                    // It's a custom one, so we should have selected 'new' logic?
+                                    // Actually the server side rendered text input hidden unless selected.
+                                    // Let's just fix the render logic.
+                                    const sel = document.getElementById('categorySelect');
+                                    const inp = document.getElementById('newCategoryInput');
+                                    if (sel.value === 'new') {
+                                        sel.classList.add('hidden');
+                                        sel.disabled = true;
+                                        inp.classList.remove('hidden');
+                                        inp.disabled = false;
+                                    }
+                                }
+                            })();
+                        </script>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Monto Total</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">Q</span>
+                            <input type="number" step="0.01" name="amount" value="{{ p.amount }}"
+                                class="input-field pl-8">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">NIT</label>
+                        <input type="text" name="nit" value="{{ p.nit }}" class="input-field">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Metros Cuadrados (m²)</label>
+                        <input type="number" step="0.01" name="square_meters" value="{{ p.square_meters|default(0) }}"
+                            class="input-field">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Razón Social</label>
+                        <input type="text" name="legal_name" value="{{ p.legal_name }}" class="input-field">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Orden de Compra</label>
+                        <input type="text" name="po_number" value="{{ p.po_number }}" class="input-field">
+                    </div>
+                </div>
+
+                <hr class="border-slate-100 my-2" />
+                <p class="text-xs font-bold text-slate-400 uppercase mb-2">Cronograma</p>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Fecha de Inicio</label>
+                    <input type="date" name="start_date" value="{{ p.start_date }}" class="input-field">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Duración (Meses)</label>
+                        <input type="number" step="0.1" name="duration_months" value="{{ p.duration_months }}"
+                            class="input-field">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Tiempo Adicional</label>
+                        <input type="number" step="0.1" name="additional_time_months"
+                            value="{{ p.additional_time_months }}" class="input-field text-red-600">
+                    </div>
+                </div>
+
+                <hr class="border-slate-100 my-2" />
+                <p class="text-xs font-bold text-slate-400 uppercase mb-2">Conexión Autodesk CC</p>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Hub</label>
+                        <input type="text" name="acc_hub" value="{{ p.acc_config.hub }}" class="input-field"
+                            placeholder="AO Hub">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Proyecto ACC</label>
+                        <input type="text" name="acc_project" value="{{ p.acc_config.project }}" class="input-field"
+                            placeholder="e.g. 24-001 Proyecto">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Carpeta</label>
+                        <input type="text" name="acc_folder" value="{{ p.acc_config.folder }}" class="input-field"
+                            placeholder="Project Files/Shared/..." title="Ruta completa a la carpeta">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Archivo</label>
+                        <input type="text" name="acc_file" value="{{ p.acc_config.file }}" class="input-field"
+                            placeholder="Modelo.rvt">
+                    </div>
+                </div>
+                <div class="flex gap-3 justify-end mt-6">
+                    <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')"
+                        class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Profit Config Modal -->
+    <div id="profitModal"
+        class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-[500px] shadow-2xl overflow-hidden">
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-600 p-4 text-white flex justify-between items-center">
+                <h2 class="font-bold text-lg">Distribución de Utilidades</h2>
+                <button onclick="document.getElementById('profitModal').classList.add('hidden')"
+                    class="text-white/80 hover:text-white">✕</button>
+            </div>
+            <form action="/project/{{ p.id }}/profit/update" method="post" class="p-6 space-y-4">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Margen Proyectado %</label>
+                        <input type="number" step="0.01" name="projected_margin" value="{{ p.projected_profit_margin }}"
+                            class="input-field border-slate-300 w-full">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Margen Real %</label>
+                        <input type="number" step="0.01" name="real_margin" value="{{ p.real_profit_margin }}"
+                            class="input-field border-emerald-300 ring-emerald-100 focus:ring-emerald-200 w-full font-bold text-emerald-700">
+                    </div>
+                </div>
+
+                <hr class="border-slate-100">
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Participación Socios
+                        (%)</label>
+                    <div class="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                        <!-- We can try to list common partners or input IDs. Ideally list? 
+                             Since we don't have list of all partners passed to this view easily in PURE html context without fetch. 
+                             Wait, we need to pass partners list to this view to render this dropdown.
+                             Let's assume user knows IDs or we enter them manually? 
+                             Better: Let's assume there are few partners and we can ask to list them.
+                             Ah, we are not passing 'partners' list to project_detail view currently.
+                             Let's input ID for now OR we update the route to pass collaborators list.
+                             
+                             Let's stick to simple Inputs for key partners if hardcoded? NO.
+                             Let's look at p.partners_config.
+                        -->
+                        {% for partner_id, share in p.partners_config.items() %}
+                        <div class="flex gap-2 items-center">
+                            <input type="text" name="dummy_name" value="{{ partner_id }}" readonly
+                                class="text-xs bg-slate-100 border-none rounded w-24 p-2 text-slate-500">
+                            <input type="number" step="0.01" name="partner_share_{{ partner_id }}" value="{{ share }}"
+                                class="input-field w-20 p-1 text-sm">
+                            <span class="text-slate-400">%</span>
+                        </div>
+                        {% endfor %}
+
+                        <p class="text-[10px] text-slate-400 mt-2">
+                            * Para agregar un nuevo socio a este proyecto, ingrese su ID abajo.
+                        </p>
+                        <div class="flex gap-2 items-center mt-1">
+                            <input type="text" name="new_partner_id" placeholder="ID Socio"
+                                class="input-field w-24 p-1 text-xs">
+                            <input type="number" step="0.01" name="new_partner_share" placeholder="%"
+                                class="input-field w-16 p-1 text-xs">
+                            <span class="text-xs text-slate-400">(Auto-adds on save if filled)</span>
+                        </div>
+
+                        <!-- Hack: We can handle the "Auto-add" in backend logic manually or JS. 
+                             Actually, let's just use JS to append an input? No, standard form submit.
+                             In backend we iterate form keys. So we can just name the new inputs 'partner_share_<ID>' dynamically via JS?
+                             Or simpler: Input 'partner_share_NEWID' -> Value.
+                             Wait, user wont know ID. 
+                             
+                             CRITICAL: User needs to select a human name.
+                             I should update read_project route to pass 'collaborators' list.
+                        -->
+                    </div>
+                </div>
+
+                <div class="flex gap-3 justify-end mt-4 pt-4 border-t border-slate-100">
+                    <button type="submit"
+                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-emerald-200">
+                        Guardar Utilidades
+                    </button>
+                </div>
+
+                <!-- Script to help with new partner addition? -->
+                <script>
+                    document.querySelector('form[action$="/profit/update"]').addEventListener('submit', function (e) {
+                        const newId = this.querySelector('input[name="new_partner_id"]').value;
+                        const newShare = this.querySelector('input[name="new_partner_share"]').value;
+                        if (newId && newShare) {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'partner_share_' + newId;
+                            input.value = newShare;
+                            this.appendChild(input);
+                        }
+                    });
+                </script>
+            </form>
+        </div>
+    </div>
+
+    <!-- Team Section -->
+    <h3 class="text-sm font-bold text-slate-500 uppercase mb-3 mt-6">Equipo de Trabajo Asignado</h3>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        {% for member in team_members %}
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+            <div
+                class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 shrink-0 border border-slate-200">
+                {{ member.name[0] }}
+            </div>
+            <div>
+                <p class="font-bold text-slate-700 text-sm">{{ member.name }}</p>
+                <p class="text-[10px] text-slate-400 uppercase font-bold">{{ member.role }}</p>
+                {% if p.partners_config.get(member.id) %}
+                <div class="mt-1">
+                    <span
+                        class="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded font-bold border border-emerald-200">
+                        {{ p.partners_config[member.id] }}% Part.
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="col-span-full bg-slate-50 p-6 rounded-xl border border-dashed border-slate-200 text-center">
+            <p class="text-slate-400 text-sm italic">No hay colaboradores asignados a este proyecto.</p>
+            <p class="text-xs text-slate-300 mt-1">Asigne usuarios desde el Panel Administrativo o Configuración.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Drop Zones Grid (Smaller View) -->
+    <h3 class="text-sm font-bold text-slate-500 uppercase mb-3 flex justify-between items-center">
+        <span>Documentos y Archivos</span>
+        <button onclick="document.getElementById('uploadModal').classList.remove('hidden')"
+            class="btn btn-xs btn-primary">
+            + Subir Archivo
+        </button>
+    </h3>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 h-[300px]">
+
+        <!-- Helper Macro for Cards -->
+        {% macro file_card(title, category, files, css_bg='bg-slate-50', css_text='text-slate-800', total_amount=0) %}
+        <div class="card p-0 overflow-hidden flex flex-col h-full shadow-sm hover:shadow-md transition-shadow">
+            <div class="{{ css_bg }} px-3 py-2 border-b border-slate-100 flex justify-between items-center shrink-0">
+                <h3 class="font-bold {{ css_text }} text-sm">{{ title }}</h3>
+                <span
+                    class="text-[10px] bg-white px-1.5 py-0.5 rounded {{ css_text }} font-bold border border-slate-100">{{
+                    files|length }}</span>
+            </div>
+            <div class="flex-1 overflow-y-auto p-2 bg-slate-50 custom-scrollbar">
+                <ul class="space-y-1">
+                    {% for f in files %}
+                    {% set meta = p.files_meta.get(category, {}).get(f, {}) %}
+                    <li
+                        class="flex flex-col gap-1 text-xs text-slate-700 bg-white p-2 rounded border border-slate-200 hover:bg-blue-50 transition-colors group relative">
+                        <div class="flex items-center gap-2 w-full">
+                            <span class="text-lg">📄</span>
+                            <div class="truncate flex-1">
+                                <a href="/project_file/{{ p.id }}/{{ category }}/{{ f }}" target="_blank"
+                                    class="font-medium hover:underline hover:text-blue-600 block truncate"
+                                    title="{{ f }}">
+                                    {{ f }}
+                                </a>
+                                {% if meta.amount %}
+                                <span class="text-[10px] font-bold text-emerald-600 block">Q{{
+                                    "{:,.2f}".format(meta.amount) }}</span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Quick Edit Amount Button -->
+                            <button onclick="editFileMeta('{{ category }}', '{{ f }}', '{{ meta.amount|default(0) }}')"
+                                class="text-slate-300 hover:text-blue-500 p-1" title="Editar Monto">
+                                ✎
+                            </button>
+                        </div>
+
+                        <!-- Delete Action -->
+                        <form action="/project/{{ p.id }}/file/delete" method="post"
+                            class="absolute top-1 right-1 hidden group-hover:block bg-white rounded shadow-sm">
+                            <input type="hidden" name="category" value="{{ category }}">
+                            <input type="hidden" name="filename" value="{{ f }}">
+                            <button type="submit"
+                                class="text-red-500 hover:text-red-700 font-bold px-1.5 py-0.5">×</button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                    {% if not files %}
+                    <li class="text-[10px] text-slate-300 text-center py-4 italic">Arrastra archivos aquí</li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <!-- Subtotal Footer -->
+            {% if total_amount > 0 %}
+            <div
+                class="px-3 py-2 bg-white border-t border-slate-100 flex justify-between items-center text-xs font-bold {{ css_text }}">
+                <span>Total</span>
+                <span>Q{{ "{:,.2f}".format(total_amount) }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endmacro %}
+
+        <!-- Facturas -->
+        {{ file_card('Facturas', 'Facturas', p.files.get("Facturas", []), 'bg-blue-50', 'text-blue-800') }}
+
+        <!-- Pagos -->
+        {{ file_card('Pagos', 'Pagos', p.files.get("Pagos", []), 'bg-emerald-50', 'text-emerald-800',
+        p.paid_amount|default(0)) }}
+
+        <!-- IVA -->
+        {{ file_card('Impuestos IVA', 'Impuestos_IVA', p.files.get("Impuestos_IVA", []), 'bg-orange-50',
+        'text-orange-800', p.total_iva|default(0)) }}
+
+        <!-- ISR -->
+        {{ file_card('Impuestos ISR', 'Impuestos_ISR', p.files.get("Impuestos_ISR", []), 'bg-red-50', 'text-red-800',
+        p.total_isr|default(0)) }}
+
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal"
+        class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-96 shadow-2xl p-6 relative">
+            <button onclick="document.getElementById('uploadModal').classList.add('hidden')"
+                class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">✕</button>
+            <h3 class="font-bold text-lg mb-4 text-slate-700">Subir Archivo</h3>
+            <form action="/project/{{ p.id }}/upload" method="post" enctype="multipart/form-data" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Categoría</label>
+                    <select name="category" class="input-field w-full">
+                        <option value="Facturas">Facturas</option>
+                        <option value="Pagos">Pagos</option>
+                        <option value="Impuestos_IVA">Impuestos IVA</option>
+                        <option value="Impuestos_ISR">Impuestos ISR</option>
+                        <option value="Legal">Legal</option>
+                        <option value="Planos">Planos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Archivo</label>
+                    <input type="file" name="file"
+                        class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Monto (Opcional)</label>
+                    <input type="number" step="0.01" name="amount" class="input-field w-full" placeholder="Q 0.00">
+                    <p class="text-[10px] text-slate-400 mt-1">Ingrese el valor monetario del documento para cálculos.
+                    </p>
+                </div>
+                <button type="submit" class="btn btn-primary w-full shadow-lg shadow-blue-200">Subir</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- REMINDERS MODAL -->
+    <div id="remindersModal"
+        class="hidden fixed inset-0 bg-black/60 z-[60] flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-[600px] shadow-2xl p-6 relative max-h-[85vh] flex flex-col">
+            <button onclick="document.getElementById('remindersModal').classList.add('hidden')"
+                class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 font-bold">✕</button>
+            <h3 class="font-bold text-xl mb-1 text-slate-800 flex items-center gap-2">🔔 Recordatorios</h3>
+            <p class="text-xs text-slate-500 mb-4">Gestione alertas y tareas para este proyecto.</p>
+
+            <div class="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+                <!-- Add Form -->
+                <form action="/project/{{ p.id }}/reminder/add" method="post"
+                    class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                    <div class="grid grid-cols-12 gap-3 items-end">
+                        <div class="col-span-6">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Título</label>
+                            <input type="text" name="title" required class="input-field py-1 text-sm bg-white"
+                                placeholder="Ej: Pago de planilla">
+                        </div>
+                        <div class="col-span-3">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fecha</label>
+                            <input type="date" name="date" required class="input-field py-1 text-sm bg-white">
+                        </div>
+                        <div class="col-span-3">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Frecuencia</label>
+                            <select name="frequency" class="input-field py-1 text-sm bg-white">
+                                <option value="Once">Una vez</option>
+                                <option value="Weekly">Semanal</option>
+                                <option value="Monthly">Mensual</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit"
+                        class="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 rounded-lg text-xs shadow-sm transition-colors">
+                        + Agregar Recordatorio
+                    </button>
+                </form>
+
+                <!-- List -->
+                <div class="space-y-2">
+                    {% if not p.reminders %}
+                    <div class="text-center py-8 text-slate-400 italic text-sm">
+                        No hay recordatorios activos.<br />
+                        <span class="text-xs">Agregue uno arriba para comenzar.</span>
+                    </div>
+                    {% endif %}
+
+                    {% for r in p.reminders|sort(attribute='date') %}
+                    <div
+                        class="flex items-center gap-3 p-3 rounded-lg border {% if r.completed %}bg-slate-50 border-slate-100{% else %}bg-white border-slate-200 shadow-sm{% endif %} group transition-all">
+                        <form action="/project/{{ p.id }}/reminder/toggle" method="POST">
+                            <input type="hidden" name="reminder_id" value="{{ r.id }}">
+                            <button type="submit"
+                                class="w-5 h-5 rounded border flex items-center justify-center transition-colors {% if r.completed %}bg-green-500 border-green-500 text-white{% else %}border-slate-300 hover:border-blue-500 text-transparent{% endif %}">
+                                ✓
+                            </button>
+                        </form>
+
+                        <div class="flex-1 {% if r.completed %}opacity-50 line-through grayscale{% endif %}">
+                            <div class="font-bold text-slate-700 text-sm">{{ r.title }}</div>
+                            <div class="flex gap-2 text-[10px] font-bold uppercase text-slate-400 mt-0.5">
+                                <span class="text-blue-500 bg-blue-50 px-1.5 rounded">{{ r.date }}</span>
+                                {% if r.frequency and r.frequency != 'Once' %}
+                                <span class="text-purple-500 bg-purple-50 px-1.5 rounded">↻ {{ r.frequency }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <form action="/project/{{ p.id }}/reminder/delete" method="POST"
+                            onsubmit="return confirm('¿Borrar?');">
+                            <input type="hidden" name="reminder_id" value="{{ r.id }}">
+                            <button type="submit"
+                                class="opacity-0 group-hover:opacity-100 p-1.5 text-red-500 hover:bg-red-50 rounded transition-all">🗑️</button>
+                        </form>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Meta Modal -->
+    <div id="fileMetaModal"
+        class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-80 shadow-2xl p-6 relative">
+            <h3 class="font-bold text-lg mb-4 text-slate-700">Editar Documento</h3>
+            <form action="/project/{{ p.id }}/file/update_meta" method="post" class="space-y-4" id="metaForm">
+                <input type="hidden" name="category" id="meta_cat">
+                <input type="hidden" name="filename" id="meta_file">
+
+                <div class="text-sm font-bold text-slate-600 mb-2 truncate" id="meta_filename_display"></div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Monto (Q)</label>
+                    <input type="number" step="0.01" name="amount" id="meta_amount" class="input-field w-full">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Nota / Descripción</label>
+                    <textarea name="note" id="meta_note" class="input-field w-full h-20 text-xs"></textarea>
+                </div>
+                <div class="flex gap-2 justify-end">
+                    <button type="button" onclick="document.getElementById('fileMetaModal').classList.add('hidden')"
+                        class="px-3 py-1.5 text-slate-500 text-xs hover:bg-slate-100 rounded">Cancel</button>
+                    <button type="submit" class="btn btn-primary text-xs">Guardar Cambios</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div> <!-- closing div for flex-col -->
+
+<script>
+    // File Meta Helper
+    function editFileMeta(cat, filename, amount, note) {
+        document.getElementById('fileMetaModal').classList.remove('hidden');
+        document.getElementById('meta_cat').value = cat;
+        document.getElementById('meta_file').value = filename;
+        document.getElementById('meta_filename_display').textContent = filename;
+        document.getElementById('meta_amount').value = amount || '';
+        document.getElementById('meta_note').value = note || '';
+    }
+
+    // Calendar Logic
+    let calDate = new Date();
+    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+    const reminders = [
+        {% for r in p.reminders %}
+    { title: "{{ r.title }}", date: "{{ r.date }}", completed: { { 'true' if r.completed else 'false' } }, type: 'reminder', id: "{{ r.id }}" },
+    {% endfor %}
+    ];
+
+    const fileEvents = [
+        {% for ev in p.events %}
+    { title: "{{ ev.filename }}", date: "{{ ev.date }}", type: '{{ ev.category }}' },
+    {% endfor %}
+    ];
+
+    function renderCalendar() {
+        const grid = document.getElementById('calendarGrid');
+        const title = document.getElementById('calTitle');
+        if (!grid || !title) return;
+
+        grid.innerHTML = '';
+
+        const year = calDate.getFullYear();
+        const month = calDate.getMonth();
+        title.innerText = `${monthNames[month]} ${year}`;
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        let startCol = firstDay - 1;
+        if (startCol < 0) startCol = 6;
+
+        for (let i = 0; i < startCol; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'bg-slate-50 min-h-[120px]';
+            grid.appendChild(cell);
+        }
+
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const isToday = dateStr === todayStr;
+
+            const cell = document.createElement('div');
+            cell.className = `bg-white p-2 min-h-[150px] border-t-0 border-l-0 relative group hover:bg-slate-50 transition-colors ${isToday ? 'bg-blue-50/30' : ''}`;
+
+            const num = document.createElement('div');
+            num.className = `text-xs font-bold mb-1 ${isToday ? 'text-blue-600 bg-blue-100 w-5 h-5 flex items-center justify-center rounded-full' : 'text-slate-500'}`;
+            num.innerText = d;
+            cell.appendChild(num);
+
+            const addBtn = document.createElement('button');
+            addBtn.innerHTML = '+';
+            addBtn.className = 'absolute top-1 right-1 w-5 h-5 flex items-center justify-center text-slate-300 hover:text-blue-600 hover:bg-white rounded-full text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity';
+            addBtn.onclick = () => openAddReminderFromCal(dateStr);
+            cell.appendChild(addBtn);
+
+            const content = document.createElement('div');
+            content.className = 'flex flex-col gap-1 overflow-y-auto max-h-[120px] custom-scrollbar';
+
+            const dayReminders = reminders.filter(r => r.date === dateStr);
+            dayReminders.forEach(r => {
+                const tag = document.createElement('div');
+                tag.className = `text-[9px] px-1.5 py-0.5 rounded border truncate cursor-pointer ${r.completed ? 'bg-slate-100 text-slate-400 border-slate-200 line-through' : 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200'}`;
+                tag.innerText = "🔔 " + r.title;
+                tag.title = r.title;
+                tag.onclick = () => {
+                    document.getElementById('remindersModal').classList.remove('hidden');
+                };
+                content.appendChild(tag);
+            });
+
+            const dayFiles = fileEvents.filter(ev => ev.date.startsWith(dateStr));
+            dayFiles.forEach(ev => {
+                let colorClass = 'bg-slate-100 text-slate-500 border-slate-200';
+                if (ev.type.includes('Factura')) colorClass = 'bg-blue-100 text-blue-700 border-blue-200';
+                if (ev.type.includes('Pago')) colorClass = 'bg-emerald-100 text-emerald-700 border-emerald-200';
+
+                const tag = document.createElement('div');
+                tag.className = `text-[9px] px-1.5 py-0.5 rounded border truncate ${colorClass}`;
+                tag.innerText = "📄 " + ev.title;
+                tag.title = ev.title;
+                content.appendChild(tag);
+            });
+
+            cell.appendChild(content);
+            grid.appendChild(cell);
+        }
+    }
+
+    function changeCalendarMonth(delta) {
+        calDate.setMonth(calDate.getMonth() + delta);
+        renderCalendar();
+    }
+
+    function jumpToToday() {
+        calDate = new Date();
+        renderCalendar();
+    }
+
+    function openAddReminderFromCal(dateStr) {
+        document.getElementById('remindersModal').classList.remove('hidden');
+        const modal = document.getElementById('remindersModal');
+        const dateInput = modal.querySelector('input[name="date"]');
+        if (dateInput) dateInput.value = dateStr;
+    }
+
+    document.addEventListener('DOMContentLoaded', renderCalendar);
+</script>
+{% endblock %}

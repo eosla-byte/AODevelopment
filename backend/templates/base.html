@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AO Admin</title>
+    <!-- Tailwind (CDN for simplicity as requested) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/social-theme.css">
+    {% block head_extra %}{% endblock %}
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar glass-panel">
+            <div class="mb-5 px-2">
+                <h1 class="text-2xl font-bold tracking-tight text-slate-800">AO<span
+                        style="color: var(--primary-blue);">Admin</span></h1>
+                <p class="text-xs text-slate-500 font-medium">Panel de Control</p>
+            </div>
+
+            <nav class="flex-1 space-y-2">
+                <a href="/"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                    <span class="text-xl">🏠</span>
+                    <span class="font-medium">Inicio</span>
+                </a>
+                <a href="/projects"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                    <span class="text-xl">📊</span>
+                    <span class="font-medium">Proyectos</span>
+                </a>
+                <a href="/calendar"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                    <span class="text-xl">📅</span>
+                    <span class="font-medium">Cronograma</span>
+                </a>
+                <a href="/cotizador"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                    <span class="text-xl">🧮</span>
+                    <span class="font-medium">Cotizador</span>
+                </a>
+                <a href="/estimaciones"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                    <span class="text-xl">📝</span>
+                    <span class="font-medium">Estimaciones</span>
+                </a>
+                <a href="/cotizaciones"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                    <span class="text-xl">📄</span>
+                    <span class="font-medium">Cotizaciones</span>
+                </a>
+
+                {% if request.state.user %}
+                {% if request.state.user.role in ['admin', 'miembro'] %}
+                <a href="/gastos"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                    <span class="text-xl">💸</span>
+                    <span class="font-medium">Gastos</span>
+                </a>
+                <a href="/hr"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                    <span class="text-xl">👥</span>
+                    <span class="font-medium">RR.HH.</span>
+                </a>
+                <a href="/socios"
+                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                    <span class="text-xl">💼</span>
+                    <span class="font-medium">Socios</span>
+                </a>
+                {% endif %}
+
+                {% if request.state.user.role == 'admin' %}
+                <div class="pt-4 mt-4 border-t border-slate-200">
+                    <p class="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Administración
+                    </p>
+                    <a href="/admin/clients"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors">
+                        <span class="text-xl">👥</span>
+                        <span class="font-medium">Conf. Clientes</span>
+                    </a>
+                    <a href="/admin/users"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors">
+                        <span class="text-xl">🛡️</span>
+                        <span class="font-medium">Usuarios y Permisos</span>
+                    </a>
+                    <a href="/admin/plugin/users"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-red-600 transition-colors"
+                        style="{% if 'plugin' in request.url.path %} background-color: #fee2e2; color: #dc2626; font-weight: 600; border: 1px solid #dc2626; {% endif %}">
+                        <span class="text-xl">R</span>
+                        <span class="font-medium">AO Development</span>
+                    </a>
+                </div>
+                {% endif %}
+                {% endif %}
+            </nav>
+
+            <div class="mt-auto pt-4 border-t border-slate-200">
+                {% if request.state.user %}
+                <div class="flex items-center gap-3 px-3 py-2">
+                    <div
+                        class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs uppercase">
+                        {{ request.state.user.name[:2] }}</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-slate-700 text-sm truncate">{{ request.state.user.name }}</p>
+                        <p class="text-xs text-slate-500 capitalize">{{ request.state.user.role }}</p>
+                    </div>
+                    <a href="/logout" title="Cerrar Sesión" class="text-slate-400 hover:text-red-500">
+                        ↩
+                    </a>
+                </div>
+                {% else %}
+                <div class="px-3 py-2">
+                    <a href="/login" class="text-sm font-bold text-blue-600 hover:underline">Iniciar Sesión</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+
+</html>

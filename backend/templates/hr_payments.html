@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col h-full bg-slate-50 relative">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-white">
+        <div class="flex items-center gap-4">
+            <a href="/hr/{{ c.id }}"
+                class="text-slate-400 hover:text-slate-600 transition-colors font-bold text-lg">←</a>
+            <div>
+                <h1 class="text-xl font-bold text-slate-800">Registro de Pagos: {{ c.name }}</h1>
+                <p class="text-xs text-slate-400">Historial de nómina y ajustes mensuales</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="bg-slate-100 rounded-lg px-4 py-2 flex flex-col items-end">
+                <span class="text-[10px] font-bold text-slate-400 uppercase">Total Percibido (Histórico)</span>
+                <span class="text-lg font-black text-emerald-600" id="globalTotal">Q{{ "{:,.2f}".format(total_earned)
+                    }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Kanban Board (Timeline) -->
+    <div class="flex-1 overflow-x-auto overflow-y-hidden p-6">
+        <div class="flex h-full gap-6 flex-row-reverse justify-end">
+            <!-- Reversed so newest is first? User didn't specify, but usually newest first is better. 
+                 "Gasto" columns are usually oldest first? The screenshot shows "Dic 2025" then "Enero". 
+                 Let's stick to chronological order (Left = Oldest) as per typical timelines, 
+                 or maybe allow user preference. 
+                 "months from the start date until the current date" -> usually implies chronological. 
+                 But for scrolling, starting at the END (current) is better. 
+                 Let's do standard order but scroll to end? Or Reverse order? 
+                 Let's do newest first (Reverse Chronological) so they see current month immediately. 
+            -->
+
+            {% for col in columns %}
+            <div
+                class="flex flex-col w-80 bg-slate-100/80 rounded-2xl border border-slate-200/60 shadow-sm shrink-0 h-full max-h-full backdrop-blur-sm">
+                <!-- Column Header -->
+                <div
+                    class="p-4 flex items-center justify-between border-b border-slate-200/50 {{ 'bg-blue-50/50' if col.is_current else '' }}">
+                    <h3 class="font-bold text-slate-700">{{ col.name }}</h3>
+                    {% if col.is_current %}
+                    <span class="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">ACTUAL</span>
+                    {% endif %}
+                </div>
+
+                <!-- Cards List -->
+                <div class="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+
+                    <!-- Base Salary Card (Automatic) -->
+                    <div
+                        class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-l-blue-500 border-slate-200 relative opacity-90">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="font-bold text-slate-700 text-sm">Salario Líquido</span>
+                            <span class="text-[10px] text-slate-400 font-normal">(Base)</span>
+                        </div>
+                        <div class="text-xs text-slate-500 mb-2">
+                            Base: Q{{ "{:,.2f}".format(col.base_data.salary) }} <br />
+                            - IGSS: Q{{ "{:,.2f}".format(col.base_data.igss) }} <br />
+                            - ISR: Q{{ "{:,.2f}".format(col.base_data.isr) }}
+                        </div>
+                        <div class="text-lg font-black text-slate-700">Q{{ "{:,.2f}".format(col.base_data.liquid) }}
+                        </div>
+                    </div>
+
+                    <!-- Adjustments -->
+                    {% for adj in col.adjustments %}
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 relative group">
+                        <form action="/hr/{{ c.id }}/adjustment/delete" method="POST"
+                            class="absolute top-2 right-2 hidden group-hover:block"
+                            onsubmit="return confirm('¿Eliminar este ajuste?')">
+                            <input type="hidden" name="adj_id" value="{{ adj.id }}">
+                            <input type="hidden" name="redirect_to" value="payments">
+                            <button type="submit" class="text-slate-300 hover:text-red-500">×</button>
+                        </form>
+
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="font-bold text-slate-700 text-sm">{{ adj.description }}</span>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <span
+                                class="text-[10px] px-2 py-0.5 rounded-full font-bold {{ 'bg-green-100 text-green-600' if adj.type == 'Bono' else 'bg-red-100 text-red-600' }}">
+                                {{ adj.type }}
+                            </span>
+                            <span class="font-bold {{ 'text-green-600' if adj.type == 'Bono' else 'text-red-600' }}">
+                                {{ '+' if adj.type == 'Bono' else '-' }}Q{{ "{:,.2f}".format(adj.amount) }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                </div>
+
+                <!-- Column Footer -->
+                <div class="p-4 border-t border-slate-200/50 bg-slate-50/50 rounded-b-2xl">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs font-bold text-slate-400 uppercase">Total Mes</span>
+                        <span
+                            class="text-lg font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                            Q{{ "{:,.2f}".format(col.total) }}
+                        </span>
+                    </div>
+                    <button onclick="openAddModal('{{ col.month_key }}', '{{ col.name }}')"
+                        class="w-full py-2 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all font-bold text-xs flex items-center justify-center gap-1">
+                        <span>+</span> Agregar Ajuste
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Add Adjustment Modal -->
+<div id="addAdjustmentModal"
+    class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white rounded-2xl w-[400px] shadow-2xl p-6 relative">
+        <button onclick="document.getElementById('addAdjustmentModal').classList.add('hidden')"
+            class="absolute top-4 right-4 text-slate-400 hover:text-slate-600">✕</button>
+        <h3 class="font-bold text-lg mb-1 text-slate-700">Agregar Ajuste</h3>
+        <p class="text-xs text-slate-400 mb-4" id="modalMonthName"></p>
+
+        <form action="/hr/{{ c.id }}/payments/add_adjustment" method="POST" class="space-y-4">
+            <input type="hidden" name="month_key" id="modalMonthKey">
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">Tipo</label>
+                <select name="type" class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                    <option value="Bono">Bono / Ingreso Extra</option>
+                    <option value="Descuento">Descuento / Deducción</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">Descripción</label>
+                <input type="text" name="description"
+                    class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm" required
+                    placeholder="Ej. Bono Navidad">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1">Monto (Q)</label>
+                <input type="number" step="0.01" name="amount"
+                    class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm" required>
+            </div>
+
+            <button type="submit"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white w-full py-2 rounded-lg text-sm font-bold shadow-lg shadow-indigo-200">Guardar</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openAddModal(monthKey, monthName) {
+        document.getElementById('addAdjustmentModal').classList.remove('hidden');
+        document.getElementById('modalMonthKey').value = monthKey;
+        document.getElementById('modalMonthName').textContent = 'Para el mes de: ' + monthName;
+    }
+</script>
+
+<style>
+    .custom-scrollbar::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 20px;
+    }
+</style>
+{% endblock %}

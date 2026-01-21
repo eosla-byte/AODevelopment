@@ -1,0 +1,1310 @@
+[
+    {
+        "id": "1768698935699",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.100",
+        "start_time": "2026-01-17T19:15:35.699063",
+        "end_time": null,
+        "last_heartbeat": "2026-01-17T19:38:18.325018",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-17T19:20:15.297678",
+                "file_name": "No Document",
+                "active_minutes": 5.500884351666664,
+                "idle_minutes": 5.500884351666664
+            },
+            {
+                "timestamp": "2026-01-17T19:20:15.305831",
+                "file_name": "No Document",
+                "active_minutes": 5.500884351666664,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T19:26:16.304533",
+                "file_name": "No Document",
+                "active_minutes": 6.016877075,
+                "idle_minutes": 6.016877075
+            },
+            {
+                "timestamp": "2026-01-17T19:26:16.313763",
+                "file_name": "No Document",
+                "active_minutes": 6.016877075,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T19:31:57.687383",
+                "file_name": "No Document",
+                "active_minutes": 5.68965907,
+                "idle_minutes": 5.68965907
+            },
+            {
+                "timestamp": "2026-01-17T19:31:57.698202",
+                "file_name": "No Document",
+                "active_minutes": 5.68965907,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T19:38:18.315456",
+                "file_name": "No Document",
+                "active_minutes": 6.343828438333334,
+                "idle_minutes": 6.343828438333334
+            },
+            {
+                "timestamp": "2026-01-17T19:38:18.325009",
+                "file_name": "No Document",
+                "active_minutes": 6.343828438333334,
+                "idle_minutes": 0.0
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768700605784",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.100",
+        "start_time": "2026-01-17T19:43:25.784773",
+        "end_time": null,
+        "last_heartbeat": "2026-01-17T19:44:25.829580",
+        "is_active": true,
+        "activity_logs": [],
+        "sync_logs": []
+    },
+    {
+        "id": "1768701232090",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.100",
+        "start_time": "2026-01-17T19:53:52.090462",
+        "end_time": null,
+        "last_heartbeat": "2026-01-17T19:54:52.126189",
+        "is_active": true,
+        "activity_logs": [],
+        "sync_logs": []
+    },
+    {
+        "id": "1768702266017",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.100",
+        "start_time": "2026-01-17T20:11:06.018004",
+        "end_time": null,
+        "last_heartbeat": "2026-01-17T20:13:09.078087",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-17T20:13:09.068590",
+                "file_name": "No Document",
+                "active_minutes": 2.3692233249999988,
+                "idle_minutes": 2.3692233249999988
+            },
+            {
+                "timestamp": "2026-01-17T20:13:09.078077",
+                "file_name": "No Document",
+                "active_minutes": 2.3692233249999988,
+                "idle_minutes": 0.0
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768702577342",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.100",
+        "start_time": "2026-01-17T20:16:17.342169",
+        "end_time": null,
+        "last_heartbeat": "2026-01-17T20:18:59.886193",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-17T20:18:59.873547",
+                "file_name": "No Document",
+                "active_minutes": 2.9200266666666663,
+                "idle_minutes": 2.9200266666666663
+            },
+            {
+                "timestamp": "2026-01-17T20:18:59.886183",
+                "file_name": "No Document",
+                "active_minutes": 2.9200266666666663,
+                "idle_minutes": 0.0
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768702879303",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.100",
+        "start_time": "2026-01-17T20:21:19.303025",
+        "end_time": null,
+        "last_heartbeat": "2026-01-17T20:27:35.537301",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-17T20:26:07.246481",
+                "file_name": "No Document",
+                "active_minutes": 5.17026386333334,
+                "idle_minutes": 5.17026386333334
+            },
+            {
+                "timestamp": "2026-01-17T20:26:07.257575",
+                "file_name": "No Document",
+                "active_minutes": 5.17026386333334,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:27:35.527523",
+                "file_name": "No Document",
+                "active_minutes": 1.3112398549999995,
+                "idle_minutes": 1.3112398549999995
+            },
+            {
+                "timestamp": "2026-01-17T20:27:35.537290",
+                "file_name": "No Document",
+                "active_minutes": 1.3112398549999995,
+                "idle_minutes": 0.0
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768703364189",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.100",
+        "start_time": "2026-01-17T20:29:24.189187",
+        "end_time": null,
+        "last_heartbeat": "2026-01-17T20:39:21.920064",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-17T20:30:16.142636",
+                "file_name": "No Document",
+                "active_minutes": 1.182912713333334,
+                "idle_minutes": 1.182912713333334
+            },
+            {
+                "timestamp": "2026-01-17T20:30:16.152379",
+                "file_name": "No Document",
+                "active_minutes": 1.182912713333334,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:34:40.814812",
+                "file_name": "No Document",
+                "active_minutes": 4.411277641666667,
+                "idle_minutes": 4.411277641666667
+            },
+            {
+                "timestamp": "2026-01-17T20:34:40.823523",
+                "file_name": "No Document",
+                "active_minutes": 4.411277641666667,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:35:48.058842",
+                "file_name": "No Document",
+                "active_minutes": 1.1207230983333334,
+                "idle_minutes": 1.1207230983333334
+            },
+            {
+                "timestamp": "2026-01-17T20:35:48.069282",
+                "file_name": "No Document",
+                "active_minutes": 1.1207230983333334,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:37:12.124046",
+                "file_name": "No Document",
+                "active_minutes": 1.4010845533333331,
+                "idle_minutes": 1.4010845533333331
+            },
+            {
+                "timestamp": "2026-01-17T20:37:12.134435",
+                "file_name": "No Document",
+                "active_minutes": 1.4010845533333331,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:39:16.606684",
+                "file_name": "No Document",
+                "active_minutes": 2.0747168133333336,
+                "idle_minutes": 2.0747168133333336
+            },
+            {
+                "timestamp": "2026-01-17T20:39:16.616320",
+                "file_name": "No Document",
+                "active_minutes": 2.0747168133333336,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:39:21.910291",
+                "file_name": "No Document",
+                "active_minutes": 0.012927980000000002,
+                "idle_minutes": 0.012927980000000002
+            },
+            {
+                "timestamp": "2026-01-17T20:39:21.920055",
+                "file_name": "No Document",
+                "active_minutes": 0.012927980000000002,
+                "idle_minutes": 0.0
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768704354002",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.100",
+        "start_time": "2026-01-17T20:45:54.002101",
+        "end_time": null,
+        "last_heartbeat": "2026-01-17T20:53:57.650496",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-17T20:46:47.720831",
+                "file_name": "No Document",
+                "active_minutes": 1.1885625066666667,
+                "idle_minutes": 1.1885625066666667
+            },
+            {
+                "timestamp": "2026-01-17T20:46:47.735991",
+                "file_name": "No Document",
+                "active_minutes": 1.1885625066666667,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:48:31.922409",
+                "file_name": "No Document",
+                "active_minutes": 1.736606875,
+                "idle_minutes": 1.736606875
+            },
+            {
+                "timestamp": "2026-01-17T20:48:31.936026",
+                "file_name": "No Document",
+                "active_minutes": 1.736606875,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:49:50.645380",
+                "file_name": "No Document",
+                "active_minutes": 1.3120998283333334,
+                "idle_minutes": 1.3120998283333334
+            },
+            {
+                "timestamp": "2026-01-17T20:49:50.655276",
+                "file_name": "No Document",
+                "active_minutes": 1.3120998283333334,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:51:05.398365",
+                "file_name": "No Document",
+                "active_minutes": 1.2458369916666672,
+                "idle_minutes": 1.2458369916666672
+            },
+            {
+                "timestamp": "2026-01-17T20:51:05.415794",
+                "file_name": "No Document",
+                "active_minutes": 1.2458369916666672,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:52:09.478160",
+                "file_name": "No Document",
+                "active_minutes": 1.0680383416666663,
+                "idle_minutes": 1.0680383416666663
+            },
+            {
+                "timestamp": "2026-01-17T20:52:09.486846",
+                "file_name": "No Document",
+                "active_minutes": 1.0680383416666663,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:53:51.950446",
+                "file_name": "No Document",
+                "active_minutes": 1.7078518866666668,
+                "idle_minutes": 1.7078518866666668
+            },
+            {
+                "timestamp": "2026-01-17T20:53:51.960604",
+                "file_name": "No Document",
+                "active_minutes": 1.7078518866666668,
+                "idle_minutes": 0.0
+            },
+            {
+                "timestamp": "2026-01-17T20:53:57.640352",
+                "file_name": "No Document",
+                "active_minutes": 0.02017083833333333,
+                "idle_minutes": 0.02017083833333333
+            },
+            {
+                "timestamp": "2026-01-17T20:53:57.650486",
+                "file_name": "No Document",
+                "active_minutes": 0.02017083833333333,
+                "idle_minutes": 0.0
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768705070792",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.100",
+        "start_time": "2026-01-17T20:57:50.792757",
+        "end_time": null,
+        "last_heartbeat": "2026-01-17T20:59:08.046185",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-17T20:57:50.877854",
+                "file_name": "No Document",
+                "active_minutes": 1.0745318083333333,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-17T20:58:51.184679",
+                "file_name": "No Document",
+                "active_minutes": 1.005365435,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-17T20:59:08.046174",
+                "file_name": "No Document",
+                "active_minutes": 0.23521566999999996,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768734531662",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.101",
+        "start_time": "2026-01-18T05:08:51.662724",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T05:09:41.457568",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T05:08:51.785890",
+                "file_name": "No Document",
+                "active_minutes": 2.348356206666667,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T05:09:41.457558",
+                "file_name": "No Document",
+                "active_minutes": 0.755298578333333,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768734945574",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.101",
+        "start_time": "2026-01-18T05:15:45.574891",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T05:19:17.691622",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T05:19:13.019513",
+                "file_name": "No Document",
+                "active_minutes": 3.9074334133333344,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T05:19:17.691615",
+                "file_name": "No Document",
+                "active_minutes": 0.029125216666666676,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768735421836",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.101",
+        "start_time": "2026-01-18T05:23:41.836414",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T05:23:54.016560",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T05:23:41.980636",
+                "file_name": "No Document",
+                "active_minutes": 1.01425859,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T05:23:54.016551",
+                "file_name": "No Document",
+                "active_minutes": 0.154215235,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768735729617",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.101",
+        "start_time": "2026-01-18T05:28:49.617931",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T05:30:27.819351",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T05:29:19.200768",
+                "file_name": "No Document",
+                "active_minutes": 1.0003098933333334,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T05:30:24.568436",
+                "file_name": "No Document",
+                "active_minutes": 1.0895308283333334,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T05:30:27.819342",
+                "file_name": "No Document",
+                "active_minutes": 0.009294985,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768736053448",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.101",
+        "start_time": "2026-01-18T05:34:13.448956",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T05:37:53.465842",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T05:35:10.662254",
+                "file_name": "No Document",
+                "active_minutes": 1.2572055316666657,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T05:37:36.851803",
+                "file_name": "No Document",
+                "active_minutes": 2.436325956666667,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T05:37:53.465833",
+                "file_name": "No Document",
+                "active_minutes": 0.23298078666666672,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768736957479",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.101",
+        "start_time": "2026-01-18T05:49:17.479175",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T05:50:13.966018",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T05:50:04.292918",
+                "file_name": "No Document",
+                "active_minutes": 1.0389357250000009,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T05:50:13.966008",
+                "file_name": "No Document",
+                "active_minutes": 0.11756728833333333,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768737272413",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.101",
+        "start_time": "2026-01-18T05:54:32.413476",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T05:59:40.642576",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T05:55:30.764117",
+                "file_name": "No Document",
+                "active_minutes": 1.27583139,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T05:56:44.332965",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.2262146766666666,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T05:59:31.648020",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 2.788541790000002,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T05:59:40.642565",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 0.07404142833333333,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768738419760",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.101",
+        "start_time": "2026-01-18T06:13:39.760514",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T06:17:06.178553",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T06:14:47.239405",
+                "file_name": "No Document",
+                "active_minutes": 1.42769539,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T06:15:47.250645",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0002490683333332,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:17:01.117703",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.2311326666666664,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:17:06.178545",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 0.03933286166666667,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768740075086",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.101",
+        "start_time": "2026-01-18T06:41:15.086567",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T07:15:06.595410",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T06:41:58.453692",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0000110816666679,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:42:58.443734",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.000042378333333,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:43:59.260248",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0135908183333335,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:45:00.732564",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0244846033333324,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:46:00.761799",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0005240533333366,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:47:00.830894",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.001183350000002,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:48:00.832614",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0000351633333326,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:49:00.840635",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0001206349999985,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:50:01.272119",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.007207439999999,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:51:16.427489",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.252561578333334,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:52:16.431705",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0000908383333331,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:53:16.735764",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.005051965,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:54:16.757964",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0003585600000011,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:55:29.918848",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.2193683750000006,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:56:30.024360",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0017309350000005,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:57:32.199823",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0021860783333345,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:58:30.158121",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.000064345,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T06:59:32.205939",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.000458728333333,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:00:30.422998",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0039620383333336,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:01:32.525491",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0010036033333336,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:02:30.984718",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.008337131666667,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:03:33.518796",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.008233881666667,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:04:31.504730",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.00046348,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:05:33.619860",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0011253383333338,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:06:31.609584",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0005739633333328,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:07:33.637475",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.000022198333334,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:08:31.697580",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0014050883333332,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T07:10:45.910083",
+                "file_name": "SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt",
+                "active_minutes": 2.2369218650000002,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:11:45.949777",
+                "file_name": "SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0006820299999992,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:12:52.904446",
+                "file_name": "SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.1159135583333333,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:13:53.063370",
+                "file_name": "SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0025949583333336,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:14:53.079442",
+                "file_name": "SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0003268433333334,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T07:15:06.595398",
+                "file_name": "SYN-HS100-ModeloHIdrosanitario-C2B_B02-M-V2.rvt",
+                "active_minutes": 0.06125815500000003,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768780821810",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.102",
+        "start_time": "2026-01-18T18:00:21.810993",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T18:02:18.594771",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T18:00:21.932036",
+                "file_name": "No Document",
+                "active_minutes": 2.1266429433333336,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T18:01:21.933699",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0001389466666664,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:02:18.594762",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 0.8941599683333331,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768781744262",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.102",
+        "start_time": "2026-01-18T18:15:44.262109",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T18:18:50.191385",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T18:16:27.052401",
+                "file_name": "No Document",
+                "active_minutes": 1.1681341233333336,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            },
+            {
+                "timestamp": "2026-01-18T18:18:22.207611",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.9192910016666667,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:18:50.191376",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 0.3931305816666668,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768782201500",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.102",
+        "start_time": "2026-01-18T18:23:21.500377",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T18:25:14.104293",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T18:24:10.070258",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.1670679483333333,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:25:10.072908",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.00010869,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:25:14.104280",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 0.016027761666666668,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768782435299",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.102",
+        "start_time": "2026-01-18T18:27:15.299615",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T18:29:16.612384",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T18:27:58.002087",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0013408866666658,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:29:02.379229",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0730505716666672,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:29:16.612372",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 0.15196523833333325,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768783049945",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.102",
+        "start_time": "2026-01-18T18:37:29.945914",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T18:45:23.942967",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T18:38:20.662152",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.194554705,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:39:20.686607",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.000575653333334,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:41:42.535600",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 2.3641074366666674,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:42:42.535369",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.000057036666667,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:43:42.661839",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0021069300000003,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:44:42.775527",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0018949116666664,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T18:45:23.942957",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 0.64138751,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768784333860",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.102",
+        "start_time": "2026-01-18T18:58:53.860172",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T19:02:09.283649",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T18:59:37.024192",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0000046400000009,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T19:00:37.534567",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.0086221549999992,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T19:02:03.376040",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.4300133666666666,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T19:02:09.283637",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 0.014229831666666668,
+                "idle_minutes": 0.0,
+                "revit_user": "Unknown",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768786637763",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.102",
+        "start_time": "2026-01-18T19:37:17.763457",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T19:38:17.816670",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T19:37:17.878108",
+                "file_name": "No Document",
+                "active_minutes": 1.01273548,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Local"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768787593314",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.102",
+        "start_time": "2026-01-18T19:53:13.314192",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T19:57:17.578010",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T19:53:56.291754",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.000495773333333,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            },
+            {
+                "timestamp": "2026-01-18T19:55:16.361948",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.3346307566666669,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            }
+        ],
+        "sync_logs": []
+    },
+    {
+        "id": "1768788304644",
+        "user_email": "eosla@somosao.com",
+        "machine_name": "OSLA",
+        "revit_version": "2024",
+        "ip_address": "192.168.68.102",
+        "start_time": "2026-01-18T20:05:04.644357",
+        "end_time": null,
+        "last_heartbeat": "2026-01-18T20:06:04.698437",
+        "is_active": true,
+        "activity_logs": [
+            {
+                "timestamp": "2026-01-18T20:05:54.740243",
+                "file_name": "SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt",
+                "active_minutes": 1.1878566466666662,
+                "idle_minutes": 0.0,
+                "revit_user": "aobimmanagement",
+                "acc_project": "Autodesk Docs://S-1-ParqueIndustrialSynergy/SYN-BIM1000-PlanchasPrefabricado-C2B_B02-M-V2.rvt"
+            }
+        ],
+        "sync_logs": []
+    }
+]

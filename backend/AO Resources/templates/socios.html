@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col h-full gap-8 overflow-y-auto pb-10">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-800">Socios</h1>
+            <p class="text-slate-500">Gestión de utilidades y participación en proyectos.</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/" class="btn bg-white border border-slate-200 text-slate-600 hover:text-slate-800">
+                ← Volver al Inicio
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% for pid, data in partners.items() %}
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative group">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-indigo-600"></div>
+            <div class="p-6">
+                <!-- Header -->
+                <div class="flex items-center gap-4 mb-4">
+                    <div
+                        class="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-2xl overflow-hidden border-2 border-white shadow-md">
+                        {% if data.collab.profile_picture %}
+                        <img src="/hr_file/{{ data.collab.id }}/Profile/{{ data.collab.profile_picture }}"
+                            class="w-full h-full object-cover">
+                        {% else %}
+                        {{ data.collab.name[0] }}
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">{{ data.collab.name }}</h2>
+                        <p class="text-slate-500 text-xs uppercase font-bold tracking-wider">Socio</p>
+                    </div>
+                </div>
+
+                <!-- Balance Main -->
+                <div class="bg-slate-50 rounded-xl p-4 border border-slate-100 flex justify-between items-end mb-4">
+                    <div>
+                        <p class="text-xs text-slate-400 font-bold uppercase mb-1">Disponible para Retiro</p>
+                        <p class="text-3xl font-black text-emerald-600">Q{{ "{:,.2f}".format(data.total_balance) }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-slate-400 font-bold uppercase mb-1">Total Ganado</p>
+                        <p class="text-sm font-bold text-slate-600">Q{{ "{:,.2f}".format(data.total_profit) }}</p>
+                    </div>
+                </div>
+
+                <!-- Projects Breakdown -->
+                <div>
+                    <h3 class="text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Participación en Proyectos</h3>
+                    {% if data.project_details %}
+                    <div class="space-y-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                        {% for detail in data.project_details %}
+                        <div
+                            class="bg-white border boundary-slate-100 rounded-lg p-3 hover:shadow-md transition-shadow relative overflow-hidden">
+                            <!-- Action Button -->
+                            <button
+                                onclick="openWithdrawalModal('{{ detail.project_id }}', '{{ data.collab.id }}', '{{ detail.project_name }}', {{ detail.balance }})"
+                                class="absolute top-2 right-2 p-1 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                                title="Registrar Retiro">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 4v16m8-8H4" />
+                                </svg>
+                            </button>
+
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-lg">{{ detail.project_emoji }}</span>
+                                <h4 class="font-bold text-slate-700 text-sm truncate w-[60%]">{{ detail.project_name }}
+                                </h4>
+                            </div>
+                            <div class="flex justify-between text-xs text-slate-500 border-t border-slate-50 pt-2">
+                                <div>
+                                    <span class="block text-[10px] text-slate-400 uppercase">Participación</span>
+                                    <span class="font-bold text-indigo-600">{{ detail.share_pct }}%</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="block text-[10px] text-slate-400 uppercase">Utilidad</span>
+                                    <span class="font-bold text-slate-700">Q{{
+                                        "{:,.2f}".format(detail.total_profit_share) }}</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="block text-[10px] text-slate-400 uppercase">Retirado</span>
+                                    <span class="font-bold text-red-400">-Q{{ "{:,.2f}".format(detail.withdrawn)
+                                        }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-slate-400 italic p-4 text-center">Sin participación activa en proyectos.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Empty State -->
+        {% if not partners %}
+        <div class="col-span-3 text-center py-20 text-slate-400">
+            <div class="text-6xl mb-4">👥</div>
+            <p class="text-lg font-bold">No se encontraron socios.</p>
+            <p class="text-sm">Asegúrese de que existan colaboradores con el rol "Socio".</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Simple Withdrawal Input Modal -->
+<div id="withdrawalModal"
+    class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm">
+    <div class="bg-white rounded-2xl w-96 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div class="bg-emerald-600 p-4 text-white flex justify-between items-center">
+            <h2 class="font-bold">Registrar Retiro</h2>
+            <button onclick="document.getElementById('withdrawalModal').classList.add('hidden')"
+                class="text-white/80 hover:text-white">✕</button>
+        </div>
+        <form id="withdrawalForm" method="post" class="p-6 space-y-4">
+            <input type="hidden" name="collab_id" id="w_collab_id">
+            <!-- Action URL set via JS -->
+
+            <div>
+                <p class="text-sm text-slate-500 mb-2">Proyecto: <span id="w_project_name"
+                        class="font-bold text-slate-800"></span></p>
+                <p class="text-xs text-slate-400">Disponible: <span id="w_max_amount"
+                        class="font-bold text-emerald-600"></span></p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Monto a Retirar (Q)</label>
+                <input type="number" step="0.01" name="amount"
+                    class="input-field w-full text-lg font-bold text-slate-700 pl-4" required>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nota / Referencia</label>
+                <input type="text" name="note" class="input-field w-full text-sm"
+                    placeholder="Ej. Anticipo utilidades...">
+            </div>
+
+            <div class="flex justify-end pt-4">
+                <button type="submit"
+                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-emerald-200 w-full">
+                    Confirmar Retiro
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openWithdrawalModal(projectId, collabId, projectName, maxAmount) {
+        document.getElementById('withdrawalModal').classList.remove('hidden');
+        document.getElementById('w_collab_id').value = collabId;
+        document.getElementById('w_project_name').innerText = projectName;
+        document.getElementById('w_max_amount').innerText = 'Q' + maxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 });
+
+        // Update Form Action
+        document.getElementById('withdrawalForm').action = "/project/" + projectId + "/withdrawal/add";
+    }
+</script>
+
+{% endblock %}

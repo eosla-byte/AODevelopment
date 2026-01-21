@@ -1,0 +1,46 @@
+[
+    {
+        "id": "admin_01",
+        "name": "Administrador",
+        "email": "admin@ao.com",
+        "role": "admin",
+        "is_active": true,
+        "hashed_password": "$2b$12$5uvi428KywJdU5uq.3yQIOd93UD.7.VuMctIPEMztlZlYEc3cj3yK",
+        "assigned_projects": [],
+        "permissions": {
+            "financials": true,
+            "acc_viewer": true,
+            "timeline": true
+        }
+    },
+    {
+        "id": "test_client_01",
+        "name": "Cliente Prueba",
+        "email": "cliente@archipelago.com",
+        "role": "client",
+        "is_active": true,
+        "hashed_password": "$2b$12$IQqSStjZhNVL.1n1VlImC.gHhen/ZRjXFMBZst2tctN/PsyDwSTny",
+        "assigned_projects": [
+            "SYN-02"
+        ],
+        "permissions": {
+            "financials": true,
+            "acc_viewer": true,
+            "timeline": true
+        }
+    },
+    {
+        "id": "1778177611734663269",
+        "name": "Edgar Osla",
+        "email": "eosla@somosao.com",
+        "role": "admin",
+        "is_active": true,
+        "hashed_password": "$2b$12$wjCoegT3E8DyVbtuipoNEeS8kCdzG4/XgBwCQ0WR5qVAWu/onyU8i",
+        "assigned_projects": [],
+        "permissions": {
+            "financials": true,
+            "acc_viewer": true,
+            "timeline": true
+        }
+    }
+]

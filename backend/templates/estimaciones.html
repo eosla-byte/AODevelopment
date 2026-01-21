@@ -1,0 +1,755 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col h-full bg-slate-50 overflow-hidden">
+    <!-- Header -->
+    <div class="flex flex-col gap-4 mb-4 pb-4 border-b border-slate-200 px-6 pt-6">
+        <div class="flex items-center justify-between">
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">📝 Estimaciones</h1>
+            <button onclick="document.getElementById('newEstimationModal').showModal()"
+                class="btn bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-lg font-bold shadow-md transition-all hover:scale-105 flex items-center gap-2">
+                <span>+ Nueva Estimación</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="flex-1 overflow-x-auto px-6 pb-6">
+        <div class="flex h-full gap-6">
+
+            <!-- Column 1: Análisis -->
+            <div class="flex-1 flex flex-col min-w-[350px] bg-slate-100/50 rounded-xl border border-slate-200/60">
+                <!-- Column Header -->
+                <div
+                    class="p-4 border-b border-slate-200 flex items-center justify-between bg-white rounded-t-xl sticky top-0 z-10">
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <h2 class="font-bold text-slate-700">Análisis</h2>
+                        <span class="bg-slate-100 text-slate-500 text-xs px-2 py-0.5 rounded-full font-mono">{{
+                            estimations | selectattr("status", "equalto", "Analisis") | list | length }}</span>
+                    </div>
+                </div>
+
+                <!-- Cards Container -->
+                <div class="flex-1 p-4 overflow-y-auto space-y-4" ondrop="drop(event, 'Analisis')"
+                    ondragover="allowDrop(event)">
+                    {% for est in estimations if est.status == 'Analisis' %}
+                    {% include 'estimation_card.html' %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Column 2: Aprobada -->
+            <div class="flex-1 flex flex-col min-w-[350px] bg-indigo-50/30 rounded-xl border border-indigo-100">
+                <!-- Column Header -->
+                <div
+                    class="p-4 border-b border-indigo-100 flex items-center justify-between bg-white rounded-t-xl sticky top-0 z-10">
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+                        <h2 class="font-bold text-emerald-800">Aprobada para Cotización</h2>
+                        <span class="bg-indigo-100 text-indigo-600 text-xs px-2 py-0.5 rounded-full font-mono">{{
+                            estimations | selectattr("status", "equalto", "Aprobada") | list | length }}</span>
+                    </div>
+                </div>
+
+                <!-- Cards Container -->
+                <div class="flex-1 p-4 overflow-y-auto space-y-4" ondrop="drop(event, 'Aprobada')"
+                    ondragover="allowDrop(event)">
+                    {% for est in estimations if est.status == 'Aprobada' %}
+                    {% include 'estimation_card.html' %}
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- TEMPLATE FOR CARD (Inline to avoid extra file complexity for now) -->
+<script type="text/template" id="card-template">
+</script>
+
+<!-- New Estimation Modal -->
+<dialog id="newEstimationModal" class="modal rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/50 open:animate-fade-in">
+    <div class="bg-white w-full max-w-2xl flex flex-col max-h-[90vh]">
+        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <h3 class="font-bold text-slate-800">Nueva Estimación</h3>
+            <button onclick="document.getElementById('newEstimationModal').close()"
+                class="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+        <form action="/estimaciones/create" method="POST" class="flex-1 overflow-y-auto p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nombre Proyecto</label>
+                    <input type="text" name="name" required
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Cliente</label>
+                    <input type="text" name="client"
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Categoría</label>
+                    <select name="category"
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="Residencial">Residencial</option>
+                        <option value="Comercial">Comercial</option>
+                        <option value="Industrial">Industrial</option>
+                        <option value="Recreativo">Recreativo</option>
+                        <option value="Educativo">Educativo</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Monto Estimado (Q)</label>
+                    <input type="number" step="0.01" name="amount" required
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Metros²</label>
+                    <input type="number" step="0.01" name="square_meters" required
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-100 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">NIT</label>
+                    <input type="text" name="nit"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Razón Social</label>
+                    <input type="text" name="legal_name"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Orden de Compra</label>
+                    <input type="text" name="po_number"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Fecha Inicio</label>
+                    <input type="date" name="start_date"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Duración (Meses)</label>
+                    <input type="number" step="0.1" name="duration_months"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button type="submit"
+                    class="w-full btn bg-indigo-600 text-white hover:bg-indigo-700 py-3 rounded-lg font-bold shadow-lg shadow-indigo-500/30 transition-all">Crear
+                    Estimación</button>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+<!-- Edit Estimation Modal (Multi-Tab) -->
+<dialog id="editEstimationModal" class="modal rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/50">
+    <div class="bg-white w-full max-w-4xl flex flex-col h-[90vh]">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <div>
+                <h3 class="font-bold text-slate-800 text-lg">Editar Estimación</h3>
+                <p class="text-xs text-slate-400 font-medium uppercase tracking-wider" id="editModalSubtitle">
+                    Configuración detallada</p>
+            </div>
+            <button onclick="document.getElementById('editEstimationModal').close()"
+                class="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <div class="flex border-b border-slate-200 bg-white sticky top-0 z-10">
+            <button onclick="switchTab('tabGeneral')"
+                class="tab-btn px-6 py-3 text-sm font-bold text-indigo-600 border-b-2 border-indigo-600 hover:bg-slate-50 transition-colors"
+                data-tab="tabGeneral">1. Datos Generales</button>
+            <button onclick="switchTab('tabRRHH')"
+                class="tab-btn px-6 py-3 text-sm font-bold text-slate-500 border-b-2 border-transparent hover:text-indigo-600 hover:bg-slate-50 transition-colors"
+                data-tab="tabRRHH">2. RR.HH.</button>
+            <button onclick="switchTab('tabImpuestos')"
+                class="tab-btn px-6 py-3 text-sm font-bold text-slate-500 border-b-2 border-transparent hover:text-indigo-600 hover:bg-slate-50 transition-colors"
+                data-tab="tabImpuestos">3. Impuestos</button>
+            <button onclick="switchTab('tabOperativos')"
+                class="tab-btn px-6 py-3 text-sm font-bold text-slate-500 border-b-2 border-transparent hover:text-indigo-600 hover:bg-slate-50 transition-colors"
+                data-tab="tabOperativos">4. Gastos Operativos</button>
+            <button onclick="switchTab('tabSocios')"
+                class="tab-btn px-6 py-3 text-sm font-bold text-slate-500 border-b-2 border-transparent hover:text-indigo-600 hover:bg-slate-50 transition-colors"
+                data-tab="tabSocios">5. Socios</button>
+        </div>
+
+        <!-- Form Content -->
+        <div class="flex-1 overflow-y-auto bg-slate-50/50">
+            <form id="editForm" onsubmit="event.preventDefault(); saveEstimationChanges();" class="p-6">
+                <input type="hidden" id="editEstId" name="est_id">
+
+                <!-- TAB 1: GENERAL -->
+                <div id="tabGeneral" class="tab-content space-y-6">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nombre Proyecto</label>
+                            <input type="text" id="editName"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Cliente</label>
+                            <input type="text" id="editClient"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Categoría</label>
+                            <select id="editCategory"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none">
+                                <option value="Residencial">Residencial</option>
+                                <option value="Comercial">Comercial</option>
+                                <option value="Industrial">Industrial</option>
+                                <option value="Recreativo">Recreativo</option>
+                                <option value="Educativo">Educativo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Monto Estimado
+                                (Q)</label>
+                            <input type="number" step="0.01" id="editAmount" oninput="recalcAll()"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none font-bold text-indigo-700">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Metros²</label>
+                            <input type="number" step="0.01" id="editM2"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Fecha Inicio</label>
+                            <input type="date" id="editStartDate"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Duración
+                                (Meses)</label>
+                            <input type="number" step="0.1" id="editDuration" oninput="recalcAll()"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 outline-none">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4 border-t border-slate-200 pt-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">NIT</label>
+                            <input type="text" id="editNit"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Razón Social</label>
+                            <input type="text" id="editLegalName"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Orden de Compra</label>
+                            <input type="text" id="editPoNumber"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: RRHH -->
+                <div id="tabRRHH" class="tab-content hidden space-y-4">
+                    <div class="flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <h4 class="font-bold text-blue-800 text-sm">Roles y Salarios</h4>
+                        <button type="button" onclick="addResourceRow()"
+                            class="text-xs bg-white text-blue-600 px-3 py-1 rounded border border-blue-200 font-bold hover:bg-blue-50">+
+                            Agregar Rol</button>
+                    </div>
+
+                    <div id="resourcesContainer" class="space-y-2">
+                        <!-- Rows injected via JS -->
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg flex justify-between items-center border border-slate-200 mt-4">
+                        <div class="text-xs font-bold text-slate-500 uppercase">Subtotal Mensual</div>
+                        <div class="text-lg font-bold text-slate-700" id="monthlyRRHHDisplay">Q0.00</div>
+                    </div>
+                    <div class="bg-slate-100 p-4 rounded-lg flex justify-between items-center border border-slate-200">
+                        <div class="text-xs font-bold text-slate-500 uppercase">Total Recursos Humanos (x Meses)</div>
+                        <div class="text-xl font-bold text-slate-800" id="totalRRHHDisplay">Q0.00</div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: IMPUESTOS -->
+                <div id="tabImpuestos" class="tab-content hidden space-y-6">
+                    <div class="bg-amber-50 p-4 rounded-lg border border-amber-100 space-y-4">
+                        <h4 class="font-bold text-amber-800 text-sm mb-2">Cálculo Automático de Impuestos</h4>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-xs font-bold text-amber-700/70 mb-1 uppercase">IVA
+                                    (12%)</label>
+                                <input type="text" id="displayIVA" disabled
+                                    class="w-full bg-white/50 border border-amber-200 rounded-lg px-3 py-2 text-sm font-mono font-bold text-amber-900">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-amber-700/70 mb-1 uppercase">ISR (7%
+                                    s/Formula)</label>
+                                <input type="text" id="displayISR" disabled
+                                    class="w-full bg-white/50 border border-amber-200 rounded-lg px-3 py-2 text-sm font-mono font-bold text-amber-900">
+                                <p class="text-[10px] text-amber-600/60 mt-1">Formula: ((Monto - IVA - 30k) * 7%) + 1.5k
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 p-4 rounded-lg flex justify-between items-center border border-slate-200">
+                        <div class="text-xs font-bold text-slate-500 uppercase">Total Impuestos</div>
+                        <div class="text-xl font-bold text-slate-800" id="totalTaxesDisplay">Q0.00</div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: OPERATIVOS -->
+                <div id="tabOperativos" class="tab-content hidden space-y-4">
+                    <p class="text-xs text-slate-500">Ingrese los gastos mensuales o globales proyectados para la
+                        operación del proyecto.</p>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Renta</label>
+                            <input type="number" step="0.01" data-type="Renta"
+                                class="op-expense w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                                placeholder="0.00" oninput="recalcAll()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Servicios
+                                Generales</label>
+                            <input type="number" step="0.01" data-type="Servicios Generales"
+                                class="op-expense w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                                placeholder="0.00" oninput="recalcAll()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Internet /
+                                Telefonía</label>
+                            <input type="number" step="0.01" data-type="Internet"
+                                class="op-expense w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                                placeholder="0.00" oninput="recalcAll()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Mobiliario</label>
+                            <input type="number" step="0.01" data-type="Mobiliario"
+                                class="op-expense w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                                placeholder="0.00" oninput="recalcAll()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Uso de Equipo</label>
+                            <input type="number" step="0.01" data-type="Equipo"
+                                class="op-expense w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                                placeholder="0.00" oninput="recalcAll()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Licencias
+                                Software</label>
+                            <input type="number" step="0.01" data-type="Licencias"
+                                class="op-expense w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm"
+                                placeholder="0.00" oninput="recalcAll()">
+                        </div>
+                    </div>
+
+                    <div
+                        class="bg-slate-100 p-4 rounded-lg flex justify-between items-center border border-slate-200 mt-4">
+                        <div class="text-xs font-bold text-slate-500 uppercase">Total Gastos Operativos (x Meses)</div>
+                        <div class="text-xl font-bold text-slate-800" id="totalOpsDisplay">Q0.00</div>
+                    </div>
+                </div>
+
+                <!-- TAB 5: SOCIOS -->
+                <div id="tabSocios" class="tab-content hidden space-y-6">
+                    <div class="bg-emerald-50 p-4 rounded-lg border border-emerald-100 mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-emerald-800 text-sm">Pool de Utilidades Estimada</h4>
+                            <span class="text-emerald-900 font-bold text-lg" id="utilityPoolDisplay">Q0.00</span>
+                        </div>
+                        <p class="text-[10px] text-emerald-700/60">Fórmula: Monto Total - (RR.HH + Impuestos +
+                            Operativos)</p>
+                    </div>
+
+                    <div class="flex justify-between items-center mb-2">
+                        <h4 class="font-bold text-slate-700 text-sm">Distribución de Socios</h4>
+                        <button type="button" onclick="addPartnerRow()"
+                            class="text-xs bg-white text-emerald-600 px-3 py-1 rounded border border-emerald-200 font-bold hover:bg-emerald-50">+
+                            Agregar Socio</button>
+                    </div>
+
+                    <div id="partnersContainer" class="space-y-2">
+                        <!-- Partner Rows -->
+                    </div>
+                </div>
+
+            </form>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="p-4 border-t border-slate-200 bg-white flex justify-end gap-3 rounded-b-xl">
+            <button type="button" onclick="document.getElementById('editEstimationModal').close()"
+                class="px-4 py-2 text-slate-500 font-bold hover:bg-slate-50 rounded-lg transition-colors">Cancelar</button>
+            <button type="button" onclick="document.getElementById('editForm').dispatchEvent(new Event('submit'))"
+                class="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 transition-colors">Guardar
+                Todo</button>
+        </div>
+    </div>
+</dialog>
+
+<script>
+    function allowDrop(ev) {
+        ev.preventDefault();
+    }
+
+    function drag(ev) {
+        ev.dataTransfer.setData("text", ev.target.id);
+    }
+
+    function drop(ev, newStatus) {
+        ev.preventDefault();
+        var data = ev.dataTransfer.getData("text");
+        var el = document.getElementById(data);
+
+        // Find the valid drop target container (div with ondrop)
+        let target = ev.target;
+        while (!target.hasAttribute("ondrop")) {
+            target = target.parentElement;
+            if (!target) return; // safety
+        }
+
+        target.appendChild(el);
+
+        // Call API to update status
+        const estId = data.replace('est-', '');
+        const formData = new FormData();
+        formData.append('est_id', estId);
+        formData.append('new_status', newStatus);
+
+        fetch('/estimaciones/update/status', {
+            method: 'POST',
+            body: formData
+        }).then(r => r.json()).then(d => {
+            console.log("Status updated", d);
+        });
+    }
+
+    // --- Global State ---
+    // Safely inject JSON data
+    const allEstimations = {{ estimations | tojson | safe }};
+    const estimationsMap = {};
+    allEstimations.forEach(e => { estimationsMap[e.id] = e; });
+
+    let currentResources = [];
+    let currentPartners = [];
+    let currentExpenses = [];
+
+    // Manually serialize collaborators to avoid issues with Python objects
+    let availableCollaborators = [
+        {% for c in collaborators %}
+    {
+        id: "{{ c.id }}",
+            name: "{{ c.name | replace('\"', '\\\"') }}",
+                role: "{{ c.role | replace('\"', '\\\"') }}"
+    },
+    {% endfor %}
+    ];
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.getElementById(tabId).classList.remove('hidden');
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-indigo-600', 'text-indigo-600');
+            el.classList.add('border-transparent', 'text-slate-500');
+        });
+        const btn = document.querySelector(`button[data-tab="${tabId}"]`);
+        btn.classList.remove('border-transparent', 'text-slate-500');
+        btn.classList.add('border-indigo-600', 'text-indigo-600');
+    }
+
+    function openEditModal(estId) {
+        const est = estimationsMap[estId];
+        if (!est) {
+            console.error("Estimation not found:", estId);
+            return;
+        }
+
+        document.getElementById('editEstId').value = est.id;
+        document.getElementById('editName').value = est.name || '';
+        document.getElementById('editClient').value = est.client || '';
+        document.getElementById('editAmount').value = est.amount || 0;
+        document.getElementById('editM2').value = est.square_meters || 0;
+        document.getElementById('editCategory').value = est.category || 'Residencial';
+        document.getElementById('editDuration').value = est.duration_months || 0;
+
+        // Date handling
+        if (est.start_date) {
+            // Ensure YYYY-MM-DD format if it's ISO
+            try {
+                document.getElementById('editStartDate').value = est.start_date.split('T')[0];
+            } catch (e) {
+                document.getElementById('editStartDate').value = est.start_date;
+            }
+        } else {
+            document.getElementById('editStartDate').value = '';
+        }
+
+        document.getElementById('editNit').value = est.nit || '';
+        document.getElementById('editLegalName').value = est.legal_name || '';
+        document.getElementById('editPoNumber').value = est.po_number || '';
+
+        switchTab('tabGeneral');
+
+        // --- Load Resources ---
+        currentResources = [];
+        document.getElementById('resourcesContainer').innerHTML = '';
+        const savedResources = est.resources || [];
+        savedResources.forEach(r => {
+            addResourceRow(r);
+        });
+
+        // --- Load Partners ---
+        currentPartners = [];
+        document.getElementById('partnersContainer').innerHTML = '';
+        const savedPartners = est.partners || [];
+        savedPartners.forEach(p => {
+            addPartnerRow(p);
+        });
+
+        // --- Load Expenses ---
+        // Clear all first
+        document.querySelectorAll('.op-expense').forEach(i => i.value = '');
+        const savedExpenses = est.expenses || [];
+        savedExpenses.forEach(exp => {
+            // Try match by data-type
+            const input = document.querySelector(`.op-expense[data-type="${exp.type}"]`);
+            if (input) {
+                input.value = exp.amount;
+            }
+        });
+
+        recalcAll();
+        document.getElementById('editEstimationModal').showModal();
+    }
+
+    function recalcAll() {
+        const amount = parseFloat(document.getElementById('editAmount').value) || 0;
+        const duration = parseFloat(document.getElementById('editDuration').value) || 0;
+
+        // RRHH
+        let totalRRHH = 0; // Monthly
+        currentResources.forEach(res => {
+            totalRRHH += (parseFloat(res.salary) || 0) * (parseInt(res.count) || 1);
+        });
+        document.getElementById('monthlyRRHHDisplay').innerText = formatMoney(totalRRHH);
+
+        const totalRRHHProject = totalRRHH * duration;
+        document.getElementById('totalRRHHDisplay').innerText = formatMoney(totalRRHHProject);
+
+        // Taxes
+        const iva = amount * 0.12;
+        let isrBase = (amount - iva) - 30000;
+        let isr = (isrBase > 0) ? (isrBase * 0.07) + 1500 : 1500;
+        if (isrBase < 0) isr = 1500; // Simplified min
+
+        document.getElementById('displayIVA').value = formatMoney(iva);
+        document.getElementById('displayISR').value = formatMoney(isr);
+        const totalTaxes = iva + isr;
+        document.getElementById('totalTaxesDisplay').innerText = formatMoney(totalTaxes);
+
+        // Ops (Total = Monthly Sum * Duration)
+        let monthlyOps = 0;
+        document.querySelectorAll('.op-expense').forEach(i => monthlyOps += parseFloat(i.value) || 0);
+        const totalOps = monthlyOps * duration;
+        document.getElementById('totalOpsDisplay').innerText = formatMoney(totalOps);
+
+        // Utility
+        const utilityPool = amount - totalRRHHProject - totalTaxes - totalOps;
+        document.getElementById('utilityPoolDisplay').innerText = formatMoney(utilityPool);
+
+        // Partners
+        currentPartners.forEach(p => {
+            const row = document.getElementById(`part-${p.id}`);
+            if (row) row.querySelector('.part-gain').innerText = formatMoney(utilityPool * (p.pct / 100));
+        });
+    }
+
+    function formatMoney(val) {
+        return "Q" + (val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // RRHH Helpers
+    function addResourceRow(data = null) {
+        const id = Date.now() + Math.floor(Math.random() * 1000);
+        const row = document.createElement('div');
+        row.className = "flex gap-2 items-center bg-white p-2 border border-slate-200 rounded";
+        row.id = `res-${id}`;
+
+        let initialRole = data ? data.role : '';
+        let initialCount = data ? data.count : 1;
+        let initialSalary = data ? data.salary : 0;
+
+        row.innerHTML = `
+            <input type="text" placeholder="Rol" class="res-role flex-1 border border-slate-200 rounded px-2 py-1 text-sm" oninput="updateRes('${id}')" value="${initialRole}">
+            <input type="number" placeholder="#" class="res-count w-16 border border-slate-200 rounded px-2 py-1 text-sm text-center" oninput="updateRes('${id}')" value="${initialCount}">
+            <input type="number" placeholder="Salario" class="res-salary w-32 border border-slate-200 rounded px-2 py-1 text-sm" oninput="updateRes('${id}')" value="${initialSalary}">
+            <button type="button" onclick="removeRes('${id}')" class="text-red-400 font-bold px-2">✕</button>
+        `;
+        document.getElementById('resourcesContainer').appendChild(row);
+        currentResources.push({ id, role: initialRole, count: initialCount, salary: initialSalary });
+    }
+
+    function updateRes(id) {
+        const row = document.getElementById(`res-${id}`);
+        const idx = currentResources.findIndex(r => r.id == id);
+        if (idx !== -1) {
+            currentResources[idx].role = row.querySelector('.res-role').value;
+            currentResources[idx].count = row.querySelector('.res-count').value;
+            currentResources[idx].salary = row.querySelector('.res-salary').value;
+        }
+        recalcAll();
+    }
+
+    function removeRes(id) {
+        currentResources = currentResources.filter(r => r.id != id);
+        document.getElementById(`res-${id}`).remove();
+        recalcAll();
+    }
+
+    // Partner Helpers
+    function addPartnerRow(data = null) {
+        // Validation: Prevent adding if total >= 100
+        let currentTotal = currentPartners.reduce((sum, p) => sum + (p.pct || 0), 0);
+        if (currentTotal >= 100 && !data) { // Allow data loading (which might be 100%), but block new adds
+            alert("Total repartido ya es 100%. Ajuste porcentajes existentes antes de agregar otro socio.");
+            return;
+        }
+
+        const id = Date.now() + Math.floor(Math.random() * 1000);
+        const row = document.createElement('div');
+        row.className = "flex gap-2 items-center bg-white p-2 border border-emerald-100 rounded";
+        row.id = `part-${id}`;
+
+        // Build options
+        let options = `<option value="">Seleccionar...</option>`;
+        availableCollaborators.forEach(c => {
+            const selected = (data && data.userId == c.id) ? 'selected' : '';
+            options += `<option value="${c.id}" ${selected}>${c.name}</option>`;
+        });
+
+        const initialPct = data ? data.pct : 0;
+
+        row.innerHTML = `
+            <select class="part-select flex-1 border border-slate-200 rounded px-2 py-1 text-sm" onchange="updatePart('${id}')">${options}</select>
+            <div class="flex items-center gap-1">
+                <input type="number" placeholder="%" class="part-pct w-16 border border-slate-200 rounded px-2 py-1 text-sm text-center font-bold text-emerald-600" oninput="updatePart('${id}')" value="${initialPct}" max="100">
+                <span class="text-xs text-slate-400">%</span>
+            </div>
+            <div class="w-32 text-right text-xs font-bold text-slate-600 part-gain">Q0.00</div>
+            <button type="button" onclick="removePart('${id}')" class="text-red-400 font-bold px-2">✕</button>
+        `;
+        document.getElementById('partnersContainer').appendChild(row);
+
+        // Push initial state
+        const initialUserId = data ? data.userId : '';
+        currentPartners.push({ id, userId: initialUserId, pct: initialPct });
+    }
+
+    function updatePart(id) {
+        const row = document.getElementById(`part-${id}`);
+        const idx = currentPartners.findIndex(p => p.id == id);
+
+        if (idx !== -1) {
+            const selArg = row.querySelector('.part-select').value;
+            let val = parseFloat(row.querySelector('.part-pct').value) || 0;
+
+            // Validation: Ensure this value doesn't push total over 100
+            // Calculate total of OTHERS
+            let otherTotal = 0;
+            currentPartners.forEach(p => {
+                if (p.id != id) otherTotal += (p.pct || 0);
+            });
+
+            let maxAllowed = 100 - otherTotal;
+            if (val > maxAllowed) {
+                val = maxAllowed;
+                row.querySelector('.part-pct').value = val; // visually clamp
+            }
+
+            currentPartners[idx].userId = selArg;
+            currentPartners[idx].pct = val;
+        }
+        recalcAll();
+    }
+
+    function removePart(id) {
+        currentPartners = currentPartners.filter(p => p.id != id);
+        document.getElementById(`part-${id}`).remove();
+        recalcAll();
+    }
+
+    function saveEstimationChanges() {
+        const labels = ["Renta", "Servicios Generales", "Internet", "Mobiliario", "Equipo", "Licencias"];
+        let exps = [];
+
+        // Collect expenses by data-type or order
+        document.querySelectorAll('.op-expense').forEach((input) => {
+            const t = input.getAttribute('data-type');
+            if (t && input.value) {
+                exps.push({ type: t, amount: input.value });
+            }
+        });
+
+        const data = {
+            est_id: document.getElementById('editEstId').value,
+            updates: {
+                name: document.getElementById('editName').value,
+                client: document.getElementById('editClient').value,
+                amount: parseFloat(document.getElementById('editAmount').value) || 0,
+                square_meters: parseFloat(document.getElementById('editM2').value) || 0,
+                category: document.getElementById('editCategory').value,
+                duration_months: parseFloat(document.getElementById('editDuration').value) || 0,
+                start_date: document.getElementById('editStartDate').value,
+                nit: document.getElementById('editNit').value,
+                legal_name: document.getElementById('editLegalName').value,
+                po_number: document.getElementById('editPoNumber').value,
+                resources: currentResources.map(r => ({ ...r, count: parseFloat(r.count) || 0, salary: parseFloat(r.salary) || 0 })),
+                partners: currentPartners.map(p => ({ ...p, pct: parseFloat(p.pct) || 0 })),
+                expenses: exps.map(e => ({ ...e, amount: parseFloat(e.amount) || 0 }))
+            }
+        };
+
+        fetch('/estimaciones/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(data)
+        }).then(r => r.json()).then(d => {
+            window.location.reload();
+        }).catch(e => alert("Error: " + e));
+    }
+</script>
+
+<style>
+    dialog::backdrop {
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(2px);
+    }
+
+    /* Card Styles */
+    .est-card {
+        cursor: grab;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .est-card:active {
+        cursor: grabbing;
+        transform: scale(1.02);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+</style>
+{% endblock %}

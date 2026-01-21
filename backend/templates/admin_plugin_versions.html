@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="px-8 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                Gestión de Versiones
+            </h1>
+            <p class="text-slate-500 mt-1">Administra las versiones y actualizaciones del Plugin Revit</p>
+        </div>
+        <button onclick="document.getElementById('modal-new-version').classList.remove('hidden')"
+            class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Nueva Versión
+        </button>
+    </div>
+
+    <!-- Versions Table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-slate-50 border-b border-slate-100 text-xs uppercase tracking-wider text-slate-500">
+                    <th class="p-4 font-semibold">Versión</th>
+                    <th class="p-4 font-semibold">Fecha Lanzamiento</th>
+                    <th class="p-4 font-semibold">Notas (Changelog)</th>
+                    <th class="p-4 font-semibold">Tipo</th>
+                    <th class="p-4 font-semibold text-right">Acciones</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+                {% for v in versions %}
+                <tr class="hover:bg-slate-50/50 transition-colors">
+                    <td class="p-4">
+                        <div class="font-bold text-slate-800">{{ v.version_number }}</div>
+                    </td>
+                    <td class="p-4 text-slate-600 text-sm">
+                        {{ v.release_date.strftime('%d/%m/%Y %H:%M') }}
+                    </td>
+                    <td class="p-4 text-slate-600 text-sm max-w-xs truncate" title="{{ v.changelog }}">
+                        {{ v.changelog }}
+                    </td>
+                    <td class="p-4">
+                        {% if v.is_mandatory %}
+                        <span
+                            class="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-red-100 text-red-700">
+                            Obligatoria
+                        </span>
+                        {% else %}
+                        <span
+                            class="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-green-100 text-green-700">
+                            Opcional
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="p-4 text-right">
+                        <form action="/admin/plugin/versions/delete" method="POST"
+                            onsubmit="return confirm('¿Seguro que deseas eliminar esta versión?');">
+                            <input type="hidden" name="version_id" value="{{ v.id }}">
+                            <button type="submit" class="text-slate-400 hover:text-red-600 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                    </path>
+                                </svg>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if not versions %}
+        <div class="p-12 text-center text-slate-400">
+            <svg class="w-16 h-16 mx-auto mb-4 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6">
+                </path>
+            </svg>
+            <p>No hay versiones publicadas.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal New Version -->
+<div id="modal-new-version"
+    class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+        <form action="/admin/plugin/versions/add" method="POST">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-bold text-slate-800 text-lg">Publicar Nueva Versión</h3>
+                <button type="button" onclick="document.getElementById('modal-new-version').classList.add('hidden')"
+                    class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Número de Versión</label>
+                    <input type="text" name="version_number" placeholder="e.g. 1.0.1" required
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Notas de la Versión (Changelog)</label>
+                    <textarea name="changelog" rows="3" placeholder="Describe los cambios..." required
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">URL de Descarga (Installer)</label>
+                    <input type="text" name="download_url" placeholder="https://..." required
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" name="is_mandatory" id="is_mandatory" value="true"
+                        class="w-4 h-4 text-blue-600 rounded border-gray-300">
+                    <label for="is_mandatory" class="text-sm font-medium text-slate-700">Actualización
+                        Obligatoria</label>
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+                <button type="button" onclick="document.getElementById('modal-new-version').classList.add('hidden')"
+                    class="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
+                <button type="submit"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors">Publicar</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

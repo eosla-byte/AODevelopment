@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contacto | AO Arquitectura</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Cormorant+Garamond:wght@300;400;600&family=Outfit:wght@200;300;400&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css">
+    <style>
+        /* Page Specific Styles */
+        body {
+            background-color: #000;
+            color: #fff;
+            overflow-x: hidden;
+        }
+
+        .contact-container {
+            display: flex;
+            /* Split layout */
+            min-height: 100vh;
+            padding-top: 80px;
+            /* Header space */
+        }
+
+        .contact-visual {
+            flex: 1;
+            padding: 4rem;
+            background: radial-gradient(circle at top left, #222, #000);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .contact-form-section {
+            flex: 1.5;
+            padding: 6rem;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Typography */
+        h1.page-title {
+            font-family: 'Barlow', sans-serif;
+            font-weight: 700;
+            font-size: 6rem;
+            line-height: 0.9;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+        }
+
+        .highlight-red {
+            color: #ff3333;
+            /* Red accent */
+            display: block;
+        }
+
+        .highlight-white {
+            color: #fff;
+            display: block;
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 3rem;
+        }
+
+        label {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            display: block;
+            margin-bottom: 1rem;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid #fff;
+            color: #fff;
+            font-family: 'Barlow', sans-serif;
+            font-size: 1.5rem;
+            padding: 0.5rem 0;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        textarea:focus {
+            border-bottom-color: #ff3333;
+        }
+
+        .submit-btn {
+            background-color: #2a3b47;
+            /* Slate blue-ish from reference */
+            color: #fff;
+            border: none;
+            padding: 1rem 3rem;
+            font-size: 1.2rem;
+            font-family: 'Barlow', sans-serif;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: background 0.3s;
+        }
+
+        .submit-btn:hover {
+            background-color: #ff3333;
+        }
+
+        /* Info Block */
+        .info-grid {
+            margin-top: 4rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.9rem;
+            border-top: 1px solid #333;
+            padding-top: 2rem;
+        }
+
+        .info-item strong {
+            display: block;
+            color: #ff3333;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .info-item a {
+            color: #fff;
+            text-decoration: none;
+        }
+
+        /* Header Fix for this page */
+        #main-header {
+            position: absolute;
+            /* Maintain absolute layout */
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <header id="main-header">
+            <div class="header-top">
+                <nav class="left-nav"><a href="/" class="nav-link">← Volver al Inicio</a></nav>
+                <nav class="center-nav"></nav> <!-- Empty -->
+                <nav class="right-nav"><a href="/contact.html" class="nav-link active">Contacto</a></nav>
+            </div>
+        </header>
+
+        <main class="contact-container">
+            <div class="contact-visual">
+                <h1 class="page-title">
+                    <span class="highlight-red">Contact</span>
+                    <span class="highlight-white">AO<br>Arquitectura</span>
+                </h1>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <strong>General Information</strong>
+                        <a href="mailto:info@aoarquitectura.com">info@aoarquitectura.com</a>
+                    </div>
+                    <div class="info-item">
+                        <strong>Human Resources</strong>
+                        <a href="mailto:rrhh@aoarquitectura.com">rrhh@aoarquitectura.com</a>
+                    </div>
+                    <div class="info-item">
+                        <strong>Guatemala</strong>
+                        <p>(502) 2222 - 0000</p>
+                        <p>Zona 14, Ciudad de Guatemala</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="contact-form-section">
+                <h2 style="font-family: 'Barlow'; font-size: 3rem; color: #ff3333; margin-bottom: 3rem;">Say hello.</h2>
+                <form action="#" method="POST">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Send your message</label>
+                        <textarea name="message" rows="1"></textarea>
+                    </div>
+                    <button type="submit" class="submit-btn"
+                        onclick="alert('Funcionalidad de envío simulada. En producción esto enviará un email.'); return false;">Send</button>
+                </form>
+            </div>
+        </main>
+    </div>
+</body>
+
+</html>

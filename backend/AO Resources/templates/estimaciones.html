@@ -1,0 +1,565 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col h-full bg-slate-50 overflow-hidden">
+    <!-- Header -->
+    <div class="flex flex-col gap-4 mb-4 pb-4 border-b border-slate-200 px-6 pt-6">
+        <div class="flex items-center justify-between">
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">📝 Estimaciones</h1>
+            <button onclick="document.getElementById('newEstimationModal').showModal()"
+                class="btn bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-lg font-bold shadow-md transition-all hover:scale-105 flex items-center gap-2">
+                <span>+ Nueva Estimación</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="flex-1 overflow-x-auto px-6 pb-6">
+        <div class="flex h-full gap-6">
+
+            <!-- Column 1: Análisis -->
+            <div class="flex-1 flex flex-col min-w-[350px] bg-slate-100/50 rounded-xl border border-slate-200/60">
+                <!-- Column Header -->
+                <div
+                    class="p-4 border-b border-slate-200 flex items-center justify-between bg-white rounded-t-xl sticky top-0 z-10">
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <h2 class="font-bold text-slate-700">Análisis</h2>
+                        <span class="bg-slate-100 text-slate-500 text-xs px-2 py-0.5 rounded-full font-mono">{{
+                            estimations | selectattr("status", "equalto", "Analisis") | list | length }}</span>
+                    </div>
+                </div>
+
+                <!-- Cards Container -->
+                <div class="flex-1 p-4 overflow-y-auto space-y-4" ondrop="drop(event, 'Analisis')"
+                    ondragover="allowDrop(event)">
+                    {% for est in estimations if est.status == 'Analisis' %}
+                    {% include 'estimation_card.html' %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Column 2: Aprobada -->
+            <div class="flex-1 flex flex-col min-w-[350px] bg-indigo-50/30 rounded-xl border border-indigo-100">
+                <!-- Column Header -->
+                <div
+                    class="p-4 border-b border-indigo-100 flex items-center justify-between bg-white rounded-t-xl sticky top-0 z-10">
+                    <div class="flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+                        <h2 class="font-bold text-emerald-800">Aprobada para Cotización</h2>
+                        <span class="bg-indigo-100 text-indigo-600 text-xs px-2 py-0.5 rounded-full font-mono">{{
+                            estimations | selectattr("status", "equalto", "Aprobada") | list | length }}</span>
+                    </div>
+                </div>
+
+                <!-- Cards Container -->
+                <div class="flex-1 p-4 overflow-y-auto space-y-4" ondrop="drop(event, 'Aprobada')"
+                    ondragover="allowDrop(event)">
+                    {% for est in estimations if est.status == 'Aprobada' %}
+                    {% include 'estimation_card.html' %}
+                    {% endfor %}
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- TEMPLATE FOR CARD (Inline to avoid extra file complexity for now) -->
+<script type="text/template" id="card-template">
+</script>
+
+<!-- New Estimation Modal -->
+<dialog id="newEstimationModal" class="modal rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/50 open:animate-fade-in">
+    <div class="bg-white w-full max-w-2xl flex flex-col max-h-[90vh]">
+        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <h3 class="font-bold text-slate-800">Nueva Estimación</h3>
+            <button onclick="document.getElementById('newEstimationModal').close()"
+                class="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+        <form action="/estimaciones/create" method="POST" class="flex-1 overflow-y-auto p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nombre Proyecto</label>
+                    <input type="text" name="name" required
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Cliente</label>
+                    <input type="text" name="client"
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Categoría</label>
+                    <select name="category"
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        <option value="Residencial">Residencial</option>
+                        <option value="Comercial">Comercial</option>
+                        <option value="Industrial">Industrial</option>
+                        <option value="Recreativo">Recreativo</option>
+                        <option value="Educativo">Educativo</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Monto Estimado (Q)</label>
+                    <input type="number" step="0.01" name="amount" required
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Metros²</label>
+                    <input type="number" step="0.01" name="square_meters" required
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                </div>
+            </div>
+
+            <div class="p-4 bg-slate-50 rounded-lg border border-slate-100 grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">NIT</label>
+                    <input type="text" name="nit"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Razón Social</label>
+                    <input type="text" name="legal_name"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Orden de Compra</label>
+                    <input type="text" name="po_number"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Fecha Inicio</label>
+                    <input type="date" name="start_date"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Duración (Meses)</label>
+                    <input type="number" step="0.1" name="duration_months"
+                        class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+            </div>
+
+            <div class="pt-2">
+                <button type="submit"
+                    class="w-full btn bg-indigo-600 text-white hover:bg-indigo-700 py-3 rounded-lg font-bold shadow-lg shadow-indigo-500/30 transition-all">Crear
+                    Estimación</button>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+<script>
+    function allowDrop(ev) {
+        ev.preventDefault();
+    }
+
+    function drag(ev) {
+        ev.dataTransfer.setData("text", ev.target.id);
+    }
+
+    function drop(ev, newStatus) {
+        ev.preventDefault();
+        var data = ev.dataTransfer.getData("text");
+        var el = document.getElementById(data);
+
+        // Find the valid drop target container (div with ondrop)
+        let target = ev.target;
+        while (!target.hasAttribute("ondrop")) {
+            target = target.parentElement;
+            if (!target) return; // safety
+        }
+
+        target.appendChild(el);
+
+        // Call API to update status
+        const estId = data.replace('est-', '');
+        const formData = new FormData();
+        formData.append('est_id', estId);
+        formData.append('new_status', newStatus);
+
+        fetch('/estimaciones/update/status', {
+            method: 'POST',
+            body: formData
+        }).then(r => r.json()).then(d => {
+            console.log("Status updated", d);
+        });
+    }
+
+    // --- DETAILS MODAL LOGIC ---
+    let currentEst = null;
+
+    async function openEstimationDetails(estId) {
+        try {
+            const res = await fetch(`/estimaciones/${estId}`);
+            if (!res.ok) throw new Error("Failed to load");
+            currentEst = await res.json();
+
+            // Populate Fields
+            document.getElementById('detId').value = currentEst.id;
+            document.getElementById('detName').value = currentEst.name;
+            document.getElementById('detClient').value = currentEst.client || "";
+            document.getElementById('detCategory').value = currentEst.category;
+            document.getElementById('detAmount').value = currentEst.amount;
+            document.getElementById('detM2').value = currentEst.square_meters;
+            document.getElementById('detDuration').value = currentEst.duration_months || 1;
+
+            // Financial Defaults if missing
+            if (!currentEst.financials) currentEst.financials = {};
+            document.getElementById('detTaxPct').value = currentEst.financials.tax_pct || 5;
+            document.getElementById('detOpExPct').value = currentEst.financials.opex_pct || 0;
+            document.getElementById('detDonationPct').value = currentEst.financials.donation_pct || 0;
+
+            // Render Tabs
+            renderResources();
+            calculateFinancials();
+
+            document.getElementById('detailsModal').showModal();
+        } catch (e) {
+            console.error(e);
+            alert("Error loading details");
+        }
+    }
+
+    function renderResources() {
+        const tbody = document.getElementById('detResourcesTable');
+        tbody.innerHTML = '';
+
+        const resources = currentEst.resources || [];
+        let totalCost = 0;
+        const duration = parseFloat(document.getElementById('detDuration').value) || 1;
+
+        resources.forEach((res, idx) => {
+            const subtotal = (parseFloat(res.cost) || 0) * (parseFloat(res.count) || 0) * duration;
+            totalCost += subtotal;
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="p-2 border-b"><input onchange="updateResource(${idx}, 'role', this.value)" type="text" value="${res.role}" class="w-full bg-transparent text-sm"></td>
+                <td class="p-2 border-b"><input onchange="updateResource(${idx}, 'count', this.value)" type="number" value="${res.count}" class="w-16 bg-slate-50 border rounded px-1 text-sm text-center"></td>
+                <td class="p-2 border-b"><input onchange="updateResource(${idx}, 'cost', this.value)" type="number" value="${res.cost}" class="w-24 bg-slate-50 border rounded px-1 text-sm text-right"></td>
+                <td class="p-2 border-b text-right text-sm font-mono text-slate-600">Q${subtotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
+                <td class="p-2 border-b text-center"><button onclick="removeResource(${idx})" class="text-red-400 hover:text-red-600">×</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('detTotalResourceCost').innerText = `Q${totalCost.toLocaleString('en-US')}`;
+        // Also Trigger Financial Calc update
+        calculateFinancials();
+    }
+
+    function updateResource(idx, field, value) {
+        if (!currentEst.resources) return;
+        currentEst.resources[idx][field] = field === 'role' ? value : parseFloat(value);
+        renderResources();
+    }
+
+    function addResource() {
+        if (!currentEst.resources) currentEst.resources = [];
+        const role = document.getElementById('newResRole').value;
+        currentEst.resources.push({
+            role: role,
+            count: 1,
+            cost: 0
+        });
+        renderResources();
+    }
+
+    function removeResource(idx) {
+        currentEst.resources.splice(idx, 1);
+        renderResources();
+    }
+
+    function calculateFinancials() {
+        // Inputs
+        const amount = parseFloat(document.getElementById('detAmount').value) || 0;
+        const duration = parseFloat(document.getElementById('detDuration').value) || 1;
+        const taxPct = parseFloat(document.getElementById('detTaxPct').value) || 0;
+        const opExPct = parseFloat(document.getElementById('detOpExPct').value) || 0;
+        const donationPct = parseFloat(document.getElementById('detDonationPct').value) || 0;
+
+        // Resource Cost
+        let resourceCost = 0;
+        (currentEst.resources || []).forEach(r => {
+            resourceCost += (r.cost * r.count * duration);
+        });
+
+        // Deductions
+        const tax = amount * (taxPct / 100);
+        const opEx = amount * (opExPct / 100);
+        const donation = amount * (donationPct / 100);
+
+        const totalDeductions = resourceCost + tax + opEx + donation;
+        const netUtility = amount - totalDeductions;
+        const margin = amount > 0 ? (netUtility / amount) * 100 : 0;
+
+        // Update UI
+        document.getElementById('dispGrossIncome').innerText = `Q${amount.toLocaleString('en-US')}`;
+        document.getElementById('dispResourceCost').innerText = `Q${resourceCost.toLocaleString('en-US')}`;
+        document.getElementById('dispTax').innerText = `Q${tax.toLocaleString('en-US')}`;
+        document.getElementById('dispOpEx').innerText = `Q${opEx.toLocaleString('en-US')}`;
+        document.getElementById('dispDonation').innerText = `Q${donation.toLocaleString('en-US')}`;
+
+        const utilEl = document.getElementById('dispNetUtility');
+        utilEl.innerText = `Q${netUtility.toLocaleString('en-US')}`;
+        utilEl.className = netUtility >= 0 ? "text-xl font-bold text-emerald-600" : "text-xl font-bold text-red-600";
+
+        document.getElementById('dispMargin').innerText = `${margin.toFixed(1)}%`;
+    }
+
+    async function saveDetails() {
+        // Gather current values from inputs that might update main object
+        currentEst.name = document.getElementById('detName').value;
+        currentEst.client = document.getElementById('detClient').value;
+        currentEst.category = document.getElementById('detCategory').value;
+        currentEst.amount = parseFloat(document.getElementById('detAmount').value);
+        currentEst.square_meters = parseFloat(document.getElementById('detM2').value);
+        currentEst.duration_months = parseFloat(document.getElementById('detDuration').value);
+
+        currentEst.financials = {
+            tax_pct: parseFloat(document.getElementById('detTaxPct').value),
+            opex_pct: parseFloat(document.getElementById('detOpExPct').value),
+            donation_pct: parseFloat(document.getElementById('detDonationPct').value)
+        };
+
+        // Resources are updated in realtime in currentEst object by renderResources logic
+
+        try {
+            const res = await fetch('/estimaciones/update/full', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(currentEst)
+            });
+            if (res.ok) {
+                location.reload();
+            } else {
+                alert("Error saving");
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function switchTab(tab) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.getElementById('tab-' + tab).classList.remove('hidden');
+
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-indigo-600', 'text-indigo-600');
+            el.classList.add('border-transparent', 'text-slate-500');
+        });
+        document.getElementById('btn-tab-' + tab).classList.add('border-indigo-600', 'text-indigo-600');
+        document.getElementById('btn-tab-' + tab).classList.remove('border-transparent', 'text-slate-500');
+    }
+</script>
+
+<style>
+    dialog::backdrop {
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(2px);
+    }
+
+    .est-card {
+        cursor: grab;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .est-card:active {
+        cursor: grabbing;
+        transform: scale(1.02);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Hide scrollbar for cleaner look */
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+</style>
+
+<!-- Details Modal HTML -->
+<dialog id="detailsModal"
+    class="modal rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/50 open:animate-fade-in w-full max-w-4xl max-h-[90vh]">
+    <div class="bg-white flex flex-col h-full overflow-hidden">
+        <!-- Header -->
+        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">📝</span>
+                <input id="detName" type="text"
+                    class="bg-transparent font-bold text-xl text-slate-800 border-none focus:ring-0 p-0"
+                    value="Nombre Proyecto">
+            </div>
+            <button onclick="document.getElementById('detailsModal').close()"
+                class="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+        </div>
+
+        <!-- Toolbar / Primary Inputs -->
+        <div class="px-6 py-4 bg-white border-b border-slate-100 flex gap-4 overflow-x-auto">
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase">Cliente</label>
+                <input id="detClient"
+                    class="text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded px-2 py-1 w-32">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase">Categoría</label>
+                <select id="detCategory"
+                    class="text-sm font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded px-2 py-1">
+                    <option value="Residencial">Residencial</option>
+                    <option value="Comercial">Comercial</option>
+                    <option value="Industrial">Industrial</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase">Duración (Meses)</label>
+                <input id="detDuration" type="number" step="0.5" onchange="calculateFinancials(); renderResources();"
+                    class="text-sm font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded px-2 py-1 w-20">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase">Monto (Q)</label>
+                <input id="detAmount" type="number" onchange="calculateFinancials()"
+                    class="text-sm font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded px-2 py-1 w-32">
+            </div>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase">Metros²</label>
+                <input id="detM2" type="number"
+                    class="text-sm font-semibold text-slate-600 bg-slate-50 border border-slate-200 rounded px-2 py-1 w-24">
+            </div>
+            <input type="hidden" id="detId">
+        </div>
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-hidden flex flex-col">
+            <!-- Tabs -->
+            <div class="flex border-b border-slate-200 px-6">
+                <button id="btn-tab-resources" onclick="switchTab('resources')"
+                    class="tab-btn px-4 py-3 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600 transition-colors">Recursos</button>
+                <button id="btn-tab-financials" onclick="switchTab('financials')"
+                    class="tab-btn px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-indigo-600 transition-colors">Análisis
+                    Financiero</button>
+            </div>
+
+            <!-- Tab: Resources -->
+            <div id="tab-resources" class="tab-content flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-slate-50 text-slate-500 font-bold text-xs uppercase text-left">
+                            <tr>
+                                <th class="p-3">Rol</th>
+                                <th class="p-3 w-20 text-center">Cant.</th>
+                                <th class="p-3 w-32 text-right">Costo Mes</th>
+                                <th class="p-3 w-32 text-right">Subtotal</th>
+                                <th class="p-3 w-10"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="detResourcesTable">
+                            <!-- JS Populated -->
+                        </tbody>
+                        <tfoot class="bg-slate-50 border-t border-slate-200">
+                            <tr>
+                                <td colspan="3" class="p-3 text-right font-bold text-slate-500 uppercase text-xs">Total
+                                    Recursos</td>
+                                <td class="p-3 text-right font-bold text-slate-700 font-mono" id="detTotalResourceCost">
+                                    Q0</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <div class="p-3 border-t border-slate-200 bg-slate-50 flex gap-2">
+                        <select id="newResRole" class="text-sm border border-slate-300 rounded px-2 py-1">
+                            <option value="Arquitecto Senior">Arquitecto Senior</option>
+                            <option value="Arquitecto Junior">Arquitecto Junior</option>
+                            <option value="Dibujante">Dibujante</option>
+                            <option value="Ingeniero Estructural">Ingeniero Estructural</option>
+                            <option value="Ingeniero MEP">Ingeniero MEP</option>
+                            <option value="Project Manager">Project Manager</option>
+                        </select>
+                        <button onclick="addResource()"
+                            class="text-sm bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700 font-bold">+
+                            Agregar Rol</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Financials -->
+            <div id="tab-financials" class="tab-content hidden flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                <div class="grid grid-cols-2 gap-6">
+                    <!-- Breakdown Card -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                        <h4 class="font-bold text-slate-700 mb-4 flex items-center gap-2">📊 Desglose</h4>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-500">Ingreso Bruto</span>
+                                <span class="font-bold text-slate-800" id="dispGrossIncome">Q0</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm text-red-500">
+                                <span class="flex items-center gap-2">Costos Directos (Recursos)</span>
+                                <span class="font-bold" id="dispResourceCost">-Q0</span>
+                            </div>
+
+                            <div class="flex justify-between items-center text-sm text-red-400">
+                                <span class="flex items-center gap-2 text-slate-500">
+                                    Impuestos
+                                    <input id="detTaxPct" type="number" onchange="calculateFinancials()"
+                                        class="w-12 text-center border-b border-indigo-200 text-indigo-600 font-bold focus:outline-none"
+                                        value="5">%
+                                </span>
+                                <span class="font-bold" id="dispTax">-Q0</span>
+                            </div>
+
+                            <div class="flex justify-between items-center text-sm text-red-400">
+                                <span class="flex items-center gap-2 text-slate-500">
+                                    Gastos Op.
+                                    <input id="detOpExPct" type="number" onchange="calculateFinancials()"
+                                        class="w-12 text-center border-b border-indigo-200 text-indigo-600 font-bold focus:outline-none"
+                                        value="10">%
+                                </span>
+                                <span class="font-bold" id="dispOpEx">-Q0</span>
+                            </div>
+
+                            <div
+                                class="flex justify-between items-center text-sm text-red-400 border-b border-slate-100 pb-3">
+                                <span class="flex items-center gap-2 text-slate-500">
+                                    Donaciones
+                                    <input id="detDonationPct" type="number" onchange="calculateFinancials()"
+                                        class="w-12 text-center border-b border-indigo-200 text-indigo-600 font-bold focus:outline-none"
+                                        value="2">%
+                                </span>
+                                <span class="font-bold" id="dispDonation">-Q0</span>
+                            </div>
+
+                            <div class="flex justify-between items-center pt-2">
+                                <span class="font-bold text-slate-700">Utilidad Neta</span>
+                                <span class="text-xl font-bold text-emerald-600" id="dispNetUtility">Q0</span>
+                            </div>
+                            <div class="flex justify-end">
+                                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Margen: <span
+                                        id="dispMargin" class="text-indigo-600">0%</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Distributions Card -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 opacity-60">
+                        <h4 class="font-bold text-slate-700 mb-4 flex items-center gap-2">🤝 Distribución (Próximamente)
+                        </h4>
+                        <p class="text-sm text-slate-400">Configuración de socios y distribución de utilidad neta se
+                            habilitará cuando la estimación sea aprobada.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+            <button onclick="document.getElementById('detailsModal').close()"
+                class="px-4 py-2 text-slate-500 hover:text-slate-700 font-bold">Cancelar</button>
+            <button onclick="saveDetails()"
+                class="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-lg shadow-indigo-500/30">Guardar
+                Cambios</button>
+        </div>
+    </div>
+</dialog>
+{% endblock %}

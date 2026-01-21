@@ -1,0 +1,987 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col h-full bg-slate-50 overflow-hidden">
+    <!-- Header & Filters -->
+    <div class="flex flex-col gap-4 mb-4 pb-4 border-b border-slate-200 px-6 pt-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="/"
+                    class="btn bg-slate-100 text-slate-600 hover:bg-slate-200 px-3 py-1 rounded-md transition-colors">←
+                    Volver</a>
+                <h1 class="text-3xl font-bold text-slate-800 tracking-tight">📊 Cotizador Master</h1>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="flex flex-wrap items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+            <div class="flex items-center gap-2">
+                <span class="text-xs font-bold text-slate-500 uppercase">Filtros:</span>
+            </div>
+
+            <select id="filterCategory"
+                class="form-select text-xs border-slate-300 rounded-md focus:ring-blue-500 focus:border-blue-500 py-1"
+                onchange="applyFilters()">
+                <option value="all">Todas las Categorías</option>
+                <option value="Residencial">Residencial</option>
+                <option value="Comercial">Comercial</option>
+                <option value="Industrial">Industrial</option>
+                <option value="Recreativo">Recreativo</option>
+                <option value="Educativo">Educativo</option>
+            </select>
+
+            <input type="number" id="filterMinAmount" placeholder="Monto Min"
+                class="form-input text-xs border-slate-300 rounded-md focus:ring-blue-500 py-1 w-24"
+                onkeyup="applyFilters()">
+            <input type="number" id="filterMaxAmount" placeholder="Monto Max"
+                class="form-input text-xs border-slate-300 rounded-md focus:ring-blue-500 py-1 w-24"
+                onkeyup="applyFilters()">
+
+            <input type="number" id="filterMinM2" placeholder="M2 Min"
+                class="form-input text-xs border-slate-300 rounded-md focus:ring-blue-500 py-1 w-20"
+                onkeyup="applyFilters()">
+
+            <input type="number" id="filterMaxRatio" placeholder="Ratio Max"
+                class="form-input text-xs border-slate-300 rounded-md focus:ring-blue-500 py-1 w-20"
+                onkeyup="applyFilters()">
+
+            <input type="number" id="filterMaxMonths" placeholder="Meses Max"
+                class="form-input text-xs border-slate-300 rounded-md focus:ring-blue-500 py-1 w-20"
+                onkeyup="applyFilters()">
+
+            <div class="h-6 w-px bg-slate-300 mx-2"></div>
+
+            <button onclick="resetFilters()"
+                class="text-xs text-red-500 hover:text-red-700 font-medium">Resetear</button>
+        </div>
+    </div>
+
+    <!-- Scrollable Content -->
+    <div class="flex-1 overflow-y-auto px-6 pb-20 space-y-8">
+
+        <!-- SECTION 1: INTERNAL PROJECTS -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 class="font-bold text-lg text-slate-700">📌 Proyectos AO</h2>
+                <div class="text-xs text-slate-400 font-mono" id="collabProjectCount">Showing all</div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm" id="tableInternal">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-3 py-3 w-10 text-center">
+                                <input type="checkbox" onchange="toggleAll('tableInternal', this)"
+                                    class="form-checkbox h-4 w-4 text-slate-600 rounded cursor-pointer">
+                            </th>
+                            <th class="px-6 py-3 font-bold text-slate-600 uppercase text-xs tracking-wider">Proyecto
+                            </th>
+                            <th class="px-6 py-3 font-bold text-slate-600 uppercase text-xs tracking-wider text-center">
+                                Colaboradores</th>
+                            <th class="px-6 py-3 font-bold text-slate-600 uppercase text-xs tracking-wider text-right">
+                                Monto</th>
+                            <th class="px-6 py-3 font-bold text-slate-600 uppercase text-xs tracking-wider text-right">
+                                Metros²</th>
+                            <th class="px-6 py-3 font-bold text-slate-600 uppercase text-xs tracking-wider text-right">
+                                Ratio (Q/m²)</th>
+                            <th class="px-6 py-3 font-bold text-slate-600 uppercase text-xs tracking-wider text-center">
+                                Meses Proy.</th>
+                            <th class="px-6 py-3 font-bold text-slate-600 uppercase text-xs tracking-wider text-center">
+                                Meses Reales</th>
+                            <th class="px-6 py-3 font-bold text-green-600 uppercase text-xs tracking-wider text-right">
+                                Utilidad Real</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for p in projects %}
+                        {% set m2 = p.square_meters|default(0) %}
+                        {% set ratio = 0 %}
+                        {% if m2 > 0 %}
+                        {% set ratio = p.amount / m2 %}
+                        {% endif %}
+                        {% set dur_real = (p.duration_months|default(0)) + (p.additional_time_months|default(0)) %}
+                        {% set real_utility = p.paid_amount * (p.real_profit_margin / 100.0) %}
+
+                        <tr class="project-row hover:bg-slate-50 transition-colors group"
+                            data-category="{{ p.category }}" data-amount="{{ p.amount }}" data-m2="{{ m2 }}"
+                            data-ratio="{{ ratio }}">
+
+                            <td class="px-3 py-3 text-center">
+                                <input type="checkbox"
+                                    class="row-select form-checkbox h-4 w-4 text-slate-600 rounded cursor-pointer"
+                                    onchange="calculateTableAverages('tableInternal', 'avgInternal')">
+                            </td>
+                            <td class="px-6 py-3">
+                                <div class="flex items-center gap-3">
+                                    <span class="text-2xl opacity-80 group-hover:scale-110 transition-transform">{{
+                                        p.emoji }}</span>
+                                    <div>
+                                        <div class="font-bold text-slate-800">{{ p.name }}</div>
+                                        <div class="text-[10px] text-slate-400 font-mono">{{ p.category }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-3 text-center">
+                                <div
+                                    class="inline-flex items-center justify-center px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full text-xs font-bold border border-indigo-100">
+                                    {{ p.collab_count }} 👤
+                                </div>
+                            </td>
+                            <td class="px-6 py-3 text-right font-medium text-slate-700 val-amount"
+                                data-val="{{ p.amount }}">
+                                Q{{ "{:,.2f}".format(p.amount) }}
+                            </td>
+                            <td class="px-6 py-3 text-right text-slate-600 val-m2" data-val="{{ m2 }}">
+                                {{ "{:,.2f}".format(m2) }} m²
+                            </td>
+                            <td class="px-6 py-3 text-right font-bold text-blue-600 val-ratio" data-val="{{ ratio }}">
+                                Q{{ "{:,.2f}".format(ratio) }}
+                            </td>
+                            <td class="px-6 py-3 text-center text-slate-600 val-months"
+                                data-val="{{ p.duration_months }}">
+                                {{ p.duration_months }}
+                            </td>
+                            <td class="px-6 py-3 text-center val-months-real" data-val="{{ dur_real }}">
+                                <span
+                                    class="{% if dur_real > p.duration_months %}text-red-500 font-bold{% else %}text-slate-600{% endif %}">
+                                    {{ "{:.1f}".format(dur_real) }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-3 text-right font-black text-emerald-600 val-utility"
+                                data-val="{{ real_utility }}">
+                                Q{{ "{:,.2f}".format(real_utility) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="bg-slate-100 border-t border-slate-200 font-bold text-slate-700">
+                        <tr class="text-xs uppercase hover:bg-slate-200 transition-colors">
+                            <td class="px-6 py-4 text-right" colspan="3">Promedios Internos:</td>
+                            <td class="px-6 py-4 text-right text-indigo-700" id="avgInternalAmount">-</td>
+                            <td class="px-6 py-4 text-right text-indigo-700" id="avgInternalM2">-</td>
+                            <td class="px-6 py-4 text-right text-blue-700" id="avgInternalRatio">-</td>
+                            <td class="px-6 py-4 text-center text-indigo-700" id="avgInternalMonths">-</td>
+                            <td class="px-6 py-4 text-center text-indigo-700" id="avgInternalMonthsReal">-</td>
+                            <td class="px-6 py-4 text-right text-emerald-700" id="avgInternalUtility">-</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- SECTION 2: MARKET STUDY -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in-up">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div class="flex items-center gap-2">
+                    <h2 class="font-bold text-lg text-slate-700">🌎 Estudio de Mercado</h2>
+                    <span
+                        class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded border border-amber-200">Comparativa</span>
+                </div>
+                <button onclick="document.getElementById('addMarketModal').showModal()"
+                    class="btn bg-slate-800 text-white hover:bg-black text-xs px-3 py-2 rounded-lg flex items-center gap-2 shadow-md transition-all hover:scale-105">
+                    <span>+ Agregar Proyecto Externo</span>
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm" id="tableMarket">
+                    <thead class="bg-slate-50 border-b border-slate-200">
+                        <tr>
+                            <th class="px-3 py-3 w-10 text-center">
+                                <input type="checkbox" onchange="toggleAll('tableMarket', this)"
+                                    class="form-checkbox h-4 w-4 text-slate-500 rounded cursor-pointer">
+                            </th>
+                            <th class="px-6 py-3 font-bold text-slate-500 uppercase text-xs tracking-wider">Proyecto
+                            </th>
+                            <th class="px-6 py-3 font-bold text-slate-500 uppercase text-xs tracking-wider text-right">
+                                Monto</th>
+                            <th class="px-6 py-3 font-bold text-slate-500 uppercase text-xs tracking-wider text-right">
+                                Metros²</th>
+                            <th class="px-6 py-3 font-bold text-slate-500 uppercase text-xs tracking-wider text-right">
+                                Ratio (Q/m²)</th>
+                            <th class="px-6 py-3 font-bold text-slate-500 uppercase text-xs tracking-wider text-center">
+                                Meses</th>
+                            <th class="px-6 py-3 text-right"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for m in market_studies %}
+                        <tr class="market-row hover:bg-slate-50 transition-colors group"
+                            data-category="{{ m.category }}" data-amount="{{ m.amount }}"
+                            data-m2="{{ m.square_meters }}" data-ratio="{{ m.ratio }}">
+
+                            <td class="px-3 py-3 text-center">
+                                <input type="checkbox"
+                                    class="row-select form-checkbox h-4 w-4 text-slate-500 rounded cursor-pointer"
+                                    onchange="calculateTableAverages('tableMarket', 'avgMarket')">
+                            </td>
+                            <td class="px-6 py-3">
+                                <div class="font-bold text-slate-700">{{ m.name }}</div>
+                                <div class="text-[10px] text-slate-400">{{ m.category }}</div>
+                            </td>
+                            <td class="px-6 py-3 text-right font-medium text-slate-600 val-amount"
+                                data-val="{{ m.amount }}">
+                                Q{{ "{:,.2f}".format(m.amount) }}
+                            </td>
+                            <td class="px-6 py-3 text-right text-slate-500 val-m2" data-val="{{ m.square_meters }}">
+                                {{ "{:,.2f}".format(m.square_meters) }} m²
+                            </td>
+                            <td class="px-6 py-3 text-right font-bold text-amber-600 val-ratio"
+                                data-val="{{ m.ratio }}">
+                                Q{{ "{:,.2f}".format(m.ratio) }}
+                            </td>
+                            <td class="px-6 py-3 text-center text-slate-500 val-months" data-val="{{ m.months }}">
+                                {{ m.months }}
+                            </td>
+                            <td class="px-6 py-3 text-right">
+                                <form action="/cotizador/market/delete" method="POST"
+                                    onsubmit="return confirm('¿Eliminar?');">
+                                    <input type="hidden" name="study_id" value="{{ m.id }}">
+                                    <button class="text-slate-300 hover:text-red-500 transition-colors">🗑️</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                        {% if not market_studies %}
+                        <tr id="emptyMarketMsg">
+                            <td colspan="7" class="px-6 py-8 text-center text-slate-400 italic bg-slate-50/50">
+                                No hay estudios de mercado registrados. Agrega uno para comparar.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                    <tfoot class="bg-amber-50/50 border-t border-amber-100 font-bold text-slate-700">
+                        <tr class="text-xs uppercase">
+                            <td class="px-6 py-4 text-right">Promedios Mercado:</td>
+                            <td class="px-6 py-4 text-right text-amber-700" id="avgMarketAmount">-</td>
+                            <td class="px-6 py-4 text-right text-amber-700" id="avgMarketM2">-</td>
+                            <td class="px-6 py-4 text-right text-amber-700" id="avgMarketRatio">-</td>
+                            <td class="px-6 py-4 text-center text-amber-700" id="avgMarketMonths">-</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- SECTION 3: GLOBAL SUMMARY -->
+        <div
+            class="bg-slate-900 rounded-xl border border-slate-700 shadow-xl overflow-hidden mt-6 text-white animate-fade-in-up">
+            <div class="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                <h2 class="font-bold text-lg text-emerald-400">🌎 Promedio Global Comparativo</h2>
+                <div class="text-xs text-slate-500 font-mono">Promedio(Internos) + Promedio(Mercado) / 2</div>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-4 gap-8 text-center">
+                    <div class="flex flex-col gap-1 border-r border-slate-800/50 last:border-0">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Monto Promedio</span>
+                        <span class="text-2xl font-bold text-emerald-400" id="globalAmount">-</span>
+                    </div>
+                    <div class="flex flex-col gap-1 border-r border-slate-800/50 last:border-0">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Metros²</span>
+                        <span class="text-2xl font-bold text-slate-200" id="globalM2">-</span>
+                    </div>
+                    <div class="flex flex-col gap-1 border-r border-slate-800/50 last:border-0">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Ratio (Q/m²)</span>
+                        <span class="text-2xl font-bold text-blue-400" id="globalRatio">-</span>
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Meses</span>
+                        <span class="text-2xl font-bold text-indigo-400" id="globalMonths">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION 4: SCATTER PLOT ANALYSIS -->
+        <div
+            class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-6 animate-fade-in-up relative group">
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 class="font-bold text-lg text-slate-700">📈 Análisis de Dispersión (M² vs Ratio)</h2>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-slate-400">Click en la gráfica para analizar nuevo punto</span>
+                    <button onclick="clearScenarios()" class="text-xs text-red-500 hover:text-red-700 underline"
+                        id="clearScenariosBtn" style="display:none;">Borrar Escenarios</button>
+                </div>
+            </div>
+            <div class="p-4 h-[500px] relative">
+                <canvas id="scatterChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Modal for Scenario Analysis -->
+        <dialog id="scenarioModal" class="modal rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/50">
+            <div class="bg-white w-full max-w-sm flex flex-col">
+                <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-slate-800">Analizar Punto</h3>
+                    <button onclick="document.getElementById('scenarioModal').close()"
+                        class="text-slate-400 hover:text-slate-600">✕</button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="text-xs text-slate-500 mb-2">Este punto es temporal y no se guarda en la base de datos
+                        hasta
+                        que lo decidas.</div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Metros² (X)</label>
+                            <input type="number" id="scenM2"
+                                class="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm font-mono"
+                                oninput="updateScenarioCalc()">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Ratio Q/m² (Y)</label>
+                            <input type="number" id="scenRatio"
+                                class="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-sm font-mono"
+                                oninput="updateScenarioCalc()">
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-50 p-3 rounded border border-slate-100 text-center">
+                        <div class="text-xs text-slate-400 uppercase font-bold">Monto Estimado</div>
+                        <div class="text-xl font-bold text-slate-800" id="scenAmount">-</div>
+                    </div>
+
+                    <div class="pt-2 flex gap-2">
+                        <button onclick="addScenarioPoint()"
+                            class="flex-1 btn bg-indigo-600 text-white hover:bg-indigo-700 py-2 rounded-lg font-bold text-xs">Agregar
+                            a Gráfica</button>
+                        <button onclick="createEstimationFromPoint()"
+                            class="flex-1 btn bg-emerald-600 text-white hover:bg-emerald-700 py-2 rounded-lg font-bold text-xs">Crear
+                            Estimación</button>
+                    </div>
+                </div>
+            </div>
+        </dialog>
+
+        <!-- Modal for Adding Market Study -->
+        <dialog id="addMarketModal"
+            class="modal rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/50 open:animate-fade-in">
+            <div class="bg-white w-full max-w-md flex flex-col">
+                <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-slate-800">Nuevo Estudio de Mercado</h3>
+                    <button onclick="document.getElementById('addMarketModal').close()"
+                        class="text-slate-400 hover:text-slate-600">✕</button>
+                </div>
+                <form action="/cotizador/market/add" method="POST" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nombre del Proyecto</label>
+                        <input type="text" name="name" required
+                            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Monto (Q)</label>
+                            <input type="number" step="0.01" name="amount" required
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Metros²</label>
+                            <input type="number" step="0.01" name="square_meters" required
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Meses</label>
+                            <input type="number" step="0.1" name="months" required
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Categoría</label>
+                            <select name="category"
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                                <option value="Residencial">Residencial</option>
+                                <option value="Comercial">Comercial</option>
+                                <option value="Industrial">Industrial</option>
+                                <option value="Recreativo">Recreativo</option>
+                                <option value="Educativo">Educativo</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit"
+                            class="w-full btn bg-blue-600 text-white hover:bg-blue-700 py-2 rounded-lg shadow-lg shadow-blue-500/30 font-bold transition-all">Guardar
+                            Proyecto</button>
+                    </div>
+                </form>
+            </div>
+        </dialog>
+
+        <!-- Modal for Creating Estimation from Cotizador -->
+        <dialog id="newEstimationModal"
+            class="modal rounded-xl shadow-2xl p-0 backdrop:bg-slate-900/50 open:animate-fade-in">
+            <div class="bg-white w-full max-w-2xl flex flex-col max-h-[90vh]">
+                <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <h3 class="font-bold text-slate-800">Nueva Estimación</h3>
+                    <button onclick="document.getElementById('newEstimationModal').close()"
+                        class="text-slate-400 hover:text-slate-600">✕</button>
+                </div>
+                <form action="/estimaciones/create" method="POST" class="flex-1 overflow-y-auto p-6 space-y-4">
+                    <input type="hidden" name="redirect_to" value="/cotizador">
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nombre Proyecto</label>
+                            <input type="text" name="name" required
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Cliente</label>
+                            <input type="text" name="client"
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Categoría</label>
+                            <select name="category"
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                                <option value="Residencial">Residencial</option>
+                                <option value="Comercial">Comercial</option>
+                                <option value="Industrial">Industrial</option>
+                                <option value="Recreativo">Recreativo</option>
+                                <option value="Educativo">Educativo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Monto Estimado
+                                (Q)</label>
+                            <input type="number" step="0.01" name="amount" required
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Metros²</label>
+                            <input type="number" step="0.01" name="square_meters" required
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-slate-50 rounded-lg border border-slate-100 grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">NIT</label>
+                            <input type="text" name="nit"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Razón Social</label>
+                            <input type="text" name="legal_name"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Orden de Compra</label>
+                            <input type="text" name="po_number"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Fecha Inicio</label>
+                            <input type="date" name="start_date"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Duración
+                                (Meses)</label>
+                            <input type="number" step="0.1" name="duration_months"
+                                class="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit"
+                            class="w-full btn bg-indigo-600 text-white hover:bg-indigo-700 py-3 rounded-lg font-bold shadow-lg shadow-indigo-500/30 transition-all">Crear
+                            Estimación</button>
+                    </div>
+                </form>
+            </div>
+        </dialog>
+
+    </div>
+</div>
+
+<script>
+    // --- 1. CROSSHAIR PLUGIN DEFINITION ---
+    const crosshairPlugin = {
+        id: 'crosshair',
+        afterInit: (chart) => {
+            chart.crosshair = { x: 0, y: 0, visible: false };
+        },
+        afterEvent: (chart, args) => {
+            const { inChartArea } = args;
+            const event = args.event;
+            const type = event.type;
+
+            // Track coordinates
+            if (inChartArea) {
+                chart.crosshair = { x: event.x, y: event.y, visible: true };
+            } else {
+                chart.crosshair.visible = false;
+            }
+
+            // Force redraw on move to animate the crosshair
+            if (type === 'mousemove' || type === 'mouseout') {
+                chart.draw();
+            }
+        },
+        afterDraw: (chart) => {
+            if (chart.crosshair && chart.crosshair.visible) {
+                const { ctx, chartArea: { top, bottom, left, right }, scales: { x, y } } = chart;
+                const xCoor = chart.crosshair.x;
+                const yCoor = chart.crosshair.y;
+
+                // 1. Draw Lines
+                ctx.save();
+                ctx.beginPath();
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#94a3b8'; // slate-400
+                ctx.setLineDash([5, 5]);
+
+                // Vertical
+                ctx.moveTo(xCoor, top);
+                ctx.lineTo(xCoor, bottom);
+                // Horizontal
+                ctx.moveTo(left, yCoor);
+                ctx.lineTo(right, yCoor);
+                ctx.stroke();
+
+                // 2. Data Calculation
+                const xVal = x.getValueForPixel(xCoor);
+                const yVal = y.getValueForPixel(yCoor);
+                const amount = xVal * yVal;
+
+                // 3. Draw Tooltip Box
+                // Check bounds to ensure tooltip stays visible
+                let boxX = xCoor + 15;
+                let boxY = yCoor - 50;
+                const boxWidth = 200;
+                const boxHeight = 45;
+
+                if (boxX + boxWidth > right) boxX = xCoor - boxWidth - 15;
+                if (boxY < top) boxY = yCoor + 15;
+
+                // Shadow
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 4;
+
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.95)'; // Slate-900 high opacity
+                ctx.beginPath();
+                ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 8);
+                ctx.fill();
+
+                // Remove shadow for text
+                ctx.shadowColor = 'transparent';
+
+                // 4. Draw Text
+                ctx.fillStyle = '#f8fafc'; // White
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'left';
+                ctx.fillText(`Est: Q${amount.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`, boxX + 12, boxY + 18);
+
+                ctx.fillStyle = '#94a3b8'; // Slate-400
+                ctx.font = '11px sans-serif';
+                // Using • as separator
+                ctx.fillText(`${xVal.toLocaleString('en-US', { maximumFractionDigits: 0 })} m²  •  Q${yVal.toFixed(2)}/m²`, boxX + 12, boxY + 34);
+
+                ctx.restore();
+
+                // Hide default cursor
+                chart.canvas.style.cursor = 'none';
+            } else {
+                chart.canvas.style.cursor = 'default';
+            }
+        }
+    };
+
+    // Check Chart global
+    if (typeof Chart !== 'undefined') {
+        Chart.register(crosshairPlugin);
+    } else {
+        console.error("Chart.js not loaded.");
+    }
+
+    // --- 2. LOGIC ---
+    let scatterChart = null;
+    let scenarios = [];
+
+    function formatMoney(amount) {
+        return "Q" + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatNumber(num) {
+        return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function getNumericValue(str) {
+        if (!str || str === '-') return 0;
+        return parseFloat(str.replace(/[^0-9.-]+/g, "")) || 0;
+    }
+
+    function calculateTableAverages(tableBodyId, prefix) {
+        const table = document.getElementById(tableBodyId);
+        const checkedBoxes = table.querySelectorAll('.row-select:checked');
+        const useSelection = checkedBoxes.length > 0;
+
+        let rows = [];
+        if (useSelection) {
+            checkedBoxes.forEach(cb => {
+                rows.push(cb.closest('tr'));
+            });
+        } else {
+            const allRows = table.querySelectorAll('tr');
+            allRows.forEach(row => {
+                // Ensure we skip empty message AND filtered rows
+                if (row.style.display !== 'none' && !row.id.includes('empty')) {
+                    rows.push(row);
+                }
+            });
+        }
+
+        let count = 0;
+        let sumAmount = 0; let sumM2 = 0; let sumRatio = 0;
+        let sumMonths = 0; let sumMonthsReal = 0; let sumUtility = 0;
+
+        rows.forEach(row => {
+            count++;
+            const getVal = (cls) => {
+                const el = row.querySelector(`.${cls}`);
+                return el ? parseFloat(el.getAttribute('data-val') || 0) : 0;
+            };
+
+            sumAmount += getVal('val-amount');
+            sumM2 += getVal('val-m2');
+            sumRatio += getVal('val-ratio');
+            sumMonths += getVal('val-months');
+            sumMonthsReal += getVal('val-months-real');
+            sumUtility += getVal('val-utility');
+        });
+
+        const setTxt = (id, val, isMoney = false, suffix = '') => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = isMoney ? formatMoney(val) : formatNumber(val) + suffix;
+        };
+
+        if (count > 0) {
+            setTxt(`${prefix}Amount`, sumAmount / count, true);
+            setTxt(`${prefix}M2`, sumM2 / count, false, " m²");
+            setTxt(`${prefix}Ratio`, sumRatio / count, true);
+            setTxt(`${prefix}Months`, (sumMonths / count), false, "");
+
+            if (prefix === 'avgInternal') {
+                setTxt(`${prefix}MonthsReal`, (sumMonthsReal / count), false, "");
+                setTxt(`${prefix}Utility`, sumUtility / count, true);
+            }
+        } else {
+            ['Amount', 'M2', 'Ratio', 'Months', 'MonthsReal', 'Utility'].forEach(k => {
+                const el = document.getElementById(`${prefix}${k}`);
+                if (el) el.innerText = "-";
+            });
+        }
+
+        calculateGlobalAverage();
+        debouncedUpdateChart();
+    }
+
+    let chartTimeout;
+    function debouncedUpdateChart() {
+        clearTimeout(chartTimeout);
+        chartTimeout = setTimeout(updateChart, 100);
+    }
+
+    function calculateGlobalAverage() {
+        const getAvg = (id) => getNumericValue(document.getElementById(id)?.innerText);
+        const hasValue = (id) => {
+            const txt = document.getElementById(id)?.innerText;
+            return txt && txt !== '-' && txt.trim() !== '';
+        };
+
+        const calcGlobalPair = (idInternal, idMarket, idGlobal, isMoney = false, suffix = '') => {
+            const val1 = getAvg(idInternal);
+            const val2 = getAvg(idMarket);
+            const has1 = hasValue(idInternal);
+            const has2 = hasValue(idMarket);
+
+            let globalVal = 0;
+            if (has1 && has2) {
+                globalVal = (val1 + val2) / 2;
+            } else if (has1) {
+                globalVal = val1;
+            } else if (has2) {
+                globalVal = val2;
+            } else {
+                const el = document.getElementById(idGlobal);
+                if (el) el.innerText = "-";
+                return;
+            }
+
+            const el = document.getElementById(idGlobal);
+            if (el) el.innerText = isMoney ? formatMoney(globalVal) : formatNumber(globalVal) + suffix;
+        };
+
+        calcGlobalPair('avgInternalAmount', 'avgMarketAmount', 'globalAmount', true);
+        calcGlobalPair('avgInternalM2', 'avgMarketM2', 'globalM2', false, " m²");
+        calcGlobalPair('avgInternalRatio', 'avgMarketRatio', 'globalRatio', true);
+        calcGlobalPair('avgInternalMonths', 'avgMarketMonths', 'globalMonths', false, "");
+    }
+
+    function getChartDataFromTable(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return [];
+
+        const checkedBoxes = table.querySelectorAll('.row-select:checked');
+        const useSelection = checkedBoxes.length > 0;
+        let rows = [];
+
+        if (useSelection) {
+            checkedBoxes.forEach(cb => rows.push(cb.closest('tr')));
+        } else {
+            table.querySelectorAll('tr').forEach(row => {
+                if (row.style.display !== 'none' && !row.id.includes('empty')) rows.push(row);
+            });
+        }
+
+        return rows.map(row => {
+            let name = "Unknown";
+            const nameEl = row.querySelector('.font-bold');
+            if (nameEl) name = nameEl.innerText;
+
+            // Robust parsing: Try attribute first, then safe defaults
+            let m2 = parseFloat(row.getAttribute('data-m2'));
+            if (isNaN(m2)) m2 = getNumericValue(row.querySelector('.val-m2')?.innerText);
+
+            let ratio = parseFloat(row.getAttribute('data-ratio'));
+            if (isNaN(ratio)) ratio = getNumericValue(row.querySelector('.val-ratio')?.innerText);
+
+            let amount = parseFloat(row.getAttribute('data-amount'));
+            if (isNaN(amount)) amount = getNumericValue(row.querySelector('.val-amount')?.innerText);
+
+            return { x: m2, y: ratio, name: name, amount: amount };
+        }).filter(d => d.x > 0 && d.y > 0);
+    }
+
+    function updateChart() {
+        const internalData = getChartDataFromTable('tableInternal');
+        const marketData = getChartDataFromTable('tableMarket');
+
+        const scenarioPoints = scenarios.map(s => ({
+            x: s.x, y: s.y, name: s.label || 'Scenario', amount: s.amount
+        }));
+
+        const data = {
+            datasets: [
+                {
+                    label: 'Proyectos AO (Azul)',
+                    data: internalData,
+                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                },
+                {
+                    label: 'Mercado (Gris)',
+                    data: marketData,
+                    backgroundColor: 'rgba(107, 114, 128, 0.7)',
+                    borderColor: 'rgba(107, 114, 128, 1)',
+                    pointRadius: 6,
+                    pointHoverRadius: 8
+                },
+                {
+                    label: 'Simulaciones (Rojo)',
+                    data: scenarioPoints,
+                    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                    borderColor: 'rgba(239, 68, 68, 1)',
+                    pointRadius: 8,
+                    pointHoverRadius: 10,
+                    pointStyle: 'triangle'
+                }
+            ]
+        };
+
+        const ctxEl = document.getElementById('scatterChart');
+        if (!ctxEl) return;
+        const ctx = ctxEl.getContext('2d');
+
+        if (scatterChart) {
+            scatterChart.data = data;
+            scatterChart.update();
+        } else {
+            if (typeof Chart === 'undefined') return;
+
+            scatterChart = new Chart(ctx, {
+                type: 'scatter',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: 'Metros Cuadrados (m²)' },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        y: {
+                            title: { display: true, text: 'Ratio (Q/m²)' },
+                            grid: { color: '#f1f5f9' }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            enabled: false, // Disable default tooltip to use custom crosshair/tooltip
+                        },
+                        // Enable custom crosshair plugin
+                        crosshair: true
+                    },
+                    onClick: (e) => {
+                        const canvasPosition = Chart.helpers.getRelativePosition(e, scatterChart);
+                        const dataX = scatterChart.scales.x.getValueForPixel(canvasPosition.x);
+                        const dataY = scatterChart.scales.y.getValueForPixel(canvasPosition.y);
+
+                        openScenarioModal(dataX, dataY);
+                    }
+                }
+            });
+        }
+
+        const clearBtn = document.getElementById('clearScenariosBtn');
+        if (clearBtn) clearBtn.style.display = scenarios.length > 0 ? 'inline-block' : 'none';
+    }
+
+    // Scenario Logic
+    function openScenarioModal(x, y) {
+        document.getElementById('scenM2').value = x.toFixed(2);
+        document.getElementById('scenRatio').value = y.toFixed(2);
+        updateScenarioCalc();
+        document.getElementById('scenarioModal').showModal();
+    }
+
+    function updateScenarioCalc() {
+        const m2 = parseFloat(document.getElementById('scenM2').value) || 0;
+        const ratio = parseFloat(document.getElementById('scenRatio').value) || 0;
+        const total = m2 * ratio;
+        document.getElementById('scenAmount').innerText = formatMoney(total);
+    }
+
+    function addScenarioPoint() {
+        const m2 = parseFloat(document.getElementById('scenM2').value) || 0;
+        const ratio = parseFloat(document.getElementById('scenRatio').value) || 0;
+
+        if (m2 > 0 && ratio > 0) {
+            scenarios.push({
+                x: m2,
+                y: ratio,
+                label: 'Simulación #' + (scenarios.length + 1),
+                amount: m2 * ratio
+            });
+            updateChart();
+            document.getElementById('scenarioModal').close();
+        }
+    }
+
+    function createEstimationFromPoint() {
+        const m2 = parseFloat(document.getElementById('scenM2').value) || 0;
+        const ratio = parseFloat(document.getElementById('scenRatio').value) || 0;
+        const total = m2 * ratio;
+
+        if (total > 0) {
+            // Open modal and pre-fill
+            document.getElementById('scenarioModal').close();
+            const modal = document.getElementById('newEstimationModal');
+            if (modal) {
+                // Try to find inputs by name
+                const form = modal.querySelector('form');
+                if (form) {
+                    const inpAmount = form.querySelector('[name="amount"]');
+                    const inpM2 = form.querySelector('[name="square_meters"]');
+                    if (inpAmount) inpAmount.value = total.toFixed(2);
+                    if (inpM2) inpM2.value = m2.toFixed(2);
+                }
+                modal.showModal();
+            }
+        }
+    }
+
+    function clearScenarios() {
+        scenarios = [];
+        updateChart();
+    }
+
+    // --- 3. FILTER LOGIC ---
+    function applyFilters() {
+        const cat = document.getElementById('filterCategory').value;
+        const minAmt = parseFloat(document.getElementById('filterMinAmount').value) || 0;
+        const maxAmt = parseFloat(document.getElementById('filterMaxAmount').value) || Infinity;
+        const minM2 = parseFloat(document.getElementById('filterMinM2').value) || 0;
+        const maxRatio = parseFloat(document.getElementById('filterMaxRatio').value) || Infinity;
+        const maxMonths = parseFloat(document.getElementById('filterMaxMonths').value) || Infinity;
+
+        const filterRow = (row) => {
+            const rCat = row.getAttribute('data-category');
+            const rAmount = parseFloat(row.getAttribute('data-amount'));
+            const rM2 = parseFloat(row.getAttribute('data-m2'));
+            const rRatio = parseFloat(row.getAttribute('data-ratio'));
+            // For months we need to parse from cell if not in attribute, but commonly we put it in attribute?
+            // Existing logic uses data-val from cell
+            // Actually, let's look at template logic
+            // We need to parse from the cell class .val-months
+            // But main row doesn't have data-months. Let's fix that or select by class.
+            const monthEl = row.querySelector('.val-months');
+            const rMonths = monthEl ? parseFloat(monthEl.getAttribute('data-val') || 0) : 0;
+
+            let visible = true;
+            if (cat !== 'all' && rCat !== cat) visible = false;
+            if (rAmount < minAmt || (maxAmt !== Infinity && rAmount > maxAmt)) visible = false;
+            if (rM2 < minM2) visible = false;
+            if (rRatio > maxRatio) visible = false;
+            if (rMonths > maxMonths) visible = false;
+
+            row.style.display = visible ? '' : 'none';
+        };
+
+        document.querySelectorAll('#tableInternal tbody tr').forEach(filterRow);
+        document.querySelectorAll('#tableMarket tbody tr').forEach(row => {
+            if (!row.id.includes('empty')) filterRow(row);
+        });
+
+        // Re-calc averages based on visible rows (passing false to indicate auto-select all visible?)
+        // Actually calculateTableAverages handles selection check. If nothing selected, it uses all visible.
+        calculateTableAverages('tableInternal', 'avgInternal');
+        calculateTableAverages('tableMarket', 'avgMarket');
+    }
+
+    function resetFilters() {
+        document.getElementById('filterCategory').value = 'all';
+        document.querySelectorAll('input[type="number"]').forEach(i => i.value = '');
+        applyFilters();
+    }
+
+    function toggleAll(tableId, source) {
+        const table = document.getElementById(tableId);
+        table.querySelectorAll('.row-select').forEach(cb => {
+            // Only toggle visible rows
+            if (cb.closest('tr').style.display !== 'none') {
+                cb.checked = source.checked;
+            }
+        });
+        const prefix = tableId === 'tableInternal' ? 'avgInternal' : 'avgMarket';
+        calculateTableAverages(tableId, prefix);
+    }
+
+    // Initial Calc
+    document.addEventListener('DOMContentLoaded', () => {
+        calculateTableAverages('tableInternal', 'avgInternal');
+        calculateTableAverages('tableMarket', 'avgMarket');
+    });
+
+</script>
+{% endblock %}

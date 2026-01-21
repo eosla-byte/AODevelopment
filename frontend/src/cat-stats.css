@@ -1,0 +1,100 @@
+/* Liquid Glass & Stats Styles */
+
+/* 1. Glass Container Effect */
+.cat-content {
+  background: rgba(255, 255, 255, 0.02);
+  /* Ultra subtle base */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 1.5rem 1rem;
+  /* Reduced padding slightly */
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.05),
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    inset 0 0 20px rgba(255, 255, 255, 0.02);
+  /* Inner glow */
+
+  /* Layout tweaks */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 90%;
+  max-width: 350px;
+  /* Slightly constrained */
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover state for the glass card */
+.category-card:hover .cat-content {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-20px);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.2),
+    0 10px 10px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* 2. Typography Updates */
+
+/* Category Title */
+.cat-content h3 {
+  font-size: 1.8rem !important;
+  /* Slightly smaller for fitting */
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  word-wrap: break-word;
+  /* Ensure wrapping */
+  max-width: 100%;
+  line-height: 1.1;
+}
+
+.cat-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.cat-stats div {
+  display: flex;
+  /* Ensure flex for centering */
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Stats Numbers - requested to be larger */
+.cat-stat-sqm {
+  font-family: 'Barlow', sans-serif;
+  /* Stronger font */
+  font-size: 2.2rem;
+  /* Adjusted for space */
+  font-weight: 700;
+  line-height: 1;
+  background: linear-gradient(to bottom right, #fff, #ccc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  /* Compatibility fix */
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.cat-stat-count {
+  font-family: 'Barlow', sans-serif;
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+/* Labels (m2, Proyectos) */
+.cat-stats div {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}

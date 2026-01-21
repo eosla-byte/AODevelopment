@@ -1,0 +1,51 @@
+[
+    {
+        "id": "1768358370556",
+        "name": "Diciembre 2025",
+        "cards": [
+            {
+                "id": "1768358393813",
+                "name": "Airbnb el paredon",
+                "amount": 6000.0,
+                "description": "Renta para convivio",
+                "files": []
+            },
+            {
+                "id": "1768358414159",
+                "name": "Regalos para convivio",
+                "amount": 4500.0,
+                "description": "",
+                "files": []
+            },
+            {
+                "id": "1768362197898",
+                "name": "Comidas",
+                "amount": 4500.0,
+                "description": "comida convivio",
+                "files": []
+            }
+        ],
+        "total": 0.0
+    },
+    {
+        "id": "1768362207725",
+        "name": "Enero",
+        "cards": [
+            {
+                "id": "1768421306634",
+                "name": "Convivio 2",
+                "amount": 15000.0,
+                "description": "poralskdgoasdijlgasdg",
+                "files": []
+            },
+            {
+                "id": "1768421320562",
+                "name": "licencias",
+                "amount": 90000.0,
+                "description": "asdfasdf",
+                "files": []
+            }
+        ],
+        "total": 0.0
+    }
+]

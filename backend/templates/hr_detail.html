@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+
+
+
+{% block content %}
+<div class="flex flex-col h-full gap-6 overflow-y-auto pb-10">
+    <!-- Breadcrumb & Header -->
+    <div class="flex items-center gap-4">
+        <a href="/hr"
+            class="text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1 font-bold text-sm">
+            <span>←</span> Volver
+        </a>
+    </div>
+
+    <!-- Main Profile Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- Left Sidebar: Identity & Quick Actions -->
+        <div class="lg:col-span-4 space-y-6">
+            <div
+                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+
+                <div class="relative mt-4 mb-4 group cursor-pointer"
+                    onclick="document.getElementById('profilePicInput').click()">
+                    <div
+                        class="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-slate-200 overflow-hidden flex items-center justify-center">
+                        {% if c.profile_picture %}
+                        <img src="/hr_file/{{ c.id }}/Profile/{{ c.profile_picture }}"
+                            class="w-full h-full object-cover"
+                            onerror="this.parentElement.innerHTML='<span class=\'text-4xl text-slate-400 font-bold\'>{{ c.name[0] }}</span>'">
+                        {% else %}
+                        <span class="text-4xl text-slate-400 font-bold">{{ c.name[0] }}</span>
+                        {% endif %}
+                    </div>
+                    <div
+                        class="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span class="text-white text-xs font-bold">Cambiar Foto</span>
+                    </div>
+                </div>
+
+                <!-- Hidden Form for Image Upload -->
+                <form action="/hr/{{ c.id }}/upload_picture" method="post" enctype="multipart/form-data" class="hidden">
+                    <input type="file" id="profilePicInput" name="file" accept="image/*" onchange="this.form.submit()">
+                </form>
+
+                <h1 class="text-2xl font-bold text-slate-800">{{ c.name }}</h1>
+                <p class="text-slate-500 font-medium">{{ c.role }}</p>
+                {% if c.email %}
+                <p class="text-xs text-slate-400 mt-1">{{ c.email }}</p>
+                {% endif %}
+
+                <div class="mt-4 flex gap-2 justify-center">
+                    <span class="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">ID: {{ c.id
+                        }}</span>
+                    {% if c.status == 'Activo' %}
+                    <span class="px-3 py-1 bg-green-100 text-green-600 rounded-full text-xs font-bold">Activo</span>
+                    {% else %}
+                    <span class="px-3 py-1 bg-red-100 text-red-600 rounded-full text-xs font-bold">Inactivo</span>
+                    {% endif %}
+                    {% if c.archived %}
+                    <span class="px-3 py-1 bg-slate-200 text-slate-600 rounded-full text-xs font-bold">Archivado</span>
+                    {% endif %}
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 w-full mt-6">
+                    <button onclick="document.getElementById('editProfileModal').classList.remove('hidden')"
+                        class="btn btn-primary w-full shadow-lg shadow-blue-200 text-xs text-center justify-center">
+                        Editar Perfil
+                    </button>
+                    <!-- Link to Ledger -->
+                    <a href="/hr_file/{{ c.id }}/Payments/Libro_Salarios.xlsx"
+                        class="btn bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 w-full text-xs flex items-center justify-center gap-1">
+                        📒 Libro
+                    </a>
+                </div>
+
+                <a href="/hr/{{ c.id }}/payments"
+                    class="w-full mt-3 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-bold shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 transition-colors">
+                    💸 Registro de Pagos
+                </a>
+
+                <!-- Archive Action -->
+                <form action="/hr/{{ c.id }}/archive" method="post" class="w-full mt-2">
+                    {% if c.archived %}
+                    <input type="hidden" name="archive" value="false">
+                    <button type="submit"
+                        class="w-full text-xs text-slate-400 font-bold hover:text-blue-600 underline">Restaurar del
+                        Archivo</button>
+                    {% else %}
+                    <input type="hidden" name="archive" value="true">
+                    <button type="submit" class="w-full text-xs text-slate-300 font-bold hover:text-red-500 underline"
+                        onclick="return confirm('¿Archivar este colaborador? Se ocultará del inicio.');">Archivar /
+                        Ocultar</button>
+                    {% endif %}
+                </form>
+            </div>
+
+            <!-- Historical Stats -->
+            <div
+                class="bg-slate-800 rounded-2xl shadow-sm border border-slate-700 p-6 text-white overflow-hidden relative">
+                <div class="absolute top-0 right-0 p-4 opacity-10">
+                    <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24">
+                        <path
+                            d="M16,11.78L20.24,4.45L21.97,5.45L16.74,14.5L10.23,10.75L5.46,19H22V21H2V3H4V17.54L9.5,8L16,11.78Z" />
+                    </svg>
+                </div>
+                <h3
+                    class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">
+                    Histórico ({{ "{:.1f}".format(calc.months_worked) }} meses)</h3>
+                <div class="space-y-6 relative z-10">
+                    <div>
+                        <div class="text-xs text-slate-400 mb-1">Total Percibido</div>
+                        <div class="text-2xl font-bold text-emerald-400">Q{{ "{:,.2f}".format(calc.hist_total_earned) }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 mb-1">Total Pasivo Acumulado</div>
+                        <div class="text-xl font-bold text-orange-400">Q{{ "{:,.2f}".format(calc.hist_liability) }}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 mb-1">Aportes Patronales Totales</div>
+                        <div class="text-xl font-bold text-blue-400">Q{{ "{:,.2f}".format(calc.hist_employer_costs) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Documents Summary -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-0 overflow-hidden">
+                <div class="p-4 border-b border-slate-100 bg-slate-50 font-bold text-slate-700 text-sm">Documentación
+                </div>
+                <div class="divide-y divide-slate-100">
+                    <a href="#docs-profile" class="flex justify-between p-4 hover:bg-slate-50 transition-colors">
+                        <span class="text-sm text-slate-600">Identificación</span>
+                        <span class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">{{
+                            c.files.get("Profile", [])|length }}</span>
+                    </a>
+                    <a href="#docs-legal" class="flex justify-between p-4 hover:bg-slate-50 transition-colors">
+                        <span class="text-sm text-slate-600">Contratos</span>
+                        <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-bold">{{
+                            c.files.get("Legal", [])|length }}</span>
+                    </a>
+                    <a href="#docs-payments" class="flex justify-between p-4 hover:bg-slate-50 transition-colors">
+                        <span class="text-sm text-slate-600">Pagos</span>
+                        <span class="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold">{{
+                            c.files.get("Payments", [])|length }}</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Content: Dashboards -->
+        <div class="lg:col-span-8 space-y-6">
+
+            <!-- Assigned Projects -->
+            <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-slate-700 text-sm uppercase tracking-wider">Proyectos Asignados</h3>
+                    {% set total_pct = 0 %}
+                    {% for ap in assigned_projects %}
+                    {% set total_pct = total_pct + ap.percentage %}
+                    {% endfor %}
+                    <span
+                        class="text-xs font-bold px-2 py-1 rounded-full {% if total_pct < 100 %}bg-amber-100 text-amber-600{% else %}bg-green-100 text-green-600{% endif %}">
+                        Asignado: {{ "{:.0f}".format(total_pct) }}% (Disp: {{ "{:.0f}".format(100 - total_pct) }}%)
+                    </span>
+                </div>
+
+                {% if assigned_projects %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {% for ap in assigned_projects %}
+                    <a href="/project/{{ ap.id }}"
+                        class="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors group">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <div
+                                class="w-10 h-10 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center font-bold text-lg">
+                                📁</div>
+                            <div class="min-w-0">
+                                <div class="font-bold text-slate-700 truncate group-hover:text-blue-600">{{ ap.name }}
+                                </div>
+                                <div class="text-xs text-slate-400 font-medium">{{ ap.id }} • {{ ap.status }}</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="block text-lg font-black text-slate-800">{{ "{:.0f}".format(ap.percentage)
+                                }}%</span>
+                            <span class="text-[10px] text-slate-400 font-bold uppercase">del Salario</span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-8 text-slate-400 italic text-sm">
+                    No tiene proyectos asignados actualmente.
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Quick Stats Row -->
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                    <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Salario Base</div>
+                    <div class="text-xl font-black text-slate-800">Q{{ "{:,.2f}".format(c.base_salary) }}</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                    <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Bonificación</div>
+                    <div class="text-xl font-black text-slate-800">Q{{ "{:,.2f}".format(c.bonus_incentive) }}</div>
+                </div>
+                <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                    <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Fecha Inicio</div>
+                    <div class="text-xl font-black text-slate-800">{{ c.start_date if c.start_date else "--/--/----" }}
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- Provisions & Employer Costs -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Provisions -->
+                {% set aguinaldo = c.base_salary / 12 %}
+                {% set bono14 = c.base_salary / 12 %}
+                {% set vacaciones = c.base_salary / 24 %}
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50">
+                        <h3 class="font-bold text-slate-700 text-sm">Provisiones Mensuales (Pasivo)</h3>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <div class="flex justify-between text-sm text-slate-600">
+                            <span>Aguinaldo (8.33%)</span>
+                            <span class="font-bold">Q{{ "{:,.2f}".format(aguinaldo) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-slate-600">
+                            <span>Bono 14 (8.33%)</span>
+                            <span class="font-bold">Q{{ "{:,.2f}".format(bono14) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-slate-600">
+                            <span>Vacaciones (4.17%)</span>
+                            <span class="font-bold">Q{{ "{:,.2f}".format(vacaciones) }}</span>
+                        </div>
+                        <div
+                            class="pt-2 mt-2 border-t border-slate-100 flex justify-between text-sm text-slate-800 font-bold">
+                            <span>Total Pasivo Mensual</span>
+                            <span>Q{{ "{:,.2f}".format(aguinaldo + bono14 + vacaciones) }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Employer Costs -->
+                {% set igss_patro = c.base_salary * 0.1067 %}
+                {% set intecap = c.base_salary * 0.01 %}
+                {% set irtra = c.base_salary * 0.01 %}
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50">
+                        <h3 class="font-bold text-slate-700 text-sm">Costos Patronales</h3>
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <div class="flex justify-between text-sm text-slate-600">
+                            <span>IGSS Patronal (10.67%)</span>
+                            <span class="font-bold">Q{{ "{:,.2f}".format(igss_patro) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-slate-600">
+                            <span>INTECAP (1%)</span>
+                            <span class="font-bold">Q{{ "{:,.2f}".format(intecap) }}</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-slate-600">
+                            <span>IRTRA (1%)</span>
+                            <span class="font-bold">Q{{ "{:,.2f}".format(irtra) }}</span>
+                        </div>
+                        <div
+                            class="pt-2 mt-2 border-t border-slate-100 flex justify-between text-sm text-slate-800 font-bold">
+                            <span>Total Aportes</span>
+                            <span>Q{{ "{:,.2f}".format(igss_patro + intecap + irtra) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Docs Sections (Reused Logic) -->
+            <div class="grid grid-cols-3 gap-4" id="docs-section">
+                {% for cat, color in [('Profile', 'blue'), ('Legal', 'gray'), ('Payments', 'green')] %}
+                <div class="card p-0 overflow-hidden" id="docs-{{ cat|lower }}">
+                    <div
+                        class="bg-{{ color }}-50 p-4 border-b border-{{ color }}-100 flex justify-between items-center">
+                        <h3 class="font-bold text-{{ color }}-800 text-sm">{{ cat }}</h3>
+                    </div>
+                    <div class="p-4 bg-white min-h-[150px] flex flex-col">
+                        <ul class="space-y-2 mb-4 text-xs">
+                            {% for f in c.files.get(cat, []) %}
+                            <li
+                                class="flex items-center gap-2 text-slate-600 bg-slate-50 p-2 rounded border border-slate-100 truncate">
+                                <a href="/hr_file/{{ c.id }}/{{ cat }}/{{ f }}" target="_blank"
+                                    class="hover:underline hover:text-blue-600 w-full truncate">
+                                    📄 {{ f }}
+                                </a>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        <form action="/hr/{{ c.id }}/upload" method="post" enctype="multipart/form-data"
+                            class="mt-auto">
+                            <input type="hidden" name="category" value="{{ cat }}">
+                            <label
+                                class="block w-full border border-dashed border-{{ color }}-300 rounded-lg p-2 text-center cursor-pointer hover:bg-{{ color }}-50 transition-colors">
+                                <span class="text-{{ color }}-500 font-bold text-xs">+ Doc</span>
+                                <input type="file" name="file" class="hidden" onchange="this.form.submit()">
+                            </label>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Plugin Stats Card -->
+                {% if calc.plugin_stats %}
+                <div class="card p-0 overflow-hidden col-span-1 md:col-span-3 lg:col-span-1 border-2 border-red-100">
+                    <div class="bg-red-50 p-4 border-b border-red-100 flex justify-between items-center">
+                        <h3 class="font-bold text-red-800 text-sm">AO Development Stats</h3>
+                        <span class="text-xs font-bold text-red-500 bg-red-100 px-2 py-0.5 rounded-full">Mes
+                            Actual</span>
+                    </div>
+                    <div class="p-4 bg-white min-h-[150px] flex flex-col justify-between">
+                        <div class="space-y-4">
+                            <div>
+                                <p class="text-xs text-slate-400 font-bold uppercase">Horas en Revit</p>
+                                <p class="text-2xl font-black text-slate-800">{{ calc.plugin_stats.month_hours }} hrs
+                                </p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-400 font-bold uppercase">Archivos Trabajados</p>
+                                <p class="text-lg font-bold text-slate-700">{{ calc.plugin_stats.files_count }}</p>
+                            </div>
+                            <div class="pt-2 border-t border-slate-100">
+                                <p class="text-[10px] text-slate-400">Vinculado a: <span
+                                        class="font-mono text-slate-600">{{ c.email }}</span></p>
+                            </div>
+                        </div>
+                        <a href="/hr/{{ c.id }}/plugin_logs"
+                            class="w-full mt-3 bg-red-600 hover:bg-red-700 text-white py-2 rounded text-xs font-bold text-center block transition-colors">
+                            Ver Base de Datos
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Edit Profile Modal -->
+<div id="editProfileModal"
+    class="hidden fixed inset-0 bg-black/60 z-[9000] flex items-center justify-center backdrop-blur-sm transition-opacity">
+    <div class="bg-white rounded-2xl p-6 w-[500px] shadow-2xl">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-slate-800">Editar Perfil</h2>
+            <button onclick="document.getElementById('editProfileModal').classList.add('hidden')"
+                class="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+
+        <form action="/hr/{{ c.id }}/update" method="post" class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Email (Plugin)</label>
+                <input type="email" name="email" value="{{ c.email }}" placeholder="usuario@ao.com"
+                    class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Rol / Cargo</label>
+                <select name="role" class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                    <option value="{{ c.role }}" selected>{{ c.role }}</option>
+                    <option value="Bim Manager">Bim Manager</option>
+                    <option value="Bim Coordinator">Bim Coordinator</option>
+                    <option value="Bim Modeler">Bim Modeler</option>
+                    <option value="Bim Drafter">Bim Drafter</option>
+                    <option value="Administrativo">Administrativo</option>
+                    <option value="Socio">Socio</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Salario Base (Q)</label>
+                    <input type="number" step="0.01" name="base_salary" value="{{ c.base_salary }}"
+                        class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Estado</label>
+                    <select name="status" class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                        <option value="Activo" {% if c.status=='Activo' %}selected{% endif %}>Activo</option>
+                        <option value="Inactivo" {% if c.status=='Inactivo' %}selected{% endif %}>Inactivo (Excluir de
+                            Planilla)</option>
+                    </select>
+                </div>
+                <!-- Row Break -->
+                <div class="col-span-2">
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Bonificación (Q)</label>
+                    <input type="number" step="0.01" name="bonus_incentive" value="{{ c.bonus_incentive }}"
+                        class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Fecha Inicio</label>
+                    <input type="date" name="start_date" value="{{ c.start_date }}"
+                        class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Cumpleaños</label>
+                    <input type="date" name="birthday" value="{{ c.birthday }}"
+                        class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm">
+                </div>
+            </div>
+
+            <div class="flex gap-3 justify-end mt-6 pt-4 border-t border-slate-100">
+                <button type="button" onclick="document.getElementById('editProfileModal').classList.add('hidden')"
+                    class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold">Cancelar</button>
+                <button type="submit"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-200">Guardar
+                    Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+{% endblock %}

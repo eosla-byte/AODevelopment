@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col h-full overflow-hidden">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-6 shrink-0">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-800">Cronograma Global</h1>
+            <p class="text-slate-500">Vista consolidada de todos los proyectos.</p>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex items-center gap-4">
+            <button
+                class="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 px-3 py-2 rounded-lg text-sm font-bold shadow-sm transition-all">
+                <img src="https://www.gstatic.com/images/branding/product/1x/calendar_2020q4_48dp.png" class="w-4 h-4"
+                    alt="GCal">
+                Sincronizar
+            </button>
+            <div class="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-sm">
+                <button onclick="changeCalendarMonth(-1)"
+                    class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-50 rounded transition-all font-bold">‹</button>
+                <span id="calTitle" class="w-40 text-center text-sm font-bold text-slate-800">Enero 2026</span>
+                <button onclick="changeCalendarMonth(1)"
+                    class="w-8 h-8 flex items-center justify-center text-slate-600 hover:bg-slate-50 rounded transition-all font-bold">›</button>
+            </div>
+            <button onclick="jumpToToday()"
+                class="btn bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-4 py-2 rounded-lg text-sm">Hoy</button>
+        </div>
+    </div>
+
+    <!-- Calendar Legend -->
+    <div class="flex gap-4 text-xs font-bold text-slate-500 mb-4 shrink-0 overflow-x-auto pb-2">
+        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-500"></span> Recordatorios
+        </div>
+        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> Facturas</div>
+        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-green-500"></span> Pagos</div>
+        <div class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-orange-500"></span> Legal</div>
+    </div>
+
+    <!-- Calendar Grid Container -->
+    <div class="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden relative">
+        <!-- Headers -->
+        <div class="grid grid-cols-7 border-b border-slate-200 bg-slate-50 shrink-0">
+            <div class="p-3 text-center text-xs uppercase font-bold text-slate-400">Lunes</div>
+            <div class="p-3 text-center text-xs uppercase font-bold text-slate-400">Martes</div>
+            <div class="p-3 text-center text-xs uppercase font-bold text-slate-400">Miércoles</div>
+            <div class="p-3 text-center text-xs uppercase font-bold text-slate-400">Jueves</div>
+            <div class="p-3 text-center text-xs uppercase font-bold text-slate-400">Viernes</div>
+            <div class="p-3 text-center text-xs uppercase font-bold text-red-400">Sábado</div>
+            <div class="p-3 text-center text-xs uppercase font-bold text-red-400">Domingo</div>
+        </div>
+
+        <!-- Days Grid -->
+        <div id="calendarGrid" class="grid grid-cols-7 auto-rows-fr gap-px bg-slate-200 flex-1 overflow-y-auto">
+            <!-- Generated via JS -->
+        </div>
+    </div>
+</div>
+
+<!-- Day Detail Modal -->
+<dialog id="dayModal" class="modal p-0 rounded-2xl shadow-2xl backdrop:bg-slate-900/60 open:animate-fade-in w-[500px]">
+    <div class="bg-white flex flex-col max-h-[80vh] overflow-hidden">
+        <div class="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
+            <div class="flex items-center gap-3">
+                <div class="text-3xl font-bold text-slate-700" id="selectedDayNum">12</div>
+                <div class="flex flex-col">
+                    <span class="text-xs font-bold text-slate-400 uppercase" id="selectedDayMonth">Enero</span>
+                    <span class="text-xs text-slate-500" id="selectedDayYear">2026</span>
+                </div>
+            </div>
+            <form method="dialog"><button class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </form>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 custom-scrollbar space-y-4">
+            <!-- Events List -->
+            <div>
+                <h4 class="text-xs font-bold text-slate-400 uppercase mb-2">Eventos y Recordatorios</h4>
+                <div id="dayEventsList" class="space-y-2">
+                    <!-- Populated via JS -->
+                </div>
+                <div id="emptyEventsMsg" class="text-sm text-slate-400 italic text-center py-4 hidden">No hay eventos
+                    para este día.</div>
+            </div>
+
+            <hr class="border-slate-100">
+
+            <!-- Add Reminder Form (Simplified, requires Project Linking) -->
+            <div>
+                <h4 class="text-xs font-bold text-blue-500 uppercase mb-2 flex items-center gap-2">
+                    <span class="text-lg">+</span> Agregar Recordatorio
+                </h4>
+                <!-- Since managing reminders usually requires a Project Context, 
+                      we can offer a "Quick Add" that asks for Project ID or Name? 
+                      Or just a generic one? The system is designed around Projects.
+                      Let's provide a Project Dropdown. -->
+                <form action="/calendar/reminder/add" method="post"
+                    class="space-y-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <input type="hidden" name="date" id="newReminderDate">
+
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Proyecto</label>
+                        <select name="project_id" class="input-field w-full text-sm py-1">
+                            {% for p in projects %}
+                            {% if not p.archived %}
+                            <option value="{{ p.id }}">{{ p.client }} - {{ p.name }}</option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Título / Tarea</label>
+                        <input type="text" name="title" class="input-field w-full text-sm py-1" required
+                            placeholder="Ej. Enviar factura...">
+                    </div>
+                    <button type="submit"
+                        class="w-full btn bg-blue-500 hover:bg-blue-600 text-white font-bold py-1.5 rounded-lg text-sm shadow-sm">
+                        Guardar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</dialog>
+
+<script>
+    // Calendar State
+    let calDate = new Date(); // Start at today
+    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+    // Data from Backend (Aggregated)
+    const globalEvents = [];
+
+    // Jinja Loop to populate events from ALL projects
+    {% for p in projects %}
+    {% if not p.archived %}
+    // 1. Reminders
+    {% for r in p.reminders %}
+    globalEvents.push({
+        title: "{{ p.client }} - {{ r.title }}",
+        date: "{{ r.date }}",
+        completed: {{ 'true' if r.completed else 'false' }},
+        type: 'reminder',
+        projectId: "{{ p.id }}",
+        projectName: "{{ p.client }}",
+        id: "{{ r.id }}" // Needed for deletion
+                });
+    {% endfor %}
+    // ... (File events logic omitted for brevity if needed or can be kept)
+    {% endif %}
+    {% endfor %}
+
+    function renderCalendar() {
+        const grid = document.getElementById('calendarGrid');
+        const title = document.getElementById('calTitle');
+        grid.innerHTML = '';
+
+        const year = calDate.getFullYear();
+        const month = calDate.getMonth();
+
+        title.innerText = `${monthNames[month]} ${year}`;
+
+        const firstDay = new Date(year, month, 1).getDay(); // 0 = Sun
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        // Adjust for Monday start (0=Mon, 6=Sun)
+        let startCol = firstDay - 1;
+        if (startCol < 0) startCol = 6;
+
+        // Empty cells
+        for (let i = 0; i < startCol; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'bg-slate-50 min-h-[100px] border-b border-r border-white/50';
+            grid.appendChild(cell);
+        }
+
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        // Days
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const isToday = dateStr === todayStr;
+
+            const cell = document.createElement('div');
+            cell.className = `bg-white p-2 min-h-[120px] border-r border-b border-slate-100 relative group hover:bg-blue-50/20 transition-colors cursor-pointer ${isToday ? 'bg-blue-50/50' : ''}`;
+
+            // Open Detail on Click
+            cell.onclick = () => openDayDetail(d, month, year, dateStr);
+
+            // Date Number
+            const num = document.createElement('div');
+            num.className = `text-sm font-bold mb-2 flex justify-between items-center ${isToday ? 'text-blue-600' : 'text-slate-400'}`;
+            num.innerHTML = `<span>${d}</span> ${isToday ? '<span class="text-[9px] bg-blue-100 text-blue-600 px-1 rounded uppercase">Hoy</span>' : ''}`;
+            cell.appendChild(num);
+
+            // Content Container
+            const content = document.createElement('div');
+            content.className = 'flex flex-col gap-1 overflow-y-auto max-h-[80px] custom-scrollbar pointer-events-none'; // events absorb click to cell
+
+            // Events for this day
+            const events = globalEvents.filter(ev => ev.date === dateStr);
+            events.slice(0, 3).forEach(ev => { // Show max 3 preview
+                const tag = document.createElement('div');
+                const isCompleted = ev.completed;
+
+                let classes = isCompleted
+                    ? 'bg-slate-100 text-slate-400 line-through border-slate-200'
+                    : 'bg-purple-100 text-purple-700 border-purple-200';
+
+                if (ev.type === 'Factura') classes = 'bg-blue-50 text-blue-700 border-blue-200';
+
+                tag.className = `text-[10px] px-1.5 py-1 rounded border truncate shadow-sm ${classes}`;
+                tag.innerHTML = `<b>${ev.projectName}</b>: ${ev.title.split('-')[1] || ev.title}`;
+                content.appendChild(tag);
+            });
+
+            if (events.length > 3) {
+                const more = document.createElement('div');
+                more.className = "text-[9px] text-slate-400 font-bold pl-1";
+                more.innerText = `+ ${events.length - 3} más...`;
+                content.appendChild(more);
+            }
+
+            cell.appendChild(content);
+            grid.appendChild(cell);
+        }
+    }
+
+    function openDayDetail(day, month, year, dateStr) {
+        const modal = document.getElementById('dayModal');
+        const list = document.getElementById('dayEventsList');
+        const emptyMsg = document.getElementById('emptyEventsMsg');
+
+        // Set Header
+        document.getElementById('selectedDayNum').innerText = day;
+        document.getElementById('selectedDayMonth').innerText = monthNames[month];
+        document.getElementById('selectedDayYear').innerText = year;
+        document.getElementById('newReminderDate').value = dateStr; // Set hidden input
+
+        // Populate List
+        const events = globalEvents.filter(ev => ev.date === dateStr);
+        list.innerHTML = '';
+
+        if (events.length === 0) {
+            emptyMsg.classList.remove('hidden');
+        } else {
+            emptyMsg.classList.add('hidden');
+            events.forEach(ev => {
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100";
+
+                // Left: Info
+                const info = document.createElement('div');
+                info.className = "flex flex-col";
+                info.innerHTML = `<span class="text-xs font-bold text-slate-700">${ev.projectName}</span>
+                                   <span class="text-sm text-slate-600 ${ev.completed ? 'line-through opacity-50' : ''}">${ev.title.split('-')[1] || ev.title}</span>`;
+
+                // Right: Actions
+                const actions = document.createElement('div');
+                actions.className = "flex gap-2";
+
+                // Go to Project
+                const btnLink = document.createElement('a');
+                btnLink.href = `/project/${ev.projectId}`;
+                btnLink.className = "text-blue-400 hover:text-blue-600 font-bold px-1";
+                btnLink.innerHTML = "↗";
+                btnLink.title = "Ir al Proyecto";
+                actions.appendChild(btnLink);
+
+                if (ev.type === 'reminder') {
+                    // Delete Button (Form)
+                    // Since we can't easily nest forms without mess, let's use a fetch or simple form button
+                    // Let's use a dynamic form creation for delete
+                    const delBtn = document.createElement('button');
+                    delBtn.innerHTML = "×";
+                    delBtn.className = "text-red-300 hover:text-red-500 font-bold px-1 text-lg";
+                    delBtn.title = "Eliminar";
+                    delBtn.onclick = () => deleteReminder(ev.projectId, ev.id);
+                    actions.appendChild(delBtn);
+                }
+
+                item.appendChild(info);
+                item.appendChild(actions);
+                list.appendChild(item);
+            });
+        }
+
+        modal.showModal();
+    }
+
+    function deleteReminder(projId, remId) {
+        if (!confirm('¿Eliminar este recordatorio?')) return;
+        // Submit via hidden form to /project/{id}/reminder/delete
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/project/${projId}/reminder/delete`;
+
+        const inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = 'reminder_id';
+        inp.value = remId;
+
+        form.appendChild(inp);
+        document.body.appendChild(form);
+        form.submit();
+    }
+
+    function changeCalendarMonth(delta) {
+        calDate.setMonth(calDate.getMonth() + delta);
+        renderCalendar();
+    }
+
+    function jumpToToday() {
+        calDate = new Date();
+        renderCalendar();
+    }
+
+    // Init
+    document.addEventListener('DOMContentLoaded', renderCalendar);
+</script>
+{% endblock %}

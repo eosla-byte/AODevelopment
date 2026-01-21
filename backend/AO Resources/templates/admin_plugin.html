@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Panel de Control - Plugin Revit</h2>
+
+    <div class="card mb-4">
+        <div class="card-header">Sesiones Activas</div>
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Máquina</th>
+                        <th>Inicio</th>
+                        <th>Último Heartbeat</th>
+                        <th>Estado</th>
+                        <th>Logs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sessions %}
+                    <tr>
+                        <td>{{ s.user_email }}</td>
+                        <td>{{ s.machine_name }}</td>
+                        <td>{{ s.start_time }}</td>
+                        <td>{{ s.last_heartbeat }}</td>
+                        <td>
+                            {% if s.is_active %}
+                            <span class="badge bg-success">Activo</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ s.activity_logs|length }} Actividades</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Resumen por Usuario</div>
+        <div class="card-body">
+            <!-- Placeholder for detailed charts -->
+            <p>Seleccione un usuario para ver detalles (Próximamente).</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,125 @@
+<div id="est-{{ est.id }}" draggable="true" ondragstart="drag(event)" onclick="openEditModal('{{ est.id }}')"
+    class="est-card bg-white p-4 rounded-xl border border-slate-200 shadow-sm hover:shadow-md group relative cursor-pointer active:scale-[0.99] transition-all">
+
+    <!-- Header -->
+    <div class="flex justify-between items-start mb-3">
+        <div class="flex items-center gap-3">
+            <span class="text-2xl bg-indigo-50 w-8 h-8 flex items-center justify-center rounded-lg">{{
+                est.emoji|default('📝') }}</span>
+            <div>
+                <h3 class="font-bold text-slate-800 text-sm leading-tight hover:text-indigo-600 transition-colors">{{
+                    est.name }}</h3>
+                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wide mt-0.5">{{ est.client }}</div>
+            </div>
+        </div>
+        <div class="text-[10px] font-mono bg-slate-100 text-slate-500 px-2 py-1 rounded font-bold">{{ est.category }}
+        </div>
+    </div>
+
+    <!-- Key Metrics Grid -->
+    <div class="grid grid-cols-2 gap-2 mb-3">
+        <div class="bg-indigo-50/50 p-2 rounded-lg border border-indigo-50 flex flex-col justify-center">
+            <div class="text-[9px] text-indigo-400 font-bold uppercase tracking-wider mb-0.5">Monto Total</div>
+            <div class="text-sm font-bold text-indigo-700">Q{{ "{:,.0f}".format(est.amount|float) }}</div>
+        </div>
+        <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 flex flex-col justify-center">
+            <div class="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Metros²</div>
+            <div class="text-sm font-bold text-slate-700">{{ "{:,.0f}".format(est.square_meters|float) }} m²</div>
+        </div>
+    </div>
+
+    <!-- Calculations -->
+    {% set duration = est.duration_months|float|default(0) %}
+    {% set amount = est.amount|float|default(0) %}
+
+    {# --- HR Calc --- #}
+    {% set ns = namespace(monthly_hr=0, count_hr=0) %}
+    {% for r in est.resources %}
+    {% set ns.monthly_hr = ns.monthly_hr + (r.salary|float * r.count|int) %}
+    {% set ns.count_hr = ns.count_hr + r.count|int %}
+    {% endfor %}
+    {% set total_hr = ns.monthly_hr * duration %}
+
+    {# --- OpEx Calc --- #}
+    {% set ns_ops = namespace(monthly_ops=0) %}
+    {% for e in est.expenses %}
+    {% set ns_ops.monthly_ops = ns_ops.monthly_ops + e.amount|float %}
+    {% endfor %}
+    {% set total_ops = ns_ops.monthly_ops * duration %}
+
+    {# --- Tax Calc --- #}
+    {% set iva = amount * 0.12 %}
+    {% set isr_base = (amount - iva) - 30000 %}
+    {% if isr_base > 0 %}
+    {% set isr = (isr_base * 0.07) + 1500 %}
+    {% else %}
+    {% set isr = 1500 %}
+    {% endif %}
+    {% set total_taxes = iva + isr %}
+
+    {# --- Utility Calc --- #}
+    {% set utility = amount - total_hr - total_ops - total_taxes %}
+
+
+    <!-- Detailed Stats Row -->
+    <div class="grid grid-cols-3 gap-2 mb-3 pt-2 border-t border-slate-100 border-dashed">
+        <div class="bg-blue-50/50 p-2 rounded">
+            <div class="text-[8px] text-blue-400 uppercase font-bold mb-0.5">Recurso Humano</div>
+            <div class="text-xs font-bold text-blue-700">Q{{ "{:,.0f}".format(total_hr) }}</div>
+            <div class="text-[9px] text-blue-500">{{ ns.count_hr }} Personas</div>
+        </div>
+
+        <div class="bg-amber-50/50 p-2 rounded">
+            <div class="text-[8px] text-amber-400 uppercase font-bold mb-0.5">Impuestos</div>
+            <div class="text-xs font-bold text-amber-700">Q{{ "{:,.0f}".format(total_taxes) }}</div>
+            <div class="text-[9px] text-amber-500">IVA + ISR</div>
+        </div>
+
+        <div class="bg-slate-50 p-2 rounded">
+            <div class="text-[8px] text-slate-400 uppercase font-bold mb-0.5">Gastos Op.</div>
+            <div class="text-xs font-bold text-slate-700">Q{{ "{:,.0f}".format(total_ops) }}</div>
+            <div class="text-[9px] text-slate-400">Global</div>
+        </div>
+    </div>
+
+    <!-- Utility & Partners -->
+    <div class="bg-emerald-50 rounded-lg p-2 border border-emerald-100 mb-2">
+        <div class="flex justify-between items-end mb-2">
+            <div>
+                <div class="text-[8px] text-emerald-500 uppercase font-bold">Utilidad Neta</div>
+                <div class="text-sm font-bold text-emerald-800">Q{{ "{:,.0f}".format(utility) }}</div>
+            </div>
+            <div class="text-[9px] text-emerald-600 font-mono font-bold">{{ "{:,.0f}".format((utility / amount * 100) if
+                amount > 0 else 0) }}%</div>
+        </div>
+
+        <!-- Partners List -->
+        <div class="space-y-1">
+            {% for p in est.partners %}
+            {# Find collaborator name #}
+            {% set col = collaborators | selectattr("id", "equalto", p.userId) | first %}
+            {% set p_gain = utility * (p.pct|float / 100) %}
+            <div class="flex justify-between items-center bg-white/60 px-2 py-1 rounded border border-emerald-100/50">
+                <span class="text-[9px] font-bold text-emerald-900 truncate max-w-[80px]">{{ col.name if col else 'TBD'
+                    }}</span>
+                <span class="text-[9px] text-emerald-700 font-mono">Q{{ "{:,.0f}".format(p_gain) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="flex items-center justify-between pt-1">
+        <div class="text-[10px] text-slate-400 font-medium">
+            Ratio: <span class="font-bold text-slate-600 bg-slate-100 px-1 py-0.5 rounded ml-1">Q{{
+                "{:,.2f}".format(est.ratio|default(0.0)) }}/m²</span>
+        </div>
+        <form action="/estimaciones/delete" method="POST"
+            onsubmit="event.stopPropagation(); return confirm('¿Borrar?');"
+            class="opacity-0 group-hover:opacity-100 transition-opacity">
+            <input type="hidden" name="est_id" value="{{ est.id }}">
+            <button class="text-red-300 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors text-xs"
+                title="Borrar">🗑️</button>
+        </form>
+    </div>
+</div>

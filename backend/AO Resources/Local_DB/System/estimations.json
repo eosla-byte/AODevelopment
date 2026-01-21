@@ -1,0 +1,38 @@
+[
+    {
+        "id": "1768845898209",
+        "created_at": "2026-01-19T12:04:58.209444",
+        "status": "Analisis",
+        "name": "Estimaci\u00f3n desde Cotizador",
+        "client": "Revisar Cliente",
+        "emoji": "\ud83d\udcdd",
+        "category": "Residencial",
+        "amount": 1896687.8595000003,
+        "square_meters": 308404.53,
+        "nit": "",
+        "legal_name": "",
+        "po_number": "",
+        "start_date": "",
+        "duration_months": 0.0,
+        "resources": [],
+        "financials": {}
+    },
+    {
+        "id": "1768845940845",
+        "created_at": "2026-01-19T12:05:40.845152",
+        "status": "Analisis",
+        "name": "PORTALES",
+        "client": "SPECTRUM",
+        "emoji": "\ud83d\udcdd",
+        "category": "Industrial",
+        "amount": 1561511.0,
+        "square_meters": 41351385.0,
+        "nit": "1534835",
+        "legal_name": "AVANCES REALES S.A.",
+        "po_number": "4242",
+        "start_date": "2026-03-05",
+        "duration_months": 6.0,
+        "resources": [],
+        "financials": {}
+    }
+]

@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- Title Section -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800">AO Development</h2>
+                <p class="text-slate-500 mt-1">Gestión de usuarios y acceso al Plugin Revit.</p>
+            </div>
+            <button onclick="document.getElementById('modal-new-user').classList.remove('hidden')"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+                <span class="text-xl">+</span> Nuevo Usuario
+            </button>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-200">
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Usuario</th>
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rol</th>
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Horas</th>
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Archivos</th>
+                        <th class="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">
+                            Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    {% for u in users %}
+                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="relative">
+                                    <div
+                                        class="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs uppercase border border-slate-200">
+                                        {{ u.name[:2] }}
+                                    </div>
+                                    {% if u.is_online %}
+                                    <span
+                                        class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white bg-green-500"
+                                        title="En Linea"></span>
+                                    {% else %}
+                                    <span
+                                        class="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full ring-2 ring-white bg-slate-300"
+                                        title="Offline"></span>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-700">{{ u.name }}</div>
+                                    <div class="text-[10px] text-slate-400 font-mono">{{ u.last_seen }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-slate-600 text-sm">{{ u.email }}</td>
+                        <td class="px-6 py-4">
+                            <span
+                                class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 uppercase tracking-wide border border-slate-200">
+                                {{ u.role }}
+                            </span>
+                        </td>
+                        <!-- Activity Columns -->
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <div class="text-left">
+                                    <div class="font-black text-slate-700 text-lg leading-none">{{ u.month_hours }} hrs
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 uppercase font-bold">Tiempo</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-2">
+                                <div class="text-left">
+                                    <div class="font-black text-slate-700 text-lg leading-none">{{ u.files_count }}
+                                    </div>
+                                    <div class="text-[10px] text-slate-400 uppercase font-bold">Archivos</div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <td class="px-6 py-4 text-right flex items-center justify-end gap-2">
+                            <!-- DB Link Button -->
+                            {% if u.collab_id %}
+                            <a href="/hr/{{ u.collab_id }}/plugin_logs"
+                                class="bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 shadow-sm">
+                                📊 Base de Datos
+                            </a>
+                            {% else %}
+                            <span class="text-[10px] text-slate-300 italic px-2">Sin Vinculación RRHH</span>
+                            {% endif %}
+
+                            <!-- Actions -->
+                            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+                            <button
+                                onclick='openPermsModal("{{ u.email }}", {{ u.permissions | tojson | default("{}") }})'
+                                title="Gestionar Permisos"
+                                class="text-slate-400 hover:text-indigo-600 transition-colors p-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                                </svg>
+                            </button>
+
+                            <form action="/admin/plugin/users/{{ u.id }}/toggle" method="post" class="inline">
+                                {% if u.is_active %}
+                                <button type="submit" title="Bloquear Usuario"
+                                    class="text-slate-400 hover:text-orange-600 transition-colors p-1"><svg
+                                        xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                    </svg></button>
+                                {% else %}
+                                <button type="submit" title="Activar Usuario"
+                                    class="text-slate-400 hover:text-green-600 transition-colors p-1"><svg
+                                        xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg></button>
+                                {% endif %}
+                            </form>
+
+                            <form action="/admin/plugin/users/{{ u.id }}/delete" method="post" class="inline"
+                                onsubmit="return confirm('¿Eliminar usuario permamente?');">
+                                <button type="submit" title="Eliminar"
+                                    class="text-slate-400 hover:text-red-600 transition-colors p-1"><svg
+                                        xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                    </svg></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal New User -->
+<div id="modal-new-user"
+    class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <h3 class="font-bold text-slate-800 text-lg">Nuevo Usuario Plugin</h3>
+            <button onclick="document.getElementById('modal-new-user').classList.add('hidden')"
+                class="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+
+        <form action="/admin/plugin/users" method="post" class="p-6 space-y-4">
+
+            <!-- Link to Collaborator -->
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Vincular con Colaborador (Opcional)</label>
+                <select id="collab_select" name="collab_id" onchange="fillUserData(this)"
+                    class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <option value="">-- Seleccionar Colaborador --</option>
+                    {% for c in collaborators %}
+                    <option value="{{ c.id }}" data-email="{{ c.email }}" data-name="{{ c.name }}">{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nombre</label>
+                    <input type="text" name="name" id="input_name" required
+                        class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Email (Login)</label>
+                    <input type="email" name="email" id="input_email" required
+                        class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
+                <input type="password" name="password" required
+                    class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Rol</label>
+                <select name="role"
+                    class="w-full rounded-lg border-slate-300 border px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <option value="plugin_user">Plugin User</option>
+                    <option value="admin">Admin</option>
+                </select>
+            </div>
+
+            <div class="pt-4 flex justify-end gap-3">
+                <button type="button" onclick="document.getElementById('modal-new-user').classList.add('hidden')"
+                    class="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
+                <button type="submit"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors">Crear
+                    Usuario</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Permissions -->
+<div id="modal-permissions"
+    class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <h3 class="font-bold text-slate-800 text-lg">Permisos de Usuario</h3>
+            <button onclick="closePermsModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+        </div>
+        <div class="p-6">
+            <input type="hidden" id="perm_user_id">
+            <h4 class="text-sm font-bold text-slate-500 uppercase tracking-wide mb-4">Módulos Accesibles</h4>
+
+            <div class="space-y-3">
+                <label
+                    class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <span class="font-medium text-slate-700">Civil Connection</span>
+                    <input type="checkbox" id="perm_civil"
+                        class="w-5 h-5 text-blue-600 rounded bg-gray-100 border-gray-300 focus:ring-blue-500">
+                </label>
+                <label
+                    class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <span class="font-medium text-slate-700">Graficos</span>
+                    <input type="checkbox" id="perm_graphics"
+                        class="w-5 h-5 text-blue-600 rounded bg-gray-100 border-gray-300 focus:ring-blue-500">
+                </label>
+                <label
+                    class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <span class="font-medium text-slate-700">Documentacion</span>
+                    <input type="checkbox" id="perm_docs"
+                        class="w-5 h-5 text-blue-600 rounded bg-gray-100 border-gray-300 focus:ring-blue-500">
+                </label>
+                <label
+                    class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <span class="font-medium text-slate-700">Topografia</span>
+                    <input type="checkbox" id="perm_topo"
+                        class="w-5 h-5 text-blue-600 rounded bg-gray-100 border-gray-300 focus:ring-blue-500">
+                </label>
+                <label
+                    class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <span class="font-medium text-slate-700">Vegetacion</span>
+                    <input type="checkbox" id="perm_veg"
+                        class="w-5 h-5 text-blue-600 rounded bg-gray-100 border-gray-300 focus:ring-blue-500">
+                </label>
+                <label
+                    class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <span class="font-medium text-slate-700">DWG Import</span>
+                    <input type="checkbox" id="perm_dwg"
+                        class="w-5 h-5 text-blue-600 rounded bg-gray-100 border-gray-300 focus:ring-blue-500">
+                </label>
+                <label
+                    class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                    <span class="font-medium text-slate-700">Cuantificaciones</span>
+                    <input type="checkbox" id="perm_quant"
+                        class="w-5 h-5 text-blue-600 rounded bg-gray-100 border-gray-300 focus:ring-blue-500">
+                </label>
+            </div>
+
+            <div class="pt-6 flex justify-end gap-3">
+                <button type="button" onclick="closePermsModal()"
+                    class="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
+                <button type="button" onclick="savePermissions()"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors">Guardar
+                    Cambios</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function fillUserData(select) {
+        const option = select.options[select.selectedIndex];
+        if (option.value) {
+            document.getElementById('input_name').value = option.dataset.name;
+            document.getElementById('input_email').value = option.dataset.email;
+        }
+    }
+
+    function openPermsModal(uid, currentPerms) {
+        document.getElementById('perm_user_id').value = uid;
+        document.getElementById('modal-permissions').classList.remove('hidden');
+
+        const perms = currentPerms || {};
+
+        const check = (id, key) => {
+            const el = document.getElementById(id);
+            // Default to checked (true) if undefined, assuming full access unless restricted
+            // OR default to unchecked if strict?
+            // Let's assume default=true (unrestricted)
+            el.checked = (perms[key] !== false);
+        };
+
+        check('perm_civil', 'CivilConnection');
+        check('perm_graphics', 'Graficos');
+        check('perm_docs', 'Documentacion');
+        check('perm_topo', 'Topografia');
+        check('perm_veg', 'Vegetacion');
+        check('perm_dwg', 'DWGImport');
+        check('perm_quant', 'Cuantificaciones');
+    }
+
+    function closePermsModal() {
+        document.getElementById('modal-permissions').classList.add('hidden');
+    }
+
+    async function savePermissions() {
+        const uid = document.getElementById('perm_user_id').value;
+        const perms = {
+            CivilConnection: document.getElementById('perm_civil').checked,
+            Graficos: document.getElementById('perm_graphics').checked,
+            Documentacion: document.getElementById('perm_docs').checked,
+            Topografia: document.getElementById('perm_topo').checked,
+            Vegetacion: document.getElementById('perm_veg').checked,
+            DWGImport: document.getElementById('perm_dwg').checked,
+            Cuantificaciones: document.getElementById('perm_quant').checked
+        };
+
+        try {
+            const res = await fetch(`/admin/plugin/users/${uid}/permissions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ permissions: perms })
+            });
+            if (res.ok) {
+                location.reload();
+            } else {
+                alert('Error guardando permisos');
+            }
+        } catch (e) {
+            console.error(e);
+            alert('Error de conexión');
+        }
+    }
+</script>
+{% endblock %}
