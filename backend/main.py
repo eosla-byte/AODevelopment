@@ -141,18 +141,45 @@ async def serve_landing(request: Request):
 async def serve_landing_alias(request: Request):
     return await serve_landing(request)
     
-@app.get("/debug-css")
-async def debug_css_route():
-    # Diagnostic Route to check if CSS is readable
-    css_path = os.path.join(BASE_DIR, "static/public_site/assets/index-N3r3Gy9x.css")
-    if not os.path.exists(css_path):
-        return JSONResponse({"status": "Missing", "path": css_path})
+@app.get("/login", response_class=HTMLResponse)
+async def serve_landing_alias(request: Request):
+    return await serve_landing(request)
+    
+@app.get("/debug-info")
+async def debug_info_route():
+    # DIAGNOSTIC ROUTE
     try:
-        with open(css_path, 'r', encoding='utf-8') as f:
-            content = f.read(100) # First 100 chars
-        return JSONResponse({"status": "Found", "preview": content})
+        # Check files content
+        css_path = os.path.join(BASE_DIR, "static/public_site/assets/index-N3r3Gy9x.css")
+        css_exists = os.path.exists(css_path)
+        
+        dir_listing = []
+        if os.path.exists(BASE_DIR):
+             dir_listing = os.listdir(BASE_DIR)
+             
+        static_listing = []
+        static_path = os.path.join(BASE_DIR, "static/public_site")
+        if os.path.exists(static_path):
+            static_listing = os.listdir(static_path)
+            
+        assets_listing = []
+        assets_dir = os.path.join(static_path, "assets")
+        if os.path.exists(assets_dir):
+            assets_listing = os.listdir(assets_dir)
+            
+        return JSONResponse({
+            "version": "1.0.1 (Absolute Paths)",
+            "base_dir": BASE_DIR,
+            "root_files": dir_listing,
+            "static_files": static_listing,
+            "assets_files": assets_listing,
+            "css_found": css_exists,
+            "cwd": os.getcwd()
+        })
     except Exception as e:
         return JSONResponse({"status": "Error", "detail": str(e)})
+
+@app.get("/cloud-quantify", response_class=HTMLResponse)
 
 @app.get("/cloud-quantify", response_class=HTMLResponse)
 async def view_cloud_quantify(request: Request):
