@@ -1772,6 +1772,22 @@ def get_session_by_id(session_id: str):
     finally:
         db.close()
 
+def get_latest_active_session(user_email: str):
+    db = SessionLocal()
+    try:
+        # Check for sessions active in last 5 minutes
+        cutoff = datetime.datetime.now() - datetime.timedelta(minutes=5)
+        return db.query(models.PluginSession)\
+            .filter(models.PluginSession.user_email == user_email)\
+            .filter(models.PluginSession.last_heartbeat > cutoff)\
+            .order_by(models.PluginSession.last_heartbeat.desc())\
+            .first()
+    except Exception as e:
+        print(f"Error getting active session for {user_email}: {e}")
+        return None
+    finally:
+        db.close()
+
 # -----------------------------------------------------------------------------
 # CLOUD COMMANDS
 # -----------------------------------------------------------------------------
@@ -1910,6 +1926,21 @@ def create_sheet_session(session_id: str, project_name: str, sheets: list, param
     except Exception as e:
         print(f"Error create_sheet_session: {e}")
         db.rollback()
+        return False
+    finally:
+        db.close()
+
+def update_sheet_session_plugin_id(session_id: str, new_plugin_session_id: str):
+    db = SessionLocal()
+    try:
+        s = db.query(PluginSheetSession).filter(PluginSheetSession.id == session_id).first()
+        if s:
+            s.plugin_session_id = new_plugin_session_id
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error updating sheet session plugin id: {e}")
         return False
     finally:
         db.close()

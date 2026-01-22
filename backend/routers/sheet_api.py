@@ -77,13 +77,46 @@ async def apply_sheet_changes(request: Request):
              
         plugin_session_id = session_data.get("plugin_session_id")
         
+        # AGGRESSIVE RECOVERY: Check if session is alive
+        from database import get_session_by_id, get_latest_active_session, update_sheet_session_plugin_id
+        import datetime
+        
+        current_plugin_session = get_session_by_id(plugin_session_id)
+        
+        # Determine if stale (older than 2 mins or missing)
+        is_stale = False
+        if not current_plugin_session:
+            is_stale = True
+        else:
+            cutoff = datetime.datetime.now() - datetime.timedelta(minutes=2)
+            if current_plugin_session.last_heartbeat < cutoff:
+                is_stale = True
+                
+        if is_stale:
+            # Try to heal
+            user_email = current_plugin_session.user_email if current_plugin_session else None
+            # If we don't know the email, we can't heal easily unless we stored it in sheet session.
+            # But wait, we might have it if we lookup the OLD session.
+            
+            if user_email:
+                new_session = get_latest_active_session(user_email)
+                if new_session:
+                    print(f"Session Healed! Old: {plugin_session_id} -> New: {new_session.id}")
+                    plugin_session_id = new_session.id
+                    # Update DB for future calls
+                    update_sheet_session_plugin_id(session_id, plugin_session_id)
+                else:
+                    return JSONResponse({"status": "error", "message": "No active Revit session found for user. Please check Revit."}, status_code=400)
+            else:
+                 return JSONResponse({"status": "error", "message": "Original Revit Link Lost. Please re-open from Revit."}, status_code=400)
+        
         if not plugin_session_id:
              return JSONResponse({"status": "error", "message": "Plugin Link Lost"}, status_code=400)
         
         # Queue Command for the specific Plugin Session
         queue_command(plugin_session_id, "UPDATE_SHEETS", updates)
         
-        return JSONResponse({"status": "ok"})
+        return JSONResponse({"status": "ok", "message": "Command Queued (Auto-Healed)" if is_stale else "Command Queued"})
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
