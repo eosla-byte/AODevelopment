@@ -678,22 +678,7 @@
             if (!confirm(msg)) return;
             performRecursiveUpload(uploadList, selectedNode.id);
         }
-        const uploadList = files.map(f => {
-            const rawPath = f.webkitRelativePath || f.name;
-            const normalized = rawPath.replace(/\\/g, '/');
-            const parts = normalized.split('/');
-            parts.pop();
-            const relPath = parts.join('/') + (parts.length > 0 ? '/' : '');
 
-            // Remove trailing slash for consistency
-            const cleanRel = relPath.endsWith('/') ? relPath.slice(0, -1) : relPath;
-
-            return { file: f, relPath: cleanRel };
-        });
-
-        if (!confirm(`Upload ${files.length} files?`)) return;
-        performRecursiveUpload(uploadList, selectedNode.id);
-        }
 
         async function performRecursiveUpload(list, rootTargetId) {
             const folderMap = { "": rootTargetId };
