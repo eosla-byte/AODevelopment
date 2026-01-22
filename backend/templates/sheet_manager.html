@@ -218,53 +218,59 @@
             <i class="fas fa-layer-group"></i>
             <span class="font-bold tracking-wide">AO Sheet Manager</span>
             <span class="text-xs bg-white/20 px-2 rounded ml-2" id="project-name">Loading...</span>
-        </div>
 
-        <!-- Browser Org Selector -->
-        <!-- Browser Org Single Button -->
-        <div class="flex items-center gap-2 ml-4">
-            <button onclick="openCustomOrgModal()"
-                class="bg-[#3e3e42] hover:bg-[#4e4e52] px-3 py-1.5 rounded text-sm font-bold shadow transition-colors flex items-center gap-2"
-                title="Configurar Organización del Navegador">
-                <i class="fas fa-sitemap"></i> Organization
-            </button>
-        </div>
+            <!-- Status Indicator -->
+            <div id="connection-status"
+                class="flex items-center gap-2 px-3 py-1 rounded bg-gray-800 text-xs border border-gray-700 ml-4 hidden">
+                <div id="status-dot" class="w-2 h-2 rounded-full bg-gray-500"></div>
+                <span id="status-text" class="text-gray-300">Checking Revit...</span>
+            </div>
 
-        <div class="flex gap-2">
-            <input type="file" id="excel-upload" hidden accept=".xlsx, .xls" onchange="handleExcelUpload(this)">
-            <button onclick="document.getElementById('excel-upload').click()"
-                class="bg-green-700 hover:bg-green-600 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
-                title="Importar Excel">
-                <i class="fas fa-file-excel"></i> Importar Excel
-            </button>
-            <button onclick="addManualSheet()"
-                class="bg-[#3e3e42] hover:bg-[#4e4e52] px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
-                title="Agregar Fila Manual">
-                <i class="fas fa-plus-square"></i>
-            </button>
-            <div class="w-px bg-white/20 mx-1"></div>
+            <!-- Browser Org Selector -->
+            <!-- Browser Org Single Button -->
+            <div class="flex items-center gap-2 ml-4">
+                <button onclick="openCustomOrgModal()"
+                    class="bg-[#3e3e42] hover:bg-[#4e4e52] px-3 py-1.5 rounded text-sm font-bold shadow transition-colors flex items-center gap-2"
+                    title="Configurar Organización del Navegador">
+                    <i class="fas fa-sitemap"></i> Organization
+                </button>
+            </div>
 
-            <button onclick="openParamsModal()"
-                class="bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
-                title="Seleccionar Parámetros">
-                <i class="fas fa-columns"></i> Parámetros
-            </button>
-            <button onclick="openTemplateModal()"
-                class="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
-                title="Cargar Template">
-                <i class="fas fa-list"></i> Templates
-            </button>
-            <button onclick="saveTemplate()"
-                class="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
-                title="Guardar Vista Actual como Template">
-                <i class="fas fa-save"></i>
-            </button>
-            <div class="w-px bg-white/20 mx-1"></div>
-            <button onclick="applyChanges()"
-                class="bg-green-600 hover:bg-green-500 px-4 py-1.5 rounded text-sm font-bold shadow transition-colors flex items-center gap-2">
-                <i class="fas fa-check"></i> Aplicar Cambios
-            </button>
-        </div>
+            <div class="flex gap-2">
+                <input type="file" id="excel-upload" hidden accept=".xlsx, .xls" onchange="handleExcelUpload(this)">
+                <button onclick="document.getElementById('excel-upload').click()"
+                    class="bg-green-700 hover:bg-green-600 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
+                    title="Importar Excel">
+                    <i class="fas fa-file-excel"></i> Importar Excel
+                </button>
+                <button onclick="addManualSheet()"
+                    class="bg-[#3e3e42] hover:bg-[#4e4e52] px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
+                    title="Agregar Fila Manual">
+                    <i class="fas fa-plus-square"></i>
+                </button>
+                <div class="w-px bg-white/20 mx-1"></div>
+
+                <button onclick="openParamsModal()"
+                    class="bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
+                    title="Seleccionar Parámetros">
+                    <i class="fas fa-columns"></i> Parámetros
+                </button>
+                <button onclick="openTemplateModal()"
+                    class="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
+                    title="Cargar Template">
+                    <i class="fas fa-list"></i> Templates
+                </button>
+                <button onclick="saveTemplate()"
+                    class="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
+                    title="Guardar Vista Actual como Template">
+                    <i class="fas fa-save"></i>
+                </button>
+                <div class="w-px bg-white/20 mx-1"></div>
+                <button onclick="applyChanges()"
+                    class="bg-green-600 hover:bg-green-500 px-4 py-1.5 rounded text-sm font-bold shadow transition-colors flex items-center gap-2">
+                    <i class="fas fa-check"></i> Aplicar Cambios
+                </button>
+            </div>
     </header>
 
     <!-- Main Content -->
@@ -334,7 +340,55 @@
         // Node: { id: string, type: 'sheet'|'group', name: string, number: string, params: {}, children: [], collapsed: false }
         let TREE_DATA = [];
 
-        document.addEventListener('DOMContentLoaded', init);
+        document.addEventListener('DOMContentLoaded', async () => {
+            await init();
+            startConnectionPolling();
+        });
+
+        // --- CONNECTION STATUS POLLING ---
+        function startConnectionPolling() {
+            pollConnectionStatus();
+            setInterval(pollConnectionStatus, 5000);
+        }
+
+        async function pollConnectionStatus() {
+            const statusDiv = document.getElementById('connection-status');
+            const dot = document.getElementById('status-dot');
+            const text = document.getElementById('status-text');
+
+            if (!SESSION_ID) return;
+            statusDiv.classList.remove('hidden');
+
+            try {
+                const res = await fetch(`${API_BASE}/status?session_id=${SESSION_ID}`);
+                const data = await res.json();
+
+                if (data.status === 'connected') {
+                    if (data.queue_size > 0) {
+                        dot.className = "w-2 h-2 rounded-full bg-yellow-400 animate-pulse";
+                        text.innerText = `Revit Connected (Queue: ${data.queue_size})`;
+                        text.className = "text-yellow-400";
+                    } else {
+                        dot.className = "w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]";
+                        text.innerText = "Revit Online";
+                        text.className = "text-green-400";
+                    }
+                } else if (data.status === 'stale') {
+                    dot.className = "w-2 h-2 rounded-full bg-orange-500";
+                    text.innerText = `Revit Idle (${data.age_seconds}s ago)`;
+                    text.className = "text-orange-400";
+                } else {
+                    dot.className = "w-2 h-2 rounded-full bg-red-600";
+                    text.innerText = "Revit Disconnected";
+                    text.className = "text-red-500 font-bold";
+                }
+
+            } catch (e) {
+                console.warn("Status poll failed", e);
+                dot.className = "w-2 h-2 rounded-full bg-gray-500";
+                text.innerText = "Revit Unknown";
+            }
+        }
 
         async function init() {
             if (!SESSION_ID) return alert("No session ID");
