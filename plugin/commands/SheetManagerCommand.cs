@@ -48,8 +48,20 @@ namespace RevitCivilConnector.Commands
                     }
                 }
 
-                // 1.1 Get Browser Organization
-                BrowserOrganization browserOrg = BrowserOrganization.GetCurrentBrowserOrganizationForSheets(doc);
+                // 1.1 Get Browser Organizations (Schemes)
+                var browserOrgs = new FilteredElementCollector(doc)
+                    .OfClass(typeof(BrowserOrganization))
+                    .Cast<BrowserOrganization>()
+                    .Where(bo => bo.AreFiltersSatisfied(sheets[0].Id)) // Only applicable to Sheets
+                    .ToList();
+
+                // 1.2 Get TitleBlocks (for creating new sheets)
+                var titleBlocks = new FilteredElementCollector(doc)
+                    .OfClass(typeof(FamilySymbol))
+                    .OfCategory(BuiltInCategory.OST_TitleBlocks)
+                    .Cast<FamilySymbol>()
+                    .Select(tb => new { id = tb.Id.ToString(), name = tb.Name })
+                    .ToList();
 
                 foreach (var s in sheets)
                 {
@@ -60,20 +72,17 @@ namespace RevitCivilConnector.Commands
                         if (p != null) pDict[pname] = p.AsString() ?? "";
                     }
 
-                    // Get Folder Path
-                    var folders = new List<string>();
-                    if (browserOrg != null)
+                    // Get Folder Paths for ALL Schemes
+                    var folderPaths = new Dictionary<string, List<string>>();
+                    foreach(var bo in browserOrgs)
                     {
                         try 
                         {
-                            var items = browserOrg.GetFolderItems(s.Id);
-                            foreach (var item in items)
-                            {
-                                if (!string.IsNullOrEmpty(item.Name))
-                                    folders.Add(item.Name);
-                            }
+                            var items = bo.GetFolderItems(s.Id);
+                            var pathList = items.Where(i => !string.IsNullOrEmpty(i.Name)).Select(i => i.Name).ToList();
+                            folderPaths[bo.Name] = pathList;
                         }
-                        catch { /* Ignore if fails for specific sheet */ }
+                        catch { folderPaths[bo.Name] = new List<string>(); }
                     }
 
                     sheetDataList.Add(new 
@@ -82,7 +91,8 @@ namespace RevitCivilConnector.Commands
                         number = s.SheetNumber,
                         name = s.Name,
                         params_data = pDict,
-                        folder_path = folders
+                        browser_paths = folderPaths // New: Map of Scheme Name -> Path List
+                        // folder_path removed/deprecated in favor of browser_paths defaults
                     });
                 }
 
@@ -92,7 +102,9 @@ namespace RevitCivilConnector.Commands
                     plugin_session_id = AuthService.Instance.SessionId,
                     project = doc.Title,
                     sheets = sheetDataList,
-                    param_definitions = allParamNames.ToList()
+                    param_definitions = allParamNames.ToList(),
+                    browser_schemes = browserOrgs.Select(b => b.Name).ToList(),
+                    title_blocks = titleBlocks
                 };
 
                 // 4. Send to Backend (Thread-Safe)

@@ -78,23 +78,48 @@ namespace RevitCivilConnector.Services
                     }
                     else if (action == "UPDATE_SHEETS")
                     {
-                        // Payload: List of { id, number, name, params }
-                        // Fix: JArray (dynamic) might not support .ToList() directly without casting.
-                        // Iterate directly.
-                        var updates = payload; // dynamic JArray contains items 
+                        var updates = payload;
                         using (Transaction t = new Transaction(app.ActiveUIDocument.Document, "Update Sheets from Web"))
                         {
                             t.Start();
-                            int count = 0;
                             var doc = app.ActiveUIDocument.Document;
                             
+                            // Cache a TitleBlock ID for new sheets if needed
+                            ElementId defaultTitleBlockId = new FilteredElementCollector(doc)
+                                .OfClass(typeof(FamilySymbol))
+                                .OfCategory(BuiltInCategory.OST_TitleBlocks)
+                                .FirstElementId();
+                                
                             foreach (dynamic update in updates)
                             {
-                                string uniqueId = update.id;
-                                Element el = doc.GetElement(uniqueId);
-                                if (el is ViewSheet sheet)
+                                ViewSheet sheet = null;
+                                bool isNew = false;
+                                try { isNew = (bool)update.is_new; } catch {}
+                                
+                                if (isNew)
                                 {
-                                    // 1. Number (Handle conflict risk? For now just try set)
+                                    // CREATE NEW SHEET
+                                    if (defaultTitleBlockId != null && defaultTitleBlockId != ElementId.InvalidElementId)
+                                    {
+                                        try 
+                                        {
+                                            // Optional: Allow choosing TB in future
+                                            sheet = ViewSheet.Create(doc, defaultTitleBlockId);
+                                            // Assign Temp Params immediately so we can set Name/Num below
+                                        }
+                                        catch { continue; }
+                                    }
+                                }
+                                else
+                                {
+                                    // GET EXISTING
+                                    string uniqueId = update.id;
+                                    try { sheet = doc.GetElement(uniqueId) as ViewSheet; } catch {}
+                                }
+                                
+                                if (sheet != null)
+                                {
+                                    // 1. Number
                                     string newNum = update.number;
                                     if(sheet.SheetNumber != newNum) { try { sheet.SheetNumber = newNum; } catch {} }
 
@@ -103,13 +128,12 @@ namespace RevitCivilConnector.Services
                                     if(sheet.Name != newName) { try { sheet.Name = newName; } catch {} }
                                     
                                     // 3. Params
-                                    var paramsDict = update.@params; // 'params' is keyword
-                                    foreach (var prop in paramsDict) // JObject or Dictionary?
+                                    var paramsDict = update.@params; 
+                                    foreach (dynamic prop in paramsDict) 
                                     {
                                         string pName = prop.Name;
                                         string pVal = prop.Value.ToString();
                                         
-                                        // Skip Name/Number as they are properties
                                         if(pName == "Sheet Number" || pName == "Sheet Name") continue;
 
                                         Parameter p = sheet.LookupParameter(pName);
@@ -118,11 +142,9 @@ namespace RevitCivilConnector.Services
                                             p.Set(pVal);
                                         }
                                     }
-                                    count++;
                                 }
                             }
                             t.Commit();
-                            // Optional: Notify success?
                         }
                     }
                 }

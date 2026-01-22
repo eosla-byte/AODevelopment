@@ -24,8 +24,20 @@ async def init_sheet_session(request: Request):
         param_defs = data.get("param_definitions", [])
         plugin_session_id = data.get("plugin_session_id")
         
+        # Metadata Handing (Piggyback on sheets_json to avoid schema migration)
+        browser_schemes = data.get("browser_schemes", [])
+        title_blocks = data.get("title_blocks", [])
+
+        # Wrap in V2 structure if metadata exists
+        storage_payload = {
+            "version": "v2",
+            "sheets": sheets,
+            "browser_schemes": browser_schemes,
+            "title_blocks": title_blocks
+        }
+        
         # Persist to DB
-        success = create_sheet_session(session_id, project, sheets, param_defs, plugin_session_id)
+        success = create_sheet_session(session_id, project, storage_payload, param_defs, plugin_session_id)
         
         if not success:
              return JSONResponse({"status": "error", "message": "Database Error"}, status_code=500)
