@@ -97,41 +97,30 @@ async def apply_sheet_changes(request: Request):
                 is_stale = True
                 
         if is_stale:
-            # Try to heal logic... (Keep existing lookup for basic sanity check)
-            # But relying on it for single ID is risky.
-            pass
-
-        # NUCLEAR BROADCAST
-        # We need the user_email.
-        user_email = None
-        if current_plugin_session:
-             user_email = current_plugin_session.user_email
-        else:
-             # Try to find via history?
-             # For now, if we don't have email, we can't broadcast easily.
-             # Wait, if current_plugin_session is None, we need to recover via Sheet Session?
-             # Sheet session stores 'plugin_session_id', but not email directly?
-             # Let's trust that we can find the old session to get the email.
-             # If completely invalid ID, we are stuck.
-             pass
-             
-        if not user_email:
-             # Fallback: Try to lookup session by ID even if stale, just to get email
-             old_session = get_session_by_id(plugin_session_id)
-             if old_session:
-                 user_email = old_session.user_email
-        
-        if user_email:
-            from database import queue_command_broadcast
-            success = queue_command_broadcast(user_email, "UPDATE_SHEETS", updates)
-            if success:
-                return JSONResponse({"status": "ok", "message": "Command Broadcasted to ALL Sessions"})
+            # Try to heal
+            user_email = current_plugin_session.user_email if current_plugin_session else None
+            machine_id = current_plugin_session.machine_id if current_plugin_session else None
+            
+            if user_email or machine_id:
+                new_session = get_latest_active_session(user_email, machine_id)
+                if new_session:
+                    print(f"Session Healed! Old: {plugin_session_id} -> New: {new_session.id}")
+                    plugin_session_id = new_session.id
+                    # Update DB for future calls
+                    update_sheet_session_plugin_id(session_id, plugin_session_id)
+                else:
+                    return JSONResponse({"status": "error", "message": "No active Revit session found for user. Please check Revit."}, status_code=400)
             else:
-                 return JSONResponse({"status": "error", "message": "No Active Revit Sessions Found (Broadcast Failed)"}, status_code=400)
-        else:
-            # Fallback to single queue if we really can't find email (shouldn't happen)
-            queue_command(plugin_session_id, "UPDATE_SHEETS", updates)
-            return JSONResponse({"status": "ok", "message": "Command Queued (Targeted)"})
+                 return JSONResponse({"status": "error", "message": "Original Revit Link Lost. Please re-open from Revit."}, status_code=400)
+        
+        if not plugin_session_id:
+             return JSONResponse({"status": "error", "message": "Plugin Link Lost"}, status_code=400)
+        
+        # Queue Command for the specific Plugin Session
+        # Targeted Command - No Broadcast
+        queue_command(plugin_session_id, "UPDATE_SHEETS", updates)
+        
+        return JSONResponse({"status": "ok", "message": "Command Queued (Targeted)"})
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
