@@ -624,7 +624,9 @@
                 // Params
                 PARAM_DEFS.forEach(p => {
                     if (activeParams.includes(p)) {
-                        const val = node.params[p] || "";
+                        // Guard against undefined params
+                        const params = node.params || {};
+                        const val = params[p] || "";
                         html += createCell(rowId, 'param:' + p, val, p);
                     }
                 });
