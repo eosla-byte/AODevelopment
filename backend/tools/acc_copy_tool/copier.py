@@ -240,10 +240,17 @@ class AccCopier:
         # 2. Extract Bucket Key
         try:
             # ID format: urn:adsk.objects:os.object:wip.dm.prod/UUID
-            # Remove prefix
-            clean_id = storage_id.replace("urn:adsk.objects:os.object:", "")
-            bucket_key = clean_id.split("/")[0]
-            object_key = clean_id.split("/")[1]
+            # Robust parsing: Split by ':' and take the last segment, then split by '/'
+            urn_parts = storage_id.split(':')
+            if len(urn_parts) > 0:
+                last_part = urn_parts[-1] # wip.dm.prod/UUID
+                if '/' in last_part:
+                    bucket_key = last_part.split('/')[0]
+                    object_key = last_part.split('/', 1)[1]
+                else:
+                    raise Exception("Invalid URN format (no slash)")
+            else:
+                 raise Exception("Invalid URN format (empty)")
             
             # debug
             print(f"Uploading to Bucket: {bucket_key}, Object: {object_key}")
@@ -261,7 +268,10 @@ class AccCopier:
             return None
             
         oss_url = f"{API_BASE}/oss/v2/buckets/{bucket_key}/objects/{object_key}"
-        auth = {"Authorization": f"Bearer {self.token}"}
+        auth = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/octet-stream"
+        }
         
         try:
             res_upload = requests.put(oss_url, headers=auth, data=content)

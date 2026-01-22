@@ -6,4 +6,4 @@ APS_CLIENT_SECRET = "bGgzvsLWO3iwh1gRxLV32zlZYh6XvSYtsUalnYwuddjw2YXMAxp5ASOAgYT
 
 # Scopes needed for copying files/folders
 # include data:read, data:write, data:create
-APS_SCOPES = ["data:read", "data:write", "data:create"]
+APS_SCOPES = ["data:read", "data:write", "data:create", "data:search", "bucket:read"]
