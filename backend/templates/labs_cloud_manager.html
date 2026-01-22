@@ -266,6 +266,11 @@
         }
 
         // Logic to build tree
+        function setLoading(msg) {
+            const tree = document.getElementById('treeView');
+            tree.innerHTML = `<div class="flex items-center justify-center h-64 text-slate-500 animate-pulse">${msg}</div>`;
+        }
+
         function createNodeEl(id, name, type, parentId) {
             const container = document.createElement('div');
             container.className = 'pl-4 border-l border-slate-700 ml-2 mt-1';
@@ -406,21 +411,9 @@
             // document.getElementById('statusText').innerText = msg;
         }
 
-        function logStatus(msg, type = 'info') {
-            const logDiv = document.getElementById('uploadLog');
-            if (!logDiv) return;
-
-            const line = document.createElement('div');
-            line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            if (type === 'error') line.style.color = '#ff4d4d';
-            if (type === 'success') line.style.color = '#4ade80';
-            logDiv.appendChild(line);
-            logDiv.scrollTop = logDiv.scrollHeight;
-        }
-
         // --- Context Menu Logic ---
-        const contextMenu = document.getElementById('contextMenu');
-        document.addEventListener('click', () => contextMenu.style.display = 'none');
+
+        // contextMenu declared above at line 401
 
         function showContextMenu(e, node) {
             e.preventDefault();
