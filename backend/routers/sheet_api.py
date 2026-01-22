@@ -68,14 +68,18 @@ async def apply_sheet_changes(request: Request):
     try:
         data = await request.json()
         session_id = data.get("session_id")
-        updates = data.get("updates") # ordered list of { id, number, name, params }
+        updates = data.get("updates") 
+        
+        print(f"DEBUG Apply: Received {len(updates)} updates for session {session_id}")
         
         # We need to know WHICH plugin session to target.
         session_data = get_sheet_session(session_id)
         if not session_data:
+             print("DEBUG Apply: Session Expired/Not Found")
              return JSONResponse({"status": "error", "message": "Session expired"}, status_code=404)
              
         plugin_session_id = session_data.get("plugin_session_id")
+        print(f"DEBUG Apply: Target Plugin Session {plugin_session_id}")
         
         # AGGRESSIVE RECOVERY: Check if session is alive
         from database import get_session_by_id, get_latest_active_session, update_sheet_session_plugin_id
