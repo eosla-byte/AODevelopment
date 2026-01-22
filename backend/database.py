@@ -1892,7 +1892,7 @@ def delete_sheet_template(tpl_id: int):
 # SHEET MANAGER SESSION FUNCTIONS
 # -----------------------------------------------------------------------------
 
-def create_sheet_session(session_id: str, project_name: str, sheets: list, param_defs: list, plugin_session_id: str):
+def create_sheet_session(session_id: str, project_name: str, sheets: list, param_defs: list, plugin_session_id: str, browser_org: dict = None):
     db = SessionLocal()
     try:
         # Check if exists (unlikely given UUID)
@@ -1902,6 +1902,7 @@ def create_sheet_session(session_id: str, project_name: str, sheets: list, param
             plugin_session_id=plugin_session_id,
             sheets_json=sheets,
             param_definitions_json=param_defs,
+            browser_org_json=browser_org or {},
             created_at=datetime.datetime.now()
         )
         db.add(new_session)
@@ -1923,6 +1924,7 @@ def get_sheet_session(session_id: str):
                 "project": session.project,
                 "sheets": session.sheets_json,
                 "param_definitions": session.param_definitions_json,
+                "browser_org": session.browser_org_json,
                 "plugin_session_id": session.plugin_session_id
             }
         return None

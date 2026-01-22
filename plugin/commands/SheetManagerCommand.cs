@@ -48,6 +48,9 @@ namespace RevitCivilConnector.Commands
                     }
                 }
 
+                // 1.1 Get Browser Organization
+                BrowserOrganization browserOrg = BrowserOrganization.GetCurrentBrowserOrganizationForSheets(doc);
+
                 foreach (var s in sheets)
                 {
                     var pDict = new Dictionary<string, string>();
@@ -57,12 +60,29 @@ namespace RevitCivilConnector.Commands
                         if (p != null) pDict[pname] = p.AsString() ?? "";
                     }
 
+                    // Get Folder Path
+                    var folders = new List<string>();
+                    if (browserOrg != null)
+                    {
+                        try 
+                        {
+                            var items = browserOrg.GetFolderItems(s.Id);
+                            foreach (var item in items)
+                            {
+                                if (!string.IsNullOrEmpty(item.Name))
+                                    folders.Add(item.Name);
+                            }
+                        }
+                        catch { /* Ignore if fails for specific sheet */ }
+                    }
+
                     sheetDataList.Add(new 
                     {
                         id = s.UniqueId,
                         number = s.SheetNumber,
                         name = s.Name,
-                        params_data = pDict
+                        params_data = pDict,
+                        folder_path = folders
                     });
                 }
 
