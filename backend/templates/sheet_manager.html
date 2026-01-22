@@ -448,29 +448,10 @@
         let currentScheme = "default";
 
         function initBrowserSchemes(schemes) {
-            const sel = document.getElementById('browser-org-select');
-            sel.innerHTML = '';
-
-            // Add Custom Option First
-            const optCustom = document.createElement('option');
-            optCustom.value = "custom";
-            optCustom.innerText = "⚙️ Personalizado (Filtros)...";
-            sel.appendChild(optCustom);
-
-            if (schemes && schemes.length > 0) {
-                schemes.forEach(s => {
-                    const opt = document.createElement('option');
-                    opt.value = s;
-                    opt.innerText = s;
-                    sel.appendChild(opt);
-                });
-                if (schemes.includes('AO')) sel.value = 'AO';
-                else sel.value = schemes[0];
-            } else {
-                sel.value = "custom"; // Fallback if no schemes
-            }
-
-            currentScheme = sel.value;
+            // Legacy Browser Org Logic Removed
+            // We default to 'custom' (or none)
+            currentScheme = "custom";
+            // Optional: If we want to support legacy Revit schemes in the future, we would add them to the modal logic here.
         }
 
         function changeBrowserOrg(scheme) {
