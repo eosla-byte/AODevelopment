@@ -86,9 +86,6 @@ async def apply_sheet_changes(request: Request):
         import datetime
         
         current_plugin_session = get_session_by_id(plugin_session_id)
-        # ... (rest of apply function) ...
-
-        # ... (rest of apply logic continues below) ...
         
         # Determine if stale (older than 2 mins or missing)
         is_stale = False
