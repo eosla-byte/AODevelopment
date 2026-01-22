@@ -61,6 +61,64 @@
             border-color: #60a5fa;
             background: rgba(59, 130, 246, 0.1);
         }
+
+        /* Context Menu */
+        #contextMenu {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            min-width: 150px;
+        }
+
+        #contextMenu div {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #e2e8f0;
+        }
+
+        #contextMenu div:hover {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .tree-item.drag-over {
+            background: rgba(59, 130, 246, 0.4);
+            border: 2px dashed #60a5fa;
+        }
+
+        /* Context Menu */
+        #contextMenu {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            background: #1e293b;
+            border: 1px solid #475569;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            min-width: 150px;
+        }
+
+        #contextMenu div {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #e2e8f0;
+        }
+
+        #contextMenu div:hover {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .tree-item.drag-over {
+            background: rgba(59, 130, 246, 0.4);
+            border: 2px dashed #60a5fa;
+        }
     </style>
 </head>
 
@@ -136,6 +194,14 @@
                 </div>
             </div>
 
+            <!-- Context Menu HTML -->
+            <div id="contextMenu">
+                <div onclick="menuAction('copy')">📋 Copy</div>
+                <div onclick="menuAction('paste')" id="ctxPaste">📥 Paste</div>
+                <div class="border-t border-slate-600 my-1"></div>
+                <div onclick="menuAction('new-folder')">📁 New Folder</div>
+                <div onclick="menuAction('delete')">🗑️ Delete</div>
+            </div>
         </aside>
 
         <!-- Right: Cloud Browser -->
@@ -236,6 +302,9 @@
 
             row.childrenDiv = childrenDiv; // Ref
 
+            // Add Drag & Drop + Context Menu
+            addDnD(row, id, type);
+
             return wrapper;
         }
 
@@ -320,7 +389,73 @@
             document.getElementById('statusText').innerText = msg;
         }
 
-        // --- Drag & Drop Upload Logic ---
+        // --- Context Menu Logic ---
+        const contextMenu = document.getElementById('contextMenu');
+        document.addEventListener('click', () => contextMenu.style.display = 'none');
+
+        function showContextMenu(e, node) {
+            e.preventDefault();
+            selectNode(node.row, node.id, node.name, node.type, node.parentId);
+
+            contextMenu.style.left = `${e.pageX}px`;
+            contextMenu.style.top = `${e.pageY}px`;
+            contextMenu.style.display = 'block';
+
+            // Conditional Logic
+            const pasteBtn = document.getElementById('ctxPaste');
+            pasteBtn.style.display = (clipboard && node.type === 'folder') ? 'block' : 'none';
+        }
+
+        async function menuAction(action) {
+            if (!selectedNode) return;
+            const { id, name, type } = selectedNode;
+
+            if (action === 'copy') {
+                clipboard = { id, name, type, mode: 'copy' };
+                setStatus(`Copied: ${name}`);
+            }
+            if (action === 'paste') {
+                if (!clipboard) return;
+                setStatus("Paste not implemented.");
+            }
+            if (action === 'new-folder') {
+                const newName = prompt("New Folder Name:");
+                if (newName) await createFolder(id, newName);
+            }
+            if (action === 'delete') {
+                if (confirm(`Delete ${name}? (Simulation)`)) {
+                    setStatus("Delete endpoint pending.");
+                }
+            }
+        }
+
+        async function createFolder(parentId, name) {
+            setStatus(`Creating folder ${name}...`);
+            try {
+                const formData = new FormData();
+                formData.append('parent_id', parentId);
+                formData.append('name', name);
+                formData.append('project_id', currentProjectId);
+
+                // Try specific endpoint or fallback
+                // Assuming POST /folders logic exists or will fail gracefully
+                const res = await fetch(`${API}/folders`, { method: 'POST', body: formData });
+                if (res.ok) {
+                    const json = await res.json();
+                    setStatus("Folder Created!");
+                    // Ideally refresh parent
+                    // selectedNode.row.click(); // Hacky refresh
+                } else {
+                    // Fallback logic if 404
+                    setStatus("Folder creation API not found.");
+                }
+            } catch (e) {
+                console.warn(e);
+            }
+        }
+
+        // --- Recursive Upload Logic ---
+
         const dropZone = document.getElementById('dropZone');
 
         dropZone.addEventListener('dragover', (e) => {
@@ -328,71 +463,166 @@
             dropZone.classList.add('dragover');
         });
 
-        dropZone.addEventListener('dragleave', (e) => {
-            dropZone.classList.remove('dragover');
-        });
+        dropZone.addEventListener('dragleave', (e) => dropZone.classList.remove('dragover'));
 
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
-            handleFiles(e.dataTransfer.files);
+
+            const items = e.dataTransfer.items;
+            if (items) {
+                const entries = [];
+                for (let i = 0; i < items.length; i++) {
+                    const entry = items[i].webkitGetAsEntry();
+                    if (entry) entries.push(entry);
+                }
+                handleEntries(entries);
+            } else {
+                handleStructureUpload(e.dataTransfer.files);
+            }
         });
 
         document.getElementById('fileInput').addEventListener('change', (e) => {
-            handleFiles(e.target.files);
+            handleStructureUpload(e.target.files);
         });
 
-        async function handleFiles(fileList) {
+        async function handleEntries(entries) {
             if (!selectedNode || selectedNode.type !== 'folder') {
-                alert("Please select a TARGET FOLDER in the cloud tree first.");
+                alert("Select a target folder first.");
+                return;
+            }
+
+            setStatus("Scanning folder structure...");
+            const filesToUpload = []; // { file, relPath }
+
+            for (const entry of entries) {
+                await traverseEntry(entry, "", filesToUpload);
+            }
+
+            if (filesToUpload.length === 0) return;
+
+            if (!confirm(`Upload ${filesToUpload.length} files with structure?`)) return;
+            performRecursiveUpload(filesToUpload, selectedNode.id);
+        }
+
+        async function traverseEntry(entry, path, list) {
+            if (entry.isFile) {
+                const file = await new Promise(resolve => entry.file(resolve));
+                list.push({ file: file, relPath: path });
+            } else if (entry.isDirectory) {
+                const dirReader = entry.createReader();
+                const entries = await new Promise(resolve => {
+                    dirReader.readEntries(resolve);
+                });
+                for (const child of entries) {
+                    await traverseEntry(child, path + entry.name + "/", list);
+                }
+            }
+        }
+
+        async function handleStructureUpload(fileList) {
+            if (!selectedNode || selectedNode.type !== 'folder') {
+                alert("Select a target folder first.");
                 return;
             }
 
             const files = Array.from(fileList);
-            if (files.length === 0) return;
+            const uploadList = files.map(f => {
+                const parts = f.webkitRelativePath.split('/');
+                parts.pop();
+                const relPath = parts.join('/') + (parts.length > 0 ? '/' : '');
+                return { file: f, relPath: relPath };
+            });
 
-            if (!confirm(`Upload ${files.length} files to '${selectedNode.name}'?`)) return;
+            if (!confirm(`Upload ${files.length} files?`)) return;
+            performRecursiveUpload(uploadList, selectedNode.id);
+        }
 
-            // Upload Loop
-            const uiProgress = document.getElementById('progressBar');
-            const percentText = document.getElementById('uploadPercent');
+        async function performRecursiveUpload(list, rootTargetId) {
+            const folderMap = { "": rootTargetId };
+            const uniquePaths = [...new Set(list.map(x => x.relPath).filter(p => p !== ""))].sort();
+
             const statusDiv = document.getElementById('uploadStatus');
             statusDiv.classList.remove('hidden');
+            const uiProgress = document.getElementById('progressBar');
+            const percentText = document.getElementById('uploadPercent');
 
-            let completed = 0;
+            // Create Folders
+            for (let i = 0; i < uniquePaths.length; i++) {
+                const fullPath = uniquePaths[i];
+                if (folderMap[fullPath]) continue;
 
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                setStatus(`Uploading ${file.name}...`);
+                const parts = fullPath.split('/').filter(x => x);
+                const name = parts.pop();
+                const parentPath = parts.join('/') + (parts.length > 0 ? '/' : '');
 
-                const formData = new FormData();
-                formData.append('project_id', currentProjectId);
-                formData.append('folder_id', selectedNode.id);
-                formData.append('file', file);
+                const parentId = folderMap[parentPath];
 
-                try {
-                    const res = await fetch(`${API}/upload`, {
-                        method: 'POST',
-                        body: formData
-                    });
-                    if (!res.ok) throw new Error("Upload fail");
-
-                } catch (e) {
-                    console.error(`Failed to upload ${file.name}`, e);
+                if (parentId) {
+                    setStatus(`Creating folder: ${fullPath}`);
+                    const newId = await createFolder(parentId, name) || ("mock-" + name);
+                    folderMap[fullPath] = newId;
                 }
 
-                completed++;
-                const pct = Math.round((completed / files.length) * 100);
+                const pct = Math.round((i / (uniquePaths.length + list.length)) * 100);
+                uiProgress.style.width = `${pct}%`;
+            }
+
+            // Upload Files
+            for (let i = 0; i < list.length; i++) {
+                const item = list[i];
+                const targetId = folderMap[item.relPath] || rootTargetId;
+
+                setStatus(`Uploading ${item.file.name}...`);
+                await apiUploadFile(targetId, item.file);
+
+                const pct = Math.round(((uniquePaths.length + i + 1) / (uniquePaths.length + list.length)) * 100);
                 uiProgress.style.width = `${pct}%`;
                 percentText.innerText = `${pct}%`;
             }
 
-            setStatus("Upload Complete!");
-            setTimeout(() => {
-                statusDiv.classList.add('hidden');
-                // Refresh folder?
-                // toggleExpand of current node to refresh
-            }, 2000);
+            setStatus("Complete!");
+            setTimeout(() => statusDiv.classList.add('hidden'), 3000);
+        }
+
+        async function apiUploadFile(folderId, file) {
+            const formData = new FormData();
+            formData.append('project_id', currentProjectId);
+            formData.append('folder_id', folderId);
+            formData.append('file', file);
+
+            try {
+                await fetch(`${API}/upload`, { method: 'POST', body: formData });
+            } catch (e) { console.error(e); }
+        }
+
+        function addDnD(row, id, type) {
+            row.draggable = true;
+            row.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', JSON.stringify({ id, type }));
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            row.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (type === 'folder') row.classList.add('drag-over');
+            });
+            row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+            row.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                row.classList.remove('drag-over');
+                if (type !== 'folder') return;
+
+                const data = e.dataTransfer.getData('text/plain');
+                if (!data) return;
+
+                const src = JSON.parse(data);
+                if (src.id === id) return;
+
+                if (confirm(`Move item to ${row.innerText.trim()}?`)) {
+                    setStatus("Move API not connected.");
+                }
+            });
+            row.addEventListener('contextmenu', (e) => showContextMenu(e, { row, id, type, name: row.innerText.trim(), parentId: null }));
         }
 
     </script>

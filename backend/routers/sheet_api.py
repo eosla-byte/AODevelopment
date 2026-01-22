@@ -23,10 +23,9 @@ async def init_sheet_session(request: Request):
         sheets = data.get("sheets", [])
         param_defs = data.get("param_definitions", [])
         plugin_session_id = data.get("plugin_session_id")
-        browser_org = data.get("browser_org", {})
         
         # Persist to DB
-        success = create_sheet_session(session_id, project, sheets, param_defs, plugin_session_id, browser_org)
+        success = create_sheet_session(session_id, project, sheets, param_defs, plugin_session_id)
         
         if not success:
              return JSONResponse({"status": "error", "message": "Database Error"}, status_code=500)

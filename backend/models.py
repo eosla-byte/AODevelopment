@@ -283,6 +283,5 @@ class PluginSheetSession(Base):
     plugin_session_id = Column(String)
     sheets_json = Column(JSON)
     param_definitions_json = Column(JSON, default=[])
-    browser_org_json = Column(JSON, default={}) # { grouping: [], sorting: [], filters: [] }
     created_at = Column(DateTime, default=func.now())
     expires_at = Column(DateTime, nullable=True) # Optional expiration logic logic
