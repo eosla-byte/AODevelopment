@@ -1868,16 +1868,28 @@
 
                 const json = await res.json();
                 if (json.status === 'ok') {
-                    alert("Cambios enviados a Revit. El plugin procesará la actualización.");
+                    // Show Non-Blocking Success
+                    const toast = document.createElement('div');
+                    toast.className = "fixed bottom-4 right-4 bg-green-600 text-white px-6 py-3 rounded shadow-xl transform transition-all duration-500 translate-y-full";
+                    toast.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Cambios enviados a Revit';
+                    document.body.appendChild(toast);
+
+                    requestAnimationFrame(() => toast.classList.remove('translate-y-full'));
+                    setTimeout(() => {
+                        toast.classList.add('translate-y-full');
+                        setTimeout(() => toast.remove(), 500);
+                    }, 3000);
+
                     // Optional: remove 'new' flags? loadData()?
                 } else {
                     alert("Error: " + json.message);
                 }
             } catch (e) {
                 alert("Error de conexión: " + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
             }
-
-            btn.innerHTML = originalText;
             btn.disabled = false;
         }
 
