@@ -274,3 +274,14 @@ class SheetTemplate(Base):
     is_global = Column(Boolean, default=True)
     created_by = Column(String, default="Admin")
     created_at = Column(DateTime, default=func.now())
+
+class PluginSheetSession(Base):
+    __tablename__ = 'plugin_sheet_sessions'
+    
+    id = Column(String, primary_key=True) # UUID
+    project = Column(String)
+    plugin_session_id = Column(String)
+    sheets_json = Column(JSON)
+    param_definitions_json = Column(JSON, default=[])
+    created_at = Column(DateTime, default=func.now())
+    expires_at = Column(DateTime, nullable=True) # Optional expiration logic logic

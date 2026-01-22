@@ -270,8 +270,7 @@
         // Better: Manipulate the SHEETS array to include "Group Items"?
         // Or just Filter the list view?
 
-        let PARAM_DEFS = [];
-        let GRID_DATA = [];
+
 
         // ... init ...
 
@@ -330,14 +329,31 @@
             if (!SESSION_ID) return alert("No session ID");
 
             // Fetch Data
-            const res = await fetch(`${API_BASE}/session/${SESSION_ID}`);
-            const json = await res.json();
-            if (json.status !== "ok") return alert(json.message);
+            try {
+                const res = await fetch(`${API_BASE}/session/${SESSION_ID}`);
+                if (!res.ok) throw new Error("Error fetching session");
 
-            const data = json.data;
-            document.getElementById('project-name').innerText = data.project;
-            SHEETS = data.sheets;
-            PARAM_DEFS = data.param_definitions || [];
+                const json = await res.json();
+                if (json.status !== "ok") {
+                    throw new Error(json.message || "Session not found");
+                }
+
+                const data = json.data;
+                document.getElementById('project-name').innerText = data.project;
+                SHEETS = data.sheets;
+                PARAM_DEFS = data.param_definitions || [];
+            } catch (err) {
+                console.error(err);
+                document.body.innerHTML += `
+                <div class="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 text-center p-8">
+                    <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
+                    <h1 class="text-3xl font-bold text-white mb-2">Sesión Expirada o Inválida</h1>
+                    <p class="text-gray-400 max-w-md mb-6">No se pudo recuperar la información de la sesión. Es posible que el servidor se haya reiniciado o el enlace haya caducado.</p>
+                    <button onclick="window.close()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded font-bold">Cerrar</button>
+                </div>
+                `;
+                return;
+            }
 
             // Prioritize Number and Name
             PARAM_DEFS = PARAM_DEFS.filter(p => p !== "Sheet Number" && p !== "Sheet Name");

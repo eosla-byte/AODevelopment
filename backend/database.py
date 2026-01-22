@@ -6,7 +6,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session, sessionmaker, joinedload
 from sqlalchemy import create_engine
 from sqlalchemy.sql import func
-from models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard
+from models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard, PluginSheetSession
 import models
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -1863,5 +1863,46 @@ def delete_sheet_template(tpl_id: int):
             db.commit()
             return True
         return False
+    finally:
+        db.close()
+
+# -----------------------------------------------------------------------------
+# SHEET MANAGER SESSION FUNCTIONS
+# -----------------------------------------------------------------------------
+
+def create_sheet_session(session_id: str, project_name: str, sheets: list, param_defs: list, plugin_session_id: str):
+    db = SessionLocal()
+    try:
+        # Check if exists (unlikely given UUID)
+        new_session = PluginSheetSession(
+            id=session_id,
+            project=project_name,
+            plugin_session_id=plugin_session_id,
+            sheets_json=sheets,
+            param_definitions_json=param_defs,
+            created_at=datetime.datetime.now()
+        )
+        db.add(new_session)
+        db.commit()
+        return True
+    except Exception as e:
+        print(f"Error create_sheet_session: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
+def get_sheet_session(session_id: str):
+    db = SessionLocal()
+    try:
+        session = db.query(PluginSheetSession).filter(PluginSheetSession.id == session_id).first()
+        if session:
+            return {
+                "project": session.project,
+                "sheets": session.sheets_json,
+                "param_definitions": session.param_definitions_json,
+                "plugin_session_id": session.plugin_session_id
+            }
+        return None
     finally:
         db.close()

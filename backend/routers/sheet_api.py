@@ -7,12 +7,8 @@ import json
 
 router = APIRouter(prefix="/api/plugin/sheets", tags=["Sheets"])
 
-# Quick in-memory store for sessions (for Beta)
-# Stores { session_id: { project_name: str, sheets: [], param_defs: [] } }
-SHEET_SESSIONS = {}
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+from database import create_sheet_session, get_sheet_session, queue_command
 
 @router.post("/init")
 async def init_sheet_session(request: Request):
@@ -23,12 +19,16 @@ async def init_sheet_session(request: Request):
         data = await request.json()
         session_id = str(uuid.uuid4())
         
-        SHEET_SESSIONS[session_id] = {
-            "project": data.get("project", "Unknown Project"),
-            "sheets": data.get("sheets", []),
-            "param_definitions": data.get("param_definitions", []),
-            "plugin_session_id": data.get("plugin_session_id")
-        }
+        project = data.get("project", "Unknown Project")
+        sheets = data.get("sheets", [])
+        param_defs = data.get("param_definitions", [])
+        plugin_session_id = data.get("plugin_session_id")
+        
+        # Persist to DB
+        success = create_sheet_session(session_id, project, sheets, param_defs, plugin_session_id)
+        
+        if not success:
+             return JSONResponse({"status": "error", "message": "Database Error"}, status_code=500)
         
         # Return redirect URL for Plugin to open
         return JSONResponse({
@@ -42,9 +42,9 @@ async def init_sheet_session(request: Request):
 
 @router.get("/session/{session_id}")
 async def get_session_data(session_id: str):
-    data = SHEET_SESSIONS.get(session_id)
+    data = get_sheet_session(session_id)
     if not data:
-        return JSONResponse({"status": "error", "message": "Session expired"}, status_code=404)
+        return JSONResponse({"status": "error", "message": "Session expired or not found"}, status_code=404)
     return JSONResponse({"status": "ok", "data": data})
 
 @router.post("/apply")
@@ -59,21 +59,16 @@ async def apply_sheet_changes(request: Request):
         updates = data.get("updates") # ordered list of { id, number, name, params }
         
         # We need to know WHICH plugin session to target.
-        # The user session is stored in memory SHEET_SESSIONS
-        if session_id not in SHEET_SESSIONS:
+        session_data = get_sheet_session(session_id)
+        if not session_data:
              return JSONResponse({"status": "error", "message": "Session expired"}, status_code=404)
              
-        session_data = SHEET_SESSIONS[session_id]
         plugin_session_id = session_data.get("plugin_session_id")
         
         if not plugin_session_id:
              return JSONResponse({"status": "error", "message": "Plugin Link Lost"}, status_code=400)
         
-        from database import queue_command
-        
         # Queue Command for the specific Plugin Session
-        # Payload must match what VisualizerHandler expects: { action, payload } (implicit in queue_command?)
-        # queue_command(session_id, action, payload)
         queue_command(plugin_session_id, "UPDATE_SHEETS", updates)
         
         return JSONResponse({"status": "ok"})
