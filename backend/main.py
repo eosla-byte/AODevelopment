@@ -394,7 +394,7 @@ async def save_template_route(request: Request):
             return JSONResponse({"status": "error", "message": "Missing name or content"}, status_code=400)
             
         tpl = save_template(name, content)
-        if tpl: return JSONResponse({"status": "success", "id": tpl.id})
+        if tpl: return JSONResponse({"status": "success", "id": tpl})
         else: return JSONResponse({"status": "error", "message": "DB Error"}, status_code=500)
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
