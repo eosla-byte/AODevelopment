@@ -122,7 +122,7 @@ def copy_content(payload: CopyPayload):
 # Step 3: Create Item/Version.
 
 @router.post("/upload")
-async def upload_file_to_acc(
+def upload_file_to_acc(
     project_id: str = Form(...),
     folder_id: str = Form(...),
     file: UploadFile = File(...)
@@ -131,6 +131,7 @@ async def upload_file_to_acc(
     Receives file from browser, uploads to ACC 
     (Proxy Upload: Browser -> Backend -> ACC).
     Limit: Good for files < 100MB.
+    Run as SYNC function (def) so FastAPI uses threadpool.
     """
     copier = get_copier()
     
