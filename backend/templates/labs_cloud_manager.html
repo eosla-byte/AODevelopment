@@ -528,7 +528,7 @@
 
         dropZone.addEventListener('dragleave', (e) => dropZone.classList.remove('dragover'));
 
-        dropZone.addEventListener('drop', (e) => {
+        dropZone.addEventListener('drop', async (e) => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
 
@@ -539,8 +539,9 @@
                     const entry = items[i].webkitGetAsEntry();
                     if (entry) entries.push(entry);
                 }
-                handleEntries(entries);
+                await handleEntries(entries);
             } else {
+                // Fallback for very old browsers
                 handleStructureUpload(e.dataTransfer.files);
             }
         });
@@ -559,31 +560,61 @@
             const filesToUpload = []; // {file, relPath}
 
             for (const entry of entries) {
-                await traverseEntry(entry, "", filesToUpload);
+                // If dropping a root folder "ProjectA", we want contents to be inside "ProjectA/"
+                // But performRecursiveUpload expects relPath.
+                // If relPath is "", it goes to rootTarget.
+                // If relPath is "FolderA/", it creates FolderA in rootTarget.
+                if (entry.isDirectory) {
+                    await traverseEntry(entry, entry.name + "/", filesToUpload);
+                } else {
+                    await traverseEntry(entry, "", filesToUpload);
+                }
             }
 
             if (filesToUpload.length === 0) return;
 
-            if (!confirm(`Upload ${filesToUpload.length} files with structure?`)) return;
+            // Verbose Confirmation
+            const folderCount = new Set(filesToUpload.map(x => x.relPath).filter(x => x)).size;
+            if (!confirm(`Structure Scan Complete:\nFiles: ${filesToUpload.length}\nFolders to Create: ${folderCount}\n\nProceed?`)) return;
+
             performRecursiveUpload(filesToUpload, selectedNode.id);
         }
 
         async function traverseEntry(entry, path, list) {
             if (entry.isFile) {
                 const file = await new Promise(resolve => entry.file(resolve));
-                list.push({ file: file, relPath: path });
+                // Add relPath property to the file object wrapper for our logic
+                // Ensure path ends with / if it exists
+                let finalPath = path;
+                if (finalPath.endsWith('/')) finalPath = finalPath.slice(0, -1);
+
+                // If path is "FolderA", the file relPath should be "FolderA" (meaning it belongs to FolderA)
+                // Wait, performRecursiveUpload logic: 
+                // item.relPath is the FOLDER path.
+                // So if file is "FolderA/doc.txt", relPath should be "FolderA".
+                // If path passed here includes the folder name "FolderA/", then yes.
+
+                // Correction: path passed in recursion usually includes trailing slash
+                // If I pass "FolderA/" to subdirectory, and this is a file inside it,
+                // finalPath should be "FolderA".
+
+                // Removing trailing slash usually safe for folderMap lookup
+                if (finalPath.endsWith('/')) finalPath = finalPath.slice(0, -1);
+
+                list.push({ file: file, relPath: finalPath });
             } else if (entry.isDirectory) {
                 const dirReader = entry.createReader();
                 const entries = await new Promise(resolve => {
                     dirReader.readEntries(resolve);
                 });
                 for (const child of entries) {
-                    await traverseEntry(child, path + entry.name + "/", list);
+                    await traverseEntry(child, path + child.name + "/", list);
                 }
             }
         }
 
         async function handleStructureUpload(fileList) {
+            // ... (keep fallback for input type=file if needed) ...
             if (!selectedNode || selectedNode.type !== 'folder') {
                 alert("Select a target folder first.");
                 return;
@@ -591,10 +622,16 @@
 
             const files = Array.from(fileList);
             const uploadList = files.map(f => {
-                const parts = f.webkitRelativePath.split('/');
+                const rawPath = f.webkitRelativePath || f.name;
+                const normalized = rawPath.replace(/\\/g, '/');
+                const parts = normalized.split('/');
                 parts.pop();
                 const relPath = parts.join('/') + (parts.length > 0 ? '/' : '');
-                return { file: f, relPath: relPath };
+
+                // Remove trailing slash for consistency
+                const cleanRel = relPath.endsWith('/') ? relPath.slice(0, -1) : relPath;
+
+                return { file: f, relPath: cleanRel };
             });
 
             if (!confirm(`Upload ${files.length} files?`)) return;
