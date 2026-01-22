@@ -195,3 +195,17 @@ async def check_connection_status(session_id: str):
         "machine": ps.machine_id,
         "user": ps.user_email
     }
+@router.get("/logs")
+async def get_logs_endpoint(session_id: str):
+    from database import get_sheet_session, get_session_logs
+    
+    session_data = get_sheet_session(session_id)
+    if not session_data:
+        return {"status": "error", "message": "Session Not Found"}
+        
+    plugin_session_id = session_data.get("plugin_session_id")
+    if not plugin_session_id:
+        return {"logs": []}
+        
+    logs = get_session_logs(plugin_session_id)
+    return {"status": "ok", "logs": logs}

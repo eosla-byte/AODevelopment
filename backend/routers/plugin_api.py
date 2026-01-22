@@ -112,11 +112,13 @@ async def plugin_heartbeat(req: HeartbeatRequest):
     permissions = {}
     
     # FETCH PENDING COMMANDS
-    # We must identify the session (and potentially the user permissions)
-    from database import get_pending_commands
+    from database import get_pending_commands, mark_commands_as_sent
     
     commands = get_pending_commands(req.session_id)
-    # Convert commands to list of dicts if they are objects, but get_pending_commands already returns list of dicts.
+    # Mark them as SENT so we know they left the server
+    if commands:
+        cmd_ids = [c["id"] for c in commands]
+        mark_commands_as_sent(cmd_ids)
     
     session = get_session_by_id(req.session_id)
     if session:
@@ -130,6 +132,20 @@ async def plugin_heartbeat(req: HeartbeatRequest):
         "permissions": permissions,
         "commands": commands # Helper for Plugin to consume
     }
+
+class CommandResult(BaseModel):
+    command_id: int
+    status: str # "success", "error"
+    result_json: Optional[dict] = {}
+    message: Optional[str] = ""
+
+@router.post("/command/result")
+async def command_result(res: CommandResult):
+    from database import update_command_status
+    success = update_command_status(res.command_id, res.status, res.result_json, res.message)
+    if not success:
+        raise HTTPException(status_code=404, detail="Command not found")
+    return {"status": "Updated"}
 
 @router.post("/track")
 async def plugin_track(req: ActivityCheckRequest):

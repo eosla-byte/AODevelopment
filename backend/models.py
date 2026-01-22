@@ -207,7 +207,11 @@ class CloudCommand(Base):
     session_id = Column(String, index=True)
     action = Column(String)
     payload = Column(JSON)
+    status = Column(String, default="pending") # pending, sent, success, error
+    result_json = Column(JSON, nullable=True) 
+    error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     is_consumed = Column(Boolean, default=False)
 
 
