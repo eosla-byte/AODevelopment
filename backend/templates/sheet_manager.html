@@ -184,7 +184,30 @@
             background: rgba(0, 122, 204, 0.2) !important;
             border: 1px solid #007acc;
         }
+
+        .grid-cell.selected-cell {
+            background: rgba(0, 122, 204, 0.4) !important;
+            border: 2px solid #007acc;
+        }
+
+        /* Resizing */
+        .resizer {
+            display: inline-block;
+            width: 5px;
+            height: 100%;
+            position: absolute;
+            right: 0;
+            top: 0;
+            cursor: col-resize;
+            z-index: 10;
+        }
+
+        .resizer:hover {
+            background: #007acc;
+        }
     </style>
+    <!-- SheetJS -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
 
 <body class="flex flex-col h-screen">
@@ -197,6 +220,19 @@
             <span class="text-xs bg-white/20 px-2 rounded ml-2" id="project-name">Loading...</span>
         </div>
         <div class="flex gap-2">
+            <input type="file" id="excel-upload" hidden accept=".xlsx, .xls" onchange="handleExcelUpload(this)">
+            <button onclick="document.getElementById('excel-upload').click()"
+                class="bg-green-700 hover:bg-green-600 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
+                title="Importar Excel">
+                <i class="fas fa-file-excel"></i> Importar Excel
+            </button>
+            <button onclick="addManualSheet()"
+                class="bg-[#3e3e42] hover:bg-[#4e4e52] px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
+                title="Agregar Fila Manual">
+                <i class="fas fa-plus-square"></i>
+            </button>
+            <div class="w-px bg-white/20 mx-1"></div>
+
             <button onclick="openParamsModal()"
                 class="bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
                 title="Seleccionar Parámetros">
@@ -368,6 +404,8 @@
                         <i class="fas fa-grip-vertical drag-handle text-gray-600 cursor-grab px-2 py-1"></i>
                         <i class="fas fa-folder text-yellow-500 mr-2 text-sm"></i>
                         <span class="font-bold text-xs text-gray-300 flex-1 py-1 outline-none" contenteditable="true" onblur="updateNodeName('${node.id}', this.innerText)">${node.name}</span>
+                        ${node.targetParam ? `<span class="text-[10px] bg-[#007acc] px-1 rounded mr-2" title="Target Param">${node.targetParam}</span>` : ''}
+                        <i class="fas fa-cog text-[10px] text-gray-400 hover:text-white cursor-pointer p-1 mr-1" onclick="openGroupConfig('${node.id}')" title="Configurar Parámetro"></i>
                         <i class="fas fa-trash text-[10px] text-gray-600 hover:text-red-500 cursor-pointer p-1" onclick="deleteNode('${node.id}')"></i>
                     </div>
                     <ul class="nested-sortable ml-4 border-l border-[#3e3e42] pl-1 space-y-[2px] min-h-[10px] pb-1">
@@ -458,6 +496,9 @@
 
         // --- RENDER GRID (Right Panel) ---
 
+        // Column Widths State
+        let COL_WIDTHS = {}; // { 'Sheet Number': 150, ... }
+
         function renderGrid() {
             const flatList = flattenTree(TREE_DATA);
 
@@ -470,8 +511,12 @@
 
             // Headers
             let html = `<div class="grid-row" style="background: #2d2d2d;">`;
-            COLS.forEach(c => {
-                html += `<div class="grid-col-header" style="width: 150px; flex-shrink:0;">${c}</div>`;
+            COLS.forEach((c, idx) => {
+                const width = COL_WIDTHS[c] || 150;
+                html += `<div class="grid-col-header relative" style="width: ${width}px; flex-shrink:0;" data-col="${c}">
+                            ${c}
+                            <div class="resizer" onmousedown="initResize(event, '${c}')"></div>
+                         </div>`;
             });
             html += `</div>`;
 
@@ -480,19 +525,21 @@
 
             flatList.forEach((node, idx) => {
                 const rowId = node.id;
-                idxHtml += `<div class="slot-index">${idx + 1}</div>`;
+                idxHtml += `<div class="slot-index" onclick="selectRow('${rowId}')">${idx + 1}</div>`;
 
                 html += `<div class="grid-row" data-row-id="${rowId}">`;
 
                 // Number
-                html += createCell(rowId, 'number', node.number);
+                html += createCell(rowId, 'number', node.number, 'Sheet Number');
                 // Name
-                html += createCell(rowId, 'name', node.name);
+                html += createCell(rowId, 'name', node.name, 'Sheet Name');
 
                 // Params
                 PARAM_DEFS.forEach(p => {
-                    const val = node.params[p] || "";
-                    html += createCell(rowId, 'param:' + p, val);
+                    if (activeParams.includes(p)) {
+                        const val = node.params[p] || "";
+                        html += createCell(rowId, 'param:' + p, val, p);
+                    }
                 });
 
                 html += `</div>`;
@@ -502,10 +549,12 @@
             indices.innerHTML = idxHtml;
         }
 
-        function createCell(id, key, value) {
+        function createCell(id, key, value, colName) {
+            const width = COL_WIDTHS[colName] || 150;
             return `
-            <div class="grid-cell relative" style="width: 150px; flex-shrink:0;" data-col="${key}"
-                 onmouseover="handleDragOver(event, '${id}', '${key}')">
+            <div class="grid-cell relative" style="width: ${width}px; flex-shrink:0;" data-col="${key}"
+                 onmousedown="startSelect(event, '${id}', '${key}')"
+                 onmouseover="updateSelect(event, '${id}', '${key}'); handleDragOver(event, '${id}', '${key}')">
                 <input type="text" value="${value}" 
                    oninput="updateNodeData('${id}', '${key}', this.value)" 
                    onfocus="this.parentElement.classList.add('focused')"
@@ -627,44 +676,39 @@
             // Flatten Tree AND Inject Group Parameters
             const updates = [];
 
-            function traverse(nodes, ancestors) {
+            function traverse(nodes, currentParams) {
                 nodes.forEach(node => {
                     if (node.type === 'group') {
-                        traverse(node.children, [...ancestors, node.name]);
+                        // If group has a target param, we take its value
+                        // Inherit currentParams
+                        const nextParams = { ...currentParams };
+
+                        if (node.targetParam) {
+                            nextParams[node.targetParam] = node.name;
+                        } else {
+                            // Fallback: Auto-assign to AO-SheetManagerGroupX? 
+                            // User asked for explicit menu. If not set, maybe we just don't send it? 
+                            // Or we map by depth? Let's use depth as fallback if no targetParam
+                            // But complexity increases. Let's stick to: If targetParam set, use it.
+                        }
+
+                        traverse(node.children, nextParams);
+
                     } else {
                         // It's a sheet. 
                         const sheet = {
                             id: node.id,
                             number: node.number,
                             name: node.name,
-                            params: { ...node.params }
+                            params: { ...node.params, ...currentParams } // Merge Inherited Group Params
                         };
-
-                        // Inject Group Params
-                        const groupLetters = ['A', 'B', 'C', 'D', 'E']; // AO-SheetManagerGroupA, B, C...
-                        ancestors.forEach((grpName, idx) => {
-                            if (idx < groupLetters.length) {
-                                sheet.params[`AO-SheetManagerGroup${groupLetters[idx]}`] = grpName;
-                            }
-                        });
-                        // Clear lower levels if moving OUT of a deeper structure?
-                        // Ideally we overwrite A, B... but if it WAS in C and now is in B (root), C remains?
-                        // For safety, we might want to send explicit Empty Strings for deeper levels?
-                        // Let's rely on Revit Plugin to handle "if param exists but not in payload" or just overwrite.
-                        // Better: Send ALL A-E, setting unused to empty string.
-
-                        groupLetters.forEach((L, idx) => {
-                            if (idx >= ancestors.length) {
-                                sheet.params[`AO-SheetManagerGroup${L}`] = "";
-                            }
-                        });
 
                         updates.push(sheet);
                     }
                 });
             }
 
-            traverse(TREE_DATA, []);
+            traverse(TREE_DATA, {});
 
             if (!confirm(`Se actualizarán ${updates.length} Sheets en Revit. ¿Continuar?`)) return;
 
@@ -960,6 +1004,267 @@
             }
             input.parentElement.classList.remove('focused');
         }
+
+        // --- PHASE 3 LOGIC (Groups, Import, Add) ---
+
+        // 1. Group Config
+        function openGroupConfig(groupId) {
+            const node = findNodeRecursive(groupId, TREE_DATA);
+            if (!node) return;
+
+            const options = PARAM_DEFS.map(p => `<option value="${p}" ${node.targetParam === p ? 'selected' : ''}>${p}</option>`).join('');
+
+            const html = `
+            <div id="group-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                <div class="bg-[#252526] p-6 rounded shadow-xl w-96 border border-[#3e3e42]">
+                    <h2 class="text-xl font-bold mb-4">Configurar Grupo: ${node.name}</h2>
+                    <label class="block text-sm text-gray-400 mb-2">Asignar Parámetro Revit:</label>
+                    <select id="group-param-select" class="w-full bg-[#1e1e1e] text-white p-2 rounded border border-[#3e3e42]">
+                        <option value="">-- Ninguno (Auto A/B/C) --</option>
+                        ${options}
+                    </select>
+                    <div class="flex justify-end mt-4 pt-4 border-t border-[#3e3e42] gap-2">
+                        <button onclick="document.getElementById('group-modal').remove()" class="text-gray-400 hover:text-white px-3">Cancelar</button>
+                        <button onclick="saveGroupParam('${groupId}')" class="bg-[#007acc] hover:bg-[#005a9e] text-white px-4 py-1.5 rounded font-bold">Guardar</button>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function saveGroupParam(groupId) {
+            const val = document.getElementById('group-param-select').value;
+            const node = findNodeRecursive(groupId, TREE_DATA);
+            if (node) {
+                node.targetParam = val || null;
+            }
+            document.getElementById('group-modal').remove();
+            renderTree();
+        }
+
+        // 2. Manual Sheet
+        function addManualSheet() {
+            const newSheet = {
+                id: generateId(),
+                type: 'sheet',
+                number: "A-000",
+                name: "New Sheet",
+                params: {},
+                children: []
+            };
+            TREE_DATA.push(newSheet);
+            renderTree();
+            renderGrid();
+        }
+
+        // 3. Excel Import
+        async function handleExcelUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const buffer = await file.arrayBuffer();
+            const workbook = XLSX.read(buffer);
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+            if (rows.length === 0) return alert("Excel vacío");
+
+            let addedCount = 0;
+            let updatedCount = 0;
+
+            rows.forEach(row => {
+                // Try to match "Sheet Number"
+                const numKey = Object.keys(row).find(k => k.toLowerCase().includes("number") || k.toLowerCase().includes("numero"));
+                // Try to match "Sheet Name"
+                const nameKey = Object.keys(row).find(k => k.toLowerCase().includes("name") || k.toLowerCase().includes("nombre"));
+
+                if (!numKey) return;
+
+                const sNum = String(row[numKey]);
+                const sName = nameKey ? String(row[nameKey]) : "Unnamed";
+
+                // Check if exists in Tree (DFS search)
+                let existing = null;
+                const flat = flattenTree(TREE_DATA);
+                existing = flat.find(n => n.type === 'sheet' && n.number === sNum);
+
+                if (existing) {
+                    existing.name = sName;
+                    // Update Params
+                    Object.keys(row).forEach(k => {
+                        if (k !== numKey && k !== nameKey && PARAM_DEFS.includes(k)) {
+                            existing.params[k] = String(row[k]);
+                        }
+                    });
+                    updatedCount++;
+                } else {
+                    // New Sheet
+                    const newS = {
+                        id: generateId(),
+                        type: 'sheet',
+                        number: sNum,
+                        name: sName,
+                        params: {},
+                        children: []
+                    };
+                    Object.keys(row).forEach(k => {
+                        if (k !== numKey && k !== nameKey && PARAM_DEFS.includes(k)) {
+                            newS.params[k] = String(row[k]);
+                        }
+                    });
+                    TREE_DATA.push(newS);
+                    addedCount++;
+                }
+            });
+
+            alert(`Importación: ${addedCount} Agregados, ${updatedCount} Actualizados.`);
+            renderTree();
+            renderGrid();
+            input.value = ""; // reset
+        }
+
+        // --- PHASE 4 LOGIC (Selection & Resizing) ---
+
+        // Selection State
+        let isSelecting = false;
+        let selectStartNode = null; // { id, key }
+
+        document.addEventListener('mouseup', () => {
+            isSelecting = false;
+            // End Resize
+            if (resizingCol) {
+                resizingCol = null;
+            }
+        });
+
+        // Multi-select Deletion
+        document.addEventListener('keydown', (e) => {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && !e.target.matches('input:focus')) {
+                deleteSelectedCells();
+            }
+        });
+
+        function startSelect(e, id, key) {
+            if (e.target.classList.contains('fill-handle')) return; // Ignore if clicking handle
+            // If right click?
+            if (e.button !== 0) return;
+
+            isSelecting = true;
+            selectStartNode = { id, key };
+
+            // Clear previous
+            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected-cell'));
+
+            // Select start cell
+            highlightRange(selectStartNode, selectStartNode);
+        }
+
+        function updateSelect(e, id, key) {
+            if (!isSelecting) return;
+            if (!selectStartNode) return;
+
+            // Highlight Range from Start to Current
+            highlightRange(selectStartNode, { id, key });
+        }
+
+        function highlightRange(start, end) {
+            const flat = flattenTree(TREE_DATA);
+            const startIdx = flat.findIndex(n => n.id === start.id);
+            const endIdx = flat.findIndex(n => n.id === end.id);
+
+            if (startIdx === -1 || endIdx === -1) return;
+
+            const minRow = Math.min(startIdx, endIdx);
+            const maxRow = Math.max(startIdx, endIdx);
+
+            // Cols? We only have Key. 
+            // If we want rect selection across columns, we need column indices.
+            // Let's assume activeParams defines order.
+            const cols = ["number", "name", ...VISIBLE_COLS.map(p => 'param:' + p)];
+            const startColIdx = cols.indexOf(start.key);
+            const endColIdx = cols.indexOf(end.key);
+
+            if (startColIdx === -1 || endColIdx === -1) return;
+
+            const minCol = Math.min(startColIdx, endColIdx);
+            const maxCol = Math.max(startColIdx, endColIdx);
+
+            const selectedCols = cols.slice(minCol, maxCol + 1);
+
+            // Clear all first? OR just add? 
+            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected-cell')); // brute force clear
+
+            for (let i = minRow; i <= maxRow; i++) {
+                const rowNodes = flat[i];
+                selectedCols.forEach(cKey => {
+                    // Find cell
+                    // We need a better selector. we have key in data-col? 
+                    // key for number is 'number', name is 'name', param is 'param:Name'
+                    // data-col matches key? In createCell: data-col="${key}"
+                    // Yes.
+                    const cell = document.querySelector(`.grid-row[data-row-id="${rowNodes.id}"] .grid-cell[data-col="${cKey}"]`);
+                    if (cell) cell.classList.add('selected-cell');
+                });
+            }
+        }
+
+        function deleteSelectedCells() {
+            const cells = document.querySelectorAll('.grid-cell.selected-cell');
+            if (cells.length === 0) return;
+
+            if (!confirm(`Borrar contenido de ${cells.length} celdas?`)) return;
+
+            cells.forEach(cell => {
+                const row = cell.closest('.grid-row');
+                const rowId = row.dataset.rowId;
+                const key = cell.dataset.col;
+
+                // Update Data
+                updateNodeData(rowId, key, "");
+            });
+            renderGrid();
+        }
+
+        // Resizing Logic
+        let resizingCol = null;
+        let startX = 0;
+        let startWidth = 0;
+        let resizingKey = ""; // to save to COL_WIDTHS
+
+        function initResize(e, colKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            resizingCol = e.target.parentElement;
+            resizingKey = colKey;
+            startX = e.pageX;
+            startWidth = resizingCol.offsetWidth;
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (resizingCol) {
+                const diff = e.pageX - startX;
+                const newW = Math.max(50, startWidth + diff);
+                resizingCol.style.width = newW + 'px';
+
+                // Directly update cells in this column for performance
+                // Selector: data-col="param:Name" ?
+                // Wait, renderGrid passes 'c' (Column Name) to initResize.
+                // createCell uses 'param:'+p as key.
+                // We need to match.
+                // Headers: "Sheet Number", "Sheet Name", "ParamX"
+                // Keys: "number", "name", "param:ParamX"
+
+                let dataCol = "";
+                if (resizingKey === "Sheet Number") dataCol = "number";
+                else if (resizingKey === "Sheet Name") dataCol = "name";
+                else dataCol = "param:" + resizingKey;
+
+                const cells = document.querySelectorAll(`.grid-cell[data-col="${dataCol}"]`);
+                cells.forEach(c => c.style.width = newW + 'px');
+
+                COL_WIDTHS[resizingKey] = newW; // Save state
+            }
+        });
 
     </script>
 </body>
