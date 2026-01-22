@@ -1823,7 +1823,24 @@
 
         const originalBuildStructure = window.buildStructure || null;
 
-        window.buildStructure = function (flatItems) {
+        window.buildStructure = function (rawItems) {
+            // 1. Normalize
+            const flatItems = rawItems.map(s => {
+                // Check if already normalized (has params object)
+                if (s.type === 'sheet' && s.params) return s;
+
+                // Normalize
+                return {
+                    id: s.id || generateId(),
+                    type: 'sheet',
+                    number: s.number || "???",
+                    name: s.name || "Unnamed",
+                    params: s.params || s.parameters || s.params_data || {}, // Robust mapping
+                    browser_paths: s.browser_paths || {},
+                    folder_path: s.folder_path || []
+                };
+            });
+
             // Group by path
             const root = [];
             const groups = {}; // path -> groupNode
@@ -1831,9 +1848,15 @@
             flatItems.forEach(item => {
                 // Determine Path based on Current Scheme
                 let path = [];
-                // item.browser_paths is the new property. 
-                // If not present (legacy item), use item.folder_path
-                if (item.browser_paths && item.browser_paths[currentScheme]) {
+
+                // CUSTOM Grouping
+                if (CUSTOM_GROUP_PARAMS && CUSTOM_GROUP_PARAMS.length > 0) {
+                    path = CUSTOM_GROUP_PARAMS.map(p => {
+                        return (item.params && item.params[p]) ? item.params[p] : "???";
+                    });
+                }
+                // Browser Org
+                else if (item.browser_paths && item.browser_paths[currentScheme]) {
                     path = item.browser_paths[currentScheme];
                 } else if (item.folder_path) {
                     path = item.folder_path; // Fallback
@@ -1868,6 +1891,7 @@
                 currentLevel.push(item);
             });
 
+            sortTree(root);
             return root;
         };
 
