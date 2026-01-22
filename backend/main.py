@@ -42,11 +42,12 @@ app = FastAPI()
 
 # Include Plugin API
 # Include Plugin API
-from routers import plugin_api, plugin_cloud, ai, sheet_api
+from routers import plugin_api, plugin_cloud, ai, sheet_api, acc_manager
 app.include_router(plugin_api.router)
 app.include_router(plugin_cloud.router)
 app.include_router(ai.router)
 app.include_router(sheet_api.router)
+app.include_router(acc_manager.router)
 
 # Input Models
 class LoginRequest(BaseModel):
@@ -100,7 +101,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Implicitly allow / (landing), /assets, /static, /api, /login
         protected_prefixes = [
             "/admin", "/estimaciones", "/cotizaciones", 
-            "/projects", "/project", "/calendar", "/hr", "/create_project"
+            "/projects", "/project", "/calendar", "/hr", "/create_project", "/labs"
         ]
         
         is_protected = any(path.startswith(p) for p in protected_prefixes)
@@ -168,6 +169,10 @@ async def serve_landing_alias(request: Request):
 @app.get("/sheets/manager", response_class=HTMLResponse)
 async def serve_sheet_manager(request: Request):
     return templates.TemplateResponse("sheet_manager.html", {"request": request})
+
+@app.get("/labs/cloud-manager", response_class=HTMLResponse)
+async def labs_cloud_manager(request: Request):
+    return templates.TemplateResponse("labs_cloud_manager.html", {"request": request})
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, view: str = "active"):

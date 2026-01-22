@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>AO Labs | Cloud Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+
+        .tree-item {
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tree-item:hover {
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        .tree-item.selected {
+            background: rgba(59, 130, 246, 0.5);
+            border-left: 3px solid #60a5fa;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+
+        .upload-zone {
+            border: 2px dashed #475569;
+            transition: all 0.3s ease;
+        }
+
+        .upload-zone.dragover {
+            border-color: #60a5fa;
+            background: rgba(59, 130, 246, 0.1);
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header
+        class="h-16 border-b border-slate-700 flex items-center justify-between px-6 bg-slate-900/80 backdrop-blur-md z-10">
+        <div class="flex items-center gap-3">
+            <div
+                class="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center font-bold">
+                L</div>
+            <h1 class="text-xl font-bold tracking-tight">AO Labs <span class="text-slate-500 font-light mx-2">/</span>
+                Cloud Manager</h1>
+        </div>
+        <a href="/dashboard" class="text-sm text-slate-400 hover:text-white transition">Exit to Dashboard</a>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex overflow-hidden">
+
+        <!-- Left: Local Upload / Actions -->
+        <aside class="w-1/3 p-6 border-r border-slate-700 flex flex-col gap-6 bg-slate-900/50">
+
+            <div class="glass-panel p-6 flex-1 flex flex-col">
+                <h2 class="text-lg font-semibold mb-4 text-purple-400">📤 Local Upload</h2>
+
+                <div id="dropZone"
+                    class="upload-zone flex-1 rounded-xl flex flex-col items-center justify-center p-8 text-center cursor-pointer relative">
+                    <input type="file" id="fileInput" class="hidden" multiple webkitdirectory />
+                    <svg class="w-16 h-16 text-slate-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12">
+                        </path>
+                    </svg>
+                    <p class="text-slate-300 font-medium">Drag Folders or Files Here</p>
+                    <p class="text-slate-500 text-sm mt-2">Supports folder structures</p>
+
+                    <button onclick="document.getElementById('fileInput').click()"
+                        class="mt-6 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">Browse
+                        Computer</button>
+                </div>
+
+                <div id="uploadStatus" class="mt-4 hidden">
+                    <div class="flex justify-between text-xs text-slate-400 mb-1">
+                        <span>Uploading...</span>
+                        <span id="uploadPercent">0%</span>
+                    </div>
+                    <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div id="progressBar" class="h-full bg-purple-500 w-0 transition-all duration-300"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel p-4">
+                <h3 class="text-sm font-semibold text-slate-400 mb-2">ACTIONS on SELECTION</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btnCopy"
+                        class="p-3 bg-slate-800 hover:bg-slate-700 rounded text-sm text-left flex items-center gap-2"
+                        disabled>
+                        <span>📋</span> Copy Folder
+                    </button>
+                    <button id="btnPaste"
+                        class="p-3 bg-slate-800 hover:bg-slate-700 rounded text-sm text-left flex items-center gap-2 opacity-50 cursor-not-allowed"
+                        disabled>
+                        <span>📥</span> Paste Here
+                    </button>
+                    <button id="btnNewFolder"
+                        class="p-3 bg-slate-800 hover:bg-slate-700 rounded text-sm text-left flex items-center gap-2"
+                        disabled>
+                        <span>📁</span> New Folder
+                    </button>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Right: Cloud Browser -->
+        <section class="flex-1 p-6 flex flex-col min-w-0">
+            <div class="glass-panel w-full h-full flex flex-col overflow-hidden">
+                <div class="p-4 border-b border-slate-700 bg-slate-800/50 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-blue-400">☁️ Autodesk Docs Browser</h2>
+                    <button onclick="loadHubs()"
+                        class="text-xs bg-slate-700 px-2 py-1 rounded hover:bg-slate-600">Refresh</button>
+                </div>
+
+                <div id="treeView" class="flex-1 overflow-y-auto p-4 space-y-1">
+                    <!-- Tree Content -->
+                    <div class="flex items-center justify-center h-64 text-slate-500 animate-pulse">Loading Cloud
+                        Data...</div>
+                </div>
+
+                <div class="p-2 border-t border-slate-700 text-xs text-slate-500 flex gap-4 bg-slate-900/50">
+                    <span id="statusText">Ready</span>
+                    <span id="selectionText" class="text-blue-400 truncate flex-1"></span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Scripts -->
+    <script>
+        // State
+        let currentHubId = null;
+        let currentProjectId = null;
+        let selectedNode = null; // { id, type, name, parentId }
+        let clipboard = null; // { id, name, type }
+
+        const API = '/api/labs/acc';
+
+        // Load Initial
+        document.addEventListener('DOMContentLoaded', loadHubs);
+
+        async function loadHubs() {
+            setLoading('Loading Hubs...');
+            const tree = document.getElementById('treeView');
+            tree.innerHTML = '';
+
+            try {
+                const res = await fetch(`${API}/hubs`);
+                const hubs = await res.json();
+
+                hubs.forEach(h => {
+                    tree.appendChild(createNodeEl(h.id, h.attributes.name, 'hub', null));
+                });
+
+                setStatus('Select a Hub to connect');
+            } catch (e) {
+                tree.innerHTML = `<div class="p-4 text-red-400">Error loading hubs. Check console.</div>`;
+                console.error(e);
+            }
+        }
+
+        // Logic to build tree
+        function createNodeEl(id, name, type, parentId) {
+            const container = document.createElement('div');
+            container.className = 'pl-4 border-l border-slate-700 ml-2 mt-1';
+            if (type === 'hub') container.className = ''; // Root no indent
+
+            const row = document.createElement('div');
+            row.className = 'tree-item group';
+            row.dataset.id = id;
+            row.dataset.type = type;
+            row.dataset.loaded = 'false';
+
+            // Icons
+            let icon = '🏢';
+            if (type === 'project') icon = '🏗️';
+            if (type === 'folder') icon = '📁';
+            if (type === 'item') icon = '📄';
+
+            row.innerHTML = `
+                <span class="opacity-50 group-hover:opacity-100 transition text-xs select-none">▶</span>
+                <span class="text-lg">${icon}</span>
+                <span class="truncate text-sm font-medium">${name}</span>
+            `;
+
+            // Click Handler
+            row.onclick = (e) => {
+                e.stopPropagation();
+                selectNode(row, id, name, type, parentId);
+                toggleExpand(row, container, id, type);
+            };
+
+            const wrapper = document.createElement('div');
+            wrapper.appendChild(row);
+
+            // Container for children
+            const childrenDiv = document.createElement('div');
+            childrenDiv.className = 'hidden pl-2';
+            wrapper.appendChild(childrenDiv);
+
+            row.childrenDiv = childrenDiv; // Ref
+
+            return wrapper;
+        }
+
+        async function toggleExpand(row, container, id, type) {
+            const childrenDiv = row.childrenDiv;
+            const arrow = row.querySelector('span:first-child');
+
+            if (!childrenDiv.classList.contains('hidden')) {
+                // Collapse
+                childrenDiv.classList.add('hidden');
+                arrow.innerText = '▶';
+                return;
+            }
+
+            // Expand
+            childrenDiv.classList.remove('hidden');
+            arrow.innerText = '▼';
+
+            if (row.dataset.loaded === 'true') return; // Already loaded
+
+            // Fetch Children
+            row.classList.add('animate-pulse');
+
+            try {
+                if (type === 'hub') {
+                    // Fetch Projects
+                    currentHubId = id;
+                    const res = await fetch(`${API}/hubs/${id}/projects`);
+                    const data = await res.json();
+                    data.forEach(p => childrenDiv.appendChild(createNodeEl(p.id, p.attributes.name, 'project', id)));
+                }
+                else if (type === 'project') {
+                    // Fetch Top Folders
+                    currentProjectId = id;
+                    const res = await fetch(`${API}/projects/${id}/top-folders?hub_id=${currentHubId}`);
+                    const data = await res.json();
+                    data.forEach(f => childrenDiv.appendChild(createNodeEl(f.id, f.attributes.name, 'folder', id)));
+                }
+                else if (type === 'folder') {
+                    // Fetch Contents
+                    const res = await fetch(`${API}/projects/${currentProjectId}/folders/${id}/contents`);
+                    const data = await res.json();
+
+                    data.folders.forEach(f => childrenDiv.appendChild(createNodeEl(f.id, f.attributes.displayName || f.attributes.name, 'folder', id)));
+
+                    // Optional: Show files? 
+                    // data.items.forEach(i => childrenDiv.appendChild(createNodeEl(i.id, i.attributes.displayName, 'item', id)));
+                }
+
+                row.dataset.loaded = 'true';
+            } catch (e) {
+                console.error(e);
+                setStatus('Error loading children');
+            } finally {
+                row.classList.remove('animate-pulse');
+            }
+        }
+
+        function selectNode(row, id, name, type, parentId) {
+            // UI
+            document.querySelectorAll('.tree-item').forEach(el => el.classList.remove('selected', 'bg-blue-900'));
+            row.classList.add('selected');
+
+            selectedNode = { id, name, type, parentId };
+
+            document.getElementById('selectionText').innerText = `Selected: ${name} (${type})`;
+
+            // Update Buttons
+            const canPaste = clipboard && type === 'folder';
+            document.getElementById('btnPaste').disabled = !canPaste;
+            document.getElementById('btnPaste').className = `p-3 bg-slate-800 rounded text-sm text-left flex items-center gap-2 ${canPaste ? 'hover:bg-blue-600 cursor-pointer' : 'opacity-50 cursor-not-allowed'}`;
+
+            document.getElementById('btnCopy').disabled = (type !== 'folder' && type !== 'item');
+            document.getElementById('btnNewFolder').disabled = (type !== 'folder' && type !== 'project'); // Usually create in Project root or folder
+        }
+
+        // Helper
+        function setLoading(msg) {
+            document.getElementById('statusText').innerText = msg;
+        }
+        function setStatus(msg) {
+            document.getElementById('statusText').innerText = msg;
+        }
+
+        // --- Drag & Drop Upload Logic ---
+        const dropZone = document.getElementById('dropZone');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFiles(e.dataTransfer.files);
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        async function handleFiles(fileList) {
+            if (!selectedNode || selectedNode.type !== 'folder') {
+                alert("Please select a TARGET FOLDER in the cloud tree first.");
+                return;
+            }
+
+            const files = Array.from(fileList);
+            if (files.length === 0) return;
+
+            if (!confirm(`Upload ${files.length} files to '${selectedNode.name}'?`)) return;
+
+            // Upload Loop
+            const uiProgress = document.getElementById('progressBar');
+            const percentText = document.getElementById('uploadPercent');
+            const statusDiv = document.getElementById('uploadStatus');
+            statusDiv.classList.remove('hidden');
+
+            let completed = 0;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                setStatus(`Uploading ${file.name}...`);
+
+                const formData = new FormData();
+                formData.append('project_id', currentProjectId);
+                formData.append('folder_id', selectedNode.id);
+                formData.append('file', file);
+
+                try {
+                    const res = await fetch(`${API}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!res.ok) throw new Error("Upload fail");
+
+                } catch (e) {
+                    console.error(f"Failed to upload ${file.name}", e);
+                }
+
+                completed++;
+                const pct = Math.round((completed / files.length) * 100);
+                uiProgress.style.width = `${pct}%`;
+                percentText.innerText = `${pct}%`;
+            }
+
+            setStatus("Upload Complete!");
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+                // Refresh folder?
+                // toggleExpand of current node to refresh
+            }, 2000);
+        }
+
+    </script>
+</body>
+
+</html>
