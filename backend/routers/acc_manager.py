@@ -143,8 +143,11 @@ async def upload_file_to_acc(
         # 2. Upload Logic
         res = copier.upload_file(project_id, folder_id, temp_path, file.filename)
         if not res:
-            raise HTTPException(status_code=500, detail="Failed to upload to ACC")
+            # Should not happen if copier raises exception, but for safety:
+            raise HTTPException(status_code=500, detail="Failed to upload (Unknown Error)")
         return {"status": "success", "data": res}
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
         
     finally:
         if os.path.exists(temp_path):
