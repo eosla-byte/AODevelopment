@@ -234,7 +234,7 @@ namespace RevitCivilConnector
             for (int i = 1; i <= 15; i += 3)
             {
                  // Create 3 buttons
-                 // EXP 1 -> Sheet Manager
+                 // EXP 01 -> Sheet Manager
                  string cmd1Class = (i == 1) ? "RevitCivilConnector.Commands.SheetManagerCommand" : "RevitCivilConnector.IACommand";
                  string name1 = (i == 1) ? "Sheet\nManager" : $"Exp {i:00}";
                  
@@ -242,9 +242,16 @@ namespace RevitCivilConnector
                  b1.Image = GetIcon("icono7.png"); // Small Image
                  b1.ToolTip = (i == 1) ? "Gestor Avanzado de Sheets (Exp 01)" : $"Experimental Function {i}";
 
-                 PushButtonData b2 = new PushButtonData($"cmdExp{i+1}", $"Exp {i+1:00}", assemblyPath, "RevitCivilConnector.IACommand");
-                 b2.Image = GetIcon("icono7.png");
-                 b2.ToolTip = $"Experimental Function {i+1}";
+                 // EXP 02 -> Cloud Manager (was generic Exp 02)
+                 // Replaces: PushButtonData b2 = new PushButtonData($"cmdExp{i+1}", $"Exp {i+1:00}", assemblyPath, "RevitCivilConnector.IACommand");
+                 string cmd2Class = (i == 1) ? "RevitCivilConnector.CloudQuantifysCommand" : "RevitCivilConnector.IACommand";
+                 string name2 = (i == 1) ? "Cloud\nManager" : $"Exp {i+1:00}";
+                 string icon2 = (i == 1) ? "icono13.png" : "icono7.png";
+                 string tip2 = (i == 1) ? "Acceso directo a Cloud Manager" : $"Experimental Function {i+1}";
+
+                 PushButtonData b2 = new PushButtonData($"cmdExp{i+1}", name2, assemblyPath, cmd2Class);
+                 b2.Image = GetIcon(icon2);
+                 b2.ToolTip = tip2;
 
                  PushButtonData b3 = new PushButtonData($"cmdExp{i+2}", $"Exp {i+2:00}", assemblyPath, "RevitCivilConnector.IACommand");
                  b3.Image = GetIcon("icono7.png");
