@@ -1638,173 +1638,303 @@
             });
     }
 
-    async function exportToPDF() {
-        const element = document.getElementById('canvasContainer');
-        const opt = {
-            margin: [0, 0, 0, 0], // No interaction with browser margins, we control bleed
-            filename: `Cotizacion_${document.getElementById('docTitle').value || 'Borrador'}.pdf`,
-            image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, scrollY: 0, letterRendering: true },
-            jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait', compress: true },
-            pagebreak: { mode: ['css', 'legacy'], before: '.page-break', avoid: '.block-item' }
-        };
-
-        // Hide UI overlays manually just in case
-        document.querySelectorAll('.no-print, .block-controls, .resize-handle').forEach(el => el.style.display = 'none');
-
-        try {
-            await html2pdf().set(opt).from(element).save();
-        } catch (e) {
-            console.error(e);
-            alert("Error al validar PDF: " + e);
-        } finally {
-            // Restore UI
-            document.querySelectorAll('.no-print, .block-controls, .resize-handle').forEach(el => el.style.display = '');
-        }
+    function exportToPDF() {
+        openExportModal();
     }
 
-    async function linkEstimation(estId) {
-        if (!estId) return;
-
-        try {
-            const resp = await fetch(`/estimaciones/${estId}`);
-            if (!resp.ok) throw new Error("Error fetching estimation");
-            const data = await resp.json();
-
-            // Populate fields if empty or user confirms
-            if (confirm(`¿Importar datos de estimación "${data.name}"? Esto sobrescribirá el título y cliente.`)) {
-                document.getElementById('docTitle').value = "Propuesta: " + data.name;
-                document.getElementById('clientName').value = data.client;
-                document.getElementById('docTotalAmount').value = data.amount;
-                // Trigger save to lock data
-                isDirty = true;
-            }
-
-            const container = document.getElementById('estimation-data-container');
-            container.innerHTML = `
-                <div class="bg-indigo-50 p-2 rounded border border-indigo-100 mb-2">
-                    <p class="text-[10px] text-indigo-500 font-bold mb-1">DATA VINCULADA</p>
-                    <div class="text-xs text-slate-700 font-bold">${data.name}</div>
-                    <div class="text-[10px] text-slate-500 mb-1">${data.client}</div>
-                    <div class="text-xs text-indigo-600 font-mono">Q${parseFloat(data.amount).toLocaleString()}</div>
-                    <div class="text-[10px] text-slate-400 mt-1">${(data.square_meters || 0).toLocaleString()} m²</div>
+    function openExportModal() {
+        if (!document.getElementById('export-modal')) {
+            const modalHtml = `
+            <div id="export-modal" class="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center hidden backdrop-blur-sm">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                    <div class="p-5 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800">Exportar Cotización</h3>
+                        <button onclick="document.getElementById('export-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="p-4 border border-slate-200 rounded-lg hover:border-indigo-500 cursor-pointer transition-all group" onclick="confirmExport('pdf')">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-file-pdf text-xl"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-800">Guardar como PDF</div>
+                                    <div class="text-xs text-slate-500">Formato digital optimizado.</div>
+                                </div>
+                            </div>
+                        </div>
+                         <div class="p-4 border border-slate-200 rounded-lg hover:border-indigo-500 cursor-pointer transition-all group" onclick="confirmExport('print')">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-print text-xl"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-800">Imprimir</div>
+                                    <div class="text-xs text-slate-500">Enviar a impresora.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            `;
-
-            isDirty = true;
-
-        } catch (e) {
-            alert("Error vinculando: " + e);
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
         }
+        document.getElementById('export-modal').classList.remove('hidden');
     }
 
-    async function saveDocument() {
-        const title = document.getElementById('docTitle').value;
-        const client = document.getElementById('clientName').value;
-        const amount = parseFloat(document.getElementById('docTotalAmount').value) || 0;
+    function confirmExport(type) {
+        document.getElementById('export-modal').classList.add('hidden');
 
-        // Sync Source of Truth
-        localBlocks = serializeBlocksFromDOM();
+        // Clone the content
+        const content = document.getElementById('canvasContainer').innerHTML;
 
-        const payload = {
-            id: quotId,
-            updates: {
-                title: title,
-                client_name: client,
-                total_amount: amount,
-                content_json: localBlocks,
-                updated_at: new Date().toISOString()
-            }
-        };
+        // Gather all styles from parent to ensure identical rendering
+        const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+            .map(s => s.outerHTML)
+            .join('');
 
-        fetch('/cotizaciones/update', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-            .then(r => r.json())
-            .then(d => {
-                if (d.status === 'success') {
-                    document.getElementById('saveStatus').innerText = "Guardado " + new Date().toLocaleTimeString();
-                    isDirty = false;
-                } else {
-                    document.getElementById('saveStatus').innerText = "Error";
-                }
-            })
-            .catch(e => {
-                console.error(e);
-                document.getElementById('saveStatus').innerText = "Error Conexión";
-            });
-    }
+        // Create Print Window
+        const printWindow = window.open('', '', 'height=900,width=800');
 
-    async function convertToProject() {
-        if (!confirm("¿Convertir esta cotización a Proyecto? Esto creará un nuevo perfil de proyecto con los datos actuales.")) return;
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>Cotizacion_${document.getElementById('docTitle').value || 'Export'}</title>
+                ${styles}
+                <style>
+                    body { 
+                        font-family: 'Barlow', sans-serif; 
+                        background: white; 
+                        margin: 0; 
+                        padding: 0;
+                    }
+                    /* Force Print Layout Overrides */
+                    .page-sheet {
+                        width: 215.9mm !important; /* Letter Width */
+                        height: 279.4mm !important; /* Letter Height */
+                        margin: 0 auto !important;
+                        background: white !important;
+                        position: relative !important;
+                        overflow: hidden !important;
+                        page-break-after: always !important;
+                        box-shadow: none !important;
+                        left: auto !important;
+                        top: auto !important;
+                        transform: none !important;
+                    }
+                    .page-sheet:last-child {
+                        page-break-after: auto !important;
+                    }
+                    
+                    /* Hide Editor Controls */
+                    .no-print, .block-controls, .resize-handle, .page-number, .grid-overlay, .ruler-x, .ruler-y {
+                        display: none !important;
+                    }
 
-        const title = document.getElementById('docTitle').value;
-        // Mock simple conversion
-        const formData = new FormData();
-        formData.append('name', title);
-        formData.append('status', 'Activo');
-        try {
-            const response = await fetch('/create_project', {
-                method: 'POST',
-                body: formData
-            });
-            if (response.redirected) {
-                window.location.href = response.url;
-            } else {
-                alert("Proyecto creado exitosamente (verifique lista)");
-            }
-        } catch (e) {
-            alert("Error al convertir: " + e);
-        }
-    }
+                    #canvasContainer {
+                        transform: none !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        position: static !important;
+                    }
+                    
+                    /* Ensure backgrounds print */
+                    * {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
 
-    // Tables logic
-    function toggleCell(cell) {
-        if (cell.classList.contains('bg-slate-100')) {
-            cell.classList.remove('bg-slate-100');
-            cell.classList.add('bg-indigo-200');
-        } else {
-            cell.classList.add('bg-slate-100');
-            cell.classList.remove('bg-indigo-200');
-        }
-    }
+                    @media print {
+                        body { margin: 0; }
+                        @page {
+                            size: letter portrait;
+                            margin: 0;
+                        }
+                        .page-sheet {
+                            page-break-after: always;
+                            break-inside: avoid;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div id="print-wrapper">
+                    ${content}
+                </div>
+                <script>
+                    window.onload = function() {
+                         // Clean up any editor-specific artifacts if needed
+                         setTimeout(() => {
+                             window.print();
+                         }, 1000);
+                    }
+</script>
+</body>
 
-    function addTimelineRow(btn) {
-        const table = btn.previousElementSibling;
-        const tbody = table.querySelector('tbody');
-        const newRow = document.createElement('tr');
-        newRow.innerHTML = `
-            <td contenteditable="true" class="p-2 font-bold text-slate-700">Nueva Fase</td>
-            <td class="p-1"><div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div></td>
-            <td class="p-1"><div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div></td>
-            <td class="p-1"><div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div></td>
-            <td class="p-1"><div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div></td>
-            <td class="p-1"><div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div></td>
-            <td class="p-1"><div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div></td>
-            <td class="p-1 text-center"><button onclick="this.closest('tr').remove()" class="text-red-300 hover:text-red-500">×</button></td>
-        `;
-        tbody.appendChild(newRow);
-    }
+</html>
+`);
 
-    function addGenericRow(btn) {
-        const table = btn.previousElementSibling;
-        const tbody = table.querySelector('tbody');
-        const count = tbody.children.length + 1;
-        const newRow = document.createElement('tr');
-        newRow.innerHTML = `
-            <td contenteditable="true" class="p-2 border border-slate-200 text-center">${count}</td>
-            <td contenteditable="true" class="p-2 border border-slate-200">Concepto...</td>
-            <td contenteditable="true" class="p-2 border border-slate-200 text-center">1</td>
-            <td contenteditable="true" class="p-2 border border-slate-200 text-right">0.00</td>
-            <td class="p-2 border border-slate-200 text-right font-bold bg-slate-50">0.00</td>
-            <td class="p-1 border border-slate-200 text-center print:hidden">
-                <button onclick="this.closest('tr').remove()" class="text-xs text-red-300 hover:text-red-500">×</button>
-            </td>
-        `;
-        tbody.appendChild(newRow);
-    }
+printWindow.document.close();
+printWindow.focus();
+}
+
+async function linkEstimation(estId) {
+if (!estId) return;
+
+try {
+const resp = await fetch(`/estimaciones/${estId}`);
+if (!resp.ok) throw new Error("Error fetching estimation");
+const data = await resp.json();
+
+// Populate fields if empty or user confirms
+if (confirm(`¿Importar datos de estimación "${data.name}"? Esto sobrescribirá el título y cliente.`)) {
+document.getElementById('docTitle').value = "Propuesta: " + data.name;
+document.getElementById('clientName').value = data.client;
+document.getElementById('docTotalAmount').value = data.amount;
+// Trigger save to lock data
+isDirty = true;
+}
+
+const container = document.getElementById('estimation-data-container');
+container.innerHTML = `
+<div class="bg-indigo-50 p-2 rounded border border-indigo-100 mb-2">
+    <p class="text-[10px] text-indigo-500 font-bold mb-1">DATA VINCULADA</p>
+    <div class="text-xs text-slate-700 font-bold">${data.name}</div>
+    <div class="text-[10px] text-slate-500 mb-1">${data.client}</div>
+    <div class="text-xs text-indigo-600 font-mono">Q${parseFloat(data.amount).toLocaleString()}</div>
+    <div class="text-[10px] text-slate-400 mt-1">${(data.square_meters || 0).toLocaleString()} m²</div>
+</div>
+`;
+
+isDirty = true;
+
+} catch (e) {
+alert("Error vinculando: " + e);
+}
+}
+
+async function saveDocument() {
+const title = document.getElementById('docTitle').value;
+const client = document.getElementById('clientName').value;
+const amount = parseFloat(document.getElementById('docTotalAmount').value) || 0;
+
+// Sync Source of Truth
+localBlocks = serializeBlocksFromDOM();
+
+const payload = {
+id: quotId,
+updates: {
+title: title,
+client_name: client,
+total_amount: amount,
+content_json: localBlocks,
+updated_at: new Date().toISOString()
+}
+};
+
+fetch('/cotizaciones/update', {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify(payload)
+})
+.then(r => r.json())
+.then(d => {
+if (d.status === 'success') {
+document.getElementById('saveStatus').innerText = "Guardado " + new Date().toLocaleTimeString();
+isDirty = false;
+} else {
+document.getElementById('saveStatus').innerText = "Error";
+}
+})
+.catch(e => {
+console.error(e);
+document.getElementById('saveStatus').innerText = "Error Conexión";
+});
+}
+
+async function convertToProject() {
+if (!confirm("¿Convertir esta cotización a Proyecto? Esto creará un nuevo perfil de proyecto con los datos actuales."))
+return;
+
+const title = document.getElementById('docTitle').value;
+// Mock simple conversion
+const formData = new FormData();
+formData.append('name', title);
+formData.append('status', 'Activo');
+try {
+const response = await fetch('/create_project', {
+method: 'POST',
+body: formData
+});
+if (response.redirected) {
+window.location.href = response.url;
+} else {
+alert("Proyecto creado exitosamente (verifique lista)");
+}
+} catch (e) {
+alert("Error al convertir: " + e);
+}
+}
+
+// Tables logic
+function toggleCell(cell) {
+if (cell.classList.contains('bg-slate-100')) {
+cell.classList.remove('bg-slate-100');
+cell.classList.add('bg-indigo-200');
+} else {
+cell.classList.add('bg-slate-100');
+cell.classList.remove('bg-indigo-200');
+}
+}
+
+function addTimelineRow(btn) {
+const table = btn.previousElementSibling;
+const tbody = table.querySelector('tbody');
+const newRow = document.createElement('tr');
+newRow.innerHTML = `
+<td contenteditable="true" class="p-2 font-bold text-slate-700">Nueva Fase</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1 text-center"><button onclick="this.closest('tr').remove()"
+        class="text-red-300 hover:text-red-500">×</button></td>
+`;
+tbody.appendChild(newRow);
+}
+
+function addGenericRow(btn) {
+const table = btn.previousElementSibling;
+const tbody = table.querySelector('tbody');
+const count = tbody.children.length + 1;
+const newRow = document.createElement('tr');
+newRow.innerHTML = `
+<td contenteditable="true" class="p-2 border border-slate-200 text-center">${count}</td>
+<td contenteditable="true" class="p-2 border border-slate-200">Concepto...</td>
+<td contenteditable="true" class="p-2 border border-slate-200 text-center">1</td>
+<td contenteditable="true" class="p-2 border border-slate-200 text-right">0.00</td>
+<td class="p-2 border border-slate-200 text-right font-bold bg-slate-50">0.00</td>
+<td class="p-1 border border-slate-200 text-center print:hidden">
+    <button onclick="this.closest('tr').remove()" class="text-xs text-red-300 hover:text-red-500">×</button>
+</td>
+`;
+tbody.appendChild(newRow);
+}
 </script>
 
 <!-- Text Formatting Toolbar -->
@@ -2346,7 +2476,7 @@
         // Overlay is fixed? No, blocks are absolute in a relative page. 
         // Overlay logic: If overlay is 'fixed', we match screen rects.
         // If overlay is 'absolute' in body, we match page coords.
-        // In the HTML I added: `fixed top-0 left-0`. So we use getBoundingClientRect directly.
+        // In the HTML I added: `fixed top - 0 left - 0`. So we use getBoundingClientRect directly.
 
         overlay.style.width = rect.width + 'px';
         overlay.style.height = rect.height + 'px';
@@ -2655,7 +2785,7 @@
             const config = p.find(x => x.type === 'page_config');
             if (config && config.content.isCover) preview += " (Portada)";
 
-            div.innerHTML = `<span class="text-slate-400">☰</span> <span class="font-bold text-slate-700 text-sm flex-1">${preview}</span> <button class="text-red-400 hover:text-red-600 font-bold" onclick="deletePageInList(this)">🗑️</button>`;
+            div.innerHTML = `< span class= "text-slate-400" >☰</span > <span class="font-bold text-slate-700 text-sm flex-1">${preview}</span> <button class="text-red-400 hover:text-red-600 font-bold" onclick="deletePageInList(this)">🗑️</button>`;
             list.appendChild(div);
         });
 
@@ -2779,7 +2909,7 @@
             if (isImageBlock) {
                 // Image Block Logic
                 const contentDiv = currentIconBlock.querySelector('.block-image-content');
-                contentDiv.innerHTML = `<img src="${dataUrl}" class="w-full h-full object-cover">`;
+                contentDiv.innerHTML = `< img src = "${dataUrl}" class= "w-full h-full object-cover" >`;
                 contentDiv.style.display = 'block';
                 currentIconBlock.querySelector('.block-image-placeholder').style.display = 'none';
             } else {
