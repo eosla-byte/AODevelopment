@@ -614,28 +614,72 @@
         }
 
         async function handleStructureUpload(fileList) {
-            // ... (keep fallback for input type=file if needed) ...
             if (!selectedNode || selectedNode.type !== 'folder') {
                 alert("Select a target folder first.");
                 return;
             }
 
             const files = Array.from(fileList);
-            const uploadList = files.map(f => {
-                const rawPath = f.webkitRelativePath || f.name;
-                const normalized = rawPath.replace(/\\/g, '/');
-                const parts = normalized.split('/');
-                parts.pop();
-                const relPath = parts.join('/') + (parts.length > 0 ? '/' : '');
+            const uploadList = [];
 
-                // Remove trailing slash for consistency
-                const cleanRel = relPath.endsWith('/') ? relPath.slice(0, -1) : relPath;
+            // Debug Log
+            console.log("Processing input files:", files.length);
 
-                return { file: f, relPath: cleanRel };
+            files.forEach(f => {
+                let relPath = "";
+                if (f.webkitRelativePath) {
+                    const rawPath = f.webkitRelativePath;
+                    const normalized = rawPath.replace(/\\/g, '/');
+                    const parts = normalized.split('/');
+                    parts.pop(); // Remove filename
+
+                    if (parts.length > 0) {
+                        relPath = parts.join('/') + '/';
+                    }
+                }
+
+                if (relPath.endsWith('/')) relPath = relPath.slice(0, -1);
+
+                uploadList.push({ file: f, relPath: relPath });
             });
 
-            if (!confirm(`Upload ${files.length} files?`)) return;
+            // Verbose Confirmation
+            const folderSet = new Set(uploadList.map(x => x.relPath).filter(x => x !== ""));
+            const folderCount = folderSet.size;
+            const distinctFolders = Array.from(folderSet).slice(0, 5).join(", ");
+            const more = folderSet.size > 5 ? `... (+${folderSet.size - 5} more)` : "";
+
+            // Log for User
+            logStatus(`Analysis Input: ${files.length} files.`);
+            logStatus(`Detected Folders: ${folderCount} (${distinctFolders} ${more})`);
+
+            if (files.length === 0) return;
+
+            let msg = `Ready to upload ${files.length} files.`;
+            if (folderCount > 0) {
+                msg += `\nWill create ${folderCount} folders:\n${distinctFolders} ${more}`;
+            } else {
+                msg += `\nNote: All files will be placed directly in "${selectedNode.name}" (No subfolders detected).`;
+            }
+
+            if (!confirm(msg)) return;
             performRecursiveUpload(uploadList, selectedNode.id);
+        }
+        const uploadList = files.map(f => {
+            const rawPath = f.webkitRelativePath || f.name;
+            const normalized = rawPath.replace(/\\/g, '/');
+            const parts = normalized.split('/');
+            parts.pop();
+            const relPath = parts.join('/') + (parts.length > 0 ? '/' : '');
+
+            // Remove trailing slash for consistency
+            const cleanRel = relPath.endsWith('/') ? relPath.slice(0, -1) : relPath;
+
+            return { file: f, relPath: cleanRel };
+        });
+
+        if (!confirm(`Upload ${files.length} files?`)) return;
+        performRecursiveUpload(uploadList, selectedNode.id);
         }
 
         async function performRecursiveUpload(list, rootTargetId) {
