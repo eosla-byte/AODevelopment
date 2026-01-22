@@ -1752,17 +1752,25 @@
         // currentScheme and initBrowserSchemes are now defined above.
 
         function changeBrowserOrg(scheme) {
+            checkFilterButton(scheme);
+
+            if (scheme === 'custom') {
+                // Always open modal when selecting this option
+                openCustomOrgModal();
+                // Do not proceed to rebuild until modal applies
+                return;
+            }
+
             currentScheme = scheme;
-            // Re-process Data
-            // We need to rebuild the Tree structure based on new paths
-            // 1. Flatten current state (preserve edits)
-            const flat = flattenTree(TREE_DATA); // This gets current rows with edits
+            if (scheme !== 'custom') CUSTOM_GROUP_PARAMS = [];
 
-            // 2. Re-Group
-            // We need access to original 'browser_paths' which might be lost if we only used 'folder_path'
-            // Fix: Ensure 'browser_paths' is stored in node data
+            // Rebuild Tree
+            // 1. Get all sheets (flatten current view)
+            const allNodes = flattenTree(TREE_DATA);
+            const sheetsOnly = allNodes.filter(n => n.type === 'sheet');
 
-            TREE_DATA = buildStructure(flat); // Will use currentScheme global
+            // 2. Rebuild
+            TREE_DATA = buildStructure(sheetsOnly);
             renderTree();
             renderGrid();
         }
