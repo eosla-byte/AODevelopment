@@ -165,7 +165,11 @@
                 <div id="uploadStatus" class="hidden mt-4 flex flex-col gap-2">
                     <div class="flex justify-between text-xs text-slate-400 mb-1">
                         <span>Uploading...</span>
-                        <span id="uploadPercent">0%</span>
+                        <div class="flex gap-2">
+                            <span id="uploadPercent">0%</span>
+                            <button onclick="document.getElementById('uploadStatus').classList.add('hidden')"
+                                class="hover:text-white px-1"><i class="fas fa-times"></i></button>
+                        </div>
                     </div>
                     <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
                         <div id="progressBar" class="h-full bg-purple-500 w-0 transition-all duration-300"></div>
@@ -606,6 +610,12 @@
             const uiProgress = document.getElementById('progressBar');
             const percentText = document.getElementById('uploadPercent');
 
+            // Clear Log
+            const logDiv = document.getElementById('uploadLog');
+            if (logDiv) logDiv.innerHTML = '';
+
+            logStatus("Starting upload process...", 'info');
+
             // Create Folders
             for (let i = 0; i < uniquePaths.length; i++) {
                 const fullPath = uniquePaths[i];
@@ -618,9 +628,10 @@
                 const parentId = folderMap[parentPath];
 
                 if (parentId) {
-                    setStatus(`Creating folder: ${fullPath}`);
+                    logStatus(`Creating folder: ${fullPath}...`);
                     const newId = await createFolder(parentId, name);
                     if (!newId) {
+                        logStatus(`Failed to create folder: ${name}. Stopping.`, 'error');
                         alert(`Failed to create folder: ${name}. Stopping upload.`);
                         return;
                     }
@@ -636,16 +647,22 @@
                 const item = list[i];
                 const targetId = folderMap[item.relPath] || rootTargetId;
 
-                setStatus(`Uploading ${item.file.name}...`);
-                await apiUploadFile(targetId, item.file);
+                logStatus(`Uploading ${item.file.name}...`);
+                try {
+                    await apiUploadFile(targetId, item.file);
+                    logStatus(`Uploaded ${item.file.name}`, 'success');
+                } catch (e) {
+                    logStatus(`Error uploading ${item.file.name}: ${e}`, 'error');
+                }
 
                 const pct = Math.round(((uniquePaths.length + i + 1) / (uniquePaths.length + list.length)) * 100);
                 uiProgress.style.width = `${pct}%`;
                 percentText.innerText = `${pct}%`;
             }
 
-            setStatus("Complete!");
-            setTimeout(() => statusDiv.classList.add('hidden'), 3000);
+            logStatus("Upload Sequence Complete!", 'success');
+            // Removed auto-hide
+            // setTimeout(() => statusDiv.classList.add('hidden'), 3000);
 
             // Refresh User Interface
             if (selectedNode && selectedNode.row) {
@@ -660,9 +677,7 @@
             formData.append('folder_id', folderId);
             formData.append('file', file);
 
-            try {
-                await fetch(`${API}/upload`, { method: 'POST', body: formData });
-            } catch (e) { console.error(e); }
+            await fetch(`${API}/upload`, { method: 'POST', body: formData });
         }
 
         function addDnD(row, id, type) {
