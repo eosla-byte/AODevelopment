@@ -4,17 +4,28 @@ import os
 import shutil
 from pydantic import BaseModel
 
-# Import our tool logic
-# We assume the tool is in backend.tools.acc_copy_tool
-# We might need to make it a module.
+import sys
+import os
+
+# Add tool directory to path dynamically
+current_dir = os.path.dirname(os.path.abspath(__file__)) # .../routers
+parent_dir = os.path.dirname(current_dir) # .../backend or /app
+tool_path = os.path.join(parent_dir, "tools", "acc_copy_tool")
+
+if tool_path not in sys.path:
+    sys.path.append(tool_path)
+
 try:
-    from backend.tools.acc_copy_tool.copier import AccCopier
-    from backend.tools.acc_copy_tool.auth import get_access_token
-except ImportError:
-    # If running from root without package structure
-    import sys
-    sys.path.append(os.path.join(os.getcwd(), "backend", "tools", "acc_copy_tool"))
     from copier import AccCopier
+    from auth import get_access_token
+except ImportError:
+    # Fallback to absolute package import for some IDEs/Runners
+    try:
+        from backend.tools.acc_copy_tool.copier import AccCopier
+        from backend.tools.acc_copy_tool.auth import get_access_token
+    except ImportError:
+        # Final attempt: direct file import logic or fail
+        raise ImportError(f"Could not import 'copier' from {tool_path}. Sys path: {sys.path}")
 
 router = APIRouter(
     prefix="/api/labs/acc",
