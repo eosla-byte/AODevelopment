@@ -10,22 +10,26 @@ import os
 # Add tool directory to path dynamically
 current_dir = os.path.dirname(os.path.abspath(__file__)) # .../routers
 parent_dir = os.path.dirname(current_dir) # .../backend or /app
-tool_path = os.path.join(parent_dir, "tools", "acc_copy_tool")
+# Add tool directory to path dynamically
+current_dir = os.path.dirname(os.path.abspath(__file__)) # .../routers
+parent_dir = os.path.dirname(current_dir) # .../backend or /app
+tools_path = os.path.join(parent_dir, "tools")
 
-if tool_path not in sys.path:
-    sys.path.append(tool_path)
+if tools_path not in sys.path:
+    sys.path.append(tools_path)
 
 try:
-    from copier import AccCopier
-    from auth import get_access_token
-except ImportError:
-    # Fallback to absolute package import for some IDEs/Runners
+    # Import as package to support relative imports inside the tool
+    from acc_copy_tool.copier import AccCopier
+    from acc_copy_tool.auth import get_access_token
+except ImportError as e:
+    # Fallback or detailed error
     try:
+        # Fallback for local dev where tools might be in root backend/tools and not picked up by logic above if cwd is weird
         from backend.tools.acc_copy_tool.copier import AccCopier
         from backend.tools.acc_copy_tool.auth import get_access_token
     except ImportError:
-        # Final attempt: direct file import logic or fail
-        raise ImportError(f"Could not import 'copier' from {tool_path}. Sys path: {sys.path}")
+        raise ImportError(f"Could not import 'acc_copy_tool' package from {tools_path}. Error: {e}. Sys path: {sys.path}")
 
 router = APIRouter(
     prefix="/api/labs/acc",
