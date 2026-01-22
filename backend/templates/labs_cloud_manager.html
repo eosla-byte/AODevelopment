@@ -162,13 +162,17 @@
                         Computer</button>
                 </div>
 
-                <div id="uploadStatus" class="mt-4 hidden">
+                <div id="uploadStatus" class="hidden mt-4 flex flex-col gap-2">
                     <div class="flex justify-between text-xs text-slate-400 mb-1">
                         <span>Uploading...</span>
                         <span id="uploadPercent">0%</span>
                     </div>
                     <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
                         <div id="progressBar" class="h-full bg-purple-500 w-0 transition-all duration-300"></div>
+                    </div>
+                    <div id="uploadLog"
+                        class="h-32 bg-[#101010] border border-[#333] rounded p-2 overflow-y-auto text-[10px] font-mono text-gray-400 mt-2">
+                        <!-- Logs -->
                     </div>
                 </div>
             </div>
@@ -381,201 +385,196 @@
             document.getElementById('btnNewFolder').disabled = (type !== 'folder' && type !== 'project'); // Usually create in Project root or folder
         }
 
-        <!-- Upload Status & Logs -->
-        <div id="uploadStatus" class="hidden mt-4 flex flex-col gap-2">
-            <div class="text-xs text-gray-400 flex justify-between">
-                <span>Proceso de Subida...</span>
-                <span id="uploadPercent">0%</span>
-            </div>
-            <div class="h-1 bg-[#3e3e42] rounded overflow-hidden">
-                <div id="progressBar" class="h-full bg-[#007acc] w-0 transition-all duration-300"></div>
-            </div>
-            <div id="uploadLog" class="h-32 bg-[#101010] border border-[#333] rounded p-2 overflow-y-auto text-[10px] font-mono text-gray-400 mt-2">
-                <!-- Logs go here -->
-            </div>
-        </div>
-        </div >
+        function logStatus(msg, type = 'info') {
+            const logDiv = document.getElementById('uploadLog');
+            if (!logDiv) return;
 
-            <script>
-                let currentHubId = null;
-                let currentProjectId = null;
-                let selectedNode = null; // {id, element, type}
-                const API = "/api/plugin/acc";
-
-                function setStatus(msg) {
-                    // Keep for legacy, but also log?
-                    // document.getElementById('statusText').innerText = msg;
-                }
-
-                function logStatus(msg, type='info') {
-                const logDiv = document.getElementById('uploadLog');
-                if (!logDiv) return;
-
-                const line = document.createElement('div');
-                line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
-                if (type === 'error') line.style.color = '#ff4d4d';
-                if (type === 'success') line.style.color = '#4ade80';
-                logDiv.appendChild(line);
-                logDiv.scrollTop = logDiv.scrollHeight;
-            }
-
-                // --- Context Menu Logic ---
-                const contextMenu = document.getElementById('contextMenu');
-        document.addEventListener('click', () => contextMenu.style.display = 'none');
-
-                function showContextMenu(e, node) {
-                    e.preventDefault();
-                selectNode(node.row, node.id, node.name, node.type, node.parentId);
-
-                contextMenu.style.left = `${e.pageX}px`;
-                contextMenu.style.top = `${e.pageY}px`;
-                contextMenu.style.display = 'block';
-
-                // Conditional Logic
-                const pasteBtn = document.getElementById('ctxPaste');
-                pasteBtn.style.display = (clipboard && node.type === 'folder') ? 'block' : 'none';
+            const line = document.createElement('div');
+            line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            if (type === 'error') line.style.color = '#ff4d4d';
+            if (type === 'success') line.style.color = '#4ade80';
+            logDiv.appendChild(line);
+            logDiv.scrollTop = logDiv.scrollHeight;
         }
 
-                async function menuAction(action) {
-            if (!selectedNode) return;
-                const {id, name, type} = selectedNode;
+        // --- Context Menu Logic ---
+        const contextMenu = document.getElementById('contextMenu');
+        document.addEventListener('click', () => contextMenu.style.display = 'none');
 
-                if (action === 'copy') {
-                    clipboard = { id, name, type, mode: 'copy' };
+        function setStatus(msg) {
+            // prompt for status?
+            // document.getElementById('statusText').innerText = msg;
+        }
+
+        function logStatus(msg, type = 'info') {
+            const logDiv = document.getElementById('uploadLog');
+            if (!logDiv) return;
+
+            const line = document.createElement('div');
+            line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            if (type === 'error') line.style.color = '#ff4d4d';
+            if (type === 'success') line.style.color = '#4ade80';
+            logDiv.appendChild(line);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // --- Context Menu Logic ---
+        const contextMenu = document.getElementById('contextMenu');
+        document.addEventListener('click', () => contextMenu.style.display = 'none');
+
+        function showContextMenu(e, node) {
+            e.preventDefault();
+            selectNode(node.row, node.id, node.name, node.type, node.parentId);
+
+            contextMenu.style.left = `${e.pageX}px`;
+            contextMenu.style.top = `${e.pageY}px`;
+            contextMenu.style.display = 'block';
+
+            // Conditional Logic
+            const pasteBtn = document.getElementById('ctxPaste');
+            pasteBtn.style.display = (clipboard && node.type === 'folder') ? 'block' : 'none';
+        }
+
+        async function menuAction(action) {
+            if (!selectedNode) return;
+            const { id, name, type } = selectedNode;
+
+            if (action === 'copy') {
+                clipboard = { id, name, type, mode: 'copy' };
                 setStatus(`Copied: ${name}`);
             }
-                if (action === 'paste') {
+            if (action === 'paste') {
                 if (!clipboard) return;
 
                 setStatus(`Pasting ${clipboard.name} into ${name}...`);
 
                 try {
                     const res = await fetch(`${API}/action/copy`, {
-                    method: 'POST',
-                headers: {'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    project_id: currentProjectId,
-                source_id: clipboard.id,
-                target_parent_id: id,
-                is_folder: clipboard.type === 'folder'
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            project_id: currentProjectId,
+                            source_id: clipboard.id,
+                            target_parent_id: id,
+                            is_folder: clipboard.type === 'folder'
                         })
                     });
 
-                if (res.ok) {
-                    setStatus("Paste Successful!");
-                // Trigger Refresh of children
-                selectedNode.row.dataset.loaded = 'false';
-                toggleExpand(selectedNode.row, null, id, type); // Collapse/Expand to refresh
+                    if (res.ok) {
+                        setStatus("Paste Successful!");
+                        // Trigger Refresh of children
+                        selectedNode.row.dataset.loaded = 'false';
+                        toggleExpand(selectedNode.row, null, id, type); // Collapse/Expand to refresh
                     } else {
                         const err = await res.json();
-                setStatus(`Error: ${err.detail || 'Unknown error'}`);
+                        setStatus(`Error: ${err.detail || 'Unknown error'}`);
                     }
                 } catch (e) {
                     console.error(e);
-                setStatus("Paste Error.");
+                    setStatus("Paste Error.");
                 }
             }
-                if (action === 'new-folder') {
+            if (action === 'new-folder') {
                 const newName = prompt("New Folder Name:");
                 if (newName) await createFolder(id, newName);
             }
-                if (action === 'delete') {
+            if (action === 'delete') {
                 if (confirm(`Delete ${name}? (Simulation)`)) {
                     setStatus("Delete endpoint pending.");
                 }
             }
         }
 
-                async function createFolder(parentId, name) {
-                    setStatus(`Creating folder ${name}...`);
-                try {
+        async function createFolder(parentId, name) {
+            setStatus(`Creating folder ${name}...`);
+            try {
                 const res = await fetch(`${API}/folders`, {
                     method: 'POST',
-                headers: {'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    project_id: currentProjectId,
-                parent_id: parentId,
-                name: name
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_id: currentProjectId,
+                        parent_id: parentId,
+                        name: name
                     })
                 });
 
                 if (res.ok) {
                     const json = await res.json();
-                setStatus("Folder Created!");
+                    setStatus("Folder Created!");
 
-                // Add to UI if parent is expanded
-                const row = document.querySelector(`.tree-item[data-id="${parentId}"]`);
-                if (row && row.dataset.loaded === 'true') {
-                    row.childrenDiv.appendChild(createNodeEl(json.data.id, name, 'folder', parentId));
-                row.childrenDiv.classList.remove('hidden');
+                    // Add to UI if parent is expanded
+                    const row = document.querySelector(`.tree-item[data-id="${parentId}"]`);
+                    if (row && row.dataset.loaded === 'true') {
+                        row.childrenDiv.appendChild(createNodeEl(json.data.id, name, 'folder', parentId));
+                        row.childrenDiv.classList.remove('hidden');
                     }
 
-                return json.data.id;
+                    return json.data.id;
                 } else {
                     setStatus("Folder creation failed.");
-                return null;
+                    return null;
                 }
             } catch (e) {
-                    console.warn(e);
+                console.warn(e);
                 return null;
             }
         }
 
-                // --- Recursive Upload Logic ---
+        // --- Recursive Upload Logic ---
 
-                const dropZone = document.getElementById('dropZone');
+        const dropZone = document.getElementById('dropZone');
 
         dropZone.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                dropZone.classList.add('dragover');
+            e.preventDefault();
+            dropZone.classList.add('dragover');
         });
 
         dropZone.addEventListener('dragleave', (e) => dropZone.classList.remove('dragover'));
 
         dropZone.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                dropZone.classList.remove('dragover');
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
 
-                const items = e.dataTransfer.items;
-                if (items) {
+            const items = e.dataTransfer.items;
+            if (items) {
                 const entries = [];
                 for (let i = 0; i < items.length; i++) {
                     const entry = items[i].webkitGetAsEntry();
-                if (entry) entries.push(entry);
+                    if (entry) entries.push(entry);
                 }
                 handleEntries(entries);
             } else {
-                    handleStructureUpload(e.dataTransfer.files);
+                handleStructureUpload(e.dataTransfer.files);
             }
         });
 
         document.getElementById('fileInput').addEventListener('change', (e) => {
-                    handleStructureUpload(e.target.files);
+            handleStructureUpload(e.target.files);
         });
 
-                async function handleEntries(entries) {
+        async function handleEntries(entries) {
             if (!selectedNode || selectedNode.type !== 'folder') {
-                    alert("Select a target folder first.");
+                alert("Select a target folder first.");
                 return;
             }
 
-                setStatus("Scanning folder structure...");
-                const filesToUpload = []; // {file, relPath}
+            setStatus("Scanning folder structure...");
+            const filesToUpload = []; // {file, relPath}
 
-                for (const entry of entries) {
-                    await traverseEntry(entry, "", filesToUpload);
+            for (const entry of entries) {
+                await traverseEntry(entry, "", filesToUpload);
             }
 
-                if (filesToUpload.length === 0) return;
+            if (filesToUpload.length === 0) return;
 
-                if (!confirm(`Upload ${filesToUpload.length} files with structure?`)) return;
-                performRecursiveUpload(filesToUpload, selectedNode.id);
+            if (!confirm(`Upload ${filesToUpload.length} files with structure?`)) return;
+            performRecursiveUpload(filesToUpload, selectedNode.id);
         }
 
-                async function traverseEntry(entry, path, list) {
+        async function traverseEntry(entry, path, list) {
             if (entry.isFile) {
                 const file = await new Promise(resolve => entry.file(resolve));
-                list.push({file: file, relPath: path });
+                list.push({ file: file, relPath: path });
             } else if (entry.isDirectory) {
                 const dirReader = entry.createReader();
                 const entries = await new Promise(resolve => {
@@ -587,35 +586,35 @@
             }
         }
 
-                async function handleStructureUpload(fileList) {
+        async function handleStructureUpload(fileList) {
             if (!selectedNode || selectedNode.type !== 'folder') {
-                    alert("Select a target folder first.");
+                alert("Select a target folder first.");
                 return;
             }
 
-                const files = Array.from(fileList);
+            const files = Array.from(fileList);
             const uploadList = files.map(f => {
                 const parts = f.webkitRelativePath.split('/');
                 parts.pop();
                 const relPath = parts.join('/') + (parts.length > 0 ? '/' : '');
-                return {file: f, relPath: relPath };
+                return { file: f, relPath: relPath };
             });
 
-                if (!confirm(`Upload ${files.length} files?`)) return;
-                performRecursiveUpload(uploadList, selectedNode.id);
+            if (!confirm(`Upload ${files.length} files?`)) return;
+            performRecursiveUpload(uploadList, selectedNode.id);
         }
 
-                async function performRecursiveUpload(list, rootTargetId) {
-            const folderMap = {"": rootTargetId };
+        async function performRecursiveUpload(list, rootTargetId) {
+            const folderMap = { "": rootTargetId };
             const uniquePaths = [...new Set(list.map(x => x.relPath).filter(p => p !== ""))].sort();
 
-                const statusDiv = document.getElementById('uploadStatus');
-                statusDiv.classList.remove('hidden');
-                const uiProgress = document.getElementById('progressBar');
-                const percentText = document.getElementById('uploadPercent');
+            const statusDiv = document.getElementById('uploadStatus');
+            statusDiv.classList.remove('hidden');
+            const uiProgress = document.getElementById('progressBar');
+            const percentText = document.getElementById('uploadPercent');
 
-                // Create Folders
-                for (let i = 0; i < uniquePaths.length; i++) {
+            // Create Folders
+            for (let i = 0; i < uniquePaths.length; i++) {
                 const fullPath = uniquePaths[i];
                 if (folderMap[fullPath]) continue;
 
@@ -627,20 +626,20 @@
 
                 if (parentId) {
                     setStatus(`Creating folder: ${fullPath}`);
-                const newId = await createFolder(parentId, name);
-                if (!newId) {
-                    alert(`Failed to create folder: ${name}. Stopping upload.`);
-                return;
+                    const newId = await createFolder(parentId, name);
+                    if (!newId) {
+                        alert(`Failed to create folder: ${name}. Stopping upload.`);
+                        return;
                     }
-                folderMap[fullPath] = newId;
+                    folderMap[fullPath] = newId;
                 }
 
                 const pct = Math.round((i / (uniquePaths.length + list.length)) * 100);
                 uiProgress.style.width = `${pct}%`;
             }
 
-                // Upload Files
-                for (let i = 0; i < list.length; i++) {
+            // Upload Files
+            for (let i = 0; i < list.length; i++) {
                 const item = list[i];
                 const targetId = folderMap[item.relPath] || rootTargetId;
 
@@ -652,40 +651,40 @@
                 percentText.innerText = `${pct}%`;
             }
 
-                setStatus("Complete!");
+            setStatus("Complete!");
             setTimeout(() => statusDiv.classList.add('hidden'), 3000);
 
-                // Refresh User Interface
-                if (selectedNode && selectedNode.row) {
-                    selectedNode.row.dataset.loaded = 'false';
+            // Refresh User Interface
+            if (selectedNode && selectedNode.row) {
+                selectedNode.row.dataset.loaded = 'false';
                 toggleExpand(selectedNode.row, null, selectedNode.id, selectedNode.type);
             }
         }
 
-                async function apiUploadFile(folderId, file) {
+        async function apiUploadFile(folderId, file) {
             const formData = new FormData();
-                formData.append('project_id', currentProjectId);
-                formData.append('folder_id', folderId);
-                formData.append('file', file);
+            formData.append('project_id', currentProjectId);
+            formData.append('folder_id', folderId);
+            formData.append('file', file);
 
-                try {
-                    await fetch(`${API}/upload`, { method: 'POST', body: formData });
-            } catch (e) {console.error(e); }
+            try {
+                await fetch(`${API}/upload`, { method: 'POST', body: formData });
+            } catch (e) { console.error(e); }
         }
 
-                function addDnD(row, id, type) {
-                    row.draggable = true;
+        function addDnD(row, id, type) {
+            row.draggable = true;
             row.addEventListener('dragstart', (e) => {
-                    e.dataTransfer.setData('text/plain', JSON.stringify({ id, type }));
+                e.dataTransfer.setData('text/plain', JSON.stringify({ id, type }));
                 e.dataTransfer.effectAllowed = 'move';
             });
             row.addEventListener('dragover', (e) => {
-                    e.preventDefault();
+                e.preventDefault();
                 if (type === 'folder') row.classList.add('drag-over');
             });
             row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
             row.addEventListener('drop', async (e) => {
-                    e.preventDefault();
+                e.preventDefault();
                 row.classList.remove('drag-over');
                 if (type !== 'folder') return;
 
@@ -699,7 +698,7 @@
                     setStatus("Move API not connected.");
                 }
             });
-            row.addEventListener('contextmenu', (e) => showContextMenu(e, {row, id, type, name: row.innerText.trim(), parentId: null }));
+            row.addEventListener('contextmenu', (e) => showContextMenu(e, { row, id, type, name: row.innerText.trim(), parentId: null }));
         }
 
     </script>
