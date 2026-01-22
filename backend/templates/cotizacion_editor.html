@@ -1713,7 +1713,68 @@
                         .page-sheet {
                             margin: 0 !important;
                             page-break-after: always !important;
+                            box-shadow: none !important; /* Remove page shadow */
+                            border: none !important;
                         }
+                        
+                        /* GLOBAL CLEANUP START */
+                        /* Remove ALL shadows (User request: "Quitale cualquier recuadro", "sombras en el telefono") */
+                        * {
+                            box-shadow: none !important;
+                            text-shadow: none !important;
+                            filter: none !important; /* Remove drop-shadow filters */
+                        }
+
+                        /* Remove Borders from Block Containers */
+                        .block-item {
+                            border: none !important;
+                            background-color: transparent !important; /* Remove block backgrounds */
+                        }
+
+                        /* Images: Remove any border/outline */
+                        img {
+                            border: none !important;
+                            outline: none !important;
+                            background: transparent !important;
+                        }
+
+                        /* Service/Icon Blocks: Remove container backgrounds/borders */
+                        .bg-blue-50\/20, .bg-slate-50, .bg-indigo-50, .bg-white {
+                             /* Be careful not to make text unreadable if overlaid, but user wants "clean" layout */
+                             /* Specific target for Service Cards and Icon Containers */
+                             background-color: transparent !important;
+                        }
+                        
+                        /* Specific Icon Block Cleanup */
+                        .block-service-icon, .block-icon-container, .shadow-sm, .shadow-lg, .shadow-xl {
+                            background-color: transparent !important;
+                            border: none !important;
+                            box-shadow: none !important;
+                        }
+
+                        /* Geometric Shapes: Remove wrapper styling, keep the SVG/Shape itself */
+                        .shape-content {
+                             box-shadow: none !important;
+                             /* Keep background color of the shape itself, but remove container's */
+                        }
+
+                        /* Cards: Remove "Card" look, keep content */
+                        [data-type="card"] .shadow-lg {
+                            box-shadow: none !important;
+                            border: none !important;
+                            /* If the card has a background color set by user, keep it? 
+                               User said: "A los iconos quitales el fondo". 
+                               "Fee Mensual" card looks white. 
+                               Let's assume we strip container styling. */
+                        }
+
+                        /* Timelines/Tables: Keep internal borders? 
+                           User said "eliminar cualquier reborde en todos los elementos". 
+                           But tables usually need grid lines. 
+                           I will assume "reborde" refers to the container box artifacts. 
+                           I will keep table cell borders, but remove block-item borders.
+                        */
+                        /* GLOBAL CLEANUP END */
                     }
 
                     body { 
@@ -1773,10 +1834,8 @@
                 </style>
             </head>
             <body>
-                <div id="print-wrapper">
-                    <div id="canvasContainer">
-                        ${content}
-                    </div>
+                <div id="canvasContainer">
+                    ${content}
                 </div>
                 <script>
                     window.onload = function() {
