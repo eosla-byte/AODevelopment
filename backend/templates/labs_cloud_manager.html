@@ -597,7 +597,11 @@
 
                 if (parentId) {
                     setStatus(`Creating folder: ${fullPath}`);
-                    const newId = await createFolder(parentId, name) || ("mock-" + name);
+                    const newId = await createFolder(parentId, name);
+                    if (!newId) {
+                        alert(`Failed to create folder: ${name}. Stopping upload.`);
+                        return;
+                    }
                     folderMap[fullPath] = newId;
                 }
 
@@ -620,6 +624,12 @@
 
             setStatus("Complete!");
             setTimeout(() => statusDiv.classList.add('hidden'), 3000);
+
+            // Refresh User Interface
+            if (selectedNode && selectedNode.row) {
+                selectedNode.row.dataset.loaded = 'false';
+                toggleExpand(selectedNode.row, null, selectedNode.id, selectedNode.type);
+            }
         }
 
         async function apiUploadFile(folderId, file) {
