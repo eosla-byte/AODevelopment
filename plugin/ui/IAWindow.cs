@@ -58,13 +58,13 @@ namespace RevitCivilConnector.UI
                 Padding = new Thickness(10)
             };
             StackPanel headerStack = new StackPanel { Orientation = Orientation.Horizontal };
+            headerBorder.Child = headerStack; // Fix: Assign child
             
-            // Icon (Small)
+            // Icon (Small) - Disabled for debug
+            /*
             try 
             {
                 var assembly = Assembly.GetExecutingAssembly();
-                // Ensure ia.png is available as EmbeddedResource or assume it is loaded
-                // Using a fallback text/shape if icon logic is complex here, but trying generic load
                 string resourceName = "RevitCivilConnector.Resources.ia.png";
                 using (Stream stream = assembly.GetManifestResourceStream(resourceName))
                 {
@@ -81,7 +81,8 @@ namespace RevitCivilConnector.UI
                     }
                 }
             }
-            catch {}
+            catch {} 
+            */
 
             TextBlock title = new TextBlock 
             { 
@@ -564,8 +565,6 @@ namespace RevitCivilConnector.UI
             };
             bubble.Child = tb;
 
-            _chatHistory.Children.Add(bubble);
-            _scrollViewer.ScrollToBottom();
             _chatHistory.Children.Add(bubble);
             _scrollViewer.ScrollToBottom();
         }
