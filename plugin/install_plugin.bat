@@ -9,7 +9,8 @@ echo ========================================================
 echo.
 
 :: 1. Definir Rutas
-set "SOURCE_DLL=%~dp0bin\Debug\net48\AOdev.dll"
+:: 1. Definir Rutas
+set "SOURCE_DLL=%~dp0bin\Release\net48\AOdev.dll"
 set "SOURCE_ADDIN=%~dp0AOdev_Release.addin"
 set "TARGET_DIR=%APPDATA%\Autodesk\Revit\Addins\2024"
 
@@ -20,13 +21,12 @@ echo.
 :: 2. Verificar Origen
 if not exist "%SOURCE_DLL%" (
     color 0C
-    echo [ERROR CRITICO] No se encontro el archivo DLL.
+    echo [ERROR CRITICO] No se encontro el archivo DLL (Release).
     echo Buscado en: "%SOURCE_DLL%"
     echo.
     echo SOLUCION:
-    echo 1. Abre Visual Studio.
-    echo 2. Ve al menu Build -^> Rebuild Solution.
-    echo 3. Vuelve a ejecutar este archivo.
+    echo 1. Abre Visual Studio o ejecuta build_and_install.bat
+    echo 2. Asegurate de compilar en modo RELEASE.
     echo.
     pause
     exit /b 1
@@ -48,7 +48,8 @@ del /F /Q "%TARGET_DIR%\AOdev.dll" >nul 2>&1
 
 :: 5. Copiar Archivos
 echo [2/3] Instalando archivos nuevos...
-copy /Y "%SOURCE_DLL%" "%TARGET_DIR%\AOdev.dll"
+mkdir "%TARGET_DIR%\AOdev"
+copy /Y "%SOURCE_DLL%" "%TARGET_DIR%\AOdev\AOdev.dll"
 if %ERRORLEVEL% NEQ 0 (
     color 0C
     echo.
@@ -64,7 +65,7 @@ copy /Y "%SOURCE_ADDIN%" "%TARGET_DIR%\AOdev.addin"
 
 :: 6. Verificacion Final
 echo [3/3] Verificando...
-if exist "%TARGET_DIR%\AOdev.dll" (
+if exist "%TARGET_DIR%\AOdev\AOdev.dll" (
     color 0A
     echo.
     echo ===========================================
