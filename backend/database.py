@@ -1772,18 +1772,31 @@ def get_session_by_id(session_id: str):
     finally:
         db.close()
 
-def get_latest_active_session(user_email: str):
+def get_latest_active_session(user_email: str, machine_id: str = None):
     db = SessionLocal()
     try:
         # Check for sessions active in last 5 minutes
         cutoff = datetime.datetime.now() - datetime.timedelta(minutes=5)
-        return db.query(models.PluginSession)\
-            .filter(models.PluginSession.user_email == user_email)\
-            .filter(models.PluginSession.last_heartbeat > cutoff)\
-            .order_by(models.PluginSession.last_heartbeat.desc())\
-            .first()
+        
+        query = db.query(models.PluginSession).filter(models.PluginSession.last_heartbeat > cutoff)
+        
+        if user_email and machine_id:
+             # Prioritize Email match, but fallback to Machine ID if Email is null in DB?
+             # OR condition?
+             # Let's trust Email first.
+             # Actually, simpler: Filter by Email OR Machine ID.
+             from sqlalchemy import or_
+             query = query.filter(or_(models.PluginSession.user_email == user_email, models.PluginSession.machine_id == machine_id))
+        elif user_email:
+             query = query.filter(models.PluginSession.user_email == user_email)
+        elif machine_id:
+             query = query.filter(models.PluginSession.machine_id == machine_id)
+        else:
+             return None
+
+        return query.order_by(models.PluginSession.last_heartbeat.desc()).first()
     except Exception as e:
-        print(f"Error getting active session for {user_email}: {e}")
+        print(f"Error getting active session for {user_email}/{machine_id}: {e}")
         return None
     finally:
         db.close()

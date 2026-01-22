@@ -99,17 +99,20 @@ async def apply_sheet_changes(request: Request):
         if is_stale:
             # Try to heal
             user_email = current_plugin_session.user_email if current_plugin_session else None
+            machine_id = current_plugin_session.machine_id if current_plugin_session else None
+            
             # If we don't know the email, we can't heal easily unless we stored it in sheet session.
             # But wait, we might have it if we lookup the OLD session.
             
-            if user_email:
-                new_session = get_latest_active_session(user_email)
+            if user_email or machine_id:
+                new_session = get_latest_active_session(user_email, machine_id)
                 if new_session:
                     print(f"Session Healed! Old: {plugin_session_id} -> New: {new_session.id}")
                     plugin_session_id = new_session.id
                     # Update DB for future calls
                     update_sheet_session_plugin_id(session_id, plugin_session_id)
                 else:
+                    print(f"DEBUG Apply: Heal Failed. No active session found for {user_email} on {machine_id}")
                     return JSONResponse({"status": "error", "message": "No active Revit session found for user. Please check Revit."}, status_code=400)
             else:
                  return JSONResponse({"status": "error", "message": "Original Revit Link Lost. Please re-open from Revit."}, status_code=400)
