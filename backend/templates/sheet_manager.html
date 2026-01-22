@@ -1093,6 +1093,68 @@
             input.parentElement.classList.remove('focused');
         }
 
+        // --- CLIPBOARD PASTE SUPPORT ---
+
+        document.addEventListener('paste', handlePaste);
+
+        function handlePaste(e) {
+            // Only handle if we have a focused cell input
+            const active = document.activeElement;
+            if (!active || !active.tagName === 'INPUT' || !active.closest('.grid-cell')) return;
+
+            e.preventDefault();
+            const clipboardData = (e.clipboardData || window.clipboardData).getData('text');
+            if (!clipboardData) return;
+
+            const startCell = active.closest('.grid-cell');
+            const startRowId = startCell.parentElement.dataset.rowId;
+            const startKey = startCell.dataset.col;
+
+            parseAndPaste(clipboardData, startRowId, startKey);
+        }
+
+        function parseAndPaste(text, startRowId, startKey) {
+            const rows = text.split(/\r\n|\n|\r/).filter(r => r.length > 0);
+            if (rows.length === 0) return;
+
+            const flat = flattenTree(TREE_DATA);
+            const startIdx = flat.findIndex(n => n.id === startRowId);
+            if (startIdx === -1) return;
+
+            // Determine Coilumn Order map
+            const activeParams = VISIBLE_COLS || PARAM_DEFS;
+            const COLS = ["Sheet Number", "Sheet Name", ...activeParams];
+            // Mapping Key -> Index
+            const colKeys = ["number", "name", ...activeParams.map(p => 'param:' + p)];
+
+            const startColIdx = colKeys.indexOf(startKey);
+            if (startColIdx === -1) return;
+
+            let updated = 0;
+
+            rows.forEach((rowStr, rOffset) => {
+                const targetRowIdx = startIdx + rOffset;
+                if (targetRowIdx >= flat.length) return; // Stop if OOB
+
+                const targetNode = flat[targetRowIdx];
+                const cells = rowStr.split('\t');
+
+                cells.forEach((val, cOffset) => {
+                    const targetColIdx = startColIdx + cOffset;
+                    if (targetColIdx >= colKeys.length) return; // Stop if OOB
+
+                    const targetKey = colKeys[targetColIdx];
+                    updateNodeData(targetNode.id, targetKey, val.trim());
+                    updated++;
+                });
+            });
+
+            if (updated > 0) {
+                renderGrid();
+                // alert(`Pegados ${updated} valores.`);
+            }
+        }
+
         // --- PHASE 3 LOGIC (Groups, Import, Add) ---
 
         // 1. Group Config
@@ -1145,7 +1207,7 @@
             renderGrid();
         }
 
-        // 3. Excel Import
+        // 3. Excel Import with Conflict Resolution
         async function handleExcelUpload(input) {
             const file = input.files[0];
             if (!file) return;
@@ -1153,89 +1215,186 @@
             const buffer = await file.arrayBuffer();
             const workbook = XLSX.read(buffer);
 
-            // Show Sheet Selection Modal
+            // Show Sheet Selection
             const selectedSheetNames = await selectExcelSheets(workbook.SheetNames);
             if (!selectedSheetNames || selectedSheetNames.length === 0) {
                 input.value = "";
                 return;
             }
 
-            let addedCount = 0;
-            let updatedCount = 0;
-            let skippedCount = 0;
+            const flat = flattenTree(TREE_DATA);
+            const existingNumbers = new Set(flat.filter(n => n.type === 'sheet').map(n => n.number));
+
+            let newSheetsBuffer = [];
+            let conflictSheetsBuffer = []; // { rawData, existingNode }
 
             selectedSheetNames.forEach(sheetName => {
                 const sheet = workbook.Sheets[sheetName];
-                // raw:false ensures we get formatted strings, but raw values better for logic. 
-                // Using generic json
                 const rows = XLSX.utils.sheet_to_json(sheet);
 
                 rows.forEach(row => {
-                    // Validation: Skip Empty Rows
-                    // Check if row has meaningful data
+                    // Validation
                     const values = Object.values(row).filter(v => v !== null && v !== "" && v !== undefined);
-                    if (values.length === 0) {
-                        skippedCount++;
-                        return;
-                    }
+                    if (values.length === 0) return;
 
-                    // Try to match "Sheet Number"
                     const numKey = Object.keys(row).find(k => k.toLowerCase().includes("number") || k.toLowerCase().includes("numero"));
-                    // Try to match "Sheet Name"
                     const nameKey = Object.keys(row).find(k => k.toLowerCase().includes("name") || k.toLowerCase().includes("nombre"));
 
-                    if (!numKey) {
-                        skippedCount++;
-                        return;
-                    }
-
+                    if (!numKey) return;
                     const sNum = String(row[numKey]).trim();
-                    if (!sNum) {
-                        skippedCount++;
-                        return;
-                    }
-
+                    if (!sNum) return;
                     const sName = nameKey ? String(row[nameKey]).trim() : "Unnamed";
 
-                    // Check if exists in Tree (DFS search)
-                    let existing = null;
-                    const flat = flattenTree(TREE_DATA);
-                    existing = flat.find(n => n.type === 'sheet' && n.number === sNum);
+                    // Parse Params
+                    const params = {};
+                    Object.keys(row).forEach(k => {
+                        if (k !== numKey && k !== nameKey && PARAM_DEFS.includes(k)) {
+                            params[k] = String(row[k]);
+                        }
+                    });
 
-                    if (existing) {
-                        existing.name = sName;
-                        // Update Params
-                        Object.keys(row).forEach(k => {
-                            if (k !== numKey && k !== nameKey && PARAM_DEFS.includes(k)) {
-                                existing.params[k] = String(row[k]);
-                            }
-                        });
-                        updatedCount++;
+                    const sheetObj = {
+                        number: sNum,
+                        name: sName,
+                        params: params
+                    };
+
+                    if (existingNumbers.has(sNum)) {
+                        conflictSheetsBuffer.push(sheetObj);
                     } else {
-                        // New Sheet (Add to Root)
-                        const newS = {
-                            id: generateId(),
-                            type: 'sheet',
-                            number: sNum,
-                            name: sName,
-                            params: {},
-                            children: []
-                        };
-                        Object.keys(row).forEach(k => {
-                            if (k !== numKey && k !== nameKey && PARAM_DEFS.includes(k)) {
-                                newS.params[k] = String(row[k]);
-                            }
-                        });
-                        TREE_DATA.push(newS);
-                        addedCount++;
+                        newSheetsBuffer.push(sheetObj);
                     }
                 });
             });
 
-            alert(`Importación Completa:\n- Agregados: ${addedCount}\n- Actualizados: ${updatedCount}\n- Omitidos (Vacíos/Sin Número): ${skippedCount}`);
-            renderTree();
-            renderGrid();
-            input.value = ""; // reset
+            // Process Non-Conflicting Immediately
+            if (newSheetsBuffer.length > 0) {
+                newSheetsBuffer.forEach(s => {
+                    TREE_DATA.push({
+                        id: generateId(),
+                        type: 'sheet',
+                        number: s.number,
+                        name: s.name,
+                        params: s.params,
+                        children: []
+                    });
+                });
+            }
+
+            // Handle Conflicts
+            if (conflictSheetsBuffer.length > 0) {
+                showConflictModal(conflictSheetsBuffer, () => {
+                    input.value = ""; // Cleanup
+                    renderTree();
+                    renderGrid();
+                });
+            } else {
+                input.value = "";
+                renderTree();
+                renderGrid();
+                alert(`${newSheetsBuffer.length} sheets importados.`);
+            }
+        }
+
+        function showConflictModal(conflicts, onComplete) {
+            const html = `
+            <div id="conflict-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                <div class="bg-[#252526] p-6 rounded shadow-xl w-[600px] border border-[#3e3e42] flex flex-col max-h-[80vh]">
+                    <div class="flex items-center gap-3 mb-4 text-yellow-500">
+                        <i class="fas fa-exclamation-triangle text-2xl"></i>
+                        <h2 class="text-xl font-bold text-white">Conflictos Encontrados: ${conflicts.length}</h2>
+                    </div>
+                    <p class="text-sm text-gray-400 mb-4">Algunos números de sheet ya existen en el sistema. ¿Qué acción deseas realizar?</p>
+                    
+                    <div class="flex gap-2 mb-4 border-b border-[#3e3e42] pb-4">
+                        <button onclick="resolveConflicts('ignore')" class="flex-1 bg-[#3e3e42] hover:bg-[#4e4e52] text-white py-2 rounded text-sm font-bold">
+                            🛑 Ignorar (Conservar Actual)
+                        </button>
+                        <button onclick="resolveConflicts('overwrite')" class="flex-1 bg-red-800 hover:bg-red-700 text-white py-2 rounded text-sm font-bold">
+                            🔄 Sobrescribir Todo
+                        </button>
+                    </div>
+
+                    <div class="flex justify-between items-center mb-2">
+                         <span class="text-xs font-bold text-gray-300">Selección Manual (Marcar para Sobrescribir)</span>
+                         <div>
+                            <button onclick="toggleAllConflicts(true)" class="text-[10px] bg-[#3e3e42] px-2 py-1 rounded hover:text-white">Marcar Todos</button>
+                            <button onclick="toggleAllConflicts(false)" class="text-[10px] bg-[#3e3e42] px-2 py-1 rounded hover:text-white">Desmarcar</button>
+                         </div>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto custom-scrollbar border border-[#3e3e42] rounded bg-[#1e1e1e] p-2 mb-4">
+                        <ul id="conflict-list" class="space-y-1">
+                            ${conflicts.map((c, i) => `
+                            <li class="flex items-center gap-3 p-2 hover:bg-[#2d2d2d] rounded">
+                                <input type="checkbox" id="conflict-chk-${i}" class="conflict-check form-checkbox text-[#007acc] rounded bg-[#2d2d2d] border-[#555]" checked>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex justify-between">
+                                        <span class="font-mono text-green-400 text-xs font-bold">${c.number}</span>
+                                        <span class="text-[10px] text-gray-500">Conflict</span>
+                                    </div>
+                                    <div class="text-xs text-gray-300 truncate">${c.name}</div>
+                                </div>
+                            </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button onclick="resolveConflicts('manual')" class="bg-[#007acc] hover:bg-[#005a9e] text-white px-6 py-2 rounded font-bold shadow">
+                            Aplicar Selección
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            document.body.appendChild(wrapper.firstElementChild);
+
+            // Bind Resolve Logic
+            window.resolveConflicts = (mode) => {
+                const flat = flattenTree(TREE_DATA);
+
+                if (mode === 'ignore') {
+                    // Do nothing for conflicts
+                    alert("Se ignoraron los conflictos.");
+                } else if (mode === 'overwrite') {
+                    // Apply ALL
+                    conflicts.forEach(c => applyConflictUpdate(c, flat));
+                    alert(`${conflicts.length} sheets actualizados.`);
+                } else if (mode === 'manual') {
+                    // Check checkboxes
+                    let count = 0;
+                    conflicts.forEach((c, i) => {
+                        const chk = document.getElementById(`conflict-chk-${i}`);
+                        if (chk && chk.checked) {
+                            applyConflictUpdate(c, flat);
+                            count++;
+                        }
+                    });
+                    alert(`${count} sheets actualizados.`);
+                }
+
+                document.getElementById('conflict-modal').remove();
+                delete window.resolveConflicts;
+                if (onComplete) onComplete();
+            };
+
+            window.toggleAllConflicts = (state) => {
+                document.querySelectorAll('.conflict-check').forEach(chk => chk.checked = state);
+            }
+        }
+
+        function applyConflictUpdate(excelData, flatNodes) {
+            const node = flatNodes.find(n => n.type === 'sheet' && n.number === excelData.number);
+            if (node) {
+                node.name = excelData.name;
+                // Merge params
+                Object.keys(excelData.params).forEach(k => {
+                    node.params[k] = excelData.params[k];
+                });
+            }
         }
 
         function selectExcelSheets(sheetNames) {
