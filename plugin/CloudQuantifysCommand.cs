@@ -154,7 +154,7 @@ namespace RevitCivilConnector
 
                 if (success)
                 {
-                     // Force start polling to ensure bridge is active
+                     // Force start polling to ensure bridge is active (Fix for Re-Open)
                      AuthService.Instance.ActiveCommandSessionId = sessionId;
                      AuthService.Instance.StartCommandPolling();
 

@@ -242,12 +242,12 @@ namespace RevitCivilConnector
                  b1.Image = GetIcon("icono7.png"); // Small Image
                  b1.ToolTip = (i == 1) ? "Gestor Avanzado de Sheets (Exp 01)" : $"Experimental Function {i}";
 
-                 // EXP 02 -> Cloud Manager (was generic Exp 02)
-                 // Replaces: PushButtonData b2 = new PushButtonData($"cmdExp{i+1}", $"Exp {i+1:00}", assemblyPath, "RevitCivilConnector.IACommand");
-                 string cmd2Class = (i == 1) ? "RevitCivilConnector.CloudQuantifysCommand" : "RevitCivilConnector.IACommand";
+                 // EXP 02 -> Cloud Manager (Standalone)
+                 // Replaces: CloudQuantifysCommand (which is now only for Cloud Quantify button)
+                 string cmd2Class = (i == 1) ? "RevitCivilConnector.Commands.CloudManagerCommand" : "RevitCivilConnector.IACommand";
                  string name2 = (i == 1) ? "Cloud\nManager" : $"Exp {i+1:00}";
                  string icon2 = (i == 1) ? "icono13.png" : "icono7.png";
-                 string tip2 = (i == 1) ? "Acceso directo a Cloud Manager" : $"Experimental Function {i+1}";
+                 string tip2 = (i == 1) ? "Acceso directo a Cloud Manager (SomosAO)" : $"Experimental Function {i+1}";
 
                  PushButtonData b2 = new PushButtonData($"cmdExp{i+1}", name2, assemblyPath, cmd2Class);
                  b2.Image = GetIcon(icon2);

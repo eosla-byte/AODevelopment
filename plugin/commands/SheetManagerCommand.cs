@@ -79,6 +79,15 @@ namespace RevitCivilConnector.Commands
                 string resultUrl = null;
                 string errorMsg = null;
 
+                // Ensure Bridge is Active (Polling) - Fix for Connectivity
+                // Sheet Manager likely uses the Login Session ID if no specific session is bound
+                if (string.IsNullOrEmpty(AuthService.Instance.ActiveCommandSessionId))
+                {
+                     // Fallback to Login Session
+                     AuthService.Instance.ActiveCommandSessionId = AuthService.Instance.SessionId;
+                }
+                AuthService.Instance.StartCommandPolling();
+
                 // Run on ThreadPool to avoid Deadlock, block Main Thread until done
                 var task = Task.Run(async () => 
                 {
