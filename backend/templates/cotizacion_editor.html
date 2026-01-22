@@ -1718,17 +1718,13 @@
                         }
                         
                         /* GLOBAL CLEANUP START */
-                        /* Remove ALL shadows (User request: "Quitale cualquier recuadro", "sombras en el telefono") */
-                        * {
-                            box-shadow: none !important;
-                            text-shadow: none !important;
-                            filter: none !important; /* Remove drop-shadow filters */
-                        }
-
-                        /* Remove Borders from Block Containers */
+                        
+                        /* Remove Borders from Block Containers but verify if users use them? 
+                           Likely yes for Tables. The .block-item border is usually the hover border (transparent).
+                        */
                         .block-item {
                             border: none !important;
-                            background-color: transparent !important; /* Remove block backgrounds */
+                            /* background-color: transparent !important;  <-- REMOVED to allow colored shapes/cards */
                         }
 
                         /* Images: Remove any border/outline */
@@ -1738,42 +1734,17 @@
                             background: transparent !important;
                         }
 
-                        /* Service/Icon Blocks: Remove container backgrounds/borders */
-                        .bg-blue-50\/20, .bg-slate-50, .bg-indigo-50, .bg-white {
-                             /* Be careful not to make text unreadable if overlaid, but user wants "clean" layout */
-                             /* Specific target for Service Cards and Icon Containers */
-                             background-color: transparent !important;
-                        }
-                        
-                        /* Specific Icon Block Cleanup */
-                        .block-service-icon, .block-icon-container, .shadow-sm, .shadow-lg, .shadow-xl {
-                            background-color: transparent !important;
-                            border: none !important;
-                            box-shadow: none !important;
-                        }
-
-                        /* Geometric Shapes: Remove wrapper styling, keep the SVG/Shape itself */
+                        /* Geometric Shapes: Keep Visuals */
                         .shape-content {
-                             box-shadow: none !important;
-                             /* Keep background color of the shape itself, but remove container's */
+                             /* Allow shadows if part of design */
                         }
 
-                        /* Cards: Remove "Card" look, keep content */
+                        /* Cards: Remove "Card" look if needed, but keep content bg */
                         [data-type="card"] .shadow-lg {
                             box-shadow: none !important;
                             border: none !important;
-                            /* If the card has a background color set by user, keep it? 
-                               User said: "A los iconos quitales el fondo". 
-                               "Fee Mensual" card looks white. 
-                               Let's assume we strip container styling. */
                         }
 
-                        /* Timelines/Tables: Keep internal borders? 
-                           User said "eliminar cualquier reborde en todos los elementos". 
-                           But tables usually need grid lines. 
-                           I will assume "reborde" refers to the container box artifacts. 
-                           I will keep table cell borders, but remove block-item borders.
-                        */
                         /* GLOBAL CLEANUP END */
                     }
 
@@ -2021,6 +1992,32 @@
         class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded italic text-slate-700">I</button>
     <button onclick="document.execCommand('underline',false,null)"
         class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded underline text-slate-700">U</button>
+    <div class="w-px bg-slate-200 mx-1"></div>
+    <!-- Alignment -->
+    <button onclick="document.execCommand('justifyLeft',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-700" title="Izquierda">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h16"></path>
+        </svg>
+    </button>
+    <button onclick="document.execCommand('justifyCenter',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-700" title="Centro">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M4 18h16"></path>
+        </svg>
+    </button>
+    <button onclick="document.execCommand('justifyRight',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-700" title="Derecha">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M4 18h16"></path>
+        </svg>
+    </button>
+    <button onclick="document.execCommand('justifyFull',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-700" title="Justificar">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+    </button>
     <div class="w-px bg-slate-200 mx-1"></div>
     <input type="color" onchange="document.execCommand('foreColor', false, this.value)"
         class="w-8 h-8 p-0 border-none rounded cursor-pointer" title="Color de texto">
