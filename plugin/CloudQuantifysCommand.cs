@@ -89,28 +89,67 @@ namespace RevitCivilConnector
                 // 2. Send to Backend
                 string json = JsonConvert.SerializeObject(payload);
                 string backendUrl = "https://aodevelopment-production.up.railway.app/api/plugin/cloud/sync-quantities";
+                string validateUrl = "https://aodevelopment-production.up.railway.app/api/plugin/validate-token";
+
+                // TOKEN VALIDATION START
+                bool isTokenValid = false;
+                if (AuthService.Instance.IsLoggedIn)
+                {
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            using (HttpClient client = new HttpClient())
+                            {
+                                var valPayload = new { token = AuthService.Instance.AccessToken };
+                                var valContent = new StringContent(JsonConvert.SerializeObject(valPayload), Encoding.UTF8, "application/json");
+                                var valResp = await client.PostAsync(validateUrl, valContent);
+                                if (valResp.IsSuccessStatusCode)
+                                {
+                                    var valStr = await valResp.Content.ReadAsStringAsync();
+                                    dynamic valJson = JsonConvert.DeserializeObject(valStr);
+                                    isTokenValid = (bool)valJson.valid;
+                                }
+                            }
+                        }
+                        catch { }
+                    }).Wait();
+                }
+
+                if (!isTokenValid)
+                {
+                    // Prompt Re-Login
+                    TaskDialog.Show("Sesión Expirada", "Su sesión ha expirado. Por favor, inicie sesión nuevamente para continuar.");
+                    var loginWin = new RevitCivilConnector.UI.LoginWindow();
+                    bool? resLogin = loginWin.ShowDialog();
+                    if (resLogin != true || !AuthService.Instance.IsLoggedIn)
+                    {
+                        return Result.Cancelled;
+                    }
+                }
+                // TOKEN VALIDATION END
 
                 // Synchronous HTTP call to ensure data is there before opening browser
                 // Using Task.Run to avoid UI blocking context issues slightly, but waiting.
                 bool success = false;
                 Task.Run(async () => 
                 {
-                   try 
-                   {
-                       using (HttpClient client = new HttpClient())
-                       {
-                           if (AuthService.Instance.IsLoggedIn)
+                    try 
+                    {
+                        using (HttpClient client = new HttpClient())
+                        {
+                            if (AuthService.Instance.IsLoggedIn)
                                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", AuthService.Instance.AccessToken);
 
-                           var content = new StringContent(json, Encoding.UTF8, "application/json");
-                           var response = await client.PostAsync(backendUrl, content);
-                           success = response.IsSuccessStatusCode;
-                       }
-                   }
-                   catch (Exception ex)
-                   {
-                       Debug.WriteLine("Cloud Sync Error: " + ex.Message);
-                   }
+                            var content = new StringContent(json, Encoding.UTF8, "application/json");
+                            var response = await client.PostAsync(backendUrl, content);
+                            success = response.IsSuccessStatusCode;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("Cloud Sync Error: " + ex.Message);
+                    }
                 }).Wait(); 
 
                 if (success)
@@ -120,7 +159,6 @@ namespace RevitCivilConnector
                      AuthService.Instance.StartCommandPolling();
 
                      // 3. Open Browser
-                     // Production URL
                      // Production URL
                      string token = Uri.EscapeDataString(AuthService.Instance.AccessToken ?? "");
                      string frontendUrl = "https://aodevelopment-production.up.railway.app/cqt-tool?session_id=" + sessionId + "&token=" + token;

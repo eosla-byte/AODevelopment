@@ -40,6 +40,9 @@ class SyncLogRequest(BaseModel):
     file_name: str
     central_path: str
 
+class TokenValidationRequest(BaseModel):
+    token: str
+
 # --- Routes ---
 
 @router.post("/login")
@@ -136,6 +139,15 @@ async def plugin_sync(req: SyncLogRequest):
     log_plugin_sync(req.session_id, req.file_name, req.central_path)
     return {"status": "Logged"}
 
+@router.post("/validate-token")
+async def validate_token_endpoint(req: TokenValidationRequest):
+    from auth_utils import decode_access_token
+    payload = decode_access_token(req.token)
+    if payload:
+        return {"valid": True, "expires": payload.get("exp"), "user": payload.get("sub")}
+    else:
+        return {"valid": False}
+
 
 from takeoff_database import save_project_packages, get_project_packages
 
@@ -155,8 +167,7 @@ async def get_takeoff(project_id: str, token: str = Depends(verify_token_dep)):
     data = get_project_packages(project_id)
     # Return as raw json string or parsed object? 
     # Let's return as object to be clean, or raw string inside a field.
-    # To avoid double parsing overhead here, we can just return it as a string field or generic dict.
-    # But FastAPI handles list of dicts safely.
+    # To avoid double parsing overhead here, we can just return it as a generic dict.
     try:
         parsed = json.loads(data)
         return parsed
@@ -213,4 +224,3 @@ def get_routines_endpoint(user_email: Optional[str] = None):
         }
         for r in routines
     ]
-
