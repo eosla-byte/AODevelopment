@@ -12,10 +12,6 @@
     <!-- SortableJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 
-    <!-- Handsontable (or simple custom grid) -->
-    <!-- Handsontable is paid for commercial. Let's use a custom lightweight grid to avoid license issues 
-         and ensure perfect sync with left panel slots -->
-
     <style>
         body {
             font-family: 'Roboto', sans-serif;
@@ -206,8 +202,8 @@
                 <div class="flex gap-1">
                     <button class="text-gray-400 hover:text-white" onclick="addGroup()" title="Add Group Separator"><i
                             class="fas fa-folder-plus"></i></button>
-                    <button class="text-gray-400 hover:text-white" onclick="deleteSelected()" title="Remove Selected"><i
-                            class="fas fa-trash"></i></button>
+                    <!-- <button class="text-gray-400 hover:text-white" onclick="deleteSelected()" title="Remove Selected"><i
+                            class="fas fa-trash"></i></button> -->
                 </div>
             </div>
 
@@ -218,20 +214,20 @@
                     oninput="filterSheets(this.value)">
             </div>
 
-            <div class="flex-1 overflow-y-auto" id="structure-container">
-                <!-- Drop Zone for Sorting -->
-                <div id="sheets-list" class="min-h-full pb-20">
-                    <!-- Sheet Items Injected Here -->
-                </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-2" id="structure-container">
+                <!-- ROOT LIST -->
+                <ul id="tree-root" class="nested-sortable space-y-[2px]">
+                    <!-- Items Injected Here -->
+                </ul>
             </div>
         </aside>
 
         <!-- RIGHT: Data Grid -->
         <main class="flex-1 flex flex-col bg-[#1e1e1e] overflow-hidden relative">
             <div class="panel-header">
-                <span>Editor de Parámetros (Fila N = Sheet en Posición N)</span>
-                <span class="ml-4 text-xs text-gray-500 italic">Arrastra en el panel izquierdo para reordenar. Los datos
-                    permanecen en su fila (slot).</span>
+                <span>Editor de Parámetros (Orden Definido por Estructura)</span>
+                <span class="ml-4 text-xs text-gray-500 italic">Mover un item a la izquierda mueve toda su fila de
+                    datos.</span>
             </div>
 
             <div class="flex flex-1 overflow-hidden relative" id="grid-container">
@@ -240,16 +236,6 @@
                     <!-- 1, 2, 3... -->
                 </div>
 
-                <!-- Scrollable Grid -->
-                <!-- Enable native resize via CSS on headers -->
-                <style>
-                    .grid-col-header {
-                        resize: horizontal;
-                        overflow: hidden;
-                    }
-
-                    /* Splitter logic would require JS, let's stick to CSS resize for columns first */
-                </style>
                 <div class="flex-1 overflow-auto custom-scrollbar" onscroll="syncScroll(this)">
                     <div id="data-grid-content" style="min-width: 1000px;">
                         <!-- Headers + Input Rows -->
@@ -265,63 +251,12 @@
         let SESSION_ID = new URLSearchParams(window.location.search).get('session_id');
         let API_BASE = "/api/plugin/sheets";
 
-        let SHEETS = []; // Original Loaded Sheets [{id, number, name, params:{}}]
-        let GROUPS = []; // Virtual Group Headers { id: 'g-1', name: 'Series 100', index: 0 } (MVP: Just insert into list?)
-        // Better: Manipulate the SHEETS array to include "Group Items"?
-        // Or just Filter the list view?
+        // APP STATE
+        let PARAM_DEFS = [];
 
-
-
-        // ... init ...
-
-        // --- FILTER ---
-        function filterSheets(query) {
-            const list = document.getElementById('sheets-list');
-            const items = list.querySelectorAll('.sheet-item');
-            const hiddenClass = 'hidden';
-
-            query = query.toLowerCase();
-
-            items.forEach(item => {
-                const num = item.querySelector('.font-mono').innerText.toLowerCase();
-                const name = item.querySelectorAll('span')[1].innerText.toLowerCase();
-                if (num.includes(query) || name.includes(query)) {
-                    item.style.display = 'flex';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-        }
-
-        // --- GROUPS ---
-        function addGroup() {
-            const name = prompt("Nombre del Grupo:", "Nuevo Grupo");
-            if (!name) return;
-
-            // Inject a visual group item
-            const container = document.getElementById('sheets-list');
-            const id = "grp-" + Date.now();
-            const html = `
-    <div class="sheet-item group-header bg-gray-700 font-bold text-white pl-2" data-type="group" data-id="${id}">
-        <i class="fas fa-folder text-yellow-500 mr-2"></i>
-        <span contenteditable="true" class="outline-none">${name}</span>
-        <i class="fas fa-trash ml-auto text-xs text-gray-500 cursor-pointer hover:text-red-500 p-2"
-            onclick="this.parentElement.remove()"></i>
-    </div>
-    `;
-            container.insertAdjacentHTML('beforeend', html);
-        }
-        let PARAM_DEFS = []; // [ "Drawn By", "Checked By", ... ]
-        let GRID_DATA = []; // Array of Rows (Objects) { "Sheet Number": "", "Sheet Name": "", ...params }
-        // GRID_DATA[i] corresponds to the i-th SLOT.
-        // When we reorder LEFT, the sheet at index i takes data from GRID_DATA[i].
-
-        // Wait... Requirements Interpretation Check:
-        // "La fila 1 del panel izquierdo (Sheet 1) tomará los valores de la fila 1 del panel derecho."
-        // "Al reordenar... el sheet en posicion 1 toma valores de Fila 1".
-        // This means GRID DATA represents the TARGET STATE for the SLOTS.
-        // It acts like a "Template".
-        // Initial state: GRID_DATA[i] is filled with SHEETS[i]'s current data.
+        // Tree Data: Recursive Structure
+        // Node: { id: string, type: 'sheet'|'group', name: string, number: string, params: {}, children: [], collapsed: false }
+        let TREE_DATA = [];
 
         document.addEventListener('DOMContentLoaded', init);
 
@@ -340,116 +275,193 @@
 
                 const data = json.data;
                 document.getElementById('project-name').innerText = data.project;
-                SHEETS = data.sheets;
+
+                // Init Params
                 PARAM_DEFS = data.param_definitions || [];
+                PARAM_DEFS = PARAM_DEFS.filter(p => p !== "Sheet Number" && p !== "Sheet Name");
+
+                // INIT TREE DATA
+                // If backend provides a flat list (Sheets), we init a flat tree.
+                // CURRENT BACKEND provides 'sheets' list.
+
+                TREE_DATA = data.sheets.map(s => ({
+                    id: s.id || generateId(),
+                    type: 'sheet',
+                    number: s.number,
+                    name: s.name,
+                    params: s.params_data || {},
+                    children: []
+                }));
+
+                renderTree();
+                renderGrid();
+
             } catch (err) {
                 console.error(err);
                 document.body.innerHTML += `
                 <div class="fixed inset-0 bg-black/90 flex flex-col items-center justify-center z-50 text-center p-8">
                     <i class="fas fa-exclamation-triangle text-6xl text-red-500 mb-4"></i>
-                    <h1 class="text-3xl font-bold text-white mb-2">Sesión Expirada o Inválida</h1>
-                    <p class="text-gray-400 max-w-md mb-6">No se pudo recuperar la información de la sesión. Es posible que el servidor se haya reiniciado o el enlace haya caducado.</p>
+                    <h1 class="text-3xl font-bold text-white mb-2">Sesión Error</h1>
+                    <p class="text-gray-400 max-w-md mb-6">${err.message}</p>
                     <button onclick="window.close()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded font-bold">Cerrar</button>
                 </div>
                 `;
-                return;
+            }
+        }
+
+        function generateId() {
+            return 'id-' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // --- RENDER TREE (Left Panel) ---
+
+        function renderTree() {
+            const root = document.getElementById('tree-root');
+            root.innerHTML = '';
+
+            TREE_DATA.forEach(node => {
+                root.appendChild(createNodeElement(node));
+            });
+
+            initSortables();
+        }
+
+        function createNodeElement(node) {
+            const li = document.createElement('li');
+            li.dataset.id = node.id;
+            li.dataset.type = node.type;
+            li.className = "relative";
+
+            if (node.type === 'group') {
+                li.innerHTML = `
+                    <div class="sheet-item group-header bg-[#2d2d2d] border border-[#3e3e42] mb-[2px] rounded flex items-center pr-2">
+                        <i class="fas fa-grip-vertical drag-handle text-gray-600 cursor-grab px-2 py-1"></i>
+                        <i class="fas fa-folder text-yellow-500 mr-2 text-sm"></i>
+                        <span class="font-bold text-xs text-gray-300 flex-1 py-1 outline-none" contenteditable="true" onblur="updateNodeName('${node.id}', this.innerText)">${node.name}</span>
+                        <i class="fas fa-trash text-[10px] text-gray-600 hover:text-red-500 cursor-pointer p-1" onclick="deleteNode('${node.id}')"></i>
+                    </div>
+                    <ul class="nested-sortable ml-4 border-l border-[#3e3e42] pl-1 space-y-[2px] min-h-[10px] pb-1">
+                        <!-- Children -->
+                    </ul>
+                `;
+
+                const ul = li.querySelector('ul');
+                if (node.children) {
+                    node.children.forEach(child => {
+                        ul.appendChild(createNodeElement(child));
+                    });
+                }
+
+            } else {
+                // SHEET
+                li.innerHTML = `
+                    <div class="sheet-item bg-[#252526] hover:bg-[#2a2d2e] border-b border-[#2d2d2d] flex items-center h-[32px] pr-2" onclick="highlightRow('${node.id}')">
+                        <i class="fas fa-grip-vertical drag-handle text-gray-600 cursor-grab px-2"></i>
+                        <i class="fas fa-file-alt text-blue-400 mr-2 text-xs"></i>
+                        <span class="font-mono text-xs text-green-400 mr-2 w-16 truncate" title="${node.number}">${node.number}</span>
+                        <span class="text-xs text-gray-300 truncate flex-1" title="${node.name}">${node.name}</span>
+                    </div>
+                `;
             }
 
-            // Prioritize Number and Name
-            PARAM_DEFS = PARAM_DEFS.filter(p => p !== "Sheet Number" && p !== "Sheet Name");
-            const COLS = ["Sheet Number", "Sheet Name", ...PARAM_DEFS];
-
-            // Init Grid Data from Sheets (Identity Mapping initially)
-            GRID_DATA = SHEETS.map(s => {
-                let row = { "Sheet Number": s.number, "Sheet Name": s.name };
-                PARAM_DEFS.forEach(p => row[p] = s.params_data[p] || "");
-                return row;
-            });
-
-            renderStructure();
-            renderGrid(COLS);
+            return li;
         }
 
-        // --- RENDER Structure (Left) ---
-        function renderStructure() {
-            const container = document.getElementById('sheets-list');
-            container.innerHTML = SHEETS.map((s, idx) => `
-    <div class="sheet-item" data-id="${s.id}" onclick="selectSheet(this)">
-        <i class="fas fa-grip-vertical drag-handle"></i>
-        <i class="fas fa-file-alt text-blue-400 mr-2"></i>
-        <span class="truncate font-mono text-xs mr-2 text-gray-400" id="lbl-num-${s.id}">${s.number}</span>
-        <span class="truncate" id="lbl-name-${s.id}">${s.name}</span>
-    </div>
-    `).join('');
+        function initSortables() {
+            const nestedSortables = document.querySelectorAll('.nested-sortable');
 
-            // Init Sortable
-            new Sortable(container, {
-                handle: '.drag-handle',
-                animation: 150,
-                onEnd: function (evt) {
-                    // Reordered DOM. The mapping Sheet[i] -> GridRow[i] changes implicitly by position.
-                    // We might want to visually update the Sheet Item Labels to match the New Slot's Data?
-                    // User requirement: "La fila 1... tomará los valores de la fila 1".
-                    // So if I move Sheet X to Pos 1, Short X should visually update to show Data from Row 1?
-                    // "Permitir reordenar... El orden definido aquí será el orden final aplicado en Revit."
-                    // If the user wants to RENUMBER, they edit the Grid.
-                    // If they want to just SORT, they drag.
-                    // If dragging changes the association to the data row, then the sheet effectively MORPHS into the target slot data.
-                    // Let's assume the Grid Data describes "The Sheet that ends up here".
-                    // Visual update is nice but optional for MVP.
-                    updateSheetLabelsFromGrid();
+            nestedSortables.forEach(el => {
+                new Sortable(el, {
+                    group: 'nested', // Shared group for drag between lists
+                    handle: '.drag-handle',
+                    animation: 150,
+                    fallbackOnBody: true,
+                    swapThreshold: 0.65,
+                    onEnd: function (evt) {
+                        // REBUILD TREE DATA FROM DOM
+                        rebuildTreeFromDOM();
+                        renderGrid(); // Sync Logic: Grid order adapts to Tree order
+                    }
+                });
+            });
+        }
+
+        function rebuildTreeFromDOM() {
+            const rootUl = document.getElementById('tree-root');
+            TREE_DATA = parseUl(rootUl);
+        }
+
+        function parseUl(ul) {
+            const nodes = [];
+            Array.from(ul.children).forEach(li => {
+                const id = li.dataset.id;
+                // Find original node data (preserve params!)
+                const original = findNodeRecursive(id, TREE_DATA);
+
+                if (original) {
+                    const newNode = { ...original };
+
+                    if (original.type === 'group') {
+                        const childUl = li.querySelector('ul');
+                        newNode.children = childUl ? parseUl(childUl) : [];
+                    }
+                    else {
+                        newNode.children = [];
+                    }
+
+                    nodes.push(newNode);
                 }
             });
+            return nodes;
         }
 
-        function updateSheetLabelsFromGrid() {
-            // Iterate DOM elements in order
-            const items = document.querySelectorAll('.sheet-item');
-            items.forEach((item, idx) => {
-                const rowData = GRID_DATA[idx];
-                if (rowData) {
-                    // Update the label in the left panel to reflect the assigned data?
-                    // Actually, usually the Left Panel shows "Current Identity".
-                    // But if "Row 1" assigns "A-101", and I drag "A-105" to Slot 1,
-                    // it implies "A-105" will be RENAMED to "A-101".
-                    // So showing "A-101" on the left item helps visualize the result.
-
-                    const numSpan = item.querySelector('.font-mono');
-                    const nameSpan = item.querySelectorAll('span')[1];
-
-                    // Show "Old -> New" ? or Just New.
-                    // Let's show New.
-                    numSpan.innerText = rowData["Sheet Number"];
-                    nameSpan.innerText = rowData["Sheet Name"];
-                    numSpan.classList.add('text-green-400'); // Highlight change
+        function findNodeRecursive(id, nodes) {
+            for (let n of nodes) {
+                if (n.id === id) return n;
+                if (n.children && n.children.length > 0) {
+                    const found = findNodeRecursive(id, n.children);
+                    if (found) return found;
                 }
-            });
+            }
+            return null;
         }
 
-        // --- RENDER Grid (Right) ---
-        function renderGrid(cols) {
+        // --- RENDER GRID (Right Panel) ---
+
+        function renderGrid() {
+            const flatList = flattenTree(TREE_DATA);
+
             const container = document.getElementById('data-grid-content');
             const indices = document.getElementById('slot-indices-col');
+            const COLS = ["Sheet Number", "Sheet Name", ...PARAM_DEFS];
 
             // Headers
             let html = `<div class="grid-row" style="background: #2d2d2d;">`;
-            cols.forEach(c => {
-                html += `<div class="grid-col-header" style="width: 150px;">${c}</div>`;
+            COLS.forEach(c => {
+                html += `<div class="grid-col-header" style="width: 150px; flex-shrink:0;">${c}</div>`;
             });
             html += `</div>`;
 
             // Rows
-            let idxHtml = `<div class="slot-index" style="height: 40px; background: #2d2d2d;">#</div>`; // Header spacer
+            let idxHtml = `<div class="slot-index" style="height: 40px; background: #2d2d2d;">#</div>`;
 
-            GRID_DATA.forEach((row, rIdx) => {
-                idxHtml += `<div class="slot-index">${rIdx + 1}</div>`;
+            flatList.forEach((node, idx) => {
+                const rowId = node.id;
+                idxHtml += `<div class="slot-index">${idx + 1}</div>`;
 
-                html += `<div class="grid-row">`;
-                cols.forEach(k => {
-                    html += `<div class="grid-cell" style="width: 150px;">
-            <input type="text" value="${row[k] || ''}" oninput="updateGridData(${rIdx}, '${k}', this.value)">
-        </div>`;
+                html += `<div class="grid-row" data-row-id="${rowId}">`;
+
+                // Number
+                html += createCell(rowId, 'number', node.number);
+                // Name
+                html += createCell(rowId, 'name', node.name);
+
+                // Params
+                PARAM_DEFS.forEach(p => {
+                    const val = node.params[p] || "";
+                    html += createCell(rowId, 'param:' + p, val);
                 });
+
                 html += `</div>`;
             });
 
@@ -457,57 +469,167 @@
             indices.innerHTML = idxHtml;
         }
 
-        function updateGridData(rowIdx, key, val) {
-            GRID_DATA[rowIdx][key] = val;
-            updateSheetLabelsFromGrid(); // Live update identity
+        function createCell(id, key, value) {
+            return `
+            <div class="grid-cell" style="width: 150px; flex-shrink:0;">
+                <input type="text" value="${value}" oninput="updateNodeData('${id}', '${key}', this.value)" 
+                   class="w-full h-full bg-transparent outline-none text-xs px-1 text-gray-300 focus:bg-[#003366]">
+            </div>`;
+        }
+
+        function flattenTree(nodes) {
+            let flat = [];
+            nodes.forEach(n => {
+                if (n.type === 'sheet') {
+                    flat.push(n);
+                }
+                if (n.children) {
+                    flat = flat.concat(flattenTree(n.children));
+                }
+            });
+            return flat;
+        }
+
+        // --- DATA UPDATES ---
+
+        function updateNodeData(id, key, val) {
+            const node = findNodeRecursive(id, TREE_DATA);
+            if (!node) return;
+
+            if (key === 'number') node.number = val;
+            else if (key === 'name') node.name = val;
+            else if (key.startsWith('param:')) {
+                const p = key.split(':')[1];
+                node.params[p] = val;
+            }
+
+            // If Number or Name changed, update Left Panel visual immediately
+            if (key === 'number' || key === 'name') updateTreeVisual(node);
+        }
+
+        function updateTreeVisual(node) {
+            const li = document.querySelector(`li[data-id="${node.id}"]`);
+            if (!li) return;
+
+            if (node.type === 'sheet') {
+                const num = li.querySelector('.font-mono');
+                const name = li.querySelector('span:last-child');
+                if (num) { num.innerText = node.number; num.title = node.number; }
+                if (name) { name.innerText = node.name; name.title = node.name; }
+            }
+        }
+
+        function updateNodeName(id, val) {
+            const node = findNodeRecursive(id, TREE_DATA);
+            if (node) node.name = val;
+        }
+
+        // --- ACTIONS ---
+
+        function addGroup() {
+            const name = prompt("Nombre del Grupo:", "Nuevo Grupo");
+            if (!name) return;
+
+            const newGroup = {
+                id: generateId(),
+                type: 'group',
+                name: name,
+                children: []
+            };
+
+            TREE_DATA.push(newGroup);
+            renderTree();
+            renderGrid();
+        }
+
+        function deleteNode(id) {
+            if (!confirm("Eliminar grupo y su contenido?")) return;
+
+            function removeFrom(nodes) {
+                const idx = nodes.findIndex(n => n.id === id);
+                if (idx > -1) {
+                    nodes.splice(idx, 1);
+                    return true;
+                }
+                for (let n of nodes) {
+                    if (n.children && removeFrom(n.children)) return true;
+                }
+                return false;
+            }
+
+            removeFrom(TREE_DATA);
+            renderTree();
+            renderGrid();
+        }
+
+
+        function highlightRow(id) {
+            // Remove previous highlight
+            document.querySelectorAll('.grid-row').forEach(r => r.style.backgroundColor = '');
+
+            const row = document.querySelector(`.grid-row[data-row-id="${id}"]`);
+            if (row) {
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                row.style.backgroundColor = '#37373d';
+
+                // Highlight
+                row.animate([
+                    { backgroundColor: '#007acc' },
+                    { backgroundColor: '#37373d' }
+                ], { duration: 500 });
+            }
         }
 
         function syncScroll(el) {
             const indices = document.getElementById('slot-indices-col');
-            // Sync vertical scroll of indices if needed (though grid-row flex handles it usually)
-            // If we had separate scroll for headers.
-        }
-
-        function selectSheet(el) {
-            document.querySelectorAll('.sheet-item').forEach(x => x.classList.remove('selected'));
-            el.classList.add('selected');
+            if (indices) indices.scrollTop = el.scrollTop;
         }
 
         async function applyChanges() {
-            // Construct Payload
-            // Ordered list of Sheet IDs from Left Panel
-            const items = document.querySelectorAll('.sheet-item');
-            const updates = [];
+            // Flatten Tree to get final Sheet List
+            const flat = flattenTree(TREE_DATA);
 
-            items.forEach((item, idx) => {
-                const sheetId = item.dataset.id;
-                const targetData = GRID_DATA[idx]; // Slot N Attributes
-
-                if (targetData) {
-                    updates.push({
-                        id: sheetId,
-                        number: targetData["Sheet Number"],
-                        name: targetData["Sheet Name"],
-                        params: targetData // Includes Params
-                    });
-                }
-            });
+            const updates = flat.map(s => ({
+                id: s.id,
+                number: s.number,
+                name: s.name,
+                params: s.params
+            }));
 
             if (!confirm(`Se actualizarán ${updates.length} Sheets en Revit. ¿Continuar?`)) return;
 
-            const res = await fetch(`${API_BASE}/apply`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: SESSION_ID, updates: updates })
-            });
+            try {
+                const res = await fetch(`${API_BASE}/apply`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: SESSION_ID, updates: updates })
+                });
 
-            const json = await res.json();
-            if (json.status === "ok") {
-                alert("Cambios enviados a Revit. Revisa la cola de comandos (o espera si tienes auto-polling).");
-                window.close();
-            } else {
-                alert("Error: " + json.message);
+                const json = await res.json();
+                if (json.status === "ok") {
+                    alert("Cambios enviados a Revit.");
+                    window.close();
+                } else {
+                    alert("Error: " + json.message);
+                }
+            } catch (e) {
+                alert("Error de conexión");
             }
+        }
+
+        function filterSheets(query) {
+            query = query.toLowerCase();
+            const lis = document.querySelectorAll('li[data-type="sheet"]');
+
+            lis.forEach(li => {
+                const text = li.innerText.toLowerCase();
+                // Very simple visibility toggle
+                if (text.includes(query)) {
+                    li.style.display = 'block';
+                } else {
+                    li.style.display = 'none';
+                }
+            });
         }
 
         // --- TEMPLATES LOGIC ---
@@ -523,18 +645,8 @@
             const name = prompt("Nombre del Template (e.g., 'Nombramiento Synergy'):");
             if (!name) return;
 
-            // Filter Config: Visible Columns?
-            // For now, we save ALL currently visible columns in order.
-            // But wait, the current Grid Renders ALL. We haven't implemented Filtering yet.
-            // Let's assume the template defines *which columns to SHOW*.
-
-            // Currently, PARAM_DEFS has all.
-            // Let's implement a quick "Column Filter" in UI or just assume we save the full list?
-            // User request: "selecciona los parametros predeterminados y filtra todo".
-            // So we need: 1. A way to toggle columns.
-
             const config = {
-                visible_columns: PARAM_DEFS // For now saving all, but if we had toggles we'd save active only
+                visible_columns: PARAM_DEFS // For now saving all
             };
 
             const res = await fetch(`${API_BASE}/templates`, {
@@ -549,8 +661,6 @@
 
         async function openTemplateModal() {
             const tpls = await loadTemplates();
-            // Simple Prompt for MVP or Modal?
-            // Let's use a nice overlaid div.
 
             let html = `
     <div id="tpl-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -584,13 +694,11 @@
                     PARAM_DEFS = tpl.config.visible_columns.filter(p => !["Sheet Number", "Sheet Name"].includes(p));
                     // Re-render
                     const COLS = ["Sheet Number", "Sheet Name", ...PARAM_DEFS];
-                    // Updating GRID_DATA structure isn't needed as it holds all keys, just re-render grid cols
                     renderGrid(COLS);
                 }
                 document.getElementById('tpl-modal').remove();
             }
         }
-
 
     </script>
 </body>
