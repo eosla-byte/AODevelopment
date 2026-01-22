@@ -64,7 +64,7 @@ async def plugin_login(req: PluginLoginRequest):
     
     latest_v_data = get_latest_plugin_version()
     
-    latest_version = "1.0.0" # Default
+    latest_version = "1.5.2" # Default
     update_info = None
     
     if latest_v_data:
