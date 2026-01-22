@@ -55,8 +55,11 @@ class AccCopier:
             return [], []
             
         data = res.json().get("data", [])
-        folders = [x for x in data if x["type"] == "folders"]
-        items = [x for x in data if x["type"] == "items"]
+        # Filter hidden items
+        visible_data = [x for x in data if not x["attributes"].get("hidden", False)]
+        
+        folders = [x for x in visible_data if x["type"] == "folders"]
+        items = [x for x in visible_data if x["type"] == "items"]
         return folders, items
 
     # ========================
@@ -230,20 +233,16 @@ class AccCopier:
         # We upload to OSS: PUT https://developer.api.autodesk.com/oss/v2/buckets/{bucketKey}/objects/{objectName}
         # Bucket Key is the part after os.object:
         
-        parts = storage_id.split(":")
-        # urn:adsk.objects:os.object:wip.dm.prod/UUID
-        # parts[3] = os.object
-        # parts[4] = wip.dm.prod/UUID ??
-        # Let's stick to standard practice:
-        # Create Storage gives us an objectId.
-        
-        # We need to extract bucket and object key.
-        # "id": "urn:adsk.objects:os.object:wip.dm.prod/775d50..."
-        # bucket_key = wip.dm.prod
-        # object_name = 775d50...
-        
-        raw_id = storage_id.replace("urn:adsk.objects:os.object:", "")
-        bucket_key, object_key = raw_id.split("/", 1)
+        # 2. Extract Bucket Key
+        # ID format: urn:adsk.objects:os.object:wip.dm.prod/UUID
+        try:
+            # Safer extraction
+            raw_id = storage_id.split("urn:adsk.objects:os.object:")[1] 
+            bucket_key = raw_id.split("/")[0]
+            object_key = raw_id.split("/")[1]
+        except IndexError:
+             print(f"Error parsing storage ID: {storage_id}")
+             return None
         
         # 2. Upload to OSS
         # Only works for < 100MB? For massive files we need chunking.
