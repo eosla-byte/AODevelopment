@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading.Tasks;
 using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
@@ -65,7 +66,7 @@ namespace RevitCivilConnector.Commands
                     });
                 }
 
-                // 3. Send to Backend
+                // 3. Prepare Payload
                 var payload = new 
                 { 
                     plugin_session_id = AuthService.Instance.SessionId,
@@ -74,44 +75,60 @@ namespace RevitCivilConnector.Commands
                     param_definitions = allParamNames.ToList()
                 };
 
-                SendToBackend(payload);
+                // 4. Send to Backend (Thread-Safe)
+                string resultUrl = null;
+                string errorMsg = null;
 
-                return Result.Succeeded;
+                // Run on ThreadPool to avoid Deadlock, block Main Thread until done
+                var task = Task.Run(async () => 
+                {
+                    try 
+                    {
+                        using (var client = new System.Net.Http.HttpClient())
+                        {
+                            string url = "https://aodevelopment-production.up.railway.app/api/plugin/sheets/init";
+                            string json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+                            var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                            var res = await client.PostAsync(url, content);
+                            if (res.IsSuccessStatusCode)
+                            {
+                                var resStr = await res.Content.ReadAsStringAsync();
+                                dynamic jsonRes = Newtonsoft.Json.JsonConvert.DeserializeObject(resStr);
+                                return (string)jsonRes.redirect_url;
+                            }
+                            else
+                            {
+                                errorMsg = "Error HTTP: " + res.StatusCode;
+                                return null;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                         errorMsg = ex.Message;
+                         return null;
+                    }
+                });
+
+                task.Wait(); // Block Revit until done
+                resultUrl = task.Result;
+
+                if (!string.IsNullOrEmpty(resultUrl))
+                {
+                    Process.Start(resultUrl);
+                    return Result.Succeeded;
+                }
+                else
+                {
+                    TaskDialog.Show("Error", errorMsg ?? "Unknown error sending data.");
+                    return Result.Failed;
+                }
             }
             catch (Exception ex)
             {
                 message = ex.Message;
                 return Result.Failed;
-            }
-        }
-
-        private async void SendToBackend(object payload)
-        {
-            try
-            {
-                using (var client = new System.Net.Http.HttpClient())
-                {
-                    string url = "https://aodevelopment-production.up.railway.app/api/plugin/sheets/init";
-                    string json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
-                    var content = new System.Net.Http.StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-                    var res = await client.PostAsync(url, content);
-                    if (res.IsSuccessStatusCode)
-                    {
-                        var resStr = await res.Content.ReadAsStringAsync();
-                        dynamic jsonRes = Newtonsoft.Json.JsonConvert.DeserializeObject(resStr);
-                        string sessionUrl = jsonRes.redirect_url;
-                        Process.Start(sessionUrl);
-                    }
-                    else
-                    {
-                        TaskDialog.Show("Error", "Error conectando con AO Cloud: " + res.StatusCode);
-                    }
-                }
-            }
-            catch(Exception ex)
-            {
-                TaskDialog.Show("Error", "Excepción de Red: " + ex.Message);
             }
         }
     }

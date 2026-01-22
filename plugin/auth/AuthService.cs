@@ -65,7 +65,7 @@ namespace RevitCivilConnector.Auth
             {
                 var machineName = Environment.MachineName;
                 var revitVersion = "2024"; 
-                var currentPluginVersion = "1.0.0"; // Should come from Assembly
+                var currentPluginVersion = "1.5.0"; // Should come from Assembly
                 var ip = GetLocalIPAddress();
 
                 var payload = new
