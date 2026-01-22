@@ -40,6 +40,9 @@ if not exist "%TARGET_DIR%" (
 
 :: 4. Limpieza (Borrar versiones viejas)
 echo [1/3] Limpiando versiones anteriores...
+if exist "%TARGET_DIR%\AOdev" (
+    rmdir /S /Q "%TARGET_DIR%\AOdev"
+)
 del /F /Q "%TARGET_DIR%\AOdev*.addin" >nul 2>&1
 del /F /Q "%TARGET_DIR%\AOdev.dll" >nul 2>&1
 

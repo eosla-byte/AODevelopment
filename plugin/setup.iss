@@ -15,3 +15,6 @@ Source: "A:\AO_DEVELOPMENT\AODevelopment\plugin\AOdev_Release.addin"; DestDir: "
 [InstallDelete]
 Type: filesandordirs; Name: "{app}\AOdev"
 Type: files; Name: "{app}\AOdev.addin"
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\AOdev.addin"
+Type: files; Name: "{userappdata}\Autodesk\Revit\Addins\2024\AOdev_Release.addin"
+Type: filesandordirs; Name: "{userappdata}\Autodesk\Revit\Addins\2024\AOdev"
