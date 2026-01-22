@@ -42,7 +42,11 @@ class AccCopier:
         if res.status_code != 200:
             print(f"Error getting top folders: {res.text}")
             return []
-        return res.json().get("data", [])
+        data = res.json().get("data", [])
+        # Strict Whitelist for Top Level to match UI
+        whitelist = ["Project Files", "Plans"]
+        filtered = [x for x in data if x["attributes"]["name"] in whitelist]
+        return filtered
 
     def get_folder_contents(self, project_id, folder_id):
         """
@@ -234,27 +238,38 @@ class AccCopier:
         # Bucket Key is the part after os.object:
         
         # 2. Extract Bucket Key
-        # ID format: urn:adsk.objects:os.object:wip.dm.prod/UUID
         try:
-            # Safer extraction
-            raw_id = storage_id.split("urn:adsk.objects:os.object:")[1] 
-            bucket_key = raw_id.split("/")[0]
-            object_key = raw_id.split("/")[1]
-        except IndexError:
-             print(f"Error parsing storage ID: {storage_id}")
+            # ID format: urn:adsk.objects:os.object:wip.dm.prod/UUID
+            # Remove prefix
+            clean_id = storage_id.replace("urn:adsk.objects:os.object:", "")
+            bucket_key = clean_id.split("/")[0]
+            object_key = clean_id.split("/")[1]
+            
+            # debug
+            print(f"Uploading to Bucket: {bucket_key}, Object: {object_key}")
+        except Exception as e:
+             print(f"Error parsing storage ID '{storage_id}': {e}")
              return None
         
         # 2. Upload to OSS
-        # Only works for < 100MB? For massive files we need chunking.
-        # Assuming small files for this snippet.
-        
         with open(file_path, "rb") as f:
             content = f.read()
+
+        # Limit check
+        if len(content) > 100 * 1024 * 1024:
+            print("Error: File too large (>100MB) for simple upload.")
+            return None
             
         oss_url = f"{API_BASE}/oss/v2/buckets/{bucket_key}/objects/{object_key}"
-        # headers needs 'Bearer token' but NOT 'Content-Type: json'. It uses raw binary.
         auth = {"Authorization": f"Bearer {self.token}"}
-        res_upload = requests.put(oss_url, headers=auth, data=content)
+        
+        try:
+            res_upload = requests.put(oss_url, headers=auth, data=content)
+            res_upload.raise_for_status()
+        except Exception as e:
+            print(f"Upload failed: {e}")
+            if res_upload: print(res_upload.text)
+            return None
         
         if res_upload.status_code != 200:
              print(f"Error uploading bytes: {res_upload.text}")
