@@ -757,18 +757,47 @@
             formData.append('folder_id', folderId);
             formData.append('file', file);
 
+            // Step 1: Init Upload (Async)
             const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });
             if (!res.ok) {
                 const errText = await res.text();
-                // Try parsing json
-                try {
-                    const errJson = JSON.parse(errText);
-                    throw new Error(errJson.detail || errText);
-                } catch (e) {
-                    throw new Error(errText);
-                }
+                throw new Error(errText);
             }
-            return await res.json();
+
+            const initData = await res.json();
+            const taskId = initData.task_id;
+
+            logStatus(`Processing on server (Task: ${taskId.slice(0, 8)})...`, 'info');
+
+            // Step 2: Poll Status
+            return await pollUploadStatus(taskId);
+        }
+
+        async function pollUploadStatus(taskId) {
+            return new Promise((resolve, reject) => {
+                const interval = setInterval(async () => {
+                    try {
+                        const res = await fetch(`${API}/upload/status/${taskId}`);
+                        if (!res.ok) throw new Error("Status check failed");
+
+                        const data = await res.json();
+
+                        if (data.status === 'done') {
+                            clearInterval(interval);
+                            resolve(data.result);
+                        } else if (data.status === 'error') {
+                            clearInterval(interval);
+                            reject(data.error);
+                        } else {
+                            // still processing, maybe update UI?
+                            console.log("Still processing...", taskId);
+                        }
+                    } catch (e) {
+                        clearInterval(interval);
+                        reject(e);
+                    }
+                }, 2000); // Check every 2s
+            });
         }
 
         function addDnD(row, id, type) {

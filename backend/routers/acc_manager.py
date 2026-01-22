@@ -1,8 +1,14 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
-from typing import List, Optional
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, BackgroundTasks
+from typing import List, Optional, Dict
 import os
 import shutil
+import uuid
 from pydantic import BaseModel
+import datetime
+
+# --- Task Store (In-Memory) ---
+# In production, use Redis or Database. For now, memory is fine for single instance.
+UPLOAD_TASKS: Dict[str, dict] = {} # task_id -> { status, result, error, created_at }
 
 import sys
 import os
@@ -121,37 +127,83 @@ def copy_content(payload: CopyPayload):
 # Step 2: Upload to signed URL.
 # Step 3: Create Item/Version.
 
+# --- Background Worker ---
+def process_acc_upload_background(task_id: str, project_id: str, folder_id: str, temp_path: str, original_filename: str):
+    try:
+        UPLOAD_TASKS[task_id]["status"] = "processing"
+        
+        copier = get_copier()
+        # Upload Logic (High Latency)
+        res = copier.upload_file(project_id, folder_id, temp_path, original_filename)
+        
+        if res:
+            UPLOAD_TASKS[task_id]["status"] = "done"
+            UPLOAD_TASKS[task_id]["result"] = res
+        else:
+            UPLOAD_TASKS[task_id]["status"] = "error"
+            UPLOAD_TASKS[task_id]["error"] = "Upload returned empty result"
+            
+    except Exception as e:
+        UPLOAD_TASKS[task_id]["status"] = "error"
+        UPLOAD_TASKS[task_id]["error"] = str(e)
+        print(f"Background Upload Error {task_id}: {e}")
+        
+    finally:
+        # Cleanup Temp File
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except: pass
+
 @router.post("/upload")
 def upload_file_to_acc(
+    background_tasks: BackgroundTasks,
     project_id: str = Form(...),
     folder_id: str = Form(...),
     file: UploadFile = File(...)
 ):
     """
-    Receives file from browser, uploads to ACC 
-    (Proxy Upload: Browser -> Backend -> ACC).
-    Limit: Good for files < 100MB.
-    Run as SYNC function (def) so FastAPI uses threadpool.
+    Async Upload:
+    1. Saves file to disk (fast).
+    2. Spawns background task for ACC upload.
+    3. Returns task_id immediately.
     """
-    copier = get_copier()
     
     # 1. Save temp
-    temp_path = f"tmp_{file.filename}"
-    with open(temp_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-        
     try:
-        # 2. Upload Logic
-        res = copier.upload_file(project_id, folder_id, temp_path, file.filename)
-        if not res:
-            # Should not happen if copier raises exception, but for safety:
-            raise HTTPException(status_code=500, detail="Failed to upload (Unknown Error)")
-        return {"status": "success", "data": res}
-    except Exception as e:
-         raise HTTPException(status_code=500, detail=str(e))
+        # Ensure tmp dir exists
+        os.makedirs("tmp", exist_ok=True)
+        task_id = str(uuid.uuid4())
+        temp_filename = f"tmp_{task_id}_{file.filename}"
+        temp_path = os.path.join("tmp", temp_filename)
         
-    finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        with open(temp_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
             
-    return {"status": "implemented_soon"}
+        # 2. Register Task
+        UPLOAD_TASKS[task_id] = {
+            "status": "pending",
+            "created_at": datetime.datetime.now(),
+            "filename": file.filename
+        }
+        
+        # 3. Spawn Worker
+        background_tasks.add_task(
+            process_acc_upload_background, 
+            task_id, project_id, folder_id, temp_path, file.filename
+        )
+        
+        return {"status": "accepted", "task_id": task_id}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/upload/status/{task_id}")
+def get_upload_status(task_id: str):
+    task = UPLOAD_TASKS.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+        
+    # Serialize datetime
+    res = {k: v for k, v in task.items() if k != "created_at"}
+    return res
