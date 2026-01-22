@@ -1623,7 +1623,8 @@
             // Fix: Ensure 'browser_paths' is stored in node data
 
             TREE_DATA = buildStructure(flat); // Will use currentScheme global
-            render();
+            renderTree();
+            renderGrid();
         }
 
         // Modified buildStructure to use Scheme
