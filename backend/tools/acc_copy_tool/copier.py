@@ -268,7 +268,8 @@ class AccCopier:
             res_upload.raise_for_status()
         except Exception as e:
             print(f"Upload failed: {e}")
-            if res_upload: print(res_upload.text)
+            if res_upload: 
+                print(f"OSS Response: {res_upload.status_code} - {res_upload.text}")
             return None
         
         if res_upload.status_code != 200:
