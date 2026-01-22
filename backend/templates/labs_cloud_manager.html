@@ -751,12 +751,15 @@
         }
 
         async function apiUploadFile(folderId, file) {
+            console.log(`DEBUG Upload: Proj=${currentProjectId}, Folder=${folderId}, File=${file.name}`);
             const formData = new FormData();
             formData.append('project_id', currentProjectId);
             formData.append('folder_id', folderId);
             formData.append('file', file);
 
-            await fetch(`${API}/upload`, { method: 'POST', body: formData });
+            const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });
+            if (!res.ok) throw new Error("Upload API failed");
+            return await res.json();
         }
 
         function addDnD(row, id, type) {
