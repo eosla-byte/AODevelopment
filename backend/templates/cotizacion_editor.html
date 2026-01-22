@@ -1769,35 +1769,35 @@
                              window.print();
                          }, 1000);
                     }
-</script>
+                <\/script>
 </body>
 
 </html>
 `);
 
-printWindow.document.close();
-printWindow.focus();
-}
+        printWindow.document.close();
+        printWindow.focus();
+    }
 
-async function linkEstimation(estId) {
-if (!estId) return;
+    async function linkEstimation(estId) {
+        if (!estId) return;
 
-try {
-const resp = await fetch(`/estimaciones/${estId}`);
-if (!resp.ok) throw new Error("Error fetching estimation");
-const data = await resp.json();
+        try {
+            const resp = await fetch(`/estimaciones/${estId}`);
+            if (!resp.ok) throw new Error("Error fetching estimation");
+            const data = await resp.json();
 
-// Populate fields if empty or user confirms
-if (confirm(`¿Importar datos de estimación "${data.name}"? Esto sobrescribirá el título y cliente.`)) {
-document.getElementById('docTitle').value = "Propuesta: " + data.name;
-document.getElementById('clientName').value = data.client;
-document.getElementById('docTotalAmount').value = data.amount;
-// Trigger save to lock data
-isDirty = true;
-}
+            // Populate fields if empty or user confirms
+            if (confirm(`¿Importar datos de estimación "${data.name}"? Esto sobrescribirá el título y cliente.`)) {
+                document.getElementById('docTitle').value = "Propuesta: " + data.name;
+                document.getElementById('clientName').value = data.client;
+                document.getElementById('docTotalAmount').value = data.amount;
+                // Trigger save to lock data
+                isDirty = true;
+            }
 
-const container = document.getElementById('estimation-data-container');
-container.innerHTML = `
+            const container = document.getElementById('estimation-data-container');
+            container.innerHTML = `
 <div class="bg-indigo-50 p-2 rounded border border-indigo-100 mb-2">
     <p class="text-[10px] text-indigo-500 font-bold mb-1">DATA VINCULADA</p>
     <div class="text-xs text-slate-700 font-bold">${data.name}</div>
@@ -1807,92 +1807,92 @@ container.innerHTML = `
 </div>
 `;
 
-isDirty = true;
+            isDirty = true;
 
-} catch (e) {
-alert("Error vinculando: " + e);
-}
-}
+        } catch (e) {
+            alert("Error vinculando: " + e);
+        }
+    }
 
-async function saveDocument() {
-const title = document.getElementById('docTitle').value;
-const client = document.getElementById('clientName').value;
-const amount = parseFloat(document.getElementById('docTotalAmount').value) || 0;
+    async function saveDocument() {
+        const title = document.getElementById('docTitle').value;
+        const client = document.getElementById('clientName').value;
+        const amount = parseFloat(document.getElementById('docTotalAmount').value) || 0;
 
-// Sync Source of Truth
-localBlocks = serializeBlocksFromDOM();
+        // Sync Source of Truth
+        localBlocks = serializeBlocksFromDOM();
 
-const payload = {
-id: quotId,
-updates: {
-title: title,
-client_name: client,
-total_amount: amount,
-content_json: localBlocks,
-updated_at: new Date().toISOString()
-}
-};
+        const payload = {
+            id: quotId,
+            updates: {
+                title: title,
+                client_name: client,
+                total_amount: amount,
+                content_json: localBlocks,
+                updated_at: new Date().toISOString()
+            }
+        };
 
-fetch('/cotizaciones/update', {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify(payload)
-})
-.then(r => r.json())
-.then(d => {
-if (d.status === 'success') {
-document.getElementById('saveStatus').innerText = "Guardado " + new Date().toLocaleTimeString();
-isDirty = false;
-} else {
-document.getElementById('saveStatus').innerText = "Error";
-}
-})
-.catch(e => {
-console.error(e);
-document.getElementById('saveStatus').innerText = "Error Conexión";
-});
-}
+        fetch('/cotizaciones/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    document.getElementById('saveStatus').innerText = "Guardado " + new Date().toLocaleTimeString();
+                    isDirty = false;
+                } else {
+                    document.getElementById('saveStatus').innerText = "Error";
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                document.getElementById('saveStatus').innerText = "Error Conexión";
+            });
+    }
 
-async function convertToProject() {
-if (!confirm("¿Convertir esta cotización a Proyecto? Esto creará un nuevo perfil de proyecto con los datos actuales."))
-return;
+    async function convertToProject() {
+        if (!confirm("¿Convertir esta cotización a Proyecto? Esto creará un nuevo perfil de proyecto con los datos actuales."))
+            return;
 
-const title = document.getElementById('docTitle').value;
-// Mock simple conversion
-const formData = new FormData();
-formData.append('name', title);
-formData.append('status', 'Activo');
-try {
-const response = await fetch('/create_project', {
-method: 'POST',
-body: formData
-});
-if (response.redirected) {
-window.location.href = response.url;
-} else {
-alert("Proyecto creado exitosamente (verifique lista)");
-}
-} catch (e) {
-alert("Error al convertir: " + e);
-}
-}
+        const title = document.getElementById('docTitle').value;
+        // Mock simple conversion
+        const formData = new FormData();
+        formData.append('name', title);
+        formData.append('status', 'Activo');
+        try {
+            const response = await fetch('/create_project', {
+                method: 'POST',
+                body: formData
+            });
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                alert("Proyecto creado exitosamente (verifique lista)");
+            }
+        } catch (e) {
+            alert("Error al convertir: " + e);
+        }
+    }
 
-// Tables logic
-function toggleCell(cell) {
-if (cell.classList.contains('bg-slate-100')) {
-cell.classList.remove('bg-slate-100');
-cell.classList.add('bg-indigo-200');
-} else {
-cell.classList.add('bg-slate-100');
-cell.classList.remove('bg-indigo-200');
-}
-}
+    // Tables logic
+    function toggleCell(cell) {
+        if (cell.classList.contains('bg-slate-100')) {
+            cell.classList.remove('bg-slate-100');
+            cell.classList.add('bg-indigo-200');
+        } else {
+            cell.classList.add('bg-slate-100');
+            cell.classList.remove('bg-indigo-200');
+        }
+    }
 
-function addTimelineRow(btn) {
-const table = btn.previousElementSibling;
-const tbody = table.querySelector('tbody');
-const newRow = document.createElement('tr');
-newRow.innerHTML = `
+    function addTimelineRow(btn) {
+        const table = btn.previousElementSibling;
+        const tbody = table.querySelector('tbody');
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
 <td contenteditable="true" class="p-2 font-bold text-slate-700">Nueva Fase</td>
 <td class="p-1">
     <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
@@ -1915,15 +1915,15 @@ newRow.innerHTML = `
 <td class="p-1 text-center"><button onclick="this.closest('tr').remove()"
         class="text-red-300 hover:text-red-500">×</button></td>
 `;
-tbody.appendChild(newRow);
-}
+        tbody.appendChild(newRow);
+    }
 
-function addGenericRow(btn) {
-const table = btn.previousElementSibling;
-const tbody = table.querySelector('tbody');
-const count = tbody.children.length + 1;
-const newRow = document.createElement('tr');
-newRow.innerHTML = `
+    function addGenericRow(btn) {
+        const table = btn.previousElementSibling;
+        const tbody = table.querySelector('tbody');
+        const count = tbody.children.length + 1;
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
 <td contenteditable="true" class="p-2 border border-slate-200 text-center">${count}</td>
 <td contenteditable="true" class="p-2 border border-slate-200">Concepto...</td>
 <td contenteditable="true" class="p-2 border border-slate-200 text-center">1</td>
@@ -1933,8 +1933,8 @@ newRow.innerHTML = `
     <button onclick="this.closest('tr').remove()" class="text-xs text-red-300 hover:text-red-500">×</button>
 </td>
 `;
-tbody.appendChild(newRow);
-}
+        tbody.appendChild(newRow);
+    }
 </script>
 
 <!-- Text Formatting Toolbar -->
