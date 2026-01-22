@@ -1106,6 +1106,10 @@
             renderGrid();
         }
 
+        function generateId() {
+            return 'new-' + crypto.randomUUID();
+        }
+
         // --- EXCEL FEATURES ---
         let dragStart = null;
         let dragCurrent = null;

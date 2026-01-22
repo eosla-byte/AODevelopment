@@ -110,6 +110,14 @@ async def plugin_heartbeat(req: HeartbeatRequest):
 
     # Get User Permissions
     permissions = {}
+    
+    # FETCH PENDING COMMANDS
+    # We must identify the session (and potentially the user permissions)
+    from database import get_pending_commands
+    
+    commands = get_pending_commands(req.session_id)
+    # Convert commands to list of dicts if they are objects, but get_pending_commands already returns list of dicts.
+    
     session = get_session_by_id(req.session_id)
     if session:
         user = get_user_by_email(session.user_email)
@@ -119,7 +127,8 @@ async def plugin_heartbeat(req: HeartbeatRequest):
     return {
         "status": "Active", 
         "action": "Continue",
-        "permissions": permissions
+        "permissions": permissions,
+        "commands": commands # Helper for Plugin to consume
     }
 
 @router.post("/track")
