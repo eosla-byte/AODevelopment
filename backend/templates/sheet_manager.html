@@ -394,7 +394,11 @@
             const normalized = items.map(s => {
                 // If s is already a node (has type='sheet'), preserve it. 
                 // If s is raw data (from backend), map it.
-                if (s.type === 'sheet') return s;
+                // FORCE TYPE: If missing or generic, ensure it's marked as sheet
+                let type = s.type;
+                if (!type) type = 'sheet';
+
+                if (type === 'sheet' && s.params && s.children) return { ...s, type: 'sheet' };
 
                 return {
                     id: s.id || generateId(),
@@ -650,7 +654,8 @@
         function flattenTree(nodes) {
             let flat = [];
             nodes.forEach(n => {
-                if (n.type === 'sheet') {
+                // Relaxed check: Include anything that isn't a group
+                if (n.type !== 'group') {
                     flat.push(n);
                 }
                 if (n.children) {
