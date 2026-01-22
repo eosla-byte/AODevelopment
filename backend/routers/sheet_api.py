@@ -86,6 +86,43 @@ async def apply_sheet_changes(request: Request):
         import datetime
         
         current_plugin_session = get_session_by_id(plugin_session_id)
+        # ... (rest of apply function) ...
+
+@router.get("/status")
+async def check_connection_status(session_id: str):
+    """
+    Returns the health of the Revit Link.
+    """
+    session_data = get_sheet_session(session_id)
+    if not session_data:
+        return {"status": "error", "message": "Session Not Found"}
+    
+    plugin_session_id = session_data.get("plugin_session_id")
+    if not plugin_session_id:
+        return {"status": "disconnected", "message": "No Revit Link"}
+        
+    from database import get_session_by_id, get_pending_commands
+    import datetime
+    
+    ps = get_session_by_id(plugin_session_id)
+    if not ps:
+        return {"status": "disconnected", "message": "Revit Session Lost"}
+        
+    # Check Age
+    age = (datetime.datetime.now() - ps.last_heartbeat).total_seconds()
+    is_alive = age < 60 # 1 minute threshold
+    
+    # Check Queue
+    pending = get_pending_commands(plugin_session_id) # returns list
+    queue_size = len(pending)
+    
+    return {
+        "status": "connected" if is_alive else "stale",
+        "age_seconds": int(age),
+        "queue_size": queue_size,
+        "machine": ps.machine_id,
+        "user": ps.user_email
+    }
         
         # Determine if stale (older than 2 mins or missing)
         is_stale = False
