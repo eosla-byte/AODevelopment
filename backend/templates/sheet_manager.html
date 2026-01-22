@@ -368,6 +368,16 @@
                     sheets = data.sheets || [];
                 }
 
+                // Populate Original Map for Diffing
+                ORIGINAL_DATA_MAP = {};
+                sheets.forEach(s => {
+                    ORIGINAL_DATA_MAP[s.id] = {
+                        number: s.number,
+                        name: s.name,
+                        params: { ...s.params } // Deep copy params
+                    };
+                });
+
                 // Initial Build (Default Scheme)
                 TREE_DATA = buildStructure(sheets);
 
@@ -391,6 +401,7 @@
         // --- SORT & GROUPING STATE ---
         let SORT_CONFIG = { key: 'number', dir: 'asc' }; // default
         let CUSTOM_GROUP_PARAMS = []; // e.g. ['Designed By', 'Checked By']
+        let ORIGINAL_DATA_MAP = {}; // id -> {number, name, params}
 
         function sortTree(nodes) {
             nodes.sort((a, b) => {
