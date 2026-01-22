@@ -161,6 +161,29 @@
             color: #666;
             border-bottom: 1px solid #2d2d2d;
         }
+
+        /* Excel Features */
+        .fill-handle {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 6px;
+            height: 6px;
+            background: #007acc;
+            cursor: crosshair;
+            z-index: 5;
+            display: none;
+        }
+
+        .grid-cell:hover .fill-handle,
+        .grid-cell.focused .fill-handle {
+            display: block;
+        }
+
+        .grid-cell.selected-range {
+            background: rgba(0, 122, 204, 0.2) !important;
+            border: 1px solid #007acc;
+        }
     </style>
 </head>
 
@@ -174,6 +197,11 @@
             <span class="text-xs bg-white/20 px-2 rounded ml-2" id="project-name">Loading...</span>
         </div>
         <div class="flex gap-2">
+            <button onclick="openParamsModal()"
+                class="bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
+                title="Seleccionar Parámetros">
+                <i class="fas fa-columns"></i> Parámetros
+            </button>
             <button onclick="openTemplateModal()"
                 class="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded text-sm font-bold shadow transition-colors"
                 title="Cargar Template">
@@ -253,6 +281,7 @@
 
         // APP STATE
         let PARAM_DEFS = [];
+        let VISIBLE_COLS = null;
 
         // Tree Data: Recursive Structure
         // Node: { id: string, type: 'sheet'|'group', name: string, number: string, params: {}, children: [], collapsed: false }
@@ -279,6 +308,7 @@
                 // Init Params
                 PARAM_DEFS = data.param_definitions || [];
                 PARAM_DEFS = PARAM_DEFS.filter(p => p !== "Sheet Number" && p !== "Sheet Name");
+                VISIBLE_COLS = [...PARAM_DEFS];
 
                 // INIT TREE DATA
                 // If backend provides a flat list (Sheets), we init a flat tree.
@@ -433,7 +463,10 @@
 
             const container = document.getElementById('data-grid-content');
             const indices = document.getElementById('slot-indices-col');
-            const COLS = ["Sheet Number", "Sheet Name", ...PARAM_DEFS];
+
+            // Filter Cols
+            const activeParams = VISIBLE_COLS || PARAM_DEFS;
+            const COLS = ["Sheet Number", "Sheet Name", ...activeParams];
 
             // Headers
             let html = `<div class="grid-row" style="background: #2d2d2d;">`;
@@ -471,9 +504,14 @@
 
         function createCell(id, key, value) {
             return `
-            <div class="grid-cell" style="width: 150px; flex-shrink:0;">
-                <input type="text" value="${value}" oninput="updateNodeData('${id}', '${key}', this.value)" 
-                   class="w-full h-full bg-transparent outline-none text-xs px-1 text-gray-300 focus:bg-[#003366]">
+            <div class="grid-cell relative" style="width: 150px; flex-shrink:0;" data-col="${key}"
+                 onmouseover="handleDragOver(event, '${id}', '${key}')">
+                <input type="text" value="${value}" 
+                   oninput="updateNodeData('${id}', '${key}', this.value)" 
+                   onfocus="this.parentElement.classList.add('focused')"
+                   onblur="handleCellBlur('${id}', '${key}', this)"
+                   class="w-full h-full bg-transparent outline-none text-xs px-1 text-gray-300">
+                <div class="fill-handle" onmousedown="startDrag(event, '${id}', '${key}')"></div>
             </div>`;
         }
 
@@ -586,15 +624,47 @@
         }
 
         async function applyChanges() {
-            // Flatten Tree to get final Sheet List
-            const flat = flattenTree(TREE_DATA);
+            // Flatten Tree AND Inject Group Parameters
+            const updates = [];
 
-            const updates = flat.map(s => ({
-                id: s.id,
-                number: s.number,
-                name: s.name,
-                params: s.params
-            }));
+            function traverse(nodes, ancestors) {
+                nodes.forEach(node => {
+                    if (node.type === 'group') {
+                        traverse(node.children, [...ancestors, node.name]);
+                    } else {
+                        // It's a sheet. 
+                        const sheet = {
+                            id: node.id,
+                            number: node.number,
+                            name: node.name,
+                            params: { ...node.params }
+                        };
+
+                        // Inject Group Params
+                        const groupLetters = ['A', 'B', 'C', 'D', 'E']; // AO-SheetManagerGroupA, B, C...
+                        ancestors.forEach((grpName, idx) => {
+                            if (idx < groupLetters.length) {
+                                sheet.params[`AO-SheetManagerGroup${groupLetters[idx]}`] = grpName;
+                            }
+                        });
+                        // Clear lower levels if moving OUT of a deeper structure?
+                        // Ideally we overwrite A, B... but if it WAS in C and now is in B (root), C remains?
+                        // For safety, we might want to send explicit Empty Strings for deeper levels?
+                        // Let's rely on Revit Plugin to handle "if param exists but not in payload" or just overwrite.
+                        // Better: Send ALL A-E, setting unused to empty string.
+
+                        groupLetters.forEach((L, idx) => {
+                            if (idx >= ancestors.length) {
+                                sheet.params[`AO-SheetManagerGroup${L}`] = "";
+                            }
+                        });
+
+                        updates.push(sheet);
+                    }
+                });
+            }
+
+            traverse(TREE_DATA, []);
 
             if (!confirm(`Se actualizarán ${updates.length} Sheets en Revit. ¿Continuar?`)) return;
 
@@ -691,13 +761,204 @@
             if (tpl) {
                 // Apply Columns
                 if (tpl.config.visible_columns) {
-                    PARAM_DEFS = tpl.config.visible_columns.filter(p => !["Sheet Number", "Sheet Name"].includes(p));
-                    // Re-render
-                    const COLS = ["Sheet Number", "Sheet Name", ...PARAM_DEFS];
-                    renderGrid(COLS);
+                    // Filter out core columns to avoid duplication/errors
+                    const core = ["Sheet Number", "Sheet Name"];
+                    const saved = tpl.config.visible_columns.filter(p => !core.includes(p));
+
+                    // Validate against current PARAM_DEFS to avoid showing deleted params
+                    VISIBLE_COLS = saved.filter(p => PARAM_DEFS.includes(p));
+
+                    renderGrid();
                 }
                 document.getElementById('tpl-modal').remove();
             }
+        }
+
+        // --- PARAMS FILTER MODAL ---
+
+        function openParamsModal() {
+            // Checkboxes for each PARAM_DEF
+            // visual state based on VISIBLE_COLS
+
+            const checks = PARAM_DEFS.map(p => {
+                const checked = VISIBLE_COLS.includes(p) ? 'checked' : '';
+                return `
+                <label class="flex items-center space-x-2 p-2 hover:bg-[#37373d] rounded cursor-pointer">
+                    <input type="checkbox" ${checked} onchange="toggleParam('${p}')" class="form-checkbox text-[#007acc] rounded bg-[#2d2d2d] border-[#3e3e42]">
+                    <span class="text-sm">${p}</span>
+                </label>
+                `;
+            }).join('');
+
+            const html = `
+    <div id="params-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="bg-[#252526] p-6 rounded shadow-xl w-[500px] border border-[#3e3e42] flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Seleccionar Parámetros Visibles</h2>
+                <div class="flex gap-2">
+                     <button onclick="toggleAllParams(true)" class="text-xs bg-[#3e3e42] hover:bg-[#4e4e52] px-2 py-1 rounded">Todas</button>
+                     <button onclick="toggleAllParams(false)" class="text-xs bg-[#3e3e42] hover:bg-[#4e4e52] px-2 py-1 rounded">Ninguna</button>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto custom-scrollbar grid grid-cols-2 gap-2 content-start">
+                ${checks}
+            </div>
+            
+            <div class="flex justify-end mt-4 pt-4 border-t border-[#3e3e42]">
+                <button onclick="document.getElementById('params-modal').remove()"
+                    class="bg-[#007acc] hover:bg-[#005a9e] text-white px-4 py-1.5 rounded font-bold shadow transition-colors">Listo</button>
+            </div>
+        </div>
+    </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function toggleParam(p) {
+            if (VISIBLE_COLS.includes(p)) {
+                VISIBLE_COLS = VISIBLE_COLS.filter(x => x !== p);
+            } else {
+                // Maintain Order based on PARAM_DEFS
+                VISIBLE_COLS.push(p);
+                // Sort by original index
+                VISIBLE_COLS.sort((a, b) => PARAM_DEFS.indexOf(a) - PARAM_DEFS.indexOf(b));
+            }
+            renderGrid();
+        }
+
+        function toggleAllParams(enable) {
+            if (enable) {
+                VISIBLE_COLS = [...PARAM_DEFS];
+            } else {
+                VISIBLE_COLS = [];
+            }
+            // Re-render modal content? or just close/reopen? 
+            // Better: update checkboxes DOM
+            document.getElementById('params-modal').remove();
+            openParamsModal(); // Simple re-render of modal
+
+            renderGrid();
+        }
+
+        // --- EXCEL FEATURES ---
+        let dragStart = null;
+        let dragCurrent = null;
+        let isDragging = false;
+
+        document.addEventListener('mouseup', endDrag);
+
+        function startDrag(e, id, key) {
+            e.stopPropagation();
+            e.preventDefault();
+            const node = findNodeRecursive(id, TREE_DATA);
+            if (!node) return;
+
+            // Resolve Value
+            let val = "";
+            if (key === 'number') val = node.number;
+            else if (key === 'name') val = node.name;
+            else if (key.startsWith('param:')) val = node.params[key.split(':')[1]];
+
+            isDragging = true;
+            dragStart = { id, key, val };
+        }
+
+        function handleDragOver(e, id, key) {
+            if (!isDragging) return;
+            if (key !== dragStart.key) return; // Vertical only
+
+            dragCurrent = { id, key };
+
+            // Visual Highlight
+            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected-range'));
+
+            const flat = flattenTree(TREE_DATA);
+            const startIdx = flat.findIndex(n => n.id === dragStart.id);
+            const endIdx = flat.findIndex(n => n.id === dragCurrent.id);
+            if (startIdx === -1 || endIdx === -1) return;
+
+            const min = Math.min(startIdx, endIdx);
+            const max = Math.max(startIdx, endIdx);
+
+            for (let i = min; i <= max; i++) {
+                const rowId = flat[i].id;
+                const cell = document.querySelector(`.grid-row[data-row-id="${rowId}"] .grid-cell[data-col="${key}"]`);
+                if (cell) cell.classList.add('selected-range');
+            }
+        }
+
+        function endDrag() {
+            if (!isDragging) return;
+            isDragging = false;
+            document.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('selected-range'));
+
+            if (dragStart && dragCurrent && dragStart.key === dragCurrent.key) {
+                applyFill(dragStart, dragCurrent);
+            }
+            dragStart = null;
+            dragCurrent = null;
+        }
+
+        function applyFill(start, end) {
+            const flat = flattenTree(TREE_DATA);
+            const startIdx = flat.findIndex(n => n.id === start.id);
+            const endIdx = flat.findIndex(n => n.id === end.id);
+
+            if (startIdx === -1 || endIdx === -1) return;
+
+            const min = Math.min(startIdx, endIdx);
+            const max = Math.max(startIdx, endIdx);
+
+            let val = start.val;
+
+            // Series Logic
+            const match = typeof val === 'string' ? val.match(/^(.*?)(\d+)$/) : null;
+            let prefix = val;
+            let num = null;
+            let digits = 0;
+            if (match) {
+                prefix = match[1];
+                num = parseInt(match[2], 10);
+                digits = match[2].length;
+            }
+
+            for (let i = min; i <= max; i++) {
+                if (flat[i].id === start.id) continue;
+
+                let newVal = val;
+                if (num !== null) {
+                    const dist = i - startIdx;
+                    const currentNum = num + dist;
+                    newVal = prefix + String(currentNum).padStart(digits, '0');
+                }
+
+                updateNodeData(flat[i].id, start.key, newVal);
+            }
+            renderGrid();
+        }
+
+        function handleCellBlur(id, key, input) {
+            const val = input.value;
+            if (val.startsWith('=')) {
+                const node = findNodeRecursive(id, TREE_DATA);
+                if (!node) return;
+
+                let formula = val.substring(1);
+
+                const getVal = (colName) => {
+                    if (colName === "Sheet Number") return node.number;
+                    if (colName === "Sheet Name") return node.name;
+                    return node.params[colName] || "";
+                };
+
+                let result = formula.replace(/\[(.*?)\]/g, (match, p1) => {
+                    return getVal(p1);
+                });
+
+                updateNodeData(id, key, result);
+                input.value = result;
+            }
+            input.parentElement.classList.remove('focused');
         }
 
     </script>
