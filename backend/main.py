@@ -42,10 +42,11 @@ app = FastAPI()
 
 # Include Plugin API
 # Include Plugin API
-from routers import plugin_api, plugin_cloud, ai
+from routers import plugin_api, plugin_cloud, ai, sheet_api
 app.include_router(plugin_api.router)
 app.include_router(plugin_cloud.router)
 app.include_router(ai.router)
+app.include_router(sheet_api.router)
 
 # Input Models
 class LoginRequest(BaseModel):
@@ -163,6 +164,10 @@ async def serve_landing(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 async def serve_landing_alias(request: Request):
     return await serve_landing(request)
+
+@app.get("/sheets/manager", response_class=HTMLResponse)
+async def serve_sheet_manager(request: Request):
+    return templates.TemplateResponse("sheet_manager.html", {"request": request})
 
 @app.get("/cqt-tool", response_class=HTMLResponse)
 async def view_cqt_tool(request: Request):

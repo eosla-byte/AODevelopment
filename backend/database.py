@@ -1830,3 +1830,38 @@ def get_all_routines(user_email=None):
     finally:
         db.close()
 
+
+# -----------------------------------------------------------------------------
+# SHEET MANAGER TEMPLATES
+# -----------------------------------------------------------------------------
+from models import SheetTemplate
+
+def get_sheet_templates():
+    db = SessionLocal()
+    try:
+        return db.query(SheetTemplate).all()
+    finally:
+        db.close()
+
+def create_sheet_template(name: str, config: dict, user="Admin"):
+    db = SessionLocal()
+    try:
+        tpl = SheetTemplate(name=name, config_json=config, created_by=user, is_global=True)
+        db.add(tpl)
+        db.commit()
+        db.refresh(tpl)
+        return tpl
+    finally:
+        db.close()
+
+def delete_sheet_template(tpl_id: int):
+    db = SessionLocal()
+    try:
+        tpl = db.query(SheetTemplate).filter(SheetTemplate.id == tpl_id).first()
+        if tpl:
+            db.delete(tpl)
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()

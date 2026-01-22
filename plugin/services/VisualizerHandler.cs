@@ -74,9 +74,54 @@ namespace RevitCivilConnector.Services
                     else if (action == "clean")
                     {
                          // Clean overrides
-                         // Ideally we need to remember what we overrode. 
-                         // For now, maybe just clear selection.
                          app.ActiveUIDocument.Selection.SetElementIds(new List<ElementId>());
+                    }
+                    else if (action == "UPDATE_SHEETS")
+                    {
+                        // Payload: List of { id, number, name, params }
+                        var updates = payload.ToList(); 
+                        using (Transaction t = new Transaction(app.ActiveUIDocument.Document, "Update Sheets from Web"))
+                        {
+                            t.Start();
+                            int count = 0;
+                            var doc = app.ActiveUIDocument.Document;
+                            
+                            foreach (dynamic update in updates)
+                            {
+                                string uniqueId = update.id;
+                                Element el = doc.GetElement(uniqueId);
+                                if (el is ViewSheet sheet)
+                                {
+                                    // 1. Number (Handle conflict risk? For now just try set)
+                                    string newNum = update.number;
+                                    if(sheet.SheetNumber != newNum) { try { sheet.SheetNumber = newNum; } catch {} }
+
+                                    // 2. Name
+                                    string newName = update.name;
+                                    if(sheet.Name != newName) { try { sheet.Name = newName; } catch {} }
+                                    
+                                    // 3. Params
+                                    var paramsDict = update.@params; // 'params' is keyword
+                                    foreach (var prop in paramsDict) // JObject or Dictionary?
+                                    {
+                                        string pName = prop.Name;
+                                        string pVal = prop.Value.ToString();
+                                        
+                                        // Skip Name/Number as they are properties
+                                        if(pName == "Sheet Number" || pName == "Sheet Name") continue;
+
+                                        Parameter p = sheet.LookupParameter(pName);
+                                        if (p != null && !p.IsReadOnly && p.StorageType == StorageType.String)
+                                        {
+                                            p.Set(pVal);
+                                        }
+                                    }
+                                    count++;
+                                }
+                            }
+                            t.Commit();
+                            // Optional: Notify success?
+                        }
                     }
                 }
                 catch (Exception ex)

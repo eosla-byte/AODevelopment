@@ -265,3 +265,12 @@ class PluginRoutine(Base):
     user_email = Column(String)
     created_at = Column(DateTime, default=func.now())
 
+class SheetTemplate(Base):
+    __tablename__ = 'plugin_sheet_templates'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    config_json = Column(JSON, default={}) # { visible_columns: [], filters: {} }
+    is_global = Column(Boolean, default=True)
+    created_by = Column(String, default="Admin")
+    created_at = Column(DateTime, default=func.now())

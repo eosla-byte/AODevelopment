@@ -234,9 +234,13 @@ namespace RevitCivilConnector
             for (int i = 1; i <= 15; i += 3)
             {
                  // Create 3 buttons
-                 PushButtonData b1 = new PushButtonData($"cmdExp{i}", $"Exp {i:00}", assemblyPath, "RevitCivilConnector.IACommand"); // Reuse command for now
+                 // EXP 1 -> Sheet Manager
+                 string cmd1Class = (i == 1) ? "RevitCivilConnector.Commands.SheetManagerCommand" : "RevitCivilConnector.IACommand";
+                 string name1 = (i == 1) ? "Sheet\nManager" : $"Exp {i:00}";
+                 
+                 PushButtonData b1 = new PushButtonData($"cmdExp{i}", name1, assemblyPath, cmd1Class); 
                  b1.Image = GetIcon("icono7.png"); // Small Image
-                 b1.ToolTip = $"Experimental Function {i}";
+                 b1.ToolTip = (i == 1) ? "Gestor Avanzado de Sheets (Exp 01)" : $"Experimental Function {i}";
 
                  PushButtonData b2 = new PushButtonData($"cmdExp{i+1}", $"Exp {i+1:00}", assemblyPath, "RevitCivilConnector.IACommand");
                  b2.Image = GetIcon("icono7.png");
