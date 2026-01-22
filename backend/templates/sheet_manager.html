@@ -221,19 +221,13 @@
         </div>
 
         <!-- Browser Org Selector -->
+        <!-- Browser Org Single Button -->
         <div class="flex items-center gap-2 ml-4">
-            <label class="text-xs text-slate-300">Browser Org:</label>
-            <div class="flex gap-1">
-                <select id="browser-org-select" onchange="changeBrowserOrg(this.value)"
-                    class="bg-[#3e3e42] text-xs text-white border border-[#555] rounded px-2 py-1 outline-none focus:border-[#007acc]">
-                    <option value="default">Default</option>
-                </select>
-                <button onclick="openCustomOrgModal()" id="btn-edit-filters"
-                    class="text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-[#3e3e42]" title="Editar Filtros"
-                    style="display:none;">
-                    <i class="fas fa-cog"></i>
-                </button>
-            </div>
+            <button onclick="openCustomOrgModal()"
+                class="bg-[#3e3e42] hover:bg-[#4e4e52] px-3 py-1.5 rounded text-sm font-bold shadow transition-colors flex items-center gap-2"
+                title="Configurar Organización del Navegador">
+                <i class="fas fa-sitemap"></i> Organization
+            </button>
         </div>
 
         <div class="flex gap-2">
@@ -1751,28 +1745,81 @@
         // --- PREVIOUSLY DUPLICATED LOGIC REMOVED ---
         // currentScheme and initBrowserSchemes are now defined above.
 
-        function changeBrowserOrg(scheme) {
-            checkFilterButton(scheme);
+        // --- CUSTOM ORG MODAL (5 LEVELS) ---
 
-            if (scheme === 'custom') {
-                // Always open modal when selecting this option
-                openCustomOrgModal();
-                // Do not proceed to rebuild until modal applies
-                return;
+        function openCustomOrgModal() {
+            // Check if modal exists
+            let modal = document.getElementById('custom-org-modal');
+            if (modal) modal.remove();
+
+            // Build 5 Selects
+            let selectsHtml = '';
+            for (let i = 0; i < 5; i++) {
+                const label = i === 0 ? "Group by:" : "Then by:";
+                let opts = `<option value="">${i === 0 ? '(None)' : '(None)'}</option>`;
+
+                PARAM_DEFS.forEach(p => {
+                    const selected = (CUSTOM_GROUP_PARAMS[i] === p) ? 'selected' : '';
+                    opts += `<option value="${p}" ${selected}>${p}</option>`;
+                });
+
+                selectsHtml += `
+                <div class="flex flex-col gap-1 mb-3">
+                    <label class="text-xs text-gray-400">${label}</label>
+                    <select id="org-level-${i}" class="bg-[#3e3e42] text-white p-2 rounded border border-[#555] text-sm outline-none focus:border-[#007acc]">
+                        ${opts}
+                    </select>
+                </div>`;
             }
 
-            currentScheme = scheme;
-            if (scheme !== 'custom') CUSTOM_GROUP_PARAMS = [];
+            const html = `
+            <div id="custom-org-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                <div class="bg-[#252526] p-6 rounded-lg shadow-2xl w-[400px] border border-[#3e3e42] flex flex-col">
+                    <div class="flex justify-between items-center mb-4 border-b border-[#3e3e42] pb-2">
+                        <h2 class="text-xl font-bold text-white"><i class="fas fa-sitemap text-[#007acc] mr-2"></i>Organización</h2>
+                        <button onclick="document.getElementById('custom-org-modal').remove()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+                    </div>
+                    
+                    <div class="flex-1 overflow-y-auto mb-4 custom-scrollbar" style="max-height: 60vh;">
+                         ${selectsHtml}
+                    </div>
 
-            // Rebuild Tree
-            // 1. Get all sheets (flatten current view)
+                    <div class="flex justify-end gap-2 pt-2">
+                        <button onclick="document.getElementById('custom-org-modal').remove()" class="px-4 py-2 text-gray-300 hover:text-white">Cancelar</button>
+                        <button onclick="applyCustomOrg()" class="bg-[#007acc] hover:bg-[#005a9e] text-white px-6 py-2 rounded font-bold shadow">Aplicar</button>
+                    </div>
+                </div>
+            </div>`;
+
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = html;
+            document.body.appendChild(wrapper.firstElementChild);
+        }
+
+        function applyCustomOrg() {
+            const newParams = [];
+            for (let i = 0; i < 5; i++) {
+                const val = document.getElementById(`org-level-${i}`).value;
+                if (val) newParams.push(val);
+            }
+
+            CUSTOM_GROUP_PARAMS = newParams;
+            currentScheme = 'custom'; // Force custom scheme
+
+            // Rebuild
+            document.getElementById('custom-org-modal').remove();
+
             const allNodes = flattenTree(TREE_DATA);
             const sheetsOnly = allNodes.filter(n => n.type === 'sheet');
-
-            // 2. Rebuild
             TREE_DATA = buildStructure(sheetsOnly);
             renderTree();
             renderGrid();
+        }
+
+        // Logic placeholder if needed
+        function changeBrowserOrg(scheme) {
+            // Retired mechanism, kept for safety compatibility
+            console.log("Legacy changeBrowserOrg called:", scheme);
         }
 
         // Modified buildStructure to use Scheme
