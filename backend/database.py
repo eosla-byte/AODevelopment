@@ -45,10 +45,10 @@ SCAN_CATEGORIES = {
 # PROJECT FUNCTIONS
 # -----------------------------------------------------------------------------
 
-def get_projects() -> List[models.Project]:
+def get_projects(archived: bool = False) -> List[models.Project]:
     db = SessionLocal()
     try:
-        projects = db.query(models.Project).filter(models.Project.archived == False).all()
+        projects = db.query(models.Project).filter(models.Project.archived == archived).all()
         # Initialize .files to empty dict to avoid template errors accessing p.files
         for p in projects:
             p.files = {cat: [] for cat in SCAN_CATEGORIES.keys()}
@@ -57,6 +57,26 @@ def get_projects() -> List[models.Project]:
     except Exception as e:
         print(f"DB Error get_projects: {e}")
         return []
+    finally:
+        db.close()
+
+def update_project_profit_config(project_id: str, projected: float, real: float, partners: dict) -> bool:
+    db = SessionLocal()
+    try:
+        proj = db.query(models.Project).filter(models.Project.id == project_id).first()
+        if not proj: return False
+        
+        proj.projected_profit_margin = projected
+        proj.real_profit_margin = real
+        proj.partners_config = partners
+        flag_modified(proj, "partners_config")
+        
+        db.commit()
+        return True
+    except Exception as e:
+        print(f"Error update_project_profit_config: {e}")
+        db.rollback()
+        return False
     finally:
         db.close()
 

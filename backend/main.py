@@ -169,6 +169,104 @@ async def serve_landing_alias(request: Request):
 async def serve_sheet_manager(request: Request):
     return templates.TemplateResponse("sheet_manager.html", {"request": request})
 
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request, view: str = "active"):
+    # 1. Projects
+    projects = get_projects(archived=(view == "archived"))
+    
+    # 2. Metrics Calculation
+    
+    # Income (Paid Amount of active projects? Or all projects?)
+    # Usually Income is absolute.
+    income = 0.0
+    if projects:
+        income = sum(p.paid_amount if p.paid_amount else 0.0 for p in projects)
+
+    # Expenses
+    # Assuming get_expenses_monthly returns a structure like { "months": { "2024-01": { "total": X } }, "total_global": Y }
+    # Or we sum manually.
+    expenses_data = get_expenses_monthly() 
+    total_expenses = 0.0
+    if expenses_data:
+        # Check structure. If list or dict.
+        # Based on typical implementation in this codebase, let's try to access safe.
+        if isinstance(expenses_data, dict):
+            # Try specific key or months
+            if "months" in expenses_data and isinstance(expenses_data["months"], dict):
+                for m in expenses_data["months"].values():
+                    total_expenses += float(m.get("total", 0.0))
+            # Fallback if just a list? (Unlikely)
+
+    # Payroll
+    collabs = get_collaborators()
+    payroll_monthly = 0.0
+    if collabs:
+        payroll_monthly = sum(c.salary for c in collabs if not c.archived and c.salary)
+    
+    payroll_total = payroll_monthly * 12 # Projection
+    
+    # Balance
+    balance = income - total_expenses - payroll_total
+    
+    # HR Alerts
+    allocations = get_total_collaborator_allocations()
+    uncovered_count = 0
+    if collabs and allocations:
+        for c in collabs:
+            if not c.archived:
+                alloc = allocations.get(c.id, 0)
+                if alloc < 100: 
+                    uncovered_count += 1
+    
+    metrics = {
+        "income": income,
+        "expenses": total_expenses,
+        "payroll_monthly": payroll_monthly,
+        "payroll_total": payroll_total,
+        "balance": balance,
+        "uncovered_collaborators_count": uncovered_count
+    }
+    
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "projects": projects,
+        "metrics": metrics,
+        "view_mode": view,
+        "year": datetime.datetime.now().year
+    })
+
+@app.post("/project/{project_id}/profit/update")
+async def update_profit_config_route(project_id: str, request: Request):
+    form = await request.form()
+    
+    try:
+        projected = float(form.get("projected_margin", 0))
+    except: projected = 0.0
+    
+    try:
+        real = float(form.get("real_margin", 0))
+    except: real = 0.0
+    
+    partners = {}
+    for key, val in form.items():
+        if key.startswith("partner_share_") and val:
+            pid = key.replace("partner_share_", "")
+            try: partners[pid] = float(val)
+            except: pass
+            
+    # New Partner
+    new_pid = form.get("new_partner_id")
+    new_share = form.get("new_partner_share")
+    if new_pid and new_share:
+        try: partners[new_pid] = float(new_share)
+        except: pass
+        
+    success = update_project_profit_config(project_id, projected, real, partners)
+    if success:
+        return RedirectResponse(f"/project/{project_id}", status_code=303)
+    else:
+        return HTMLResponse("<h1>Error updating profit configuration</h1>", status_code=500)
+
 @app.get("/cqt-tool", response_class=HTMLResponse)
 async def view_cqt_tool(request: Request):
     # Manual Auth Check to bypass Middleware caching/redirect issues
