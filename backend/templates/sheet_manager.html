@@ -387,42 +387,178 @@
         }
 
         // Global Builder (for init and re-org)
-        window.buildStructure = function (items) {
-            const rootNodes = [];
+        // --- SORT & GROUPING STATE ---
+        let SORT_CONFIG = { key: 'number', dir: 'asc' }; // default
+        let CUSTOM_GROUP_PARAMS = []; // e.g. ['Designed By', 'Checked By']
 
-            // Normalize Items (ensure they have params/children props)
-            const normalized = items.map(s => {
-                // If s is already a node (has type='sheet'), preserve it. 
-                // If s is raw data (from backend), map it.
-                // FORCE TYPE: If missing or generic, ensure it's marked as sheet
-                let type = s.type;
-                if (!type) type = 'sheet';
+        function sortTree(nodes) {
+            nodes.sort((a, b) => {
+                // Always Groups on Top
+                if (a.type !== b.type) {
+                    return a.type === 'group' ? -1 : 1;
+                }
 
-                if (type === 'sheet' && s.params && s.children) return { ...s, type: 'sheet' };
+                // If Sheets, use SORT_CONFIG
+                if (a.type === 'sheet') {
+                    let valA, valB;
 
-                return {
-                    id: s.id || generateId(),
-                    type: 'sheet',
-                    number: s.number,
-                    name: s.name,
-                    params: s.params_data || {},
-                    folder_path: s.folder_path || [], // Legacy Support
-                    browser_paths: s.browser_paths || {}, // New V2
-                    children: []
-                };
+                    if (SORT_CONFIG.key === 'number') { valA = a.number; valB = b.number; }
+                    else if (SORT_CONFIG.key === 'name') { valA = a.name; valB = b.name; }
+                    else {
+                        // Param
+                        const p = SORT_CONFIG.key.replace('param:', '');
+                        valA = a.params[p] || "";
+                        valB = b.params[p] || "";
+                    }
+
+                    const cmp = valA.localeCompare(valB, undefined, { numeric: true, sensitivity: 'base' });
+                    return SORT_CONFIG.dir === 'asc' ? cmp : -cmp;
+                }
+
+                // If Groups, always sort alpha asc for now, or use same logic if applicable?
+                // Groups usually just Name.
+                return a.name.localeCompare(b.name, undefined, { numeric: true });
             });
 
-            normalized.forEach(node => {
-                // Determine Path
+            nodes.forEach(n => {
+                if (n.children && n.children.length > 0) sortTree(n.children);
+            });
+        }
+
+        function handleHeaderClick(colKey) {
+            if (SORT_CONFIG.key === colKey) {
+                // Toggle Dir
+                SORT_CONFIG.dir = SORT_CONFIG.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                SORT_CONFIG.key = colKey;
+                SORT_CONFIG.dir = 'asc';
+            }
+
+            // Visual feedback could be added here (arrow icons)
+
+            // Re-sort and Render
+            sortTree(TREE_DATA); // recursive sort
+            renderTree();
+            renderGrid(); // Grid follows tree order
+        }
+
+        // --- BROWSER ORG & APPLY CHANGES ---
+
+        let currentScheme = "default";
+
+        function initBrowserSchemes(schemes) {
+            const sel = document.getElementById('browser-org-select');
+            sel.innerHTML = '';
+
+            // Add Custom Option First
+            const optCustom = document.createElement('option');
+            optCustom.value = "custom";
+            optCustom.innerText = "⚙️ Personalizado (Filtros)...";
+            sel.appendChild(optCustom);
+
+            if (schemes && schemes.length > 0) {
+                schemes.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s;
+                    opt.innerText = s;
+                    sel.appendChild(opt);
+                });
+                if (schemes.includes('AO')) sel.value = 'AO';
+                else sel.value = schemes[0];
+            } else {
+                sel.value = "custom"; // Fallback if no schemes
+            }
+
+            currentScheme = sel.value;
+        }
+
+        function changeBrowserOrg(scheme) {
+            if (scheme === 'custom') {
+                openCustomOrgModal();
+                return;
+            }
+
+            currentScheme = scheme;
+            CUSTOM_GROUP_PARAMS = []; // Reset custom
+
+            const flat = flattenTree(TREE_DATA);
+            TREE_DATA = buildStructure(flat);
+            renderTree();
+            renderGrid();
+        }
+
+        function openCustomOrgModal() {
+            // Checkboxes for all params
+            const checks = PARAM_DEFS.map(p => `
+                <label class="flex items-center space-x-2 p-2 hover:bg-[#37373d] rounded cursor-pointer">
+                    <input type="checkbox" value="${p}" class="form-checkbox text-[#007acc] rounded bg-[#2d2d2d] border-[#3e3e42]">
+                    <span class="text-sm">${p}</span>
+                </label>
+            `).join('');
+
+            const html = `
+            <div id="org-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                <div class="bg-[#252526] p-6 rounded shadow-xl w-[400px] border border-[#3e3e42] flex flex-col max-h-[80vh]">
+                    <h2 class="text-xl font-bold mb-2">Organización Personalizada</h2>
+                    <p class="text-xs text-gray-400 mb-4">Selecciona los parámetros para agrupar (en orden de jerarquía):</p>
+                    
+                    <div class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-1 mb-4" id="org-checks">
+                        ${checks}
+                    </div>
+                    
+                    <div class="flex justify-end gap-2 pt-4 border-t border-[#3e3e42]">
+                        <button onclick="document.getElementById('org-modal').remove()" class="text-gray-400 hover:text-white px-3">Cancelar</button>
+                        <button onclick="applyCustomOrg()" class="bg-[#007acc] hover:bg-[#005a9e] text-white px-4 py-1.5 rounded font-bold">Aplicar</button>
+                    </div>
+                </div>
+            </div>`;
+
+            document.body.insertAdjacentHTML('beforeend', html);
+        }
+
+        function applyCustomOrg() {
+            const inputs = document.querySelectorAll('#org-checks input:checked');
+            CUSTOM_GROUP_PARAMS = Array.from(inputs).map(i => i.value);
+
+            document.getElementById('org-modal').remove();
+
+            // Rebuild
+            const flat = flattenTree(TREE_DATA);
+            TREE_DATA = buildStructure(flat);
+            renderTree();
+            renderGrid();
+        }
+
+        // Global Builder
+        window.buildStructure = function (items) {
+            // 1. Normalize (same as before)
+            const nodes = items.map(s => {
+                if (s.type === 'sheet') return s;
+                // Raw to Node... logic duplicated? 
+                // We should use a helper or rely on the fact that 'items' passed here are usually already nodes from flattenTree
+                return s;
+            }).filter(n => n.type === 'sheet'); // Filter out existing groups, we rebuild them
+
+            const rootNodes = [];
+
+            nodes.forEach(node => {
                 let path = [];
-                if (node.browser_paths && node.browser_paths[currentScheme]) {
+
+                // PATH LOGIC
+                if (CUSTOM_GROUP_PARAMS.length > 0) {
+                    // Custom Grouping
+                    path = CUSTOM_GROUP_PARAMS.map(p => {
+                        let val = node.params[p];
+                        return val || "???"; // Text for empty group
+                    });
+                } else if (node.browser_paths && node.browser_paths[currentScheme]) {
                     path = node.browser_paths[currentScheme];
                 } else if (node.folder_path) {
                     path = node.folder_path;
                 }
 
+                // Insert into Tree
                 let currentLevel = rootNodes;
-
                 path.forEach(folderName => {
                     let group = currentLevel.find(n => n.type === 'group' && n.name === folderName);
                     if (!group) {
@@ -431,35 +567,19 @@
                             type: 'group',
                             name: folderName,
                             children: [],
-                            targetParam: null
+                            targetParam: null // Could infer?
                         };
                         currentLevel.push(group);
                     }
                     currentLevel = group.children;
                 });
-
                 currentLevel.push(node);
+                node.children = []; // Clear old children just in case
             });
 
             sortTree(rootNodes);
             return rootNodes;
         };
-
-        function sortTree(nodes) {
-            nodes.sort((a, b) => {
-                if (a.type === b.type) {
-                    if (a.type === 'sheet') {
-                        return a.number.localeCompare(b.number, undefined, { numeric: true });
-                    }
-                    return a.name.localeCompare(b.name, undefined, { numeric: true });
-                }
-                return a.type === 'group' ? -1 : 1;
-            });
-
-            nodes.forEach(n => {
-                if (n.children && n.children.length > 0) sortTree(n.children);
-            });
-        }
 
 
         function generateId() {
@@ -600,8 +720,21 @@
             let html = `<div class="grid-row" style="background: #2d2d2d;">`;
             COLS.forEach((c, idx) => {
                 const width = COL_WIDTHS[c] || 150;
-                html += `<div class="grid-col-header relative" style="width: ${width}px; flex-shrink:0;" data-col="${c}">
-                            ${c}
+
+                // Determine sort key
+                let sortKey = '';
+                if (c === "Sheet Number") sortKey = 'number';
+                else if (c === "Sheet Name") sortKey = 'name';
+                else sortKey = 'param:' + c;
+
+                const activeSort = SORT_CONFIG.key === sortKey;
+                const arrow = activeSort ? (SORT_CONFIG.dir === 'asc' ? '▲' : '▼') : '';
+
+                html += `<div class="grid-col-header relative cursor-pointer hover:bg-[#3e3e42]" 
+                             style="width: ${width}px; flex-shrink:0;" 
+                             data-col="${c}"
+                             onclick="handleHeaderClick('${sortKey}')">
+                            ${c} <span class="text-[10px] text-yellow-500">${arrow}</span>
                             <div class="resizer" onmousedown="initResize(event, '${c}')"></div>
                          </div>`;
             });
@@ -1591,25 +1724,8 @@
 
         // --- BROWSER ORG & APPLY CHANGES ---
 
-        let currentScheme = "default";
-
-        function initBrowserSchemes(schemes) {
-            const sel = document.getElementById('browser-org-select');
-            if (!schemes || schemes.length === 0) {
-                sel.style.display = 'none';
-                return;
-            }
-            sel.innerHTML = '';
-            schemes.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s;
-                opt.innerText = s;
-                sel.appendChild(opt);
-            });
-            // Default to first or 'AO' if exists
-            if (schemes.includes('AO')) sel.value = 'AO';
-            currentScheme = sel.value;
-        }
+        // --- PREVIOUSLY DUPLICATED LOGIC REMOVED ---
+        // currentScheme and initBrowserSchemes are now defined above.
 
         function changeBrowserOrg(scheme) {
             currentScheme = scheme;
