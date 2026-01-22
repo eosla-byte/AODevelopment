@@ -68,6 +68,22 @@ def list_contents(project_id: str, folder_id: str):
     folders, items = copier.get_folder_contents(project_id, folder_id)
     return {"folders": folders, "items": items}
 
+# --- Create Folder ---
+
+class CreateFolderPayload(BaseModel):
+    project_id: str
+    parent_id: str
+    name: str
+
+@router.post("/folders")
+def create_new_folder(payload: CreateFolderPayload):
+    copier = get_copier()
+    res = copier.create_folder(payload.project_id, payload.parent_id, payload.name)
+    if not res:
+        raise HTTPException(status_code=500, detail="Failed to create folder")
+    return {"status": "success", "data": res}
+
+
 class CopyPayload(BaseModel):
     project_id: str
     source_id: str # Folder or Item ID
@@ -79,17 +95,18 @@ def copy_content(payload: CopyPayload):
     copier = get_copier()
     if payload.is_folder:
         # Full Recursive Copy
-        # We need to fetch source info locally to get name
-        # Optimization: We assume we can fetch it.
-        # copier.recursive_copy requires a 'source_folder' dict object.
-        # We'll fetch it first.
-        # Problem: API to get folder details by ID?
-        # Usually GET /folders/{id} returns details.
-        # copier doesn't have it implemented.
-        # For now, we rely on frontend parsing.
-        # Let's Implement 'get_folder_details' in wrapper or use what we have.
-        # Workaround: Frontend passes name? Or we fetch parent contents and find it.
-        pass
+        # 1. Fetch Source Folder Details
+        source_folder = copier.get_folder(payload.project_id, payload.source_id)
+        if not source_folder:
+            raise HTTPException(status_code=404, detail="Source folder not found")
+            
+        # 2. Perform Recursive Copy
+        try:
+            copier.recursive_copy(payload.project_id, source_folder, payload.target_parent_id)
+            return {"status": "success", "message": "Recursive copy started/completed"}
+        except Exception as e:
+             raise HTTPException(status_code=500, detail=f"Copy Error: {str(e)}")
+
     else:
         # Single File Copy
         res = copier.copy_item(payload.project_id, payload.source_id, payload.target_parent_id)

@@ -176,17 +176,17 @@
             <div class="glass-panel p-4">
                 <h3 class="text-sm font-semibold text-slate-400 mb-2">ACTIONS on SELECTION</h3>
                 <div class="grid grid-cols-2 gap-2">
-                    <button id="btnCopy"
+                    <button id="btnCopy" onclick="menuAction('copy')"
                         class="p-3 bg-slate-800 hover:bg-slate-700 rounded text-sm text-left flex items-center gap-2"
                         disabled>
                         <span>📋</span> Copy Folder
                     </button>
-                    <button id="btnPaste"
+                    <button id="btnPaste" onclick="menuAction('paste')"
                         class="p-3 bg-slate-800 hover:bg-slate-700 rounded text-sm text-left flex items-center gap-2 opacity-50 cursor-not-allowed"
                         disabled>
                         <span>📥</span> Paste Here
                     </button>
-                    <button id="btnNewFolder"
+                    <button id="btnNewFolder" onclick="menuAction('new-folder')"
                         class="p-3 bg-slate-800 hover:bg-slate-700 rounded text-sm text-left flex items-center gap-2"
                         disabled>
                         <span>📁</span> New Folder
@@ -416,7 +416,34 @@
             }
             if (action === 'paste') {
                 if (!clipboard) return;
-                setStatus("Paste not implemented.");
+
+                setStatus(`Pasting ${clipboard.name} into ${name}...`);
+
+                try {
+                    const res = await fetch(`${API}/action/copy`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            project_id: currentProjectId,
+                            source_id: clipboard.id,
+                            target_parent_id: id,
+                            is_folder: clipboard.type === 'folder'
+                        })
+                    });
+
+                    if (res.ok) {
+                        setStatus("Paste Successful!");
+                        // Trigger Refresh of children
+                        selectedNode.row.dataset.loaded = 'false';
+                        toggleExpand(selectedNode.row, null, id, type); // Collapse/Expand to refresh
+                    } else {
+                        const err = await res.json();
+                        setStatus(`Error: ${err.detail || 'Unknown error'}`);
+                    }
+                } catch (e) {
+                    console.error(e);
+                    setStatus("Paste Error.");
+                }
             }
             if (action === 'new-folder') {
                 const newName = prompt("New Folder Name:");
@@ -432,25 +459,35 @@
         async function createFolder(parentId, name) {
             setStatus(`Creating folder ${name}...`);
             try {
-                const formData = new FormData();
-                formData.append('parent_id', parentId);
-                formData.append('name', name);
-                formData.append('project_id', currentProjectId);
+                const res = await fetch(`${API}/folders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        project_id: currentProjectId,
+                        parent_id: parentId,
+                        name: name
+                    })
+                });
 
-                // Try specific endpoint or fallback
-                // Assuming POST /folders logic exists or will fail gracefully
-                const res = await fetch(`${API}/folders`, { method: 'POST', body: formData });
                 if (res.ok) {
                     const json = await res.json();
                     setStatus("Folder Created!");
-                    // Ideally refresh parent
-                    // selectedNode.row.click(); // Hacky refresh
+
+                    // Add to UI if parent is expanded
+                    const row = document.querySelector(`.tree-item[data-id="${parentId}"]`);
+                    if (row && row.dataset.loaded === 'true') {
+                        row.childrenDiv.appendChild(createNodeEl(json.data.id, name, 'folder', parentId));
+                        row.childrenDiv.classList.remove('hidden');
+                    }
+
+                    return json.data.id;
                 } else {
-                    // Fallback logic if 404
-                    setStatus("Folder creation API not found.");
+                    setStatus("Folder creation failed.");
+                    return null;
                 }
             } catch (e) {
                 console.warn(e);
+                return null;
             }
         }
 
