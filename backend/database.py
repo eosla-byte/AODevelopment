@@ -518,7 +518,9 @@ def get_or_create_default_column():
     finally:
         db.close()
 
-def get_expenses_monthly(year: int):
+def get_expenses_monthly(year: int = None):
+    if year is None:
+        year = datetime.datetime.now().year
     db = SessionLocal()
     try:
         # Get all cards (we ignore ExpenseColumn structure for this view)

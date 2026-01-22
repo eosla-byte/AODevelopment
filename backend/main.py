@@ -188,14 +188,16 @@ async def dashboard(request: Request, view: str = "active"):
     expenses_data = get_expenses_monthly() 
     total_expenses = 0.0
     if expenses_data:
-        # Check structure. If list or dict.
-        # Based on typical implementation in this codebase, let's try to access safe.
-        if isinstance(expenses_data, dict):
-            # Try specific key or months
-            if "months" in expenses_data and isinstance(expenses_data["months"], dict):
-                for m in expenses_data["months"].values():
-                    total_expenses += float(m.get("total", 0.0))
-            # Fallback if just a list? (Unlikely)
+        # get_expenses_monthly returns a LIST of month dicts
+        if isinstance(expenses_data, list):
+            for m in expenses_data:
+                total_expenses += float(m.get("total", 0.0))
+        elif isinstance(expenses_data, dict) and "months" in expenses_data:
+             # Fallback for alternative structure (safety)
+             for m in expenses_data["months"].values():
+                 total_expenses += float(m.get("total", 0.0))
+
+    # Payroll
 
     # Payroll
     collabs = get_collaborators()
@@ -1291,24 +1293,20 @@ async def upload_file(project_id: str, category: str = Form(...), amount: str = 
         # Actually checking 'if amount' handles 'None' or empty string.
         # But if amount is missing but note exists, we still want to save the note.
         
-        should_save = False
+        # Always save metadata to ensure file appears in the list
         val = 0.0
         if amount and amount.strip():
              try:
                  val = float(amount)
-                 should_save = True
              except: pass
-        if note and note.strip():
-             should_save = True
              
-        if should_save:
-             try:
-                 # Note default text "Initial upload" is good only if note is empty
-                 final_note = note if note.strip() else "Initial upload"
-                 update_project_file_meta(project_id, category, file.filename, val, final_note)
-             except Exception as e:
-                 print(f"ERROR: Failed to save metadata during upload: {e}")
-                 pass
+        try:
+             # Note default text "Initial upload" is good only if note is empty
+             final_note = note if note and note.strip() else "" 
+             update_project_file_meta(project_id, category, file.filename, val, final_note)
+        except Exception as e:
+             print(f"ERROR: Failed to save metadata during upload: {e}")
+             pass
             
     return RedirectResponse(f"/project/{project_id}", status_code=303)
 

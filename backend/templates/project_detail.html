@@ -31,7 +31,8 @@
     <!-- Financial Dashboards (Computed on the fly in Template) -->
 
     {% set total = p.amount %}
-    {% set paid = p.paid_amount|default(0) %}
+    <!-- Use calculated totals from files for Paid Amount -->
+    {% set paid = p.cat_totals.get('Pagos', 0) %}
 
     {% if total > 0 %}{% set avance_fin = (paid / total) * 100 %}{% else %}{% set avance_fin = 0 %}{% endif %}
     {% set saldo_pendiente = total - paid %}
@@ -59,15 +60,13 @@
 
     <!-- 1. Variables Financieras Básicas (Directas) -->
 
-    <!-- Calculate Totals from Files -->
-    {% set paid = p.paid_amount|default(0) %}
+    <!-- Calculate Totals from Files (Override manual paid_amount) -->
+    {% set paid = p.cat_totals.get('Pagos', 0) %}
     {% if total > 0 %}{% set avance_fin = (paid / total) * 100 %}{% else %}{% set avance_fin = 0 %}{% endif %}
     {% set saldo_pendiente = total - paid %}
 
     {% set util_bruta = paid * (p.real_profit_margin / 100.0) %}
 
-    <!-- Header Summary Section: Contracted vs Collected -->
-    <!-- Header Summary Section: Contracted vs Collected -->
     <!-- Header Summary Section: Contracted vs Collected -->
     <div
         class="bg-gradient-to-r from-slate-900 to-slate-800 rounded-2xl p-8 md:p-10 text-white mb-6 shadow-xl relative group min-h-[250px] flex flex-col justify-between">
@@ -201,12 +200,14 @@
 
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div class="text-xs text-slate-400 font-bold uppercase mb-1">IVA Pagado</div>
-            <div class="text-xl font-bold text-red-500">Q{{ "{:,.2f}".format(p.total_iva_paid|default(0)) }}</div>
+            <div class="text-xl font-bold text-red-500">Q{{ "{:,.2f}".format(p.cat_totals.get('Impuestos_IVA', 0)) }}
+            </div>
         </div>
 
         <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div class="text-xs text-slate-400 font-bold uppercase mb-1">ISR Pagado</div>
-            <div class="text-xl font-bold text-red-500">Q{{ "{:,.2f}".format(p.total_isr_paid|default(0)) }}</div>
+            <div class="text-xl font-bold text-red-500">Q{{ "{:,.2f}".format(p.cat_totals.get('Impuestos_ISR', 0)) }}
+            </div>
         </div>
 
         <div class="bg-emerald-50 p-4 rounded-xl border border-emerald-200 shadow-sm col-span-2">
@@ -534,7 +535,8 @@
                     {
                         id: "{{ c.id }}",
                             name: "{{ c.name }}",
-                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }} - (assignedCollabs["{{ c.id }}"] || 0))
+                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }
+                    } - (assignedCollabs["{{ c.id }}"] || 0))
                         },
                     {% endfor %}
                     ];
@@ -706,47 +708,41 @@
                     <label class="block text-xs font-bold text-slate-500 mb-2 uppercase">Participación Socios
                         (%)</label>
                     <div class="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                        <!-- We can try to list common partners or input IDs. Ideally list? 
-                             Since we don't have list of all partners passed to this view easily in PURE html context without fetch. 
-                             Wait, we need to pass partners list to this view to render this dropdown.
-                             Let's assume user knows IDs or we enter them manually? 
-                             Better: Let's assume there are few partners and we can ask to list them.
-                             Ah, we are not passing 'partners' list to project_detail view currently.
-                             Let's input ID for now OR we update the route to pass collaborators list.
-                             
-                             Let's stick to simple Inputs for key partners if hardcoded? NO.
-                             Let's look at p.partners_config.
-                        -->
                         {% for partner_id, share in p.partners_config.items() %}
                         <div class="flex gap-2 items-center">
-                            <input type="text" name="dummy_name" value="{{ partner_id }}" readonly
-                                class="text-xs bg-slate-100 border-none rounded w-24 p-2 text-slate-500">
+                            <!-- Try to find name -->
+                            {% set ns = namespace(name=partner_id) %}
+                            {% for c in collaborators %}
+                            {% if c.id == partner_id %}{% set ns.name = c.name %}{% endif %}
+                            {% endfor %}
+
+                            <input type="text" value="{{ ns.name }}" readonly
+                                class="text-xs bg-slate-100 border-none rounded flex-1 p-2 text-slate-600 truncate"
+                                title="ID: {{ partner_id }}">
+
+                            <!-- Hidden input for the key if needed, or we assume route handles it via name parsing? 
+                                 Route likely iterates form. keys like 'partner_share_{ID}' are expected.
+                            -->
                             <input type="number" step="0.01" name="partner_share_{{ partner_id }}" value="{{ share }}"
-                                class="input-field w-20 p-1 text-sm">
+                                class="input-field w-20 p-1 text-sm text-right">
                             <span class="text-slate-400">%</span>
                         </div>
                         {% endfor %}
 
-                        <p class="text-[10px] text-slate-400 mt-2">
-                            * Para agregar un nuevo socio a este proyecto, ingrese su ID abajo.
+                        <p class="text-[10px] text-slate-400 mt-2 mb-1">
+                            * Agregar nuevo socio:
                         </p>
                         <div class="flex gap-2 items-center mt-1">
-                            <input type="text" name="new_partner_id" placeholder="ID Socio"
-                                class="input-field w-24 p-1 text-xs">
+                            <select name="new_partner_id" class="input-field flex-1 p-1 text-xs">
+                                <option value="">Seleccionar Socio...</option>
+                                {% for c in collaborators %}
+                                <option value="{{ c.id }}">{{ c.name }}</option>
+                                {% endfor %}
+                            </select>
                             <input type="number" step="0.01" name="new_partner_share" placeholder="%"
-                                class="input-field w-16 p-1 text-xs">
-                            <span class="text-xs text-slate-400">(Auto-adds on save if filled)</span>
+                                class="input-field w-16 p-1 text-xs text-right">
+                            <span class="text-xs text-slate-400 font-bold">%</span>
                         </div>
-
-                        <!-- Hack: We can handle the "Auto-add" in backend logic manually or JS. 
-                             Actually, let's just use JS to append an input? No, standard form submit.
-                             In backend we iterate form keys. So we can just name the new inputs 'partner_share_<ID>' dynamically via JS?
-                             Or simpler: Input 'partner_share_NEWID' -> Value.
-                             Wait, user wont know ID. 
-                             
-                             CRITICAL: User needs to select a human name.
-                             I should update read_project route to pass 'collaborators' list.
-                        -->
                     </div>
                 </div>
 
@@ -757,12 +753,14 @@
                     </button>
                 </div>
 
-                <!-- Script to help with new partner addition? -->
                 <script>
                     document.querySelector('form[action$="/profit/update"]').addEventListener('submit', function (e) {
-                        const newId = this.querySelector('input[name="new_partner_id"]').value;
+                        const newId = this.querySelector('select[name="new_partner_id"]').value;
                         const newShare = this.querySelector('input[name="new_partner_share"]').value;
                         if (newId && newShare) {
+                            // Append as if it was an existing field so backend picks it up?
+                            // Backend likely needs to handle 'new_partner_id' separate OR we append a hidden field.
+                            // Let's stick to the hidden field trick which matches the form naming convention 'partner_share_ID'
                             const input = document.createElement('input');
                             input.type = 'hidden';
                             input.name = 'partner_share_' + newId;
@@ -817,7 +815,7 @@
                             <!-- Quick Edit Amount Button -->
                             <!-- Quick Edit Amount Button -->
                             <button
-                                onclick="editFileMeta('{{ category }}', '{{ f.name }}', '{{ f.amount|default(0) }}', '{{ f.note|default('')|replace("'", "\\'")|replace('\n', ' ')|replace('\r', '') }}')"
+                                onclick="editFileMeta('{{ category }}', '{{ f.name }}', '{{ f.amount|default(0) }}', {{ f.note|default('')|tojson|forceescape }})"
                                 class="text-slate-300 hover:text-blue-500 p-1" title="Editar Monto">
                                 ✎
                             </button>
@@ -840,11 +838,13 @@
             </div>
 
             <!-- Subtotal Footer -->
+            {% if category in ['Pagos', 'Impuestos_IVA', 'Impuestos_ISR'] %}
             <div
                 class="px-3 py-2 bg-white border-t border-slate-100 flex justify-between items-center text-xs font-bold {{ css_text }}">
                 <span>Total</span>
                 <span>Q{{ "{:,.2f}".format(total_amount) }}</span>
             </div>
+            {% endif %}
         </div>
         {% endmacro %}
 
@@ -884,7 +884,8 @@
             <form action="/project/{{ p.id }}/upload" method="post" enctype="multipart/form-data" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">Categoría</label>
-                    <select name="category" class="input-field w-full">
+                    <select name="category" id="upload_category" class="input-field w-full"
+                        onchange="toggleUploadAmount()">
                         <option value="Facturas">Facturas</option>
                         <option value="Pagos">Pagos</option>
                         <option value="Impuestos_IVA">Impuestos IVA</option>
@@ -899,7 +900,7 @@
                         class="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                         required>
                 </div>
-                <div>
+                <div id="upload_amount_container" class="hidden">
                     <label class="block text-xs font-bold text-slate-500 mb-1">Monto (Opcional)</label>
                     <input type="number" step="0.01" name="amount" class="input-field w-full" placeholder="Q 0.00">
                     <p class="text-[10px] text-slate-400 mt-1">Ingrese el valor monetario del documento para cálculos.
@@ -1007,7 +1008,7 @@
 
                 <div class="text-sm font-bold text-slate-600 mb-2 truncate" id="meta_filename_display"></div>
 
-                <div>
+                <div id="meta_amount_container">
                     <label class="block text-xs font-bold text-slate-500 mb-1">Monto (Q)</label>
                     <input type="number" step="0.01" name="amount" id="meta_amount" class="input-field w-full">
                 </div>
@@ -1027,6 +1028,9 @@
 </div> <!-- closing div for flex-col -->
 
 <script>
+    // Financial Categories
+    const FIN_CATS = ['Pagos', 'Impuestos_IVA', 'Impuestos_ISR'];
+
     // File Meta Helper
     function editFileMeta(cat, filename, amount, note) {
         document.getElementById('fileMetaModal').classList.remove('hidden');
@@ -1035,7 +1039,29 @@
         document.getElementById('meta_filename_display').textContent = filename;
         document.getElementById('meta_amount').value = amount || '';
         document.getElementById('meta_note').value = note || '';
+
+        // Toggle Amount Field
+        const amtContainer = document.getElementById('meta_amount_container');
+        if (FIN_CATS.includes(cat)) {
+            amtContainer.classList.remove('hidden');
+        } else {
+            amtContainer.classList.add('hidden');
+        }
     }
+
+    // Toggle Upload Amount
+    function toggleUploadAmount() {
+        const cat = document.getElementById('upload_category').value;
+        const container = document.getElementById('upload_amount_container');
+        if (FIN_CATS.includes(cat)) {
+            container.classList.remove('hidden');
+        } else {
+            container.classList.add('hidden');
+        }
+    }
+
+    // Init state
+    toggleUploadAmount();
 
     // Calendar Logic Removed - now using simple list
     function openAddReminder() {
