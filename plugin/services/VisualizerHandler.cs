@@ -79,7 +79,9 @@ namespace RevitCivilConnector.Services
                     else if (action == "UPDATE_SHEETS")
                     {
                         // Payload: List of { id, number, name, params }
-                        var updates = payload.ToList(); 
+                        // Fix: JArray (dynamic) might not support .ToList() directly without casting.
+                        // Iterate directly.
+                        var updates = payload; // dynamic JArray contains items 
                         using (Transaction t = new Transaction(app.ActiveUIDocument.Document, "Update Sheets from Web"))
                         {
                             t.Start();

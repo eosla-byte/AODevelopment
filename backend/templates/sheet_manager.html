@@ -204,11 +204,18 @@
             <div class="panel-header justify-between">
                 <span>Estructura (Project Browser)</span>
                 <div class="flex gap-1">
-                    <button class="text-gray-400 hover:text-white" onclick="addGroup()"><i
+                    <button class="text-gray-400 hover:text-white" onclick="addGroup()" title="Add Group Separator"><i
                             class="fas fa-folder-plus"></i></button>
-                    <button class="text-gray-400 hover:text-white" onclick="deleteSelected()"><i
+                    <button class="text-gray-400 hover:text-white" onclick="deleteSelected()" title="Remove Selected"><i
                             class="fas fa-trash"></i></button>
                 </div>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="p-2 border-b border-[#3e3e42]">
+                <input type="text" id="sheet-search" placeholder="Filtrar Sheets..."
+                    class="w-full bg-[#2d2d2d] text-xs text-white p-1 rounded border border-[#3e3e42] outline-none focus:border-[#007acc]"
+                    oninput="filterSheets(this.value)">
             </div>
 
             <div class="flex-1 overflow-y-auto" id="structure-container">
@@ -234,6 +241,15 @@
                 </div>
 
                 <!-- Scrollable Grid -->
+                <!-- Enable native resize via CSS on headers -->
+                <style>
+                    .grid-col-header {
+                        resize: horizontal;
+                        overflow: hidden;
+                    }
+
+                    /* Splitter logic would require JS, let's stick to CSS resize for columns first */
+                </style>
                 <div class="flex-1 overflow-auto custom-scrollbar" onscroll="syncScroll(this)">
                     <div id="data-grid-content" style="min-width: 1000px;">
                         <!-- Headers + Input Rows -->
@@ -245,271 +261,318 @@
     </div>
 
     <!-- JS Logic -->
-    <script>
-        let SESSION_ID = new URLSearchParams(window.location.search).get('session_id');
-        let API_BASE = "/api/plugin/sheets";
+    let SESSION_ID = new URLSearchParams(window.location.search).get('session_id');
+    let API_BASE = "/api/plugin/sheets";
 
-        let SHEETS = []; // Original Loaded Sheets [{id, number, name, params:{}}]
-        let PARAM_DEFS = []; // [ "Drawn By", "Checked By", ... ]
-        let GRID_DATA = []; // Array of Rows (Objects) { "Sheet Number": "", "Sheet Name": "", ...params }
-        // GRID_DATA[i] corresponds to the i-th SLOT. 
-        // When we reorder LEFT, the sheet at index i takes data from GRID_DATA[i].
+    let SHEETS = []; // Original Loaded Sheets [{id, number, name, params:{}}]
+    let GROUPS = []; // Virtual Group Headers { id: 'g-1', name: 'Series 100', index: 0 } (MVP: Just insert into list?)
+    // Better: Manipulate the SHEETS array to include "Group Items"?
+    // Or just Filter the list view?
 
-        // Wait... Requirements Interpretation Check:
-        // "La fila 1 del panel izquierdo (Sheet 1) tomará los valores de la fila 1 del panel derecho."
-        // "Al reordenar... el sheet en posicion 1 toma valores de Fila 1".
-        // This means GRID DATA represents the TARGET STATE for the SLOTS.
-        // It acts like a "Template".
-        // Initial state: GRID_DATA[i] is filled with SHEETS[i]'s current data.
+    let PARAM_DEFS = [];
+    let GRID_DATA = [];
 
-        document.addEventListener('DOMContentLoaded', init);
+    // ... init ...
 
-        async function init() {
-            if (!SESSION_ID) return alert("No session ID");
+    // --- FILTER ---
+    function filterSheets(query) {
+    const list = document.getElementById('sheets-list');
+    const items = list.querySelectorAll('.sheet-item');
+    const hiddenClass = 'hidden';
 
-            // Fetch Data
-            const res = await fetch(`${API_BASE}/session/${SESSION_ID}`);
-            const json = await res.json();
-            if (json.status !== "ok") return alert(json.message);
+    query = query.toLowerCase();
 
-            const data = json.data;
-            document.getElementById('project-name').innerText = data.project;
-            SHEETS = data.sheets;
-            PARAM_DEFS = data.param_definitions || [];
+    items.forEach(item => {
+    const num = item.querySelector('.font-mono').innerText.toLowerCase();
+    const name = item.querySelectorAll('span')[1].innerText.toLowerCase();
+    if(num.includes(query) || name.includes(query)) {
+    item.style.display = 'flex';
+    } else {
+    item.style.display = 'none';
+    }
+    });
+    }
 
-            // Prioritize Number and Name
-            PARAM_DEFS = PARAM_DEFS.filter(p => p !== "Sheet Number" && p !== "Sheet Name");
-            const COLS = ["Sheet Number", "Sheet Name", ...PARAM_DEFS];
+    // --- GROUPS ---
+    function addGroup() {
+    const name = prompt("Nombre del Grupo:", "Nuevo Grupo");
+    if(!name) return;
 
-            // Init Grid Data from Sheets (Identity Mapping initially)
-            GRID_DATA = SHEETS.map(s => {
-                let row = { "Sheet Number": s.number, "Sheet Name": s.name };
-                PARAM_DEFS.forEach(p => row[p] = s.params_data[p] || "");
-                return row;
-            });
+    // Inject a visual group item
+    const container = document.getElementById('sheets-list');
+    const id = "grp-" + Date.now();
+    const html = `
+    <div class="sheet-item group-header bg-gray-700 font-bold text-white pl-2" data-type="group" data-id="${id}">
+        <i class="fas fa-folder text-yellow-500 mr-2"></i>
+        <span contenteditable="true" class="outline-none">${name}</span>
+        <i class="fas fa-trash ml-auto text-xs text-gray-500 cursor-pointer hover:text-red-500 p-2"
+            onclick="this.parentElement.remove()"></i>
+    </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
+    }
+    let PARAM_DEFS = []; // [ "Drawn By", "Checked By", ... ]
+    let GRID_DATA = []; // Array of Rows (Objects) { "Sheet Number": "", "Sheet Name": "", ...params }
+    // GRID_DATA[i] corresponds to the i-th SLOT.
+    // When we reorder LEFT, the sheet at index i takes data from GRID_DATA[i].
 
-            renderStructure();
-            renderGrid(COLS);
-        }
+    // Wait... Requirements Interpretation Check:
+    // "La fila 1 del panel izquierdo (Sheet 1) tomará los valores de la fila 1 del panel derecho."
+    // "Al reordenar... el sheet en posicion 1 toma valores de Fila 1".
+    // This means GRID DATA represents the TARGET STATE for the SLOTS.
+    // It acts like a "Template".
+    // Initial state: GRID_DATA[i] is filled with SHEETS[i]'s current data.
 
-        // --- RENDER Structure (Left) ---
-        function renderStructure() {
-            const container = document.getElementById('sheets-list');
-            container.innerHTML = SHEETS.map((s, idx) => `
-                <div class="sheet-item" data-id="${s.id}" onclick="selectSheet(this)">
-                    <i class="fas fa-grip-vertical drag-handle"></i>
-                    <i class="fas fa-file-alt text-blue-400 mr-2"></i>
-                    <span class="truncate font-mono text-xs mr-2 text-gray-400" id="lbl-num-${s.id}">${s.number}</span>
-                    <span class="truncate" id="lbl-name-${s.id}">${s.name}</span>
-                </div>
-            `).join('');
+    document.addEventListener('DOMContentLoaded', init);
 
-            // Init Sortable
-            new Sortable(container, {
-                handle: '.drag-handle',
-                animation: 150,
-                onEnd: function (evt) {
-                    // Reordered DOM. The mapping Sheet[i] -> GridRow[i] changes implicitly by position.
-                    // We might want to visually update the Sheet Item Labels to match the New Slot's Data?
-                    // User requirement: "La fila 1... tomará los valores de la fila 1".
-                    // So if I move Sheet X to Pos 1, Short X should visually update to show Data from Row 1?
-                    // "Permitir reordenar... El orden definido aquí será el orden final aplicado en Revit."
-                    // If the user wants to RENUMBER, they edit the Grid.
-                    // If they want to just SORT, they drag.
-                    // If dragging changes the association to the data row, then the sheet effectively MORPHS into the target slot data.
-                    // Let's assume the Grid Data describes "The Sheet that ends up here".
-                    // Visual update is nice but optional for MVP.
-                    updateSheetLabelsFromGrid();
-                }
-            });
-        }
+    async function init() {
+    if (!SESSION_ID) return alert("No session ID");
 
-        function updateSheetLabelsFromGrid() {
-            // Iterate DOM elements in order
-            const items = document.querySelectorAll('.sheet-item');
-            items.forEach((item, idx) => {
-                const rowData = GRID_DATA[idx];
-                if (rowData) {
-                    // Update the label in the left panel to reflect the assigned data?
-                    // Actually, usually the Left Panel shows "Current Identity".
-                    // But if "Row 1" assigns "A-101", and I drag "A-105" to Slot 1, 
-                    // it implies "A-105" will be RENAMED to "A-101".
-                    // So showing "A-101" on the left item helps visualize the result.
+    // Fetch Data
+    const res = await fetch(`${API_BASE}/session/${SESSION_ID}`);
+    const json = await res.json();
+    if (json.status !== "ok") return alert(json.message);
 
-                    const numSpan = item.querySelector('.font-mono');
-                    const nameSpan = item.querySelectorAll('span')[1];
+    const data = json.data;
+    document.getElementById('project-name').innerText = data.project;
+    SHEETS = data.sheets;
+    PARAM_DEFS = data.param_definitions || [];
 
-                    // Show "Old -> New" ? or Just New.
-                    // Let's show New.
-                    numSpan.innerText = rowData["Sheet Number"];
-                    nameSpan.innerText = rowData["Sheet Name"];
-                    numSpan.classList.add('text-green-400'); // Highlight change
-                }
-            });
-        }
+    // Prioritize Number and Name
+    PARAM_DEFS = PARAM_DEFS.filter(p => p !== "Sheet Number" && p !== "Sheet Name");
+    const COLS = ["Sheet Number", "Sheet Name", ...PARAM_DEFS];
 
-        // --- RENDER Grid (Right) ---
-        function renderGrid(cols) {
-            const container = document.getElementById('data-grid-content');
-            const indices = document.getElementById('slot-indices-col');
+    // Init Grid Data from Sheets (Identity Mapping initially)
+    GRID_DATA = SHEETS.map(s => {
+    let row = { "Sheet Number": s.number, "Sheet Name": s.name };
+    PARAM_DEFS.forEach(p => row[p] = s.params_data[p] || "");
+    return row;
+    });
 
-            // Headers
-            let html = `<div class="grid-row" style="background: #2d2d2d;">`;
-            cols.forEach(c => {
-                html += `<div class="grid-col-header" style="width: 150px;">${c}</div>`;
-            });
-            html += `</div>`;
+    renderStructure();
+    renderGrid(COLS);
+    }
 
-            // Rows
-            let idxHtml = `<div class="slot-index" style="height: 40px; background: #2d2d2d;">#</div>`; // Header spacer
+    // --- RENDER Structure (Left) ---
+    function renderStructure() {
+    const container = document.getElementById('sheets-list');
+    container.innerHTML = SHEETS.map((s, idx) => `
+    <div class="sheet-item" data-id="${s.id}" onclick="selectSheet(this)">
+        <i class="fas fa-grip-vertical drag-handle"></i>
+        <i class="fas fa-file-alt text-blue-400 mr-2"></i>
+        <span class="truncate font-mono text-xs mr-2 text-gray-400" id="lbl-num-${s.id}">${s.number}</span>
+        <span class="truncate" id="lbl-name-${s.id}">${s.name}</span>
+    </div>
+    `).join('');
 
-            GRID_DATA.forEach((row, rIdx) => {
-                idxHtml += `<div class="slot-index">${rIdx + 1}</div>`;
+    // Init Sortable
+    new Sortable(container, {
+    handle: '.drag-handle',
+    animation: 150,
+    onEnd: function (evt) {
+    // Reordered DOM. The mapping Sheet[i] -> GridRow[i] changes implicitly by position.
+    // We might want to visually update the Sheet Item Labels to match the New Slot's Data?
+    // User requirement: "La fila 1... tomará los valores de la fila 1".
+    // So if I move Sheet X to Pos 1, Short X should visually update to show Data from Row 1?
+    // "Permitir reordenar... El orden definido aquí será el orden final aplicado en Revit."
+    // If the user wants to RENUMBER, they edit the Grid.
+    // If they want to just SORT, they drag.
+    // If dragging changes the association to the data row, then the sheet effectively MORPHS into the target slot data.
+    // Let's assume the Grid Data describes "The Sheet that ends up here".
+    // Visual update is nice but optional for MVP.
+    updateSheetLabelsFromGrid();
+    }
+    });
+    }
 
-                html += `<div class="grid-row">`;
-                cols.forEach(k => {
-                    html += `<div class="grid-cell" style="width: 150px;">
-                        <input type="text" value="${row[k] || ''}" oninput="updateGridData(${rIdx}, '${k}', this.value)">
-                    </div>`;
-                });
-                html += `</div>`;
-            });
+    function updateSheetLabelsFromGrid() {
+    // Iterate DOM elements in order
+    const items = document.querySelectorAll('.sheet-item');
+    items.forEach((item, idx) => {
+    const rowData = GRID_DATA[idx];
+    if (rowData) {
+    // Update the label in the left panel to reflect the assigned data?
+    // Actually, usually the Left Panel shows "Current Identity".
+    // But if "Row 1" assigns "A-101", and I drag "A-105" to Slot 1,
+    // it implies "A-105" will be RENAMED to "A-101".
+    // So showing "A-101" on the left item helps visualize the result.
 
-            container.innerHTML = html;
-            indices.innerHTML = idxHtml;
-        }
+    const numSpan = item.querySelector('.font-mono');
+    const nameSpan = item.querySelectorAll('span')[1];
 
-        function updateGridData(rowIdx, key, val) {
-            GRID_DATA[rowIdx][key] = val;
-            updateSheetLabelsFromGrid(); // Live update identity
-        }
+    // Show "Old -> New" ? or Just New.
+    // Let's show New.
+    numSpan.innerText = rowData["Sheet Number"];
+    nameSpan.innerText = rowData["Sheet Name"];
+    numSpan.classList.add('text-green-400'); // Highlight change
+    }
+    });
+    }
 
-        function syncScroll(el) {
-            const indices = document.getElementById('slot-indices-col');
-            // Sync vertical scroll of indices if needed (though grid-row flex handles it usually)
-            // If we had separate scroll for headers.
-        }
+    // --- RENDER Grid (Right) ---
+    function renderGrid(cols) {
+    const container = document.getElementById('data-grid-content');
+    const indices = document.getElementById('slot-indices-col');
 
-        function selectSheet(el) {
-            document.querySelectorAll('.sheet-item').forEach(x => x.classList.remove('selected'));
-            el.classList.add('selected');
-        }
+    // Headers
+    let html = `<div class="grid-row" style="background: #2d2d2d;">`;
+        cols.forEach(c => {
+        html += `<div class="grid-col-header" style="width: 150px;">${c}</div>`;
+        });
+        html += `</div>`;
 
-        async function applyChanges() {
-            // Construct Payload
-            // Ordered list of Sheet IDs from Left Panel
-            const items = document.querySelectorAll('.sheet-item');
-            const updates = [];
+    // Rows
+    let idxHtml = `<div class="slot-index" style="height: 40px; background: #2d2d2d;">#</div>`; // Header spacer
 
-            items.forEach((item, idx) => {
-                const sheetId = item.dataset.id;
-                const targetData = GRID_DATA[idx]; // Slot N Attributes
+    GRID_DATA.forEach((row, rIdx) => {
+    idxHtml += `<div class="slot-index">${rIdx + 1}</div>`;
 
-                if (targetData) {
-                    updates.push({
-                        id: sheetId,
-                        number: targetData["Sheet Number"],
-                        name: targetData["Sheet Name"],
-                        params: targetData // Includes Params
-                    });
-                }
-            });
+    html += `<div class="grid-row">`;
+        cols.forEach(k => {
+        html += `<div class="grid-cell" style="width: 150px;">
+            <input type="text" value="${row[k] || ''}" oninput="updateGridData(${rIdx}, '${k}', this.value)">
+        </div>`;
+        });
+        html += `</div>`;
+    });
 
-            if (!confirm(`Se actualizarán ${updates.length} Sheets en Revit. ¿Continuar?`)) return;
+    container.innerHTML = html;
+    indices.innerHTML = idxHtml;
+    }
 
-            const res = await fetch(`${API_BASE}/apply`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ session_id: SESSION_ID, updates: updates })
-            });
+    function updateGridData(rowIdx, key, val) {
+    GRID_DATA[rowIdx][key] = val;
+    updateSheetLabelsFromGrid(); // Live update identity
+    }
 
-            const json = await res.json();
-            if (json.status === "ok") {
-                alert("Cambios enviados a Revit. Revisa la cola de comandos (o espera si tienes auto-polling).");
-                window.close();
-            } else {
-                alert("Error: " + json.message);
-            }
-        }
+    function syncScroll(el) {
+    const indices = document.getElementById('slot-indices-col');
+    // Sync vertical scroll of indices if needed (though grid-row flex handles it usually)
+    // If we had separate scroll for headers.
+    }
 
-        // --- TEMPLATES LOGIC ---
+    function selectSheet(el) {
+    document.querySelectorAll('.sheet-item').forEach(x => x.classList.remove('selected'));
+    el.classList.add('selected');
+    }
 
-        async function loadTemplates() {
-            const res = await fetch(`${API_BASE}/templates`);
-            const json = await res.json();
-            if (json.status === "ok") return json.templates;
-            return [];
-        }
+    async function applyChanges() {
+    // Construct Payload
+    // Ordered list of Sheet IDs from Left Panel
+    const items = document.querySelectorAll('.sheet-item');
+    const updates = [];
 
-        async function saveTemplate() {
-            const name = prompt("Nombre del Template (e.g., 'Nombramiento Synergy'):");
-            if (!name) return;
+    items.forEach((item, idx) => {
+    const sheetId = item.dataset.id;
+    const targetData = GRID_DATA[idx]; // Slot N Attributes
 
-            // Filter Config: Visible Columns?
-            // For now, we save ALL currently visible columns in order.
-            // But wait, the current Grid Renders ALL. We haven't implemented Filtering yet.
-            // Let's assume the template defines *which columns to SHOW*.
+    if (targetData) {
+    updates.push({
+    id: sheetId,
+    number: targetData["Sheet Number"],
+    name: targetData["Sheet Name"],
+    params: targetData // Includes Params
+    });
+    }
+    });
 
-            // Currently, PARAM_DEFS has all.
-            // Let's implement a quick "Column Filter" in UI or just assume we save the full list?
-            // User request: "selecciona los parametros predeterminados y filtra todo".
-            // So we need: 1. A way to toggle columns.
+    if (!confirm(`Se actualizarán ${updates.length} Sheets en Revit. ¿Continuar?`)) return;
 
-            const config = {
-                visible_columns: PARAM_DEFS // For now saving all, but if we had toggles we'd save active only
-            };
+    const res = await fetch(`${API_BASE}/apply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: SESSION_ID, updates: updates })
+    });
 
-            const res = await fetch(`${API_BASE}/templates`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, config })
-            });
-            const json = await res.json();
-            if (json.status === "ok") alert("Template Guardado");
-            else alert("Error: " + json.message);
-        }
+    const json = await res.json();
+    if (json.status === "ok") {
+    alert("Cambios enviados a Revit. Revisa la cola de comandos (o espera si tienes auto-polling).");
+    window.close();
+    } else {
+    alert("Error: " + json.message);
+    }
+    }
 
-        async function openTemplateModal() {
-            const tpls = await loadTemplates();
-            // Simple Prompt for MVP or Modal?
-            // Let's use a nice overlaid div.
+    // --- TEMPLATES LOGIC ---
 
-            let html = `
-            <div id="tpl-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-                <div class="bg-[#252526] p-6 rounded shadow-xl w-96 border border-[#3e3e42]">
-                    <h2 class="text-xl font-bold mb-4">Cargar Template</h2>
-                    <ul class="space-y-2 max-h-60 overflow-y-auto mb-4 custom-scrollbar">
-                        ${tpls.map(t => `
-                            <li class="p-2 hover:bg-[#37373d] cursor-pointer flex justify-between group" onclick="applyTemplate(${t.id})">
-                                <span>${t.name}</span>
-                                <i class="fas fa-play text-xs opacity-0 group-hover:opacity-100 text-green-400 mt-1"></i>
-                            </li>
-                        `).join('')}
-                        ${tpls.length === 0 ? '<li class="text-gray-500 italic">No hay templates guardados.</li>' : ''}
-                    </ul>
-                    <div class="flex justify-between">
-                         <button onclick="document.getElementById('tpl-modal').remove()" class="text-gray-400 hover:text-white">Cerrar</button>
-                    </div>
-                </div>
-            </div>`;
-            document.body.insertAdjacentHTML('beforeend', html);
-        }
+    async function loadTemplates() {
+    const res = await fetch(`${API_BASE}/templates`);
+    const json = await res.json();
+    if (json.status === "ok") return json.templates;
+    return [];
+    }
 
-        async function applyTemplate(id) {
-            const tpls = await loadTemplates();
-            const tpl = tpls.find(t => t.id === id);
-            if (tpl) {
-                // Apply Columns
-                if (tpl.config.visible_columns) {
-                    PARAM_DEFS = tpl.config.visible_columns.filter(p => !["Sheet Number", "Sheet Name"].includes(p));
-                    // Re-render
-                    const COLS = ["Sheet Number", "Sheet Name", ...PARAM_DEFS];
-                    // Updating GRID_DATA structure isn't needed as it holds all keys, just re-render grid cols
-                    renderGrid(COLS);
-                }
-                document.getElementById('tpl-modal').remove();
-            }
-        }
+    async function saveTemplate() {
+    const name = prompt("Nombre del Template (e.g., 'Nombramiento Synergy'):");
+    if (!name) return;
+
+    // Filter Config: Visible Columns?
+    // For now, we save ALL currently visible columns in order.
+    // But wait, the current Grid Renders ALL. We haven't implemented Filtering yet.
+    // Let's assume the template defines *which columns to SHOW*.
+
+    // Currently, PARAM_DEFS has all.
+    // Let's implement a quick "Column Filter" in UI or just assume we save the full list?
+    // User request: "selecciona los parametros predeterminados y filtra todo".
+    // So we need: 1. A way to toggle columns.
+
+    const config = {
+    visible_columns: PARAM_DEFS // For now saving all, but if we had toggles we'd save active only
+    };
+
+    const res = await fetch(`${API_BASE}/templates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, config })
+    });
+    const json = await res.json();
+    if (json.status === "ok") alert("Template Guardado");
+    else alert("Error: " + json.message);
+    }
+
+    async function openTemplateModal() {
+    const tpls = await loadTemplates();
+    // Simple Prompt for MVP or Modal?
+    // Let's use a nice overlaid div.
+
+    let html = `
+    <div id="tpl-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="bg-[#252526] p-6 rounded shadow-xl w-96 border border-[#3e3e42]">
+            <h2 class="text-xl font-bold mb-4">Cargar Template</h2>
+            <ul class="space-y-2 max-h-60 overflow-y-auto mb-4 custom-scrollbar">
+                ${tpls.map(t => `
+                <li class="p-2 hover:bg-[#37373d] cursor-pointer flex justify-between group"
+                    onclick="applyTemplate(${t.id})">
+                    <span>${t.name}</span>
+                    <i class="fas fa-play text-xs opacity-0 group-hover:opacity-100 text-green-400 mt-1"></i>
+                </li>
+                `).join('')}
+                ${tpls.length === 0 ? '<li class="text-gray-500 italic">No hay templates guardados.</li>' : ''}
+            </ul>
+            <div class="flex justify-between">
+                <button onclick="document.getElementById('tpl-modal').remove()"
+                    class="text-gray-400 hover:text-white">Cerrar</button>
+            </div>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    async function applyTemplate(id) {
+    const tpls = await loadTemplates();
+    const tpl = tpls.find(t => t.id === id);
+    if (tpl) {
+    // Apply Columns
+    if (tpl.config.visible_columns) {
+    PARAM_DEFS = tpl.config.visible_columns.filter(p => !["Sheet Number", "Sheet Name"].includes(p));
+    // Re-render
+    const COLS = ["Sheet Number", "Sheet Name", ...PARAM_DEFS];
+    // Updating GRID_DATA structure isn't needed as it holds all keys, just re-render grid cols
+    renderGrid(COLS);
+    }
+    document.getElementById('tpl-modal').remove();
+    }
+    }
 
 
     </script>
