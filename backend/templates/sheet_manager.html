@@ -229,6 +229,11 @@
             <!-- Browser Org Selector -->
             <!-- Browser Org Single Button -->
             <div class="flex items-center gap-2 ml-4">
+                <button onclick="openLogsModal()"
+                    class="bg-[#3e3e42] hover:bg-[#4e4e52] px-3 py-1.5 rounded text-sm font-bold shadow transition-colors flex items-center gap-2"
+                    title="Ver Logs de Comandos">
+                    <i class="fas fa-terminal"></i> Logs
+                </button>
                 <button onclick="openCustomOrgModal()"
                     class="bg-[#3e3e42] hover:bg-[#4e4e52] px-3 py-1.5 rounded text-sm font-bold shadow transition-colors flex items-center gap-2"
                     title="Configurar Organización del Navegador">
@@ -574,6 +579,76 @@
             TREE_DATA = buildStructure(flat);
             renderTree();
             renderGrid();
+        }
+
+        // --- LOGS MODAL ---
+        let logInterval = null;
+
+        function openLogsModal() {
+            const html = `
+            <div id="logs-modal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+                <div class="bg-[#1e1e1e] w-[800px] h-[600px] border border-[#3e3e42] rounded shadow-xl flex flex-col font-mono text-sm">
+                    <div class="flex justify-between items-center p-4 border-b border-[#3e3e42] bg-[#252526]">
+                        <span class="font-bold text-gray-200">Revit Command History</span>
+                        <button onclick="closeLogsModal()" class="text-gray-400 hover:text-white px-2">✕</button>
+                    </div>
+                    <div class="flex-1 overflow-auto p-4 custom-scrollbar" id="logs-content">
+                        <p class="text-gray-500">Loading logs...</p>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', html);
+            fetchLogs();
+            logInterval = setInterval(fetchLogs, 3000);
+        }
+
+        function closeLogsModal() {
+            document.getElementById('logs-modal').remove();
+            if (logInterval) clearInterval(logInterval);
+        }
+
+        async function fetchLogs() {
+            if (!document.getElementById('logs-modal')) return;
+            try {
+                const res = await fetch(`${API_BASE}/logs?session_id=${SESSION_ID}`);
+                const data = await res.json();
+                const container = document.getElementById('logs-content');
+
+                if (data.status !== "ok") {
+                    container.innerHTML = `<p class="text-red-500">${data.message}</p>`;
+                    return;
+                }
+
+                if (!data.logs || data.logs.length === 0) {
+                    container.innerHTML = `<p class="text-gray-500">No commands found for this session.</p>`;
+                    return;
+                }
+
+                container.innerHTML = data.logs.map(log => {
+                    let color = "text-gray-400";
+                    let icon = "○";
+                    if (log.status === "sent") { color = "text-blue-400"; icon = "➜"; }
+                    if (log.status === "success") { color = "text-green-400"; icon = "✓"; }
+                    if (log.status === "error") { color = "text-red-400"; icon = "✕"; }
+
+                    return `
+                    <div class="flex items-start gap-3 border-b border-[#2d2d2d] py-2 hover:bg-[#252526] px-2">
+                        <span class="text-xs text-gray-500 w-20 shrink-0">${log.created_at.split('T')[1]?.split('.')[0] || ''}</span>
+                        <span class="${color} font-bold w-6 shrink-0 text-center">${icon}</span>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-gray-300">${log.action}</span>
+                                <span class="text-[10px] bg-[#3e3e42] px-1 rounded text-gray-400 uppercase">${log.status}</span>
+                            </div>
+                            ${log.error ? `<p class="text-red-400 mt-1 text-xs">${log.error}</p>` : ''}
+                            <p class="text-gray-600 text-xs truncate font-mono mt-0.5">${log.payload_preview}</p>
+                        </div>
+                    </div>`;
+                }).join('');
+
+            } catch (e) {
+                console.error("Log error", e);
+            }
         }
 
         // Global Builder
