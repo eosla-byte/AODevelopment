@@ -104,10 +104,18 @@
             </form>
             {% else %}
             <form action="/project/{{ p.id }}/delete" method="post"
-                onsubmit="return confirm('¿Archivar este proyecto?');">
+                onsubmit="return confirm('¿Archivar este proyecto (Mover a Histórico)?');">
+                <button type="submit"
+                    class="p-2 bg-yellow-500/20 hover:bg-yellow-500/40 border border-yellow-500/50 rounded-lg text-yellow-200 transition-colors"
+                    title="Archivar Proyecto">
+                    📂 Archivar
+                </button>
+            </form>
+            <form action="/project/{{ p.id }}/hard_delete" method="post"
+                onsubmit="return confirm('¿⚠️ ELIMINAR PROYECTO PERMANENTEMENTE?\n\nEsta acción no se puede deshacer.');">
                 <button type="submit"
                     class="p-2 bg-red-500/20 hover:bg-red-500/40 border border-red-500/50 rounded-lg text-red-200 transition-colors"
-                    title="Archivar Proyecto">
+                    title="Eliminar Definitivamente">
                     🗑️
                 </button>
             </form>
@@ -535,8 +543,7 @@
                     {
                         id: "{{ c.id }}",
                             name: "{{ c.name }}",
-                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }
-                    } - (assignedCollabs["{{ c.id }}"] || 0))
+                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }} - (assignedCollabs["{{ c.id }}"] || 0))
                     },
                     {% endfor %}
                     ];

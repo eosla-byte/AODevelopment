@@ -6,20 +6,19 @@ from jinja2 import Environment, FileSystemLoader
 # Add current directory to path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from database import get_project_details, get_total_collaborator_allocations, get_root_path, get_collaborators
+from database import get_project_details, get_total_collaborator_allocations, get_collaborators
 
 def reproduce_render():
-    root_path = get_root_path()
-    project_id = "SYN-03" # Using the ID from the screenshot/previous logs
+    project_id = "POR1" # Using the ID from the screenshot/previous logs
     
     print(f"Loading data for project {project_id}...")
-    p = get_project_details(root_path, project_id)
+    p = get_project_details(project_id)
     if not p:
         print("Project not found.")
         return
 
-    collabs = get_collaborators(root_path)
-    total_allocs = get_total_collaborator_allocations(root_path)
+    collabs = get_collaborators()
+    total_allocs = get_total_collaborator_allocations()
 
     # Setup Jinja env
     template_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
