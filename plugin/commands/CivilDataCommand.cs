@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using RevitCivilConnector.UI;
+using RevitCivilConnector.Services;
 
 namespace RevitCivilConnector.Commands
 {
@@ -13,6 +14,8 @@ namespace RevitCivilConnector.Commands
     public class CivilDataCommand : IExternalCommand
     {
         public static CivilDataWindow Window = null;
+        public static CivilImportHandler ImportHandler = null;
+        public static ExternalEvent ImportEvent = null;
 
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
@@ -20,7 +23,9 @@ namespace RevitCivilConnector.Commands
             {
                 if (Window == null || !Window.IsLoaded)
                 {
-                    Window = new CivilDataWindow(commandData.Application);
+                    ImportHandler = new Services.CivilImportHandler();
+                    ImportEvent = ExternalEvent.Create(ImportHandler);
+                    Window = new CivilDataWindow(commandData.Application, ImportHandler, ImportEvent);
                     Window.Show();
                 }
                 else

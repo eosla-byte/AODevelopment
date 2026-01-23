@@ -13,14 +13,18 @@ namespace RevitCivilConnector.UI
     public partial class CivilDataWindow : Window
     {
         private UIApplication _uiApp;
+        private Services.CivilImportHandler _handler;
+        private ExternalEvent _exEvent;
         private int _currentStep = 1;
         private string _loadedFilePath;
         private LandXmlData _parsedData;
 
-        public CivilDataWindow(UIApplication uiApp)
+        public CivilDataWindow(UIApplication uiApp, Services.CivilImportHandler handler, ExternalEvent exEvent)
         {
             InitializeComponent();
             _uiApp = uiApp;
+            _handler = handler;
+            _exEvent = exEvent;
             UpdateStepUI();
         }
 
@@ -48,17 +52,14 @@ namespace RevitCivilConnector.UI
             {
                 ViewSelection.Visibility = Visibility.Visible;
                 btnBack.Visibility = Visibility.Visible;
-                btnNext.Visibility = Visibility.Visible; // Or Finish if this was import only
-                // Based on screenshots, it seems to go to Manager after selection
-                // Or maybe selection IS parsing?
-                // Let's assume Next goes to Manager/Preview
+                btnNext.Visibility = Visibility.Visible; 
                 txtStepTitle.Text = "Step 2: Select Elements";
             }
             else if (_currentStep == 3) // MANAGER
             {
                 ViewManager.Visibility = Visibility.Visible;
                 pnlManagerButtons.Visibility = Visibility.Visible;
-                btnCancel.Visibility = Visibility.Collapsed; // Replaced by Panel buttons
+                btnCancel.Visibility = Visibility.Collapsed; 
                 txtStepTitle.Text = "Step 3: Manage Links";
                 
                 // Populate List
@@ -79,8 +80,6 @@ namespace RevitCivilConnector.UI
 
         private void BtnFilter_Click(object sender, RoutedEventArgs e)
         {
-            // Just move to step 2 directly? Or popup?
-            // "..." usually means popup, but here step 2 makes sense as the filter UI
              _currentStep = 2;
              LoadData();
              UpdateStepUI();
@@ -173,19 +172,16 @@ namespace RevitCivilConnector.UI
                 selected = list.Where(x => x.IsSelected).ToList();
             }
             
-            // Service Call
-            var svc = new RevitCivilGeometry(_uiApp);
             bool shared = rbShared.IsChecked == true;
             
-            try 
-            {
-                svc.CreateGeometry(selected, shared);
-                MessageBox.Show($"Successfully imported {selected.Count} elements.");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error importing: " + ex.Message);
-            }
+            // Set Data on Handler
+            _handler.ElementsToImport = selected;
+            _handler.UseSharedCoordinates = shared;
+            
+            // Raise Event
+            _exEvent.Raise();
+            
+            // Note: MessageBox success/fail is now handled by the Handler
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e) => this.Close();
