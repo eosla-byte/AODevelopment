@@ -537,7 +537,7 @@
                             name: "{{ c.name }}",
                                 avail: 100 - ({{ total_allocations.get(c.id, 0.0) }
                     } - (assignedCollabs["{{ c.id }}"] || 0))
-                        },
+                    },
                     {% endfor %}
                     ];
 
