@@ -163,6 +163,11 @@ namespace RevitCivilConnector.Models
                     }
                     data.Alignments.Add(civilAlign);
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error parsing LandXML: " + ex.Message);
+            }
 
             return data;
         }
