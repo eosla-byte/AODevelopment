@@ -89,11 +89,30 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
             
         proj.files = {cat: [] for cat in SCAN_CATEGORIES.keys()}
         
-        # SAFEGUARDS for JSON attributes
-        if proj.reminders is None: proj.reminders = []
-        if proj.acc_config is None: proj.acc_config = {}
-        if proj.partners_config is None: proj.partners_config = {}
-        if proj.assigned_collaborators is None: proj.assigned_collaborators = {}
+        # SAFEGUARDS for JSON attributes (Ensure correct Types)
+        if proj.reminders is None or not isinstance(proj.reminders, list): 
+            proj.reminders = []
+            
+        if proj.acc_config is None or not isinstance(proj.acc_config, dict): 
+            proj.acc_config = {}
+            
+        if proj.partners_config is None or not isinstance(proj.partners_config, dict): 
+            proj.partners_config = {}
+            
+        if proj.assigned_collaborators is None or not isinstance(proj.assigned_collaborators, dict): 
+            proj.assigned_collaborators = {}
+            
+        if proj.files_meta is None or not isinstance(proj.files_meta, dict): 
+            proj.files_meta = {}
+
+        # SAFEGUARDS for Numeric Fields (Ensure Float)
+        if proj.amount is None: proj.amount = 0.0
+        if proj.paid_amount is None: proj.paid_amount = 0.0
+        if proj.square_meters is None: proj.square_meters = 0.0
+        if proj.projected_profit_margin is None: proj.projected_profit_margin = 0.0
+        if proj.real_profit_margin is None: proj.real_profit_margin = 0.0
+        if proj.duration_months is None: proj.duration_months = 0.0
+        if proj.additional_time_months is None: proj.additional_time_months = 0.0
 
         # CALCULATE FINANCIAL METRICS FROM METADATA
         cat_totals = {}
@@ -118,6 +137,10 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
 
         proj.cat_totals = cat_totals 
         
+        # Override paid_amount with calculated if we rely on files, 
+        # or should we respect DB if files are empty?
+        # Logic says: Recalculate from files if available.
+        # But 'payments' usually come from files in "Pagos".
         proj.paid_amount = cat_totals.get("Pagos", 0.0)
         proj.total_iva_paid = cat_totals.get("Impuestos_IVA", 0.0)
         proj.total_isr_paid = cat_totals.get("Impuestos_ISR", 0.0)

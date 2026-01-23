@@ -243,7 +243,6 @@ namespace RevitCivilConnector
                  b1.ToolTip = (i == 1) ? "Gestor Avanzado de Sheets (Exp 01)" : $"Experimental Function {i}";
 
                  // EXP 02 -> Cloud Manager (Standalone)
-                 // Replaces: CloudQuantifysCommand (which is now only for Cloud Quantify button)
                  string cmd2Class = (i == 1) ? "RevitCivilConnector.Commands.CloudManagerCommand" : "RevitCivilConnector.IACommand";
                  string name2 = (i == 1) ? "Cloud\nManager" : $"Exp {i+1:00}";
                  string icon2 = (i == 1) ? "icono13.png" : "icono7.png";
@@ -253,9 +252,14 @@ namespace RevitCivilConnector
                  b2.Image = GetIcon(icon2);
                  b2.ToolTip = tip2;
 
-                 PushButtonData b3 = new PushButtonData($"cmdExp{i+2}", $"Exp {i+2:00}", assemblyPath, "RevitCivilConnector.IACommand");
+                 // EXP 03 -> Sheet Manager 2.0
+                 string cmd3Class = (i == 1) ? "RevitCivilConnector.Commands.SheetManagerTwoCommand" : "RevitCivilConnector.IACommand";
+                 string name3 = (i == 1) ? "Sheet\nMgr 2.0" : $"Exp {i+2:00}";
+                 string tip3 = (i == 1) ? "Crear y organizar Sheets desde Excel/CSV (Sheet Manager 2.0)" : $"Experimental Function {i+2}";
+
+                 PushButtonData b3 = new PushButtonData($"cmdExp{i+2}", name3, assemblyPath, cmd3Class);
                  b3.Image = GetIcon("icono7.png");
-                 b3.ToolTip = $"Experimental Function {i+2}";
+                 b3.ToolTip = tip3;
                  
                  pLabs.AddStackedItems(b1, b2, b3);
             }
