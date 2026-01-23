@@ -543,7 +543,8 @@
                     {
                         id: "{{ c.id }}",
                             name: "{{ c.name }}",
-                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }} - (assignedCollabs["{{ c.id }}"] || 0))
+                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }
+                    } - (assignedCollabs["{{ c.id }}"] || 0))
                     },
                     {% endfor %}
                     ];
@@ -848,8 +849,8 @@
             {% if category in ['Pagos', 'Impuestos_IVA', 'Impuestos_ISR'] %}
             <div
                 class="px-3 py-2 bg-white border-t border-slate-100 flex justify-between items-center text-xs font-bold {{ css_text }}">
-                <span>Total</span>
-                <span>Q{{ "{:,.2f}".format(total_amount) }}</span>
+                <span>Total Calculado</span>
+                <span>Q{{ "{:,.2f}".format(total_amount|default(0)) }}</span>
             </div>
             {% endif %}
         </div>

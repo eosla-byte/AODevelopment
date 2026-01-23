@@ -1316,10 +1316,18 @@ async def upload_file(project_id: str, category: str = Form(...), amount: str = 
     return RedirectResponse(f"/project/{project_id}", status_code=303)
 
 @app.post("/project/{project_id}/file/update_meta")
-async def update_file_metadata(project_id: str, category: str = Form(...), filename: str = Form(...), amount: str = Form(...), note: str = Form("")):
+async def update_file_metadata(project_id: str, category: str = Form(...), filename: str = Form(...), amount: str = Form(None), note: str = Form("")):
     try:
-        val = float(amount)
+        val = 0.0
+        if amount and amount.strip():
+            try: val = float(amount)
+            except: pass
+            
         update_project_file_meta(project_id, category, filename, val, note)
+    except Exception as e:
+        print(f"ERROR: Failed to update metadata: {e}")
+        pass
+    return RedirectResponse(f"/project/{project_id}", status_code=303)
     except Exception as e:
         print(f"ERROR: Failed to update metadata: {e}")
         pass
