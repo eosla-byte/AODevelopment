@@ -64,6 +64,13 @@ namespace RevitCivilConnector
             btnCivil.AvailabilityClassName = "RevitCivilConnector.Auth.CivilAuthAvailability";
             pCivil.AddItem(btnCivil);
 
+            // Button 2: CivilData 2.0 (New)
+            PushButtonData btnCivilData = new PushButtonData("cmdCivilData", "CivilData\n2.0", assemblyPath, "RevitCivilConnector.Commands.CivilDataCommand");
+            btnCivilData.LargeImage = GetIcon("icono1.png"); // Reusing icon for now or use new one
+            btnCivilData.ToolTip = "Importación y Gestión de LandXML.";
+            btnCivilData.AvailabilityClassName = "RevitCivilConnector.Auth.CivilAuthAvailability";
+            pCivil.AddItem(btnCivilData);
+
 
             // ====================================================
             // PANEL: Graficos

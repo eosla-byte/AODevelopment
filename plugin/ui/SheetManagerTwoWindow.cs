@@ -54,17 +54,17 @@ namespace RevitCivilConnector.ui
             Label lblFile = new Label { Content = "Seleccione archivo CSV/Excel (.csv):", FontWeight = FontWeights.Bold };
             mainStack.Children.Add(lblFile);
 
-            Grid fileGrid = new Grid();
+            System.Windows.Controls.Grid fileGrid = new System.Windows.Controls.Grid();
             fileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             fileGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             _txtPath = new TextBox { IsReadOnly = true, Margin = new Thickness(0, 0, 5, 0), VerticalContentAlignment = VerticalAlignment.Center, Height = 25 };
-            Grid.SetColumn(_txtPath, 0);
+            System.Windows.Controls.Grid.SetColumn(_txtPath, 0);
             fileGrid.Children.Add(_txtPath);
 
             Button btnBrowse = new Button { Content = "...", Width = 30, Height = 25 };
             btnBrowse.Click += BtnBrowse_Click;
-            Grid.SetColumn(btnBrowse, 1);
+            System.Windows.Controls.Grid.SetColumn(btnBrowse, 1);
             fileGrid.Children.Add(btnBrowse);
 
             mainStack.Children.Add(fileGrid);
