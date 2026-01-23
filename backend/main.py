@@ -1084,17 +1084,29 @@ async def read_cotizador(request: Request):
 
 @app.get("/project/{project_id}", response_class=HTMLResponse)
 async def read_project(request: Request, project_id: str):
-    # root_path = get_root_path() # Removed
-    project = get_project_details(project_id)
-    if not project:
-        return RedirectResponse("/")
-        
-    return templates.TemplateResponse("project_detail.html", {
-        "request": request,
-        "p": project,
-        "collaborators": get_collaborators(),
-        "total_allocations": get_total_collaborator_allocations()
-    })
+    try:
+        # root_path = get_root_path() # Removed
+        project = get_project_details(project_id)
+        if not project:
+            return RedirectResponse("/")
+            
+        return templates.TemplateResponse("project_detail.html", {
+            "request": request,
+            "p": project,
+            "collaborators": get_collaborators(),
+            "total_allocations": get_total_collaborator_allocations()
+        })
+    except Exception as e:
+        import traceback
+        return HTMLResponse(content=f"""
+        <html>
+            <body style="background:#111; color:#f88; font-family:monospace; padding:20px;">
+                <h1>500 Internal Server Error (Project Route)</h1>
+                <h2>{e}</h2>
+                <pre>{traceback.format_exc()}</pre>
+            </body>
+        </html>
+        """, status_code=500)
 
 @app.post("/project/{project_id}/edit")
 async def edit_project(
