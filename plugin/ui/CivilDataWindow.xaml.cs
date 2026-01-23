@@ -201,8 +201,13 @@ namespace RevitCivilConnector.UI
         public class ManagerItem
         {
             public string Name { get; set; }
-            public string InfoText { get; set; } // e.g., "Type: Roadway Corridor-1"
+            public string InfoText { get; set; } 
             public string Comment { get; set; } = "<not set>";
+            
+            // New Category Selection
+            public string SelectedCategory { get; set; } = "Generic Models";
+            public List<string> AvailableCategories { get; set; } = new List<string>();
+
             public bool HasChildren => Children != null && Children.Any();
             public List<ManagerItem> Children { get; set; } = new List<ManagerItem>();
         }
@@ -211,21 +216,47 @@ namespace RevitCivilConnector.UI
         {
             if (_parsedData == null) return;
             
+            // Default Categories list
+            List<string> cats = new List<string> 
+            { 
+                "Topography", 
+                "Roads", 
+                "Floors", 
+                "Generic Models", 
+                "Site", 
+                "Structural Foundations" 
+            };
+
             var root = new ManagerItem 
             { 
                 Name = System.IO.Path.GetFileName(_loadedFilePath) + $" ({DateTime.Now:g})",
                 InfoText = "LandXML Source",
-                Comment = "Linked"
+                Comment = "Linked",
+                AvailableCategories = new List<string>() // Root doesn't track category usually, or maybe it does?
             };
 
             // Add elements as children
             foreach (var s in _parsedData.Surfaces)
             {
-                root.Children.Add(new ManagerItem { Name = s.Name, InfoText = "Type: Surface", Comment = s.MaterialName });
+                root.Children.Add(new ManagerItem 
+                { 
+                    Name = s.Name, 
+                    InfoText = "Type: Surface", 
+                    Comment = s.MaterialName, 
+                    SelectedCategory = "Topography", // Default for Surface
+                    AvailableCategories = cats 
+                });
             }
              foreach (var a in _parsedData.Alignments)
             {
-                root.Children.Add(new ManagerItem { Name = a.Name, InfoText = "Type: Roadway Corridor", Comment = a.MaterialName });
+                root.Children.Add(new ManagerItem 
+                { 
+                    Name = a.Name, 
+                    InfoText = "Type: Roadway Corridor", 
+                    Comment = a.MaterialName,
+                    SelectedCategory = "Roads", // Default for Alignment
+                    AvailableCategories = cats
+                });
             }
 
             var items = new List<ManagerItem> { root };

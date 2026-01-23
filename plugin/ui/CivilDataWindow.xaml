@@ -3,6 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="CivilData 2.0" Height="600" Width="800" WindowStartupLocation="CenterScreen" ResizeMode="CanResize">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <!-- Simple style based trigger or converter would be better, but for now lets assume BoolToVis exists natively. 
+             Actually CountToVis needs a custom one or we can use a Style trigger. 
+             Let's use a Style for the ComboBox visibility instead of a binding converter if we can't easily add a class.
+             However, I can just add a quick converter class in code behind or use a style trigger on the ComboBox itself. -->
         <Style TargetType="Button">
             <Setter Property="Padding" Value="10,5"/>
             <Setter Property="Margin" Value="5"/>
@@ -126,7 +131,23 @@
                                     <StackPanel Orientation="Horizontal">
                                         <!-- Icon placeholder -->
                                         <TextBlock Text="▼" FontSize="8" Margin="0,2,5,0" Visibility="{Binding HasChildren, Converter={StaticResource BoolToVis}}"/>
-                                        <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" VerticalAlignment="Center" Width="120" TextTrimming="CharacterEllipsis"/>
+                                        
+                                        <!-- Category Selector -->
+                                        <ComboBox ItemsSource="{Binding AvailableCategories}" 
+                                                  SelectedItem="{Binding SelectedCategory, Mode=TwoWay}"
+                                                  Width="100" Height="20" Margin="5,0,0,0"
+                                                  FontSize="10">
+                                            <ComboBox.Style>
+                                                <Style TargetType="ComboBox">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding AvailableCategories.Count}" Value="0">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ComboBox.Style>
+                                        </ComboBox>
                                     </StackPanel>
                                     <TextBlock Text="{Binding InfoText}" FontSize="10" Foreground="Gray" Margin="10,0,0,0"/>
                                     <TextBlock Text="{Binding Comment, StringFormat='Comment: {0}'}" FontSize="10" Foreground="Gray" Margin="10,0,0,0" FontStyle="Italic"/>
