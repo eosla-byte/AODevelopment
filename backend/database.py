@@ -48,10 +48,22 @@ SCAN_CATEGORIES = {
 def get_projects(archived: bool = False) -> List[models.Project]:
     db = SessionLocal()
     try:
-        projects = db.query(models.Project).filter(models.Project.archived == archived).all()
+        # Filter out 'Analisis' (Estimations) from standard project list
+        projects = db.query(models.Project).filter(
+            models.Project.archived == archived,
+            models.Project.status != "Analisis" 
+        ).all()
+        
         # Initialize .files to empty dict to avoid template errors accessing p.files
         for p in projects:
             p.files = {cat: [] for cat in SCAN_CATEGORIES.keys()}
+            # Calculate dynamic Paid Amount if needed for list view, 
+            # effectively reusing logic from get_project_details but lighter
+            # actually p.paid_amount should be persisted.
+            # But let's safe guard it.
+            if p.amount is None: p.amount = 0.0
+            if p.paid_amount is None: p.paid_amount = 0.0
+            
             db.expunge(p)
         return projects
     except Exception as e:
@@ -319,12 +331,14 @@ def get_total_collaborator_allocations():
         active_projects = db.query(models.Project).filter(models.Project.status == "Activo").all()
         allocations = {}
         for p in active_projects:
-            if p.assigned_collaborators:
+            # Safe Guard: Ensure we have a DICT
+            if p.assigned_collaborators and isinstance(p.assigned_collaborators, dict):
                 for cid, pct in p.assigned_collaborators.items():
                     try:
                         val = float(pct)
                         allocations[cid] = allocations.get(cid, 0.0) + val
                     except: pass
+    
         return allocations
     finally:
         db.close()

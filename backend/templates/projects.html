@@ -46,27 +46,65 @@
                 </span>
             </div>
 
-            <div class="pl-3 space-y-2">
-                <div class="flex items-center gap-2 text-xs text-slate-500 font-bold">
-                    <span>ID: {{ p.id }}</span>
-                </div>
-                <div class="flex items-center gap-2 text-sm text-slate-600">
-                    <span class="font-bold">👤 {{ p.client }}</span>
+            <div class="pl-3 space-y-3 mt-2">
+
+                <!-- ID and Client -->
+                <div class="flex justify-between items-start">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase">Cliente</span>
+                        <span class="text-xs font-bold text-slate-600 truncate max-w-[120px]" title="{{ p.client }}">
+                            {{ p.client or 'Sin Cliente' }}
+                        </span>
+                    </div>
+                    <div class="flex flex-col items-end">
+                        <span class="text-[10px] text-slate-400 font-bold uppercase">Inicio</span>
+                        <span class="text-xs text-slate-500 font-medium">
+                            {{ p.start_date.split('T')[0] if p.start_date else '--' }}
+                        </span>
+                    </div>
                 </div>
 
-                <p class="text-sm font-bold text-slate-700 mt-2">
-                    Q{{ "{:,.2f}".format(p.amount) }}
-                </p>
+                <!-- Financial Big Number -->
+                <div>
+                    <span class="text-[10px] text-slate-400 font-bold uppercase">Monto Contratado</span>
+                    <p class="text-xl font-black text-slate-800 tracking-tight">
+                        Q{{ "{:,.2f}".format(p.amount) }}
+                    </p>
+                </div>
 
-                <div class="flex gap-4 mt-3 pt-3 border-t border-slate-50 text-xs text-slate-400 font-medium">
-                    <div class="flex items-center gap-1">
-                        <span class="p-1 rounded bg-blue-50 text-blue-600">📄 {{ p.files.get("Facturas", [])|length }}
-                            Fac.</span>
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-2 gap-2 py-2 border-t border-slate-50">
+                    <div class="bg-slate-50 p-1.5 rounded border border-slate-100">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase">Metros²</div>
+                        <div class="text-xs font-bold text-slate-600">{{ "{:,.2f}".format(p.square_meters) }} m²</div>
                     </div>
-                    <div class="flex items-center gap-1">
-                        <span class="p-1 rounded bg-green-50 text-green-600">💰 {{ p.files.get("Pagos", [])|length }}
-                            Pagos</span>
+                    <div class="bg-slate-50 p-1.5 rounded border border-slate-100">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase">Ratio/m²</div>
+                        {% set ratio = 0 %}
+                        {% if p.square_meters > 0 %}
+                        {% set ratio = p.amount / p.square_meters %}
+                        {% endif %}
+                        <div class="text-xs font-bold text-blue-600">Q{{ "{:,.0f}".format(ratio) }}</div>
                     </div>
+                </div>
+
+                <!-- Paid Progress -->
+                {% set paid = p.paid_amount|default(0) %}
+                {% set pct = 0 %}
+                {% if p.amount > 0 %}
+                {% set pct = (paid / p.amount) * 100 %}
+                {% endif %}
+
+                <div class="flex items-center gap-2 mt-1">
+                    <div class="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-emerald-500 rounded-full" style="width: {{ pct }}%"></div>
+                    </div>
+                    <span class="text-[10px] font-bold text-emerald-600 w-8 text-right">{{ "{:.0f}".format(pct)
+                        }}%</span>
+                </div>
+                <div class="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                    <span>Cobrado: Q{{ "{:,.0f}".format(paid) }}</span>
+                    <span>Pagado</span>
                 </div>
             </div>
         </a>
