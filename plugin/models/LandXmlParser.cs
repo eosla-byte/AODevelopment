@@ -61,9 +61,55 @@ namespace RevitCivilConnector.Models
                         Type = "Surface"
                     };
 
-                    // Simple Parsing logic for Faces (3D faces)
-                    // Note: Real implementation needs to parse Pnts and Faces definition
-                    // This is a placeholder structure for the parser logic
+                    // 1. Parse Points
+                    var pnts = new Dictionary<int, XYZPoint>();
+                    var def = surf.Element(ns + "Definition");
+                    if (def != null)
+                    {
+                        var pntsNode = def.Element(ns + "Pnts");
+                        if (pntsNode != null)
+                        {
+                            foreach (var p in pntsNode.Elements(ns + "P"))
+                            {
+                                int id = int.Parse(p.Attribute("id").Value);
+                                var coords = p.Value.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                                if (coords.Length >= 3) // Y X Z (LandXML usually Northing Easting Elev) or N E Z
+                                {
+                                    // LandXML: Y=Northing, X=Easting. Revit: X=Easting, Y=Northing.
+                                    // So Revit X = LandXML Easting (X? check spec usually Y X Z or distinct)
+                                    // Standard LandXML: "Y X Z" order for <P> content is common? No, actually space delimited: "North East Elev" -> Y X Z
+                                    // Let's assume standard Y X Z based on typical C3D export
+                                    
+                                    double val1 = double.Parse(coords[0]); // Y (North)
+                                    double val2 = double.Parse(coords[1]); // X (East)
+                                    double val3 = double.Parse(coords[2]); // Z
+                                    
+                                    // Map to Revit: X=East, Y=North
+                                    pnts[id] = new XYZPoint { X = val2, Y = val1, Z = val3 };
+                                }
+                            }
+                        }
+                        
+                        // 2. Parse Faces
+                        var facesNode = def.Element(ns + "Faces");
+                        if (facesNode != null)
+                        {
+                            foreach (var f in facesNode.Elements(ns + "F"))
+                            {
+                                var ids = f.Value.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                                if (ids.Length == 3)
+                                {
+                                    var facePoints = new List<XYZPoint>();
+                                    foreach(var iStr in ids)
+                                    {
+                                        int pid = int.Parse(iStr);
+                                        if(pnts.ContainsKey(pid)) facePoints.Add(pnts[pid]);
+                                    }
+                                    if(facePoints.Count == 3) civilSurf.Faces.Add(facePoints);
+                                }
+                            }
+                        }
+                    }
                     data.Surfaces.Add(civilSurf);
                 }
 
@@ -75,14 +121,48 @@ namespace RevitCivilConnector.Models
                         Name = align.Attribute("name")?.Value ?? "Unnamed Alignment",
                         Type = "Alignment"
                     };
+                    
+                    var coordGeom = align.Element(ns + "CoordGeom");
+                    if (coordGeom != null)
+                    {
+                         // Parse Lines and Curves to get points
+                         // Simplified: Just grabbing start/end points of geometry for visualization
+                         foreach(var elem in coordGeom.Elements())
+                         {
+                             // Line, Curve, Spiral
+                             // Each has Start and End (or PI)
+                             // This is complex, implementing simplified "Start" points sequence
+                             // Usually <Start> Y X </Start> <End> Y X </End>
+                             
+                             // Try to find <Start> element
+                             // Note: Namespace applies
+                             var start = elem.Element(ns + "Start");
+                             if (start != null)
+                             {
+                                 var coords = start.Value.Trim().Split(new[]{' '}, StringSplitOptions.RemoveEmptyEntries);
+                                 if (coords.Length >= 2)
+                                 {
+                                     double n = double.Parse(coords[0]);
+                                     double e = double.Parse(coords[1]);
+                                     civilAlign.Points.Add(new XYZPoint { X = e, Y = n, Z = 0 }); 
+                                 }
+                             }
+                             // Also End
+                             var end = elem.Element(ns + "End");
+                             if (end != null)
+                             {
+                                 var coords = end.Value.Trim().Split(new[]{' '}, StringSplitOptions.RemoveEmptyEntries);
+                                 if (coords.Length >= 2)
+                                 {
+                                     double n = double.Parse(coords[0]);
+                                     double e = double.Parse(coords[1]);
+                                     civilAlign.Points.Add(new XYZPoint { X = e, Y = n, Z = 0 }); 
+                                 }
+                             }
+                         }
+                    }
                     data.Alignments.Add(civilAlign);
                 }
-            }
-            catch (Exception ex)
-            {
-                // Log error
-                Console.WriteLine("Error parsing LandXML: " + ex.Message);
-            }
 
             return data;
         }

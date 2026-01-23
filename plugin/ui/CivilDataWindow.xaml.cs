@@ -167,9 +167,42 @@ namespace RevitCivilConnector.UI
             
             // Collect selected
             List<CivilElement> selected = new List<CivilElement>();
-            if (dgElements.ItemsSource is List<CivilElement> list)
+            
+            // Priority: If we are in Step 3 (Manager), use the TreeView items as the source of truth
+            // Because user might have renamed or deleted items.
+            if (_currentStep == 3)
             {
-                selected = list.Where(x => x.IsSelected).ToList();
+                 var items = tvImportedData.ItemsSource as List<ManagerItem>;
+                 if (items != null && items.Count > 0)
+                 {
+                     // Flatten hierarchy
+                     var children = items[0].Children; // Root -> Children
+                     // Match back to _parsedData by Name or Reference?
+                     // Better: We should have stored the reference in ManagerItem.
+                     // Since we didn't add it to ManagerItem class, map by Name for now (risky but okay for prototype)
+                     
+                     var allParsed = new List<CivilElement>();
+                     allParsed.AddRange(_parsedData.Surfaces);
+                     allParsed.AddRange(_parsedData.Alignments);
+                     
+                     foreach(var child in children)
+                     {
+                         var match = allParsed.FirstOrDefault(x => x.Name == child.Name);
+                         if (match != null)
+                         {
+                             match.MaterialName = child.Comment; // Sync material choice back
+                             selected.Add(match);
+                         }
+                     }
+                 }
+            }
+            else
+            {
+                // Step 2 Logic
+                if (dgElements.ItemsSource is List<CivilElement> list)
+                {
+                    selected = list.Where(x => x.IsSelected).ToList();
+                }
             }
             
             bool shared = rbShared.IsChecked == true;
@@ -180,8 +213,6 @@ namespace RevitCivilConnector.UI
             
             // Raise Event
             _exEvent.Raise();
-            
-            // Note: MessageBox success/fail is now handled by the Handler
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e) => this.Close();
@@ -198,7 +229,7 @@ namespace RevitCivilConnector.UI
         {
             public string Name { get; set; }
             public string InfoText { get; set; } 
-            public string Comment { get; set; } = "<not set>";
+            public string Comment { get; set; } = "<not set>"; // Used for Material
             
             // New Category Selection
             public string SelectedCategory { get; set; } = "Generic Models";
@@ -213,65 +244,159 @@ namespace RevitCivilConnector.UI
             if (_parsedData == null) return;
             
             // Default Categories list
-            List<string> cats = new List<string> 
-            { 
-                "Topography", 
-                "Roads", 
-                "Floors", 
-                "Generic Models", 
-                "Site", 
-                "Structural Foundations" 
-            };
+            List<string> cats = new List<string> { "Topography", "Roads", "Floors", "Generic Models", "Site" };
 
             var root = new ManagerItem 
             { 
                 Name = System.IO.Path.GetFileName(_loadedFilePath) + $" ({DateTime.Now:g})",
                 InfoText = "LandXML Source",
                 Comment = "Linked",
-                AvailableCategories = new List<string>() // Root doesn't track category usually, or maybe it does?
+                AvailableCategories = new List<string>() 
             };
 
             // Add elements as children
-            foreach (var s in _parsedData.Surfaces)
+            foreach (var s in _parsedData.Surfaces.Where(x => x.IsSelected))
             {
                 root.Children.Add(new ManagerItem 
                 { 
                     Name = s.Name, 
                     InfoText = "Type: Surface", 
                     Comment = s.MaterialName, 
-                    SelectedCategory = "Topography", // Default for Surface
+                    SelectedCategory = "Topography", 
                     AvailableCategories = cats 
                 });
             }
-             foreach (var a in _parsedData.Alignments)
+             foreach (var a in _parsedData.Alignments.Where(x => x.IsSelected))
             {
                 root.Children.Add(new ManagerItem 
                 { 
                     Name = a.Name, 
                     InfoText = "Type: Roadway Corridor", 
                     Comment = a.MaterialName,
-                    SelectedCategory = "Roads", // Default for Alignment
+                    SelectedCategory = "Roads", 
                     AvailableCategories = cats
                 });
             }
 
             var items = new List<ManagerItem> { root };
             tvImportedData.ItemsSource = items;
-            
             txtSavedPath.Text = _loadedFilePath;
+            
+            UpdatePreview();
+        }
+        
+        private void UpdatePreview()
+        {
+            cvsPreview.Children.Clear();
+            if (_parsedData == null) return;
+            
+            // Calculate Bounds
+            double minX = double.MaxValue, minY = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue;
+            bool hasData = false;
+            
+            var surfaces = _parsedData.Surfaces.Where(x => x.IsSelected).ToList();
+            var alignments = _parsedData.Alignments.Where(x => x.IsSelected).ToList();
+            
+            // Scan Points
+            foreach(var s in surfaces)
+            {
+                // Surface has Faces (List<List<XYZPoint>>)
+                foreach(var face in s.Faces)
+                {
+                    foreach(var pt in face)
+                    {
+                        if(pt.X < minX) minX = pt.X; if(pt.X > maxX) maxX = pt.X;
+                        if(pt.Y < minY) minY = pt.Y; if(pt.Y > maxY) maxY = pt.Y;
+                        hasData = true;
+                    }
+                }
+            }
+            foreach(var a in alignments)
+            {
+                foreach(var pt in a.Points)
+                {
+                     if(pt.X < minX) minX = pt.X; if(pt.X > maxX) maxX = pt.X;
+                     if(pt.Y < minY) minY = pt.Y; if(pt.Y > maxY) maxY = pt.Y;
+                     hasData = true;
+                }
+            }
+            
+            if (!hasData) return;
+            
+            // Scale to Canvas
+            double width = maxX - minX;
+            double height = maxY - minY;
+            if (width < 0.1) width = 1; 
+            if (height < 0.1) height = 1;
+            
+            double cvsW = cvsPreview.ActualWidth;
+            double cvsH = cvsPreview.ActualHeight;
+            if (cvsW == 0 || double.IsNaN(cvsW)) cvsW = 400; // Fallback if layout not ready
+            if (cvsH == 0 || double.IsNaN(cvsH)) cvsH = 300;
+            
+            // Padding
+            cvsW -= 20; cvsH -= 20;
+            
+            double scaleX = cvsW / width;
+            double scaleY = cvsH / height;
+            double scale = Math.Min(scaleX, scaleY);
+            
+            // Draw func
+            Func<double, double, Point> toPoint = (x, y) => 
+            {
+                double px = (x - minX) * scale + 10;
+                double py = cvsH - ((y - minY) * scale) + 10; // Flip Y for screen coords
+                return new Point(px, py);
+            };
+            
+            // Draw Alignments (Red Lines)
+            foreach(var a in alignments)
+            {
+                var poly = new System.Windows.Shapes.Polyline
+                {
+                    Stroke = System.Windows.Media.Brushes.Red,
+                    StrokeThickness = 2
+                };
+                foreach(var pt in a.Points) poly.Points.Add(toPoint(pt.X, pt.Y));
+                cvsPreview.Children.Add(poly);
+            }
+            
+            // Draw Surfaces (Gray Edges, limited to avoid lag)
+            int faceCount = 0;
+            foreach(var s in surfaces)
+            {
+                foreach(var face in s.Faces)
+                {
+                    if (faceCount > 2000) break; // Performance limit for canvas
+                    var poly = new System.Windows.Shapes.Polygon
+                    {
+                        Stroke = System.Windows.Media.Brushes.Gray,
+                        StrokeThickness = 0.5,
+                        Fill = System.Windows.Media.Brushes.Transparent // Wireframe
+                    };
+                    foreach(var pt in face) poly.Points.Add(toPoint(pt.X, pt.Y));
+                    cvsPreview.Children.Add(poly);
+                    faceCount++;
+                }
+            }
+            
+            // Add Text
+            TextBlock info = new TextBlock { Text = $"{faceCount} Faces, {alignments.Count} Routes", Foreground = System.Windows.Media.Brushes.Black, FontSize = 10 };
+            Canvas.SetLeft(info, 5); Canvas.SetBottom(info, 5);
+            cvsPreview.Children.Add(info);
         }
 
         public void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
-             MessageBox.Show("Refreshed data from source.");
-             // Logic to re-parse XML would go here
+             UpdatePreview();
         }
 
         public void BtnMaterial_Click(object sender, RoutedEventArgs e)
         {
              var selected = tvImportedData.SelectedItem as ManagerItem;
              if (selected != null)
-                 MessageBox.Show($"Change Material for: {selected.Name}");
+                 MessageBox.Show($"Change Material for: {selected.Name} (Not implemented in prototype)");
              else
                  MessageBox.Show("Please select an item in the tree.");
         }
@@ -312,9 +437,17 @@ namespace RevitCivilConnector.UI
 
         public void BtnDelete_Click(object sender, RoutedEventArgs e)
         {
-             if (MessageBox.Show("Are you sure you want to remove this item?", "Confirm", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
+             if (tvImportedData.SelectedItem is ManagerItem selected && selected.Name != "LandXML Source")
              {
-                 MessageBox.Show("Item removed.");
+                 // Find parent
+                 var items = tvImportedData.ItemsSource as List<ManagerItem>;
+                 var root = items[0];
+                 if (root.Children.Contains(selected))
+                 {
+                     root.Children.Remove(selected);
+                     tvImportedData.Items.Refresh();
+                     UpdatePreview(); // Re-render preview without deleted item
+                 }
              }
         }
 
