@@ -57,12 +57,33 @@ def get_projects(archived: bool = False) -> List[models.Project]:
         # Initialize .files to empty dict to avoid template errors accessing p.files
         for p in projects:
             p.files = {cat: [] for cat in SCAN_CATEGORIES.keys()}
-            # Calculate dynamic Paid Amount if needed for list view, 
-            # effectively reusing logic from get_project_details but lighter
-            # actually p.paid_amount should be persisted.
-            # But let's safe guard it.
+            
+            # Safeguard numeric fields
             if p.amount is None: p.amount = 0.0
             if p.paid_amount is None: p.paid_amount = 0.0
+            if p.duration_months is None: p.duration_months = 0.0
+            if p.additional_time_months is None: p.additional_time_months = 0.0
+
+            # Populate Events from Files Meta
+            events = []
+            if p.files_meta and isinstance(p.files_meta, dict):
+                for cat, files in p.files_meta.items():
+                    if isinstance(files, dict):
+                        for fname, meta in files.items():
+                            if isinstance(meta, dict):
+                                date_str = meta.get("date", "")
+                                # If no date, maybe we shouldn't show it on timeline? 
+                                # Or show at start date?
+                                # Let's try to parse or keep empty.
+                                # The template JS handles date parsing.
+                                if date_str:
+                                    events.append({
+                                        "type": "file",
+                                        "date": date_str,
+                                        "category": cat,
+                                        "filename": fname
+                                    })
+            p.events = events
             
             db.expunge(p)
         return projects
