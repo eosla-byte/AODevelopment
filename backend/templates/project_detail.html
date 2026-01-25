@@ -543,7 +543,8 @@
                     {
                         id: "{{ c.id }}",
                             name: "{{ c.name }}",
-                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }} - (assignedCollabs["{{ c.id }}"] || 0))
+                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }
+                    } - (assignedCollabs["{{ c.id }}"] || 0))
                     },
                     {% endfor %}
                     ];
@@ -913,6 +914,11 @@
                     <p class="text-[10px] text-slate-400 mt-1">Ingrese el valor monetario del documento para cálculos.
                     </p>
                 </div>
+                <div id="upload_date_container" class="hidden">
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Fecha del Documento (Opcional)</label>
+                    <input type="date" name="file_date" class="input-field w-full text-xs">
+                    <p class="text-[10px] text-slate-400 mt-1">Si se deja vacío se usará la fecha actual.</p>
+                </div>
                 <div>
                     <label class="block text-xs font-bold text-slate-500 mb-1">Nota (Opcional)</label>
                     <textarea name="note" class="input-field w-full h-16 text-xs"
@@ -1056,14 +1062,17 @@
         }
     }
 
-    // Toggle Upload Amount
     function toggleUploadAmount() {
         const cat = document.getElementById('upload_category').value;
         const container = document.getElementById('upload_amount_container');
+        const dateContainer = document.getElementById('upload_date_container');
+
         if (FIN_CATS.includes(cat)) {
             container.classList.remove('hidden');
+            dateContainer.classList.remove('hidden');
         } else {
             container.classList.add('hidden');
+            dateContainer.classList.add('hidden');
         }
     }
 

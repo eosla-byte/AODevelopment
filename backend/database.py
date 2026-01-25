@@ -875,7 +875,7 @@ def update_project_profit_config(root_path, pid, pm, rm, partners):
     finally:
         db.close()
 
-def update_project_file_meta(pid, cat, fname, amt, note):
+def update_project_file_meta(pid, cat, fname, amt, note, file_date=None):
     db = SessionLocal()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
@@ -888,7 +888,7 @@ def update_project_file_meta(pid, cat, fname, amt, note):
             
             if cat not in meta: meta[cat] = {}
             
-            current_date = datetime.datetime.now().isoformat()
+            current_date = file_date if file_date else datetime.datetime.now().isoformat()
             meta[cat][fname] = {"amount": amt, "note": note, "date": current_date}
             
             p.files_meta = meta

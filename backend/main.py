@@ -1279,7 +1279,7 @@ async def serve_project_file(project_id: str, category: str, filename: str):
     return FileResponse(file_path)
 
 @app.post("/project/{project_id}/upload")
-async def upload_file(project_id: str, category: str = Form(...), amount: str = Form(None), note: str = Form(""), file: UploadFile = File(...)):
+async def upload_file(project_id: str, category: str = Form(...), amount: str = Form(None), note: str = Form(""), file_date: str = Form(None), file: UploadFile = File(...)):
     # root_path = get_root_path() # Removed
     project = get_project_details(project_id)
     if project:
@@ -1308,7 +1308,7 @@ async def upload_file(project_id: str, category: str = Form(...), amount: str = 
         try:
              # Note default text "Initial upload" is good only if note is empty
              final_note = note if note and note.strip() else "" 
-             update_project_file_meta(project_id, category, file.filename, val, final_note)
+             update_project_file_meta(project_id, category, file.filename, val, final_note, file_date)
         except Exception as e:
              print(f"ERROR: Failed to save metadata during upload: {e}")
              pass
