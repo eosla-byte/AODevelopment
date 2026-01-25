@@ -1022,9 +1022,78 @@ async def read_root(request: Request, view: str = ""):
 async def read_projects(request: Request):
     # root_path = get_root_path() # Removed
     projects = get_projects()
+    
+    # --- Project Grouping Logic ---
+    grouped_items = []
+    
+    # 1. Bucketize
+    groups = {} 
+    singles = []
+    
+    # Groupable Logic: ID must contain '-' AND prefix length >= 3
+    # Actually user said: "first 3 letters of code... e.g. SYN-01 groups by SYN"
+    # So we take prefix before '-'.
+    
+    for p in projects:
+        # Check if project has a dash format like XXX-000
+        if '-' in str(p.id):
+            parts = str(p.id).split('-')
+            prefix = parts[0]
+            if len(prefix) >= 3:
+                # Add to bucket
+                if prefix not in groups:
+                    groups[prefix] = []
+                groups[prefix].append(p)
+                continue
+        
+        # If no Dash or short prefix, it's single
+        singles.append(p)
+        
+    # 2. Process Buckets
+    for prefix, proj_list in groups.items():
+        if len(proj_list) > 1:
+            # Create a Group Object summary
+            # Sort by ID or Start Date? ID usually implies order.
+            proj_list.sort(key=lambda x: x.id)
+            
+            # Sums
+            total_amount = sum(x.amount for x in proj_list if x.amount)
+            total_paid = sum(x.paid_amount for x in proj_list if x.paid_amount)
+            total_sqm = sum(x.square_meters for x in proj_list if x.square_meters)
+            
+            group_obj = {
+                "is_group": True,
+                "prefix": prefix,
+                "name": f"Proyectos {prefix}",
+                "count": len(proj_list),
+                "amount": total_amount,
+                "paid_amount": total_paid,
+                "square_meters": total_sqm,
+                "children": proj_list,
+                "status": "Varios", # Mixed
+                "start_date": proj_list[0].start_date # Earliest
+            }
+            grouped_items.append(group_obj)
+        else:
+            # Only 1 item, treat as single
+            singles.append(proj_list[0])
+            
+    # 3. sorting
+    # We want a unified list of [GroupObj, SingleProj, GroupObj...]
+    # Sort Singles and Groups together by something... Name? ID? Status?
+    # Let's keep Singles separate? Or mix them?
+    # User said "Agrupar...". Implicitly shown in same list.
+    
+    # Add singles to list
+    grouped_items.extend(singles)
+    
+    # Optional: Sort huge list by Name
+    # grouped_items.sort(key=lambda x: x.name if hasattr(x, 'name') else x['name'])
+    # Actually, recent might be better. Let's rely on insertion order or sort by date.
+    
     return templates.TemplateResponse("projects.html", {
         "request": request,
-        "projects": projects
+        "items": grouped_items # Renamed 'projects' to 'items' to imply mixed types
     })
 
 @app.get("/calendar", response_class=HTMLResponse)
