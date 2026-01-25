@@ -135,12 +135,27 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
             for cat, files_dict in proj.files_meta.items():
                 if isinstance(files_dict, dict):
                     current_sum = 0.0
+                    # Ensure category exists in files dict (though initialized above, safety check)
+                    if cat not in proj.files:
+                        proj.files[cat] = []
+
                     for fname, meta in files_dict.items():
                         if isinstance(meta, dict):
+                            # Populate File Object for UI
+                            file_obj = {
+                                "name": fname,
+                                "amount": 0.0,
+                                "note": meta.get("note", ""),
+                                "date": meta.get("date", "")
+                            }
+                            
                             try:
                                 val = float(meta.get("amount", 0.0))
                                 current_sum += val
+                                file_obj["amount"] = val
                             except: pass
+                            
+                            proj.files[cat].append(file_obj)
                     
                     if cat in cat_totals:
                          cat_totals[cat] = current_sum
