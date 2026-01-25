@@ -1107,8 +1107,8 @@
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         // Prepare Data
-        const rawReminders = {{ p.reminders| tojson if p.reminders else '[]'
-    }};
+        // Safer injection
+        const rawReminders = {{ (p.reminders or[]) | tojson }};
     const startDate = "{{ p.start_date }}";
 
     const events = [];
@@ -1125,29 +1125,28 @@
     }
 
     // 2. Add Reminders
-    rawReminders.forEach(r => {
-        events.push({
-            id: 'rem_' + r.id,
-            timestamp: r.date, // Assuming YYYY-MM-DD
-            title: r.title,
-            type: 'reminder',
-            completed: r.completed,
-            color: r.completed ? '#94a3b8' : '#e11d48' // slate/rose
+    if (Array.isArray(rawReminders)) {
+        rawReminders.forEach(r => {
+            events.push({
+                id: 'rem_' + r.id,
+                timestamp: r.date, // Assuming YYYY-MM-DD
+                title: r.title,
+                type: 'reminder',
+                completed: r.completed,
+                color: r.completed ? '#94a3b8' : '#e11d48' // slate/rose
+            });
         });
-    });
+    }
 
-    // 3. Add Dummy Activity for Files (If explicit dates aren't available, we distribute them for demo)
-    // In production, we would iterate p.files and use f.date
-    // Using Jinja to inject file data if simple
+    // 3. Add Dummy Activity for Files
     const fileEvents = [];
+    // Use a safe way to iterate in case p.files is weird or None
+    {% if p.files %}
     {% for cat, files in p.files.items() %}
     {% for f in files %}
-    // Only if file has a date property we can trust. 
-    // Using a fallback "Created Today" if missing is risky for timeline.
-    // We'll skip for now or check if variable exists.
     {% if f.date %}
     fileEvents.push({
-        id: 'file_{{ loop.index }}',
+        id: 'file_{{ loop.index }}_{{ cat }}',
         timestamp: "{{ f.date }}",
         title: "{{ f.name }}",
         type: 'file',
@@ -1156,6 +1155,7 @@
     {% endif %}
     {% endfor %}
     {% endfor %}
+    {% endif %}
 
     events.push(...fileEvents);
 
