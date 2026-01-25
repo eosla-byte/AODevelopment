@@ -543,7 +543,8 @@
                     {
                         id: "{{ c.id }}",
                             name: "{{ c.name }}",
-                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }} - (assignedCollabs["{{ c.id }}"] || 0))
+                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }
+                    } - (assignedCollabs["{{ c.id }}"] || 0))
                     },
                     {% endfor %}
                     ];
@@ -777,6 +778,23 @@
                     });
                 </script>
             </form>
+        </div>
+    </div>
+
+    <!-- Timeline Section -->
+    <div class="mb-8">
+        <h3 class="text-sm font-bold text-slate-500 uppercase mb-3 flex justify-between items-center">
+            <span>Cronograma de Actividad</span>
+            <div class="flex gap-2 text-xs">
+                <button onclick="timeline.zoomToRange('month')"
+                    class="px-2 py-1 hover:bg-slate-100 rounded text-slate-500">Mes</button>
+                <button onclick="timeline.zoomToRange('year')"
+                    class="px-2 py-1 hover:bg-slate-100 rounded text-slate-500">Año</button>
+            </div>
+        </h3>
+        <div id="timeline-container"
+            class="w-full h-[320px] bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <!-- Timeline injected here -->
         </div>
     </div>
 
@@ -1082,5 +1100,94 @@
     function openAddReminder() {
         document.getElementById('remindersModal').classList.remove('hidden');
     }
+</script>
+
+<!-- Timeline Initialization -->
+<script src="{{ url_for('static', filename='js/timeline.js') }}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Prepare Data
+        const rawReminders = {{ p.reminders| tojson if p.reminders else '[]'
+    }};
+    const startDate = "{{ p.start_date }}";
+
+    const events = [];
+
+    // 1. Add Start Date
+    if (startDate) {
+        events.push({
+            id: 'start',
+            timestamp: startDate,
+            title: 'Inicio de Proyecto',
+            type: 'milestone',
+            color: '#2563eb' // blue-600
+        });
+    }
+
+    // 2. Add Reminders
+    rawReminders.forEach(r => {
+        events.push({
+            id: 'rem_' + r.id,
+            timestamp: r.date, // Assuming YYYY-MM-DD
+            title: r.title,
+            type: 'reminder',
+            completed: r.completed,
+            color: r.completed ? '#94a3b8' : '#e11d48' // slate/rose
+        });
+    });
+
+    // 3. Add Dummy Activity for Files (If explicit dates aren't available, we distribute them for demo)
+    // In production, we would iterate p.files and use f.date
+    // Using Jinja to inject file data if simple
+    const fileEvents = [];
+    {% for cat, files in p.files.items() %}
+    {% for f in files %}
+    // Only if file has a date property we can trust. 
+    // Using a fallback "Created Today" if missing is risky for timeline.
+    // We'll skip for now or check if variable exists.
+    {% if f.date %}
+    fileEvents.push({
+        id: 'file_{{ loop.index }}',
+        timestamp: "{{ f.date }}",
+        title: "{{ f.name }}",
+        type: 'file',
+        color: '#059669'
+    });
+    {% endif %}
+    {% endfor %}
+    {% endfor %}
+
+    events.push(...fileEvents);
+
+    // Init Timeline
+    window.timeline = new Timeline('timeline-container', {
+        zoomSpeed: 0.001,
+        onSelect: (evt) => {
+            // Show small popup or detail?
+            alert(`Selected: ${evt.title}\nDate: ${evt.timestamp}`);
+        }
+    });
+
+    window.timeline.setEvents(events);
+
+    // Helper methods for buttons
+    window.timeline.zoomToRange = (rangeType) => {
+        const now = Date.now();
+        const OneDay = 86400000;
+        let start, end;
+
+        if (rangeType === 'month') {
+            start = now - OneDay * 15;
+            end = now + OneDay * 15;
+        } else if (rangeType === 'year') {
+            start = now - OneDay * 180;
+            end = now + OneDay * 180;
+        }
+
+        if (window.timeline.animateViewport) {
+            window.timeline.animateViewport(start, end);
+        }
+    };
+    });
 </script>
 {% endblock %}
