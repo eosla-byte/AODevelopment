@@ -543,7 +543,8 @@
                     {
                         id: "{{ c.id }}",
                             name: "{{ c.name }}",
-            avail: 100 - ({{ total_allocations.get(c.id, 0.0) }} - (assignedCollabs["{{ c.id }}"] || 0))
+                                avail: 100 - ({{ total_allocations.get(c.id, 0.0) }
+                    } - (assignedCollabs["{{ c.id }}"] || 0))
                     },
                     {% endfor %}
                     ];
@@ -1102,7 +1103,7 @@
 </script>
 
 <!-- Timeline Initialization -->
-<script src="{{ url_for('static', filename='js/timeline.js') }}"></script>
+<script src="{{ url_for('static', path='js/timeline.js') }}"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         // Prepare Data
