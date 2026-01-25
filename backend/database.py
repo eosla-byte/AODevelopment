@@ -875,7 +875,7 @@ def update_project_profit_config(root_path, pid, pm, rm, partners):
     finally:
         db.close()
 
-def update_project_file_meta(root_path, pid, cat, fname, amt, note):
+def update_project_file_meta(pid, cat, fname, amt, note):
     db = SessionLocal()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
