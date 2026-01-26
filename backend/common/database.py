@@ -11,16 +11,31 @@ from .models import Base, Project as DBProject, Collaborator as DBCollaborator, 
 from sqlalchemy.orm.attributes import flag_modified
 
 # DATABASE SETUP
-# Use SQLite for local development default, can be overridden by env var
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aodev.db")
+# Multi-DB Configuration for Microservices/Monolith Hybrid
 
-if "sqlite" in DATABASE_URL:
-    print("⚠️  [DATABASE STATUS] USING LOCAL SQLITE (DATA WILL BE LOST ON DEPLOY) ⚠️")
-else:
-    print("✅  [DATABASE STATUS] USING EXTERNAL DATABASE (PERSISTENT) ✅")
+CORE_DB_URL = os.getenv("CORE_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db"))
+OPS_DB_URL = os.getenv("OPS_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db"))
+PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db"))
+EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db"))
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'}")
+print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'}")
+
+# Create Engines
+engine_core = create_engine(CORE_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in CORE_DB_URL else {})
+engine_ops = create_engine(OPS_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in OPS_DB_URL else {})
+engine_plugin = create_engine(PLUGIN_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in PLUGIN_DB_URL else {})
+engine_ext = create_engine(EXT_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in EXT_DB_URL else {})
+
+# Create Session Factories
+SessionCore = sessionmaker(autocommit=False, autoflush=False, bind=engine_core)
+SessionOps = sessionmaker(autocommit=False, autoflush=False, bind=engine_ops)
+SessionPlugin = sessionmaker(autocommit=False, autoflush=False, bind=engine_plugin)
+SessionExt = sessionmaker(autocommit=False, autoflush=False, bind=engine_ext)
+
+# Universal SessionLocal for backwards compatibility (defaults to Ops for main app, or Core for Auth?)
+# Ideally we replace usage, but to avoid breaking 2000 lines, we route dynamically or default to Ops (Operations is the biggest chunk).
+SessionLocal = SessionOps 
 
 def get_db():
     db = SessionLocal()
@@ -29,8 +44,33 @@ def get_db():
     finally:
         db.close()
 
-# Ensure tables exist (for now)
-Base.metadata.create_all(bind=engine)
+# Specific Providers
+def get_core_db():
+    db = SessionCore()
+    try: yield db
+    finally: db.close()
+
+def get_ops_db():
+    db = SessionOps()
+    try: yield db
+    finally: db.close()
+
+def get_plugin_db():
+    db = SessionPlugin()
+    try: yield db
+    finally: db.close()
+
+# Ensure tables exist (Scan all metadata across all engines? Or assume separate migrations?)
+# For Phase 1 (Shared Code): Create ALL tables on ALL DBs? No, that messes up separation.
+# We should only create relevant tables on relevant engines.
+# But `Base.metadata` acts as a global registry.
+# Quick fix: Create all on all. It's redundant but safe for "Monolith acting as everything".
+# Better: User `split_database` logic.
+# For now, let's skip auto-create or keep it simple.
+# The migration script already populated them, so tables exist.
+# We can comment out create_all or leave it for dev.
+# Base.metadata.create_all(bind=engine_ops) 
+
 
 SCAN_CATEGORIES = {
     "Facturas": "invoice",
@@ -483,7 +523,7 @@ class User:
 
 def get_users() -> List[User]:
     # root_path ignored for SQL Users, but kept for signature compatibility
-    db = SessionLocal()
+    db = SessionCore()
     try:
         users_db = db.query(models.AppUser).all()
         # Convert to User objects, handling potential missing assigned_projects attribute if migration failed (though I ran it, safeguards are good)
@@ -494,7 +534,7 @@ def get_users() -> List[User]:
         db.close()
 
 def get_user_by_email(email: str) -> Optional[User]:
-    db = SessionLocal()
+    db = SessionCore()
     try:
         u = db.query(models.AppUser).filter(models.AppUser.email == email).first()
         if u:
@@ -504,7 +544,7 @@ def get_user_by_email(email: str) -> Optional[User]:
         db.close()
 
 def save_user(user: User):
-    db = SessionLocal()
+    db = SessionCore()
     try:
         # Check if exists
         existing = db.query(models.AppUser).filter(models.AppUser.email == user.email).first()
@@ -532,7 +572,7 @@ def delete_user(user_id: str):
     # user_id in main.py is likely email or ID. 
     # original save_user used ID. AppUser PK is email.
     # We should assume user_id might be email.
-    db = SessionLocal()
+    db = SessionCore()
     try:
         # Try ID match? AppUser doesn't have ID column in my model, only Email.
         # But 'User' class has ID.
@@ -1077,7 +1117,7 @@ def get_user_plugin_stats(email):
         db.close()
 
 def start_revit_session(email, machine, version, ip, plugin_version="1.0.0"):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         sid = str(uuid.uuid4())
         session = models.PluginSession(
@@ -1101,7 +1141,7 @@ def start_revit_session(email, machine, version, ip, plugin_version="1.0.0"):
         db.close()
 
 def heartbeat_session(session_id, ip):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         session = db.query(models.PluginSession).filter(models.PluginSession.id == session_id).first()
         if session:
@@ -1116,7 +1156,7 @@ def heartbeat_session(session_id, ip):
         db.close()
 
 def end_revit_session(session_id):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         session = db.query(models.PluginSession).filter(models.PluginSession.id == session_id).first()
         if session:
@@ -1170,7 +1210,7 @@ def get_plugin_sessions():
         db.close()
 
 def get_user_plugin_logs(email, start_date: datetime.date = None, end_date: datetime.date = None):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         # Robust case-insensitive search
         if not email: return []
@@ -1247,7 +1287,7 @@ def get_user_plugin_logs(email, start_date: datetime.date = None, end_date: date
         db.close()
 
 def log_plugin_activity(session_id, filename, active_min, idle_min, revit_user, acc_proj):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         act = models.PluginActivity(
             session_id=session_id,
@@ -1266,8 +1306,12 @@ def log_plugin_activity(session_id, filename, active_min, idle_min, revit_user, 
         db.close()
 
 def log_plugin_sync(session_id, filename, central_path):
-    # Optional logic for sync
-    pass
+    db = SessionPlugin()
+    try:
+        # Optional logic for sync
+        pass
+    finally:
+        db.close()
 
 
 # ==========================================
@@ -1627,7 +1671,7 @@ def delete_estimation(est_id: str):
 # ==========================================
 
 def create_plugin_version(version: str, changelog: str, url: str, mandatory: bool):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         new_v = models.PluginVersion(
             version_number=version,
@@ -1666,7 +1710,7 @@ def delete_plugin_version(version_id: int):
         db.close()
 
 def get_latest_plugin_version():
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         # Assumes ID desc is chronological.
         # Could also sort by version_number semver if needed, but ID is safer for insertion order
@@ -1687,7 +1731,7 @@ def get_latest_plugin_version():
 # ==========================================
 
 def save_cloud_session(session_id: str, data: dict, project_name: str = None, user_email: str = None, folder_id: str = None):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         session = db.query(models.PluginCloudSession).filter(models.PluginCloudSession.id == session_id).first()
         
@@ -1718,7 +1762,7 @@ def save_cloud_session(session_id: str, data: dict, project_name: str = None, us
         db.close()
 
 def get_cloud_session(session_id: str):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         s = db.query(models.PluginCloudSession).filter(models.PluginCloudSession.id == session_id).first()
         if s:
@@ -1734,7 +1778,7 @@ def get_cloud_session(session_id: str):
         db.close()
 
 def list_cloud_projects(email: str = None):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         q = db.query(models.PluginCloudSession)
         if email:
@@ -1900,7 +1944,7 @@ def get_latest_active_session(user_email: str, machine_id: str = None):
 # -----------------------------------------------------------------------------
 
 def queue_command(session_id: str, action: str, payload: dict):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         cmd = models.CloudCommand(
             session_id=session_id,
@@ -1914,7 +1958,7 @@ def queue_command(session_id: str, action: str, payload: dict):
         db.close()
 
 def get_pending_commands(session_id: str):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         # Get unconsumed commands
         cmds = db.query(models.CloudCommand).filter(
@@ -1943,7 +1987,7 @@ def get_pending_commands(session_id: str):
 # ROUTINES (KNOWLEDGE BASE)
 # -----------------------------------------------------------------------------
 def save_routine(title, description, category, actions_json, user_email, is_global=False):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         new_routine = models.PluginRoutine(
             title=title,
@@ -1964,7 +2008,7 @@ def save_routine(title, description, category, actions_json, user_email, is_glob
         db.close()
 
 def get_all_routines(user_email=None):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         query = db.query(models.PluginRoutine)
         if user_email:
@@ -1982,7 +2026,7 @@ def get_all_routines(user_email=None):
 from .models import SheetTemplate
 
 def get_sheet_templates():
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         return db.query(SheetTemplate).all()
     finally:
@@ -2016,7 +2060,7 @@ def delete_sheet_template(tpl_id: int):
 # -----------------------------------------------------------------------------
 
 def create_sheet_session(session_id: str, project_name: str, sheets: list, param_defs: list, plugin_session_id: str):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         # Check if exists (unlikely given UUID)
         new_session = PluginSheetSession(
