@@ -571,6 +571,27 @@ def update_user_permissions(user_id: str, permissions: dict):
     finally:
         db.close()
 
+def update_user_assigned_projects(user_email: str, project_ids: List[str]) -> bool:
+    """
+    Updates the list of project IDs assigned to a user.
+    """
+    db = SessionLocal()
+    try:
+        # AppUser PK is email
+        u = db.query(models.AppUser).filter(models.AppUser.email == user_email).first()
+        
+        if u:
+            u.assigned_projects = project_ids
+            flag_modified(u, "assigned_projects")
+            db.commit()
+            return True
+        return False
+    except Exception as e:
+        print(f"Error updating assigned projects: {e}")
+        return False
+    finally:
+        db.close()
+
 # -----------------------------------------------------------------------------
 # MISSING FUNCTIONS STUBS (To prevent ImportErrors)
 # -----------------------------------------------------------------------------
