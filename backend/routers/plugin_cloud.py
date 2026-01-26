@@ -54,7 +54,7 @@ async def calculate_quantities_cloud(payload: GeometryPayload):
 # COMMAND QUEUE (BRIDGE)
 # ==========================================
 # Replaced In-Memory with DB Queue to handle multiple workers (Gunicorn)
-from database import queue_command, get_pending_commands
+from common.database import queue_command, get_pending_commands
 
 class CommandPayload(BaseModel):
     action: str
@@ -75,7 +75,7 @@ async def get_commands_for_revit(session_id: str):
 # ==========================================
 
 # In-Memory Session Store (For now, could be DB backed later)
-from database import save_cloud_session, get_cloud_session, list_cloud_projects, delete_cloud_session, create_project_folder, list_project_folders, delete_project_folder
+from common.database import save_cloud_session, get_cloud_session, list_cloud_projects, delete_cloud_session, create_project_folder, list_project_folders, delete_project_folder
 
 class CloudQuantifyPayload(BaseModel):
     session_id: str
@@ -197,7 +197,7 @@ async def delete_folder_endpoint(folder_id: str = Body(..., embed=True)):
 async def rename_folder_endpoint(folder_id: str = Body(..., embed=True), new_name: str = Body(..., embed=True)):
     # Imports inside to avoid circular dependency issues if any, or ensuring they are available.
     # We need to update the import at top of file, but for now assuming these will be available via 'database' module import.
-    from database import rename_project_folder
+    from common.database import rename_project_folder
     success = rename_project_folder(folder_id, new_name)
     if success:
         return {"status": "success", "message": "Folder renamed"}
@@ -205,7 +205,7 @@ async def rename_folder_endpoint(folder_id: str = Body(..., embed=True), new_nam
 
 @router.post("/rename-session")
 async def rename_session_endpoint(session_id: str = Body(..., embed=True), new_name: str = Body(..., embed=True)):
-    from database import rename_cloud_session
+    from common.database import rename_cloud_session
     success = rename_cloud_session(session_id, new_name)
     if success:
         return {"status": "success", "message": "Session renamed"}

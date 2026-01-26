@@ -6,7 +6,7 @@ import json
 import datetime
 from openai import AsyncOpenAI
 # Import database to log stats
-from database import SessionLocal
+from common.database import SessionLocal
 # We need a model to log AI stats. Let's reuse models.PluginActivity or create new?
 # Ideally we add a simple function in database.py to log this.
 # For now, we'll inline a simple logger or import if I add it to database.py

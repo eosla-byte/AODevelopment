@@ -6,11 +6,11 @@ import datetime
 import json
 
 # Import from parent (assuming we run from root)
-from database import (
+from common.database import (
     start_revit_session, heartbeat_session, end_revit_session,
     log_plugin_activity, log_plugin_sync, get_user_by_email
 )
-from auth_utils import verify_password, create_access_token, verify_token_dep
+from common.auth_utils import verify_password, create_access_token, verify_token_dep
 
 router = APIRouter(prefix="/api/plugin")
 

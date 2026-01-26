@@ -13,7 +13,7 @@ import mimetypes
 import datetime
 import uuid
 # Database Imports
-from database import (
+from common.database import (
     get_projects, create_project, get_project_details, 
     get_collaborators, create_collaborator, get_collaborator_details, update_project_meta, 
     update_collaborator, update_collaborator_picture, add_adjustment, remove_adjustment, 
@@ -23,6 +23,7 @@ from database import (
     delete_expense_column, update_expense_card_files, add_project_reminder, delete_project_reminder, 
     toggle_project_reminder, get_total_collaborator_allocations, update_project_collaborators, 
     get_collaborator_assigned_projects, get_project_stats_by_category, delete_project_file_meta,
+    update_user_assigned_projects, update_user_permissions,
     # Auth
     User, get_users, save_user, get_user_by_email, delete_user,
     # Market Study
@@ -34,7 +35,7 @@ from database import (
     # Templates
     get_templates, save_template
 )
-from auth_utils import get_password_hash, verify_password, create_access_token, decode_access_token
+from common.auth_utils import get_password_hash, verify_password, create_access_token, decode_access_token
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 

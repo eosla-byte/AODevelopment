@@ -27,49 +27,55 @@
                     <span class="text-xl">🏠</span>
                     <span class="font-medium">Inicio</span>
                 </a>
-                <a href="/projects"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
-                    <span class="text-xl">📊</span>
-                    <span class="font-medium">Proyectos</span>
-                </a>
-                <a href="/calendar"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
-                    <span class="text-xl">📅</span>
-                    <span class="font-medium">Cronograma</span>
-                </a>
-                <a href="/cotizador"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
-                    <span class="text-xl">🧮</span>
-                    <span class="font-medium">Cotizador</span>
-                </a>
-                <a href="/estimaciones"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
-                    <span class="text-xl">📝</span>
-                    <span class="font-medium">Estimaciones</span>
-                </a>
-                <a href="/cotizaciones"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
-                    <span class="text-xl">📄</span>
-                    <span class="font-medium">Cotizaciones</span>
-                </a>
+                <!-- PROYECTOS GROUP -->
+                <div class="mb-4">
+                    <a href="/projects"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                        <span class="text-xl">📊</span>
+                        <span class="font-medium">Proyectos</span>
+                    </a>
+                    <a href="/calendar"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                        <span class="text-xl">📅</span>
+                        <span class="font-medium">Cronograma</span>
+                    </a>
+                    <a href="/cotizador"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                        <span class="text-xl">🧮</span>
+                        <span class="font-medium">Cotizador</span>
+                    </a>
+                    <a href="/estimaciones"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                        <span class="text-xl">📝</span>
+                        <span class="font-medium">Estimaciones</span>
+                    </a>
+                    <a href="/cotizaciones"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                        <span class="text-xl">📄</span>
+                        <span class="font-medium">Cotizaciones</span>
+                    </a>
+                </div>
 
+                <!-- HR & FINANCES GROUP -->
                 {% if request.state.user %}
                 {% if request.state.user.role in ['admin', 'miembro'] %}
-                <a href="/gastos"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
-                    <span class="text-xl">💸</span>
-                    <span class="font-medium">Gastos</span>
-                </a>
-                <a href="/hr"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
-                    <span class="text-xl">👥</span>
-                    <span class="font-medium">RR.HH.</span>
-                </a>
-                <a href="/socios"
-                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
-                    <span class="text-xl">💼</span>
-                    <span class="font-medium">Socios</span>
-                </a>
+                <div class="mb-4 pt-4 border-t border-slate-200">
+                    <a href="/gastos"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                        <span class="text-xl">💸</span>
+                        <span class="font-medium">Gastos</span>
+                    </a>
+                    <a href="/hr"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                        <span class="text-xl">👥</span>
+                        <span class="font-medium">RR.HH.</span>
+                    </a>
+                    <a href="/socios"
+                        class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 hover:bg-slate-100 hover:text-blue-600 transition-colors">
+                        <span class="text-xl">💼</span>
+                        <span class="font-medium">Socios</span>
+                    </a>
+                </div>
                 {% endif %}
 
                 {% if request.state.user.role == 'admin' %}

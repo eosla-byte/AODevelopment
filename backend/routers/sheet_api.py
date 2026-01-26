@@ -8,7 +8,7 @@ import json
 router = APIRouter(prefix="/api/plugin/sheets", tags=["Sheets"])
 
 
-from database import create_sheet_session, get_sheet_session, queue_command
+from common.database import create_sheet_session, get_sheet_session, queue_command
 
 @router.post("/init")
 async def init_sheet_session(request: Request):
@@ -82,7 +82,7 @@ async def apply_sheet_changes(request: Request):
         print(f"DEBUG Apply: Target Plugin Session {plugin_session_id}")
         
         # AGGRESSIVE RECOVERY: Check if session is alive
-        from database import get_session_by_id, get_latest_active_session, update_sheet_session_plugin_id
+        from common.database import get_session_by_id, get_latest_active_session, update_sheet_session_plugin_id
         import datetime
         
         current_plugin_session = get_session_by_id(plugin_session_id)
@@ -125,7 +125,7 @@ async def apply_sheet_changes(request: Request):
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 # --- TEMPLATES ---
-from database import get_sheet_templates, create_sheet_template, delete_sheet_template
+from common.database import get_sheet_templates, create_sheet_template, delete_sheet_template
 
 @router.get("/templates")
 async def list_sheet_templates():
@@ -164,7 +164,7 @@ async def check_connection_status(session_id: str):
     """
     Returns the health of the Revit Link.
     """
-    from database import get_sheet_session # Ensure imports
+    from common.database import get_sheet_session # Ensure imports
     session_data = get_sheet_session(session_id)
     if not session_data:
         return {"status": "error", "message": "Session Not Found"}
@@ -173,7 +173,7 @@ async def check_connection_status(session_id: str):
     if not plugin_session_id:
         return {"status": "disconnected", "message": "No Revit Link"}
         
-    from database import get_session_by_id, get_pending_commands
+    from common.database import get_session_by_id, get_pending_commands
     import datetime
     
     ps = get_session_by_id(plugin_session_id)
@@ -197,7 +197,7 @@ async def check_connection_status(session_id: str):
     }
 @router.get("/logs")
 async def get_logs_endpoint(session_id: str):
-    from database import get_sheet_session, get_session_logs
+    from common.database import get_sheet_session, get_session_logs
     
     session_data = get_sheet_session(session_id)
     if not session_data:
