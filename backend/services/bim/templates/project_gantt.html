@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ project.name }} - Cronograma BIM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Frappe Gantt CSS (Base) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css">
+    <style>
+        .bim-sidebar {
+            background-color: #0f172a;
+            color: white;
+        }
+
+        /* Custom Gantt Styling for Premium Look */
+        .gantt .bar-progress {
+            fill: #6366f1 !important;
+        }
+
+        /* Indigo 500 */
+        .gantt .bar {
+            fill: #e0e7ff !important;
+        }
+
+        /* Indigo 100 */
+        .gantt .bar-label {
+            fill: #1e293b !important;
+            font-family: sans-serif;
+            font-weight: 500;
+        }
+
+        .gantt-container {
+            overflow-x: auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .popup-wrapper {
+            background: rgba(15, 23, 42, 0.95) !important;
+            color: white !important;
+            border-radius: 8px !important;
+            backdrop-filter: blur(10px);
+        }
+
+        .popup-wrapper .title {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 min-h-screen flex text-slate-800">
+
+    <!-- Sidebar (Compact) -->
+    <aside
+        class="bim-sidebar w-16 hover:w-64 transition-all duration-300 flex-shrink-0 flex flex-col group overflow-hidden z-20 shadow-xl">
+        <div class="p-4 border-b border-slate-800 flex items-center gap-3">
+            <div
+                class="w-8 h-8 rounded bg-indigo-500 flex items-center justify-center font-bold text-white flex-shrink-0">
+                AO</div>
+            <span
+                class="font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300">PlanSystem</span>
+        </div>
+
+        <nav class="flex-1 p-2 space-y-2 mt-4">
+            <a href="/dashboard"
+                class="flex items-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">
+                <span class="text-xl">📊</span>
+                <span
+                    class="ml-3 opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity">Dashboard</span>
+            </a>
+            <a href="/projects" class="flex items-center p-2 rounded-lg bg-indigo-600 text-white shadow-lg transition">
+                <span class="text-xl">📁</span>
+                <span class="ml-3 opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity">Proyecto
+                    Actual</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden">
+
+        <!-- Header Controls -->
+        <header class="bg-white border-b border-slate-200 p-4 flex justify-between items-center shadow-sm z-10">
+            <div>
+                <h2 class="text-xl font-bold flex items-center gap-2">
+                    <span class="text-slate-400 font-normal">Proyecto:</span>
+                    {{ project.name }}
+                </h2>
+                <div class="text-xs text-slate-500 flex gap-2 mt-1">
+                    <span class="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Activo</span>
+                    <span>Versión: <strong class="text-slate-700">Baseline V1</strong></span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <!-- Zoom Controls -->
+                <div class="bg-slate-100 rounded-lg p-1 flex">
+                    <button onclick="changeZoom('Day')"
+                        class="px-3 py-1 text-xs font-medium rounded hover:bg-white hover:shadow-sm transition">Día</button>
+                    <button onclick="changeZoom('Week')"
+                        class="px-3 py-1 text-xs font-medium rounded bg-white shadow-sm transition">Semana</button>
+                    <button onclick="changeZoom('Month')"
+                        class="px-3 py-1 text-xs font-medium rounded hover:bg-white hover:shadow-sm transition">Mes</button>
+                </div>
+
+                <button
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition">
+                    🔄 Comparar
+                </button>
+
+                <button
+                    class="border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+                    ⚙️ Config
+                </button>
+            </div>
+        </header>
+
+        <!-- Gantt Container -->
+        <div class="flex-1 overflow-auto bg-slate-50 scroll-smooth relative">
+            <div id="gantt-chart" class="p-6 h-full"></div>
+
+            <!-- Floating Upload / Import Interface if empty -->
+            {% if tasks|length == 0 %}
+            <div class="absolute inset-0 flex items-center justify-center bg-slate-50/80 backdrop-blur-sm z-0">
+                <div class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-lg border border-slate-100">
+                    <div
+                        class="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 text-2xl mx-auto mb-4">
+                        📅
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Cronograma Vacío</h3>
+                    <p class="text-slate-500 mb-6">Importa un archivo .XER (Primavera) o .XML (Project) para visualizar
+                        el cronograma.</p>
+
+                    <form action="/projects/{{ project.id }}/schedule/upload" method="POST"
+                        enctype="multipart/form-data" class="space-y-4">
+                        <label
+                            class="block w-full cursor-pointer hover:bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-8 transition">
+                            <input type="file" name="file" class="hidden" onchange="this.form.submit()">
+                            <span class="text-sm font-medium text-slate-600">Haz clic para subir archivo</span>
+                            <span class="block text-xs text-slate-400 mt-1">Soporta .xer y .xml</span>
+                        </label>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+    </main>
+
+    <!-- Frappe Gantt JS -->
+    <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
+    <script>
+        // Init Data from Server
+        const tasksData = {{ tasks_json| safe }};
+
+        if (tasksData.length > 0) {
+            // Initialize Gantt
+            const gantt = new Gantt("#gantt-chart", tasksData, {
+                header_height: 50,
+                column_width: 30,
+                step: 24,
+                view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+                bar_height: 20,
+                bar_corner_radius: 3,
+                arrow_curve: 5,
+                padding: 18,
+                view_mode: 'Week',
+                date_format: 'YYYY-MM-DD',
+                custom_popup_html: function (task) {
+                    return `
+                        <div class="popup-wrapper p-4 w-64 shadow-2xl">
+                            <div class="title font-bold text-sm mb-2 pb-2 border-slate-700">${task.name}</div>
+                            <div class="subtitle text-xs text-slate-300">
+                                <div>Inicio: ${task.start}</div>
+                                <div>Fin: ${task.end}</div>
+                                <div class="mt-2 text-indigo-400 font-bold">${task.progress}% Completado</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            function changeZoom(mode) {
+                gantt.change_view_mode(mode);
+            }
+        }
+    </script>
+</body>
+
+</html>

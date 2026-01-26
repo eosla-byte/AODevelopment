@@ -75,6 +75,70 @@ async def dashboard(request: Request, user = Depends(get_current_user)):
         "org_name": org_name
     })
 
+@app.get("/projects", response_class=HTMLResponse)
+async def projects_list(request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse("/auth/login")
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request, "user_name": user.get("sub"), "user_initials": user.get("sub")[:2], "org_name": "TBD"
+    })
+
+@app.get("/projects/{project_id}", response_class=HTMLResponse)
+async def view_project_gantt(request: Request, project_id: str, user = Depends(get_current_user)):
+    if not user: return RedirectResponse("/auth/login")
+    
+    # 1. Fetch Project & Latest Version
+    db = SessionExt()
+    project = db.query(BimProject).filter(BimProject.id == project_id).first()
+    
+    # Mock Data if no project found (or create on fly for demo?)
+    if not project:
+         # Create Dummy for demo
+         project = BimProject(id=project_id, name="Proyecto Demo Torre A", organization_id="1")
+    
+    # Fetch Activities from DB
+    # For now, we return empty list or mock list
+    tasks = []
+    
+    # Transform for Frappe Gantt
+    # Format: {id: "Task 1", name: "Redesign website", start: "2016-12-28", end: "2016-12-31", progress: 20, dependencies: "Task 2, Task 3"}
+    tasks_json = [
+        {
+            "id": "A100",
+            "name": "Cimentación Profunda",
+            "start": "2024-02-01",
+            "end": "2024-02-15",
+            "progress": 100,
+            "dependencies": ""
+        },
+        {
+            "id": "A110",
+            "name": "Estructura Nivel 1",
+            "start": "2024-02-16",
+            "end": "2024-03-01",
+            "progress": 45,
+            "dependencies": "A100"
+        },
+         {
+            "id": "A120",
+            "name": "Estructura Nivel 2",
+            "start": "2024-03-02",
+            "end": "2024-03-15",
+            "progress": 0,
+            "dependencies": "A110"
+        }
+    ]
+    import json
+    tasks_str = json.dumps(tasks_json)
+
+    db.close()
+
+    return templates.TemplateResponse("project_gantt.html", {
+        "request": request,
+        "project": project,
+        "tasks": tasks_json,
+        "tasks_json": tasks_str
+    })
+
 @app.post("/projects/{project_id}/schedule/upload")
 async def upload_schedule(project_id: str, file: UploadFile = File(...), user = Depends(get_current_user)):
     if not user: return RedirectResponse("/auth/login")
