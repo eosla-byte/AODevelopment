@@ -289,3 +289,88 @@ class PluginSheetSession(Base):
     param_definitions_json = Column(JSON, default=[])
     created_at = Column(DateTime, default=func.now())
     expires_at = Column(DateTime, nullable=True) # Optional expiration logic logic
+
+# -----------------------------------------------------------------------------
+# SCHEMA: BIM PORTAL (External) -> Prefix 'bim_'
+# -----------------------------------------------------------------------------
+
+class BimOrganization(Base):
+    __tablename__ = 'bim_organizations'
+    
+    id = Column(String, primary_key=True) # UUID
+    name = Column(String, nullable=False)
+    tax_id = Column(String) # NIT/RFC
+    logo_url = Column(String)
+    created_at = Column(DateTime, default=func.now())
+    is_active = Column(Boolean, default=True)
+
+    users = relationship("BimUser", back_populates="organization")
+    projects = relationship("BimProject", back_populates="organization")
+
+class BimUser(Base):
+    __tablename__ = 'bim_users'
+    
+    id = Column(String, primary_key=True) # UUID
+    organization_id = Column(String, ForeignKey('bim_organizations.id'))
+    email = Column(String, unique=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String)
+    role = Column(String, default="Member") # Owner, Admin, Member, Guest
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    
+    organization = relationship("BimOrganization", back_populates="users")
+
+class BimProject(Base):
+    __tablename__ = 'bim_projects'
+    
+    id = Column(String, primary_key=True) # UUID
+    organization_id = Column(String, ForeignKey('bim_organizations.id'))
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    status = Column(String, default="Active")
+    created_at = Column(DateTime, default=func.now())
+    
+    organization = relationship("BimOrganization", back_populates="projects")
+
+# -----------------------------------------------------------------------------
+# SCHEMA: BIM SCHEDULE MODULE
+# -----------------------------------------------------------------------------
+
+class BimScheduleVersion(Base):
+    __tablename__ = 'bim_schedule_versions'
+    
+    id = Column(String, primary_key=True)
+    project_id = Column(String, ForeignKey('bim_projects.id'))
+    version_name = Column(String) # e.g. "Baseline 1", "Update Nov"
+    imported_at = Column(DateTime, default=func.now())
+    imported_by = Column(String, ForeignKey('bim_users.id'))
+    source_filename = Column(String)
+    source_type = Column(String) # P6, MSP
+    
+    activities = relationship("BimActivity", back_populates="version", cascade="all, delete-orphan")
+
+class BimActivity(Base):
+    __tablename__ = 'bim_activities'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    version_id = Column(String, ForeignKey('bim_schedule_versions.id'))
+    
+    activity_id = Column(String) # The P6 Activity ID (e.g. A1000)
+    wbs_code = Column(String)
+    name = Column(String, nullable=False)
+    
+    planned_start = Column(DateTime)
+    planned_finish = Column(DateTime)
+    actual_start = Column(DateTime)
+    actual_finish = Column(DateTime)
+    
+    duration = Column(Float)
+    pct_complete = Column(Float, default=0.0)
+    
+    # Hierarchy
+    parent_wbs = Column(String)
+    
+    # Relationships
+    version = relationship("BimScheduleVersion", back_populates="activities")
+

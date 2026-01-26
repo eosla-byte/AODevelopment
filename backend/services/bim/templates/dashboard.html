@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - AO PlanSystem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .bim-sidebar {
+            background-color: #0f172a;
+            color: white;
+        }
+
+        .nav-item:hover {
+            background-color: #1e293b;
+            color: #818cf8;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 min-h-screen flex">
+
+    <!-- Sidebar -->
+    <aside class="bim-sidebar w-64 flex-shrink-0 flex flex-col">
+        <div class="p-6 border-b border-slate-800">
+            <h1 class="text-xl font-bold tracking-tight">AO<span class="text-indigo-500">PlanSystem</span></h1>
+            <p class="text-xs text-slate-400 mt-1">{{ org_name }}</p>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-1">
+            <a href="/dashboard"
+                class="nav-item flex items-center px-4 py-3 rounded-lg bg-slate-800 text-white font-medium transition">
+                <span>📊</span>
+                <span class="ml-3">Dashboard</span>
+            </a>
+            <a href="/projects"
+                class="nav-item flex items-center px-4 py-3 rounded-lg text-slate-400 font-medium transition">
+                <span>📁</span>
+                <span class="ml-3">Proyectos</span>
+            </a>
+            <a href="/team"
+                class="nav-item flex items-center px-4 py-3 rounded-lg text-slate-400 font-medium transition">
+                <span>👥</span>
+                <span class="ml-3">Equipo</span>
+            </a>
+        </nav>
+
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center gap-3">
+                <div
+                    class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center font-bold text-white text-xs">
+                    {{ user_initials }}
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-sm font-medium truncate">{{ user_name }}</p>
+                    <a href="/auth/logout" class="text-xs text-slate-400 hover:text-red-400 transition">Cerrar
+                        Sesión</a>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-8">
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800">Resumen General</h2>
+                <p class="text-slate-500">Bienvenido al portal de coordinación.</p>
+            </div>
+            <button
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm">
+                + Nuevo Proyecto
+            </button>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <p class="text-sm font-medium text-slate-500 mb-1">Proyectos Activos</p>
+                <p class="text-3xl font-bold text-slate-800">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <p class="text-sm font-medium text-slate-500 mb-1">Hitos Pendientes</p>
+                <p class="text-3xl font-bold text-amber-500">0</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                <p class="text-sm font-medium text-slate-500 mb-1">Miembros del Equipo</p>
+                <p class="text-3xl font-bold text-emerald-500">1</p>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
+            <div class="text-4xl mb-4">🏗️</div>
+            <h3 class="text-lg font-medium text-slate-900 mb-2">No hay proyectos activos</h3>
+            <p class="text-slate-500 max-w-sm mx-auto mb-6">Comienza creando tu primer proyecto BIM para gestionar
+                cronogramas y entregables.</p>
+        </div>
+    </main>
+
+</body>
+
+</html>
