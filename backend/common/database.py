@@ -60,16 +60,15 @@ def get_plugin_db():
     try: yield db
     finally: db.close()
 
-# Ensure tables exist (Scan all metadata across all engines? Or assume separate migrations?)
-# For Phase 1 (Shared Code): Create ALL tables on ALL DBs? No, that messes up separation.
-# We should only create relevant tables on relevant engines.
-# But `Base.metadata` acts as a global registry.
-# Quick fix: Create all on all. It's redundant but safe for "Monolith acting as everything".
-# Better: User `split_database` logic.
-# For now, let's skip auto-create or keep it simple.
-# The migration script already populated them, so tables exist.
-# We can comment out create_all or leave it for dev.
-# Base.metadata.create_all(bind=engine_ops) 
+# Ensure tables exist
+# For Phase 1 (Shared Code): Create ALL tables on ALL DBs to avoid missing table errors
+# especially for new modules like BIM (bim_users, bim_projects)
+# We bind to engine_ext because auth.py uses SessionExt, but since they likely share the same sqlite file, 
+# this ensures the file has the schema.
+Base.metadata.create_all(bind=engine_ext) 
+# Also ensure for Ops/Core just in case they are different files in some configs
+Base.metadata.create_all(bind=engine_core)
+Base.metadata.create_all(bind=engine_ops) 
 
 
 SCAN_CATEGORIES = {
