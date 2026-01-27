@@ -13,7 +13,18 @@ import datetime
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if BACKEND_ROOT not in sys.path:
+    # Append root for common modules
     sys.path.append(BACKEND_ROOT)
+
+# PRIORITIZE LOCAL IMPORTS: Insert current dir at the start of sys.path
+# This ensures that 'import routers' picks up the local './routers' folder 
+# instead of the global '/app/routers' package found in BACKEND_ROOT
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+elif sys.path[0] != BASE_DIR:
+    # Ensure it's first if it was elsewhere
+    sys.path.remove(BASE_DIR)
+    sys.path.insert(0, BASE_DIR)
 
 from common.database import get_db, SessionExt 
 # Note: For this service, get_db should ideally point to SessionExt or we explicitely use SessionExt
@@ -24,7 +35,11 @@ try:
 except ImportError:
     from schedule_parser import parse_schedule
 
-from routers import auth
+try:
+    from .routers import auth
+except ImportError:
+    # Fallback to direct import, relying on sys.path[0] == BASE_DIR
+    import routers.auth as auth
 
 app = FastAPI(title="AO PlanSystem (BIM Portal)")
 
