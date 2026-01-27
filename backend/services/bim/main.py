@@ -193,4 +193,6 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
         return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8004, reload=True)
+    port = int(os.getenv("PORT", 8004))
+    print(f"Starting BIM Service on port {port}")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
