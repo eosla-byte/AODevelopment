@@ -207,7 +207,7 @@ async def logout():
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, user_jwt = Depends(get_current_admin)):
+async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = Depends(get_current_admin)):
     if not user_jwt: return RedirectResponse("/login")
     
     db = SessionCore()
@@ -227,27 +227,35 @@ async def dashboard(request: Request, user_jwt = Depends(get_current_admin)):
 
     # 1. SUPER ADMIN VIEW
     if user_db.role == "SuperAdmin":
-        view_context["view_mode"] = "super_admin"
-        # Fetch all organizations with member counts
-        orgs = db.query(models.Organization).all()
-        # Enrich with counts (simple logic for now, or join)
-        view_context["organizations"] = orgs
+        if org_id:
+            # Switch to Org Admin View for specific org
+            target_org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
+            if target_org:
+                view_context["view_mode"] = "org_admin"
+                view_context["current_org"] = target_org
+        else:
+            view_context["view_mode"] = "super_admin"
+            # Fetch all organizations with member counts
+            orgs = db.query(models.Organization).all()
+            view_context["organizations"] = orgs
 
     # 2. ORG ADMIN VIEW (If not super admin, but IS an admin of a specific org)
     else:
         # distinct Logic: Find memberships where role='Admin'
-        membership = db.query(models.OrganizationUser).filter(
+        # If org_id provided, check if member of THAT org
+        query = db.query(models.OrganizationUser).filter(
             models.OrganizationUser.user_id == user_db.id,
             models.OrganizationUser.role == "Admin"
-        ).first()
+        )
+        
+        if org_id:
+             query = query.filter(models.OrganizationUser.organization_id == org_id)
+             
+        membership = query.first()
         
         if membership:
             view_context["view_mode"] = "org_admin"
             view_context["current_org"] = membership.organization
-            # Fetch members for this org
-            # We can access memberships via org.users relationship, 
-            # but we likely want the User objects populated.
-            # models.OrganizationUser links to AccountUser via 'user' relationship.
         else:
             # 3. STATIC MEMBER VIEW (Apps Launcher)
             view_context["view_mode"] = "member"
