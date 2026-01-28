@@ -162,8 +162,13 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             print(f"Login Failed: User '{email}' not found in DB.")
             return JSONResponse({"status": "error", "message": f"User '{email}' not found."}, status_code=401)
             
-        print(f"User found: {user.id}. Role: {user.role}. Verifying password...")
-        if not verify_password(password, user.hashed_password):
+        print(f"User found: {user.id}. Role: {user.role}.")
+        print(f"Stored Hash (First 10 chars): {user.hashed_password[:10] if user.hashed_password else 'NONE'}...")
+        
+        verification = verify_password(password, user.hashed_password)
+        print(f"Verification Result: {verification}")
+        
+        if not verification:
             print("Login Failed: Password mismatch.")
             return JSONResponse({"status": "error", "message": "Invalid password (hash mismatch)."}, status_code=401)
             
