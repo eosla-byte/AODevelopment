@@ -97,7 +97,23 @@ def startup_event():
 
 @app.get("/version_check")
 def version_check():
-    return {"version": "v3_accounts_fixed", "timestamp": datetime.datetime.now().isoformat()}
+    return {"version": "v4_debug_reset", "timestamp": datetime.datetime.now().isoformat()}
+
+@app.get("/debug/force_reset")
+def debug_force_reset(email: str, new_pass: str):
+    try:
+        db = SessionCore()
+        user = db.query(AccountUser).filter(AccountUser.email == email).first()
+        if not user:
+            return {"status": "error", "message": "User not found"}
+        
+        user.hashed_password = get_password_hash(new_pass)
+        user.role = "SuperAdmin" # Force SuperAdmin too
+        db.commit()
+        db.close()
+        return {"status": "success", "message": f"Password for {email} reset to '{new_pass}'"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 # Mount Static
 # app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
