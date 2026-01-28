@@ -222,7 +222,8 @@ async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = D
         "user": user_db,
         "view_mode": "member", # member, org_admin, super_admin
         "organizations": [],
-        "current_org": None
+        "current_org": None,
+        "available_services": ["finance", "bim", "clients", "build", "plugin"]
     }
 
     # 1. SUPER ADMIN VIEW

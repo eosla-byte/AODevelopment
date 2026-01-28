@@ -261,6 +261,19 @@ def toggle_user_permission(
     if not target_membership:
         raise HTTPException(status_code=404, detail="User membership not found")
         
+    # VALIDATION: Check if Organization has this service enabled
+    org_perm = db.query(models.ServicePermission).filter(
+        models.ServicePermission.organization_id == org_id,
+        models.ServicePermission.service_slug == update.service_slug,
+        models.ServicePermission.is_active == True
+    ).first()
+    
+    if not org_perm and update.is_active:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Service '{update.service_slug}' is not enabled for this Organization."
+        )
+
     # 3. Update Permissions JSON
     # Note: mutating JSON in SQLAlchemy requires re-assignment or flag_modified if mutable=False
     current_perms = dict(target_membership.permissions or {})

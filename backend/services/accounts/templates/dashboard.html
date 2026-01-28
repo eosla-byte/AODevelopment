@@ -124,8 +124,22 @@
                             org.status }}</span>
                     </div>
                     <h3 class="text-lg font-bold text-slate-800 mb-1">{{ org.name }}</h3>
-                    <p class="text-sm text-slate-500 mb-4">{{ org.users|length }} Users • {{
-                        org.service_permissions|length }} Services Active</p>
+                    <p class="text-sm text-slate-500 mb-4">{{ org.users|length }} Users</p>
+
+                    <!-- Service Flags (SuperAdmin Control) -->
+                    <div class="mb-4 flex flex-wrap gap-2">
+                        {% for svc in available_services %}
+                        {% set ns = namespace(active=false) %}
+                        {% for p in org.service_permissions %}
+                        {% if p.service_slug == svc and p.is_active %}{% set ns.active = true %}{% endif %}
+                        {% endfor %}
+                        <button
+                            onclick="toggleOrgService('{{ org.id }}', '{{ svc }}', {{ 'false' if ns.active else 'true' }})"
+                            class="px-2 py-1 text-xs font-medium rounded border {{ 'bg-blue-100 text-blue-700 border-blue-200' if ns.active else 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100' }}">
+                            {{ svc|upper }}
+                        </button>
+                        {% endfor %}
+                    </div>
 
                     <div class="border-t border-slate-100 pt-4 flex justify-between items-center">
                         <div class="flex -space-x-2">
@@ -150,6 +164,21 @@
                 {% endfor %}
             </div>
             {% endif %}
+
+            <script>
+                async function toggleOrgService(orgId, serviceSlug, isActive) {
+                    try {
+                        const res = await fetch(`/api/organizations/${orgId}/services`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify({ service_slug: serviceSlug, is_active: isActive })
+                        });
+                        if (res.ok) window.location.reload();
+                        else alert('Error updating organization service');
+                    } catch (err) { alert(err); }
+                }
+            </script>
 
             <!-- ORG ADMIN VIEW: MEMBERS TABLE -->
             {% if view_mode == 'org_admin' %}
