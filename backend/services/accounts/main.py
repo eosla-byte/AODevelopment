@@ -77,11 +77,18 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         return JSONResponse({"status": "error", "message": "Invalid password."}, status_code=401)
         
     if user.role != "Admin":
+         # In future, members can login to update their own profile?
+         # For now, restriction is good for the "Admin" panel.
          return JSONResponse({"status": "error", "message": "Access restricted to Administrators."}, status_code=403)
 
     access_token = create_access_token(
-        data={"sub": user.email, "role": user.role, "id": user.id},
-        expires_delta=datetime.timedelta(hours=12) # Long session for admin
+        data={
+            "sub": user.email, 
+            "role": user.role, 
+            "id": user.id,
+            "services_access": user.services_access or {}
+        },
+        expires_delta=datetime.timedelta(hours=12)
     )
     
     response = JSONResponse({"status": "ok", "redirect": "/dashboard"})

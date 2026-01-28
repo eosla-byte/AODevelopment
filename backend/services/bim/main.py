@@ -77,7 +77,13 @@ async def root(user = Depends(get_current_user)):
 async def dashboard(request: Request, user = Depends(get_current_user)):
     if not user:
         return RedirectResponse("/auth/login")
-        
+    
+    # Permission Check
+    services_access = user.get("services_access", {})
+    # If key doesn't exist (old token), denied. If false, denied.
+    if not services_access.get("AOPlanSystem", False):
+         return HTMLResponse(content="<h1>Access Denied</h1><p>You do not have permission to access AO PlanSystem. Contact your administrator.</p>", status_code=403)
+
     # Fetch Org Name details?
     db = SessionExt()
     user_db = db.query(BimUser).filter(BimUser.email == user["sub"]).first()
