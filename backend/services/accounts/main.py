@@ -28,6 +28,10 @@ from common.models import AccountUser
 
 app = FastAPI(title="AO Accounts & Identity")
 
+@app.get("/version_check")
+def version_check():
+    return {"version": "v2_fixed_session_core", "timestamp": datetime.datetime.now().isoformat()}
+
 # Mount Static
 # app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
@@ -64,7 +68,7 @@ async def login_page(request: Request):
 
 @app.post("/auth/login")
 async def login_action(email: str = Form(...), password: str = Form(...)):
-    db = SessionExt()
+    db = SessionCore()
     user = db.query(AccountUser).filter(AccountUser.email == email).first()
     db.close()
     
@@ -105,7 +109,7 @@ async def logout():
 async def dashboard(request: Request, user = Depends(get_current_admin)):
     if not user: return RedirectResponse("/login")
     
-    db = SessionExt()
+    db = SessionCore()
     users = db.query(AccountUser).all()
     
     # Serialize and Group by Company
@@ -170,7 +174,7 @@ async def create_user(
 ):
     if not user_jwt: raise HTTPException(status_code=401)
     
-    db = SessionExt()
+    db = SessionCore()
     if db.query(AccountUser).filter(AccountUser.email == email).first():
         db.close()
         return JSONResponse({"status": "error", "message": "Email already registered"}, status_code=400)
@@ -217,7 +221,7 @@ async def update_user(
 ):
     if not user_jwt: raise HTTPException(status_code=401)
     
-    db = SessionExt()
+    db = SessionCore()
     user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
     if not user:
         db.close()
@@ -253,7 +257,7 @@ async def toggle_service_access(
 ):
     if not user_jwt: raise HTTPException(status_code=401)
     
-    db = SessionExt()
+    db = SessionCore()
     user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
     if not user:
         db.close()
@@ -275,7 +279,7 @@ async def toggle_service_access(
 @app.delete("/api/users/{user_id}")
 async def delete_user(user_id: str, user_jwt = Depends(get_current_admin)):
     if not user_jwt: raise HTTPException(status_code=401)
-    db = SessionExt()
+    db = SessionCore()
     user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
     if user:
         db.delete(user)
@@ -286,7 +290,7 @@ async def delete_user(user_id: str, user_jwt = Depends(get_current_admin)):
 # Setup Script Route (Temporary, to create first admin if none)
 @app.get("/setup_initial_admin")
 async def setup_admin():
-    db = SessionExt()
+    db = SessionCore()
     if db.query(AccountUser).count() > 0:
         db.close()
         return "Admin already exists or users exist. Setup disabled."
@@ -310,7 +314,8 @@ async def force_admin_reset():
     Endpoint de emergencia para restaurar acceso admin en Produccion.
     Sobreescribe la contraseña y rol del usuario admin@somosao.com.
     """
-    db = SessionExt()
+    from common.database import SessionCore, AccountUser, get_password_hash
+    db = SessionCore()
     email = "admin@somosao.com"
     
     # 1. Buscar o Crear
