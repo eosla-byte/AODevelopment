@@ -252,8 +252,8 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                 <span
-                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if membership.user.is_active else 'bg-red-100 text-red-800' }}">
-                                    {{ 'Active' if membership.user.is_active else 'Hold' }}
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if membership.user.status == 'Active' else 'bg-red-100 text-red-800' }}">
+                                    {{ membership.user.status }}
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -263,7 +263,7 @@
                                     "email": "{{ membership.user.email }}",
                                     "company": "{{ membership.user.company }}",
                                     "role": "{{ membership.user.role }}",
-                                    "is_active": {{ "true" if membership.user.is_active else "false" }}
+                                    "status": "{{ membership.user.status }}"
                                 })' class="text-indigo-600 hover:text-indigo-900 mr-3" title="Edit">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -327,9 +327,9 @@
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700">Status</label>
-                            <select name="is_active" class="mt-1 block w-full border border-slate-300 rounded-md p-2">
-                                <option value="true">Active</option>
-                                <option value="false">Hold (Inactive)</option>
+                            <select name="status" class="mt-1 block w-full border border-slate-300 rounded-md p-2">
+                                <option value="Active">Active</option>
+                                <option value="Hold">Hold (Inactive)</option>
                             </select>
                         </div>
                     </div>
@@ -446,7 +446,7 @@
             form.email.value = user.email;
             form.company.value = user.company || '';
             form.role.value = user.role;
-            form.is_active.value = user.is_active !== false ? 'true' : 'false';
+            form.status.value = user.status;
             form.password.value = ''; // Reset password field
 
             el.classList.remove('opacity-0', 'pointer-events-none');
