@@ -185,16 +185,24 @@ app.add_middleware(AuthMiddleware)
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_landing(request: Request):
-    # Auto-redirect disabled.
-    # Use BASE_DIR for robustness
+    # Host based routing
+    host = request.headers.get("host", "").lower()
+    
+    # If accessing via accounts subdomain, serve the Accounts/Unified Login
+    if "accounts." in host:
+        return templates.TemplateResponse("login.html", {"request": request})
+
+    # Default: Serve Public Landing Page
     index_path = os.path.join(BASE_DIR, "static/public_site/index.html")
     if os.path.exists(index_path):
         return FileResponse(index_path)
+        
     return HTMLResponse("<h1>AO Development</h1><p>Frontend not found.</p>")
 
 @app.get("/login", response_class=HTMLResponse)
-async def serve_landing_alias(request: Request):
-    return await serve_landing(request)
+async def serve_login(request: Request):
+    # Explicit login page
+    return templates.TemplateResponse("login.html", {"request": request})
 
 @app.get("/sheets/manager", response_class=HTMLResponse)
 async def serve_sheet_manager(request: Request):
