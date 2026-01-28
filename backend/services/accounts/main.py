@@ -18,6 +18,7 @@ if BASE_DIR not in sys.path:
 
 from common.database import get_db, SessionCore 
 from common.auth_utils import verify_password, create_access_token, decode_access_token, get_password_hash
+import common.models as models 
 from common.models import AccountUser
 
 from routers import organizations
@@ -38,8 +39,8 @@ def startup_event():
         admin = db.query(AccountUser).filter(AccountUser.email == admin_email).first()
         if admin:
             # FORCE RESET PASSWORD TO 'admin123' to ensure access
-            print(f"Reseting password for {admin_email}...")
-            admin.hashed_password = get_password_hash("admin123")
+            # print(f"Reseting password for {admin_email}...") # Commented out to reduce noise
+            # admin.hashed_password = get_password_hash("admin123")
             
             if admin.role != "SuperAdmin":
                 print(f"Promotion {admin_email} to SuperAdmin...")
@@ -97,23 +98,7 @@ def startup_event():
 
 @app.get("/version_check")
 def version_check():
-    return {"version": "v4_debug_reset", "timestamp": datetime.datetime.now().isoformat()}
-
-@app.get("/debug/force_reset")
-def debug_force_reset(email: str, new_pass: str):
-    try:
-        db = SessionCore()
-        user = db.query(AccountUser).filter(AccountUser.email == email).first()
-        if not user:
-            return {"status": "error", "message": "User not found"}
-        
-        user.hashed_password = get_password_hash(new_pass)
-        user.role = "SuperAdmin" # Force SuperAdmin too
-        db.commit()
-        db.close()
-        return {"status": "success", "message": f"Password for {email} reset to '{new_pass}'"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    return {"version": "v5_cookie_debug", "timestamp": datetime.datetime.now().isoformat()}
 
 # Mount Static
 # app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
@@ -124,17 +109,25 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 def get_current_admin(request: Request):
     token = request.cookies.get("accounts_access_token")
     if not token:
+        print("Auth Failed: No 'accounts_access_token' cookie found.")
         return None
     try:
         scheme, _, param = token.partition(" ")
+        if not param:
+             # Maybe raw token without Bearer prefix?
+             param = token
+             
         payload = decode_access_token(param)
         if not payload: 
+            print("Auth Failed: Invalid Token signature.")
             return None
         # Check if role is Admin (or sufficient privilege)
-        if payload.get("role") != "Admin":
+        if payload.get("role") != "Admin" and payload.get("role") != "SuperAdmin":
+            print(f"Auth Failed: Insufficient Role {payload.get('role')}")
             return None
         return payload 
-    except:
+    except Exception as e:
+        print(f"Auth Failed: Exception {e}")
         return None
 
 # --- Routes ---
@@ -194,7 +187,15 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         )
         
         response = JSONResponse({"status": "ok", "redirect": "/dashboard"})
-        response.set_cookie(key="accounts_access_token", value=f"Bearer {access_token}", httponly=True)
+        # Use Lax for standard navigation
+        response.set_cookie(
+            key="accounts_access_token", 
+            value=f"Bearer {access_token}", 
+            httponly=True,
+            samesite="lax",
+            secure=False # Set to True if strictly SSL, but False usually works on Railway internal/proxied
+        )
+        print(f"Cookie set for {user.email}")
         return response
     finally:
         db.close()
