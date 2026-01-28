@@ -222,7 +222,7 @@
                                 Joined</th>
                             <th
                                 class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">
-                                Status</th>
+                                Actions</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-slate-200">
@@ -250,8 +250,29 @@
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                 {{ membership.joined_at.strftime('%Y-%m-%d') if membership.joined_at else 'N/A' }}
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right">
-                                <span class="text-green-600 font-medium text-sm">Active</span>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <span
+                                    class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ 'bg-green-100 text-green-800' if membership.user.is_active else 'bg-red-100 text-red-800' }}">
+                                    {{ 'Active' if membership.user.is_active else 'Hold' }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button onclick='openEditUser({{ membership.user | tojson }})'
+                                    class="text-indigo-600 hover:text-indigo-900 mr-3" title="Edit">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                                        </path>
+                                    </svg>
+                                </button>
+                                <button onclick="deleteUser('{{ membership.user.id }}')"
+                                    class="text-red-600 hover:text-red-900" title="Delete">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                                        </path>
+                                    </svg>
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -262,6 +283,72 @@
 
         </div>
     </main>
+
+    <!-- Modal: EDIT USER -->
+    <div id="editUserModal"
+        class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50" onclick="closeEditUserModal()"></div>
+        <div class="bg-white w-full max-w-lg mx-auto rounded-xl shadow-2xl z-50 p-6">
+            <h2 class="text-xl font-bold text-slate-800 mb-4">Edit User</h2>
+            <form id="editUserForm" onsubmit="updateUser(event)">
+                <input type="hidden" name="user_id">
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Full Name</label>
+                            <input type="text" name="full_name" required
+                                class="mt-1 block w-full border border-slate-300 rounded-md p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Company</label>
+                            <input type="text" name="company"
+                                class="mt-1 block w-full border border-slate-300 rounded-md p-2">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700">Email (Read Only)</label>
+                        <input type="email" name="email" readonly
+                            class="mt-1 block w-full border border-slate-300 rounded-md p-2 bg-slate-100 text-slate-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Role</label>
+                            <select name="role" class="mt-1 block w-full border border-slate-300 rounded-md p-2">
+                                <option value="Member">Member</option>
+                                <option value="Admin">Admin</option>
+                                <option value="SuperAdmin">SuperAdmin</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Status</label>
+                            <select name="is_active" class="mt-1 block w-full border border-slate-300 rounded-md p-2">
+                                <option value="true">Active</option>
+                                <option value="false">Hold (Inactive)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-200 pt-4 mt-4">
+                        <h3 class="text-sm font-semibold text-slate-900 mb-2">Security</h3>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">New Password <span
+                                    class="text-slate-400 font-normal">(Leave blank to keep current)</span></label>
+                            <input type="text" name="password" placeholder="Set new password..."
+                                class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-red-500 focus:border-red-500">
+                            <p class="text-xs text-slate-500 mt-1">Typing here will immediately override the user's
+                                password.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button type="button" onclick="closeEditUserModal()"
+                        class="px-4 py-2 text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Save
+                        Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Modal: CREATE ORG -->
     <div id="orgModal"
@@ -342,6 +429,65 @@
         function closeInviteModal() {
             const el = document.getElementById('inviteModal');
             if (el) el.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        // --- User Edit Logic ---
+        function openEditUser(user) {
+            const el = document.getElementById('editUserModal');
+            const form = document.getElementById('editUserForm');
+            form.user_id.value = user.id;
+            form.full_name.value = user.full_name;
+            form.email.value = user.email;
+            form.company.value = user.company || '';
+            form.role.value = user.role;
+            form.is_active.value = user.is_active !== false ? 'true' : 'false';
+            form.password.value = ''; // Reset password field
+
+            el.classList.remove('opacity-0', 'pointer-events-none');
+        }
+
+        function closeEditUserModal() {
+            document.getElementById('editUserModal').classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        async function updateUser(e) {
+            e.preventDefault();
+            const form = e.target;
+            const userId = form.user_id.value;
+
+            // Build FormData manually to handle boolean flags if needed, or just let formData handle typical fields
+            const formData = new FormData(form);
+            // Convert is_active to proper boolean or handle in backend
+            // Our backend expects Form data.
+
+            try {
+                const res = await fetch(`/api/users/${userId}/update`, {
+                    method: 'POST',
+                    body: formData // Send as multipart/form-data
+                });
+
+                if (res.ok) {
+                    window.location.reload();
+                } else {
+                    const data = await res.json();
+                    alert(data.message || 'Error updating user');
+                }
+            } catch (err) { alert(err); }
+        }
+
+        async function deleteUser(userId) {
+            if (!confirm('Are you sure you want to permanently DELETE this user? This cannot be undone.')) return;
+
+            try {
+                const res = await fetch(`/api/users/${userId}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Error deleting user');
+                }
+            } catch (err) { alert(err); }
         }
 
         async function createOrg(e) {
