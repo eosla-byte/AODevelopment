@@ -12,7 +12,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 # DATABASE SETUP
 # Use SQLite for local development default, can be overridden by env var
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aodev.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aodev.db").strip()
 
 if "sqlite" in DATABASE_URL:
     print("⚠️  [DATABASE STATUS] USING LOCAL SQLITE (DATA WILL BE LOST ON DEPLOY) ⚠️")

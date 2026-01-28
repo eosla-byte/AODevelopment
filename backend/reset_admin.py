@@ -8,15 +8,15 @@ def reset_admin():
     admin = User(
         id="admin_01",
         name="Administrador",
-        email="admin@ao.com",
+        email="admin@somosao.com",
         role="admin",
         is_active=True,
         hashed_password=get_password_hash("admin123")
     )
     
     # 2. Save (Upsert)
-    save_user(None, admin)
-    print("Admin user 'admin@ao.com' with password 'admin123' has been ensured.")
+    save_user(admin)
+    print("Admin user 'admin@somosao.com' with password 'admin123' has been ensured.")
 
 if __name__ == "__main__":
     reset_admin()
