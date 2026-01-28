@@ -484,5 +484,5 @@ async def force_admin_reset():
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8005))
-    print(f"Starting Accounts Service on port {port}")
+    print(f"Starting Accounts Service v2.1 (Passlib) on port {port}")
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
