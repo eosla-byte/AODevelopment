@@ -9,16 +9,7 @@ import uuid
 import datetime
 from typing import List, Optional
 
-# Path Setup to allow importing 'backend.common'
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Assumes structure: AODevelopment/backend/services/accounts/main.py
-# So we need to go up 3 levels to get to AODevelopment
-BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-if BACKEND_ROOT not in sys.path:
-    # Append root for common modules
-    sys.path.append(BACKEND_ROOT)
-
+# Local imports (common is now partially vendored or in path)
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
