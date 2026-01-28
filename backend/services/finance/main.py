@@ -1,23 +1,38 @@
-from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+import uvicorn
 import os
+import sys
 
-from ...common.database import get_expenses_monthly, get_collaborators
+# Path Setup for local common module
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
-app = FastAPI(title="AO HR & Finance")
+from routers import projects, hr, expenses, quotes
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+app = FastAPI(title="AO Finance & Operations")
 
-@app.get("/hr/list")
-async def hr_list():
-    return get_collaborators()
+# Mount Static & Templates
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
-@app.get("/expenses/list")
-async def expenses_list(year: int = None):
-    return get_expenses_monthly(year)
+# Include Routers
+app.include_router(projects.router)
+app.include_router(hr.router)
+app.include_router(expenses.router)
+app.include_router(quotes.router)
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok", "service": "AO HR & Finance"}
+@app.get("/", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request, "title": "AO Admin"})
+
+@app.get("/version_check")
+def version_check():
+    return {"service": "AO Finance", "version": "v1.0"}
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8002))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
