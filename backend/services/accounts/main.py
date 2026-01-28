@@ -9,6 +9,9 @@ import uuid
 import datetime
 from typing import List, Optional
 
+# Path Setup
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Local imports (common is now partially vendored or in path)
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
