@@ -58,6 +58,62 @@ def debug_context(
     }
 
 # Mount Static if needed (Shared assets or dedicated?)
+from common.models import Organization, OrganizationUser, ServicePermission
+from common.auth_utils import get_current_user
+
+@app.get("/api/me/organizations")
+def get_my_organizations(
+    db: SessionExt = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get list of organizations the user belongs to THAT HAVE BIM ENABLED.
+    """
+    user_id = current_user.get("id")
+    
+    # 1. Get Memberships
+    memberships = db.query(OrganizationUser).filter(OrganizationUser.user_id == user_id).all()
+    org_ids = [m.organization_id for m in memberships]
+    
+    if not org_ids:
+        return []
+
+    # 2. Filter by Service Permission 'bim' = Active
+    valid_perms = db.query(ServicePermission).filter(
+        ServicePermission.organization_id.in_(org_ids),
+        ServicePermission.service_slug == "bim",
+        ServicePermission.is_active == True
+    ).all()
+    
+    valid_org_ids = [p.organization_id for p in valid_perms]
+    
+    # 3. Fetch Organization Details
+    # Also check USER specific permission per org? 
+    # Logic in require_org_access: "if not is_org_admin and not user_perms.get(service_slug)"
+    # We should replicate that logic to NOT show orgs where user is restricted.
+    
+    final_orgs = []
+    
+    valid_orgs_db = db.query(Organization).filter(Organization.id.in_(valid_org_ids)).all()
+    org_map = {o.id: o for o in valid_orgs_db}
+    
+    for m in memberships:
+        if m.organization_id in valid_org_ids:
+            # Check User Perms
+            if m.role != "Admin":
+                perms = m.permissions or {}
+                if not perms.get("bim"):
+                    continue # Skip this org, user doesn't have access
+            
+            org = org_map.get(m.organization_id)
+            if org:
+                final_orgs.append({
+                    "id": org.id,
+                    "name": org.name,
+                    "role": m.role
+                })
+                
+    return final_orgs
 # For now, we can use CDN for tailwind, or mount shared if we want logos
 # app.mount("/static", StaticFiles(directory=os.path.join(BACKEND_ROOT, "static")), name="static")
 
@@ -68,71 +124,89 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 app.include_router(auth.router)
 
 # Dependencies
-def get_current_user(request: Request):
-    token = request.cookies.get("access_token")
-    if not token:
-        return None
-    
-    try:
-        scheme, _, param = token.partition(" ")
-        payload = decode_access_token(param)
-        if not payload: return None
-        return payload # Returns dict {"sub": email, "role": role, "org": org_id}
-    except:
-        return None
+# Dependencies
+# Use imported get_current_user from common.auth_utils
 
 @app.get("/", response_class=HTMLResponse)
-async def root(user = Depends(get_current_user)):
-    if user:
-        return RedirectResponse("/dashboard")
-    return RedirectResponse("/auth/login")
+async def root(request: Request, user = Depends(get_current_user)):
+    """
+    Root Entry Point.
+    - If not logged in -> Login.
+    - If logged in -> Show Organization Selector.
+    """
+    # Note: get_current_user raises 401 if missing, but for HTML routes we often want Redirect.
+    # But since we use Depends(get_current_user) which raises HTTPException, 
+    # we might need a "soft" dependency or handle exception globally.
+    # For now, if get_current_user fails, it shows JSON error. 
+    # BETTER: Use a try/except helper or allow optional.
+    # Let's rely on the frontend redirecting if 401?
+    # Actually, common.auth_utils.get_current_user logic raises 401.
+    # To prevent JSON 401 on homepage, we should accept it might fail?
+    # But Depends() execution happens before function body.
+    # I'll let it raise 401 and let browser show raw error? No user experience bad.
+    # I will modify this to use a "get_optional_user" logic? 
+    # Or just assume if they hit / they might be redirected by JS in org_selector.
+    
+    # Wait, if I use the template org_selector, it does a fetch("/api/me/organizations").
+    # If THAT returns 401, the JS redirects to login.
+    # So I can just return the HTML without enforcing user check here?
+    # Yes, serve the shell, let the shell authenticate.
+    return templates.TemplateResponse("org_selector.html", {"request": request})
+
+@app.get("/auth/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, user = Depends(get_current_user)):
-    if not user:
-        return RedirectResponse("/auth/login")
-    
-    # Permission Check
-    services_access = user.get("services_access", {})
-    # If key doesn't exist (old token), denied. If false, denied.
-    if not services_access.get("AOPlanSystem", False):
-         html_content = """
-         <html>
-            <body style="font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f8fafc;">
-                <h1 style="color: #ef4444;">Acceso Denegado / Access Denied</h1>
-                <p style="color: #475569; margin-bottom: 20px;">No tienes permisos para acceder a AO PlanSystem.</p>
-                <div style="background-color: #e2e8f0; padding: 15px; border-radius: 8px; font-size: 0.9em; margin-bottom: 20px;">
-                    <strong>Tip:</strong> Si te acaban de dar acceso, tu sesión actual es antigua.
-                </div>
-                <a href="/auth/logout" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                    Cerrar Sesión y Recargar Permisos
-                </a>
-            </body>
-         </html>
-         """
-         return HTMLResponse(content=html_content, status_code=403)
-
-    # Fetch Org Name details?
-    # Fetch Org Name details?
-    from common.database import SessionCore
-    from common.models import AccountUser
-    
+async def dashboard(
+    request: Request, 
+    org_id: str, # REQUIRED param
+    user = Depends(get_current_user)
+):
+    """
+    Workspace Dashboard.
+    Requires org_id query param to define context.
+    """
     db = SessionCore()
-    # Find user in Core DB
-    user_db = db.query(AccountUser).filter(AccountUser.email == user["sub"]).first()
-    org_name = "Organización"
-    
-    if user_db:
-        org_name = user_db.company or "AO Development"
-        
-    db.close()
-    
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request, 
-        "user_name": user_db.full_name if user_db else user.get("sub"), 
-        "user_initials": (user_db.full_name[:2].upper()) if user_db and user_db.full_name else "AO",
-        "org_name": org_name
-    })
+    try:
+         # 1. Validate Access (Manual check akin to require_org_access)
+         # We do this here because we are in a GET HTML route, not API with Headers.
+         user_id = user['id']
+         
+         membership = db.query(OrganizationUser).filter(
+             OrganizationUser.organization_id == org_id,
+             OrganizationUser.user_id == user_id
+         ).first()
+         
+         if not membership:
+             # Redirect to selector if invalid
+             return RedirectResponse("/")
+             
+         # Check Service Perm
+         # (Assuming if they got here via selector, they have it, but verify)
+         org_perm = db.query(ServicePermission).filter(
+            ServicePermission.organization_id == org_id,
+            ServicePermission.service_slug == "bim",
+            ServicePermission.is_active == True
+         ).first()
+         
+         if not org_perm:
+             return HTMLResponse("<h1>Organization has no access to BIM</h1>", status_code=403)
+             
+         org = membership.organization
+         
+         return templates.TemplateResponse("dashboard.html", {
+            "request": request, 
+            "user_name": user.get("sub"), 
+            "user_initials": user.get("sub")[:2].upper(),
+            "org_name": org.name,
+            "org_id": org.id,
+            "role": membership.role
+         })
+    finally:
+        db.close()
+
+
 
 @app.get("/projects", response_class=HTMLResponse)
 async def projects_list(request: Request, user = Depends(get_current_user)):
