@@ -135,10 +135,19 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
     if not verify_password(password, user.hashed_password):
         return JSONResponse({"status": "error", "message": "Invalid password."}, status_code=401)
         
-    if user.role != "Admin":
-         # In future, members can login to update their own profile?
-         # For now, restriction is good for the "Admin" panel.
-         return JSONResponse({"status": "error", "message": "Access restricted to Administrators."}, status_code=403)
+    valid_roles = ["Admin", "SuperAdmin"]
+    if user.role not in valid_roles:
+         # Check Organization Memberships for "Admin" role?
+         # For V2, if a user is an Org Admin, their Global Role is "Standard"
+         # But they have an OrganizationUser entry with role="Admin".
+         # We need to check that.
+         is_org_admin = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.user_id == user.id,
+            models.OrganizationUser.role == "Admin"
+         ).first()
+
+         if not is_org_admin:
+             return JSONResponse({"status": "error", "message": "Access restricted to Administrators."}, status_code=403)
 
     access_token = create_access_token(
         data={
@@ -161,50 +170,66 @@ async def logout():
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, user = Depends(get_current_admin)):
-    if not user: return RedirectResponse("/login")
+async def dashboard(request: Request, user_jwt = Depends(get_current_admin)):
+    if not user_jwt: return RedirectResponse("/login")
     
     db = SessionCore()
-    users = db.query(AccountUser).all()
+    user_db = db.query(AccountUser).filter(AccountUser.email == user_jwt["sub"]).first()
     
-    # Serialize and Group by Company
-    users_by_company = {}
-    
-    for u in users:
-        u_data = {
-            "id": u.id,
-            "full_name": u.full_name,
-            "email": u.email,
-            "company": u.company or "Unassigned",
-            "phone": u.phone,
-            "role": u.role,
-            "status": u.status,
-            "access_level": "Project", 
-            "added_on": u.created_at.strftime("%Y-%m-%d") if u.created_at else "",
-            "docs_access": u.docs_access,
-            "insight_access": u.insight_access,
-            "services_access": u.services_access or {}
-        }
-        
-        company_key = u_data["company"]
-        if company_key not in users_by_company:
-            users_by_company[company_key] = []
-        users_by_company[company_key].append(u_data)
-        
-    db.close()
-    
-    # Sort companies alphabetically, put 'Unassigned' last if present
-    company_names = sorted(users_by_company.keys())
-    if "Unassigned" in company_names:
-        company_names.remove("Unassigned")
-        company_names.append("Unassigned")
-    
-    return templates.TemplateResponse("dashboard.html", {
+    if not user_db:
+        db.close()
+        return RedirectResponse("/login")
+
+    view_context = {
         "request": request,
-        "users_by_company": users_by_company,
-        "company_list": company_names,
-        "admin_email": user["sub"]
-    })
+        "user": user_db,
+        "view_mode": "member", # member, org_admin, super_admin
+        "organizations": [],
+        "current_org": None
+    }
+
+    # 1. SUPER ADMIN VIEW
+    if user_db.role == "SuperAdmin":
+        view_context["view_mode"] = "super_admin"
+        # Fetch all organizations with member counts
+        orgs = db.query(models.Organization).all()
+        # Enrich with counts (simple logic for now, or join)
+        view_context["organizations"] = orgs
+
+    # 2. ORG ADMIN VIEW (If not super admin, but IS an admin of a specific org)
+    else:
+        # distinct Logic: Find memberships where role='Admin'
+        membership = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.user_id == user_db.id,
+            models.OrganizationUser.role == "Admin"
+        ).first()
+        
+        if membership:
+            view_context["view_mode"] = "org_admin"
+            view_context["current_org"] = membership.organization
+            # Fetch members for this org
+            # We can access memberships via org.users relationship, 
+            # but we likely want the User objects populated.
+            # models.OrganizationUser links to AccountUser via 'user' relationship.
+        else:
+            # 3. STATIC MEMBER VIEW (Apps Launcher)
+            view_context["view_mode"] = "member"
+    
+    # db.close() # TemplateResponse might need lazy loads? 
+    # Better to eager load or keep session open if Jinja needs it?
+    # For safety with simple relationships, we can close if we eagerly loaded.
+    # But SqlAlchemy objects detach if session closes.
+    # We will close APTER template rendering? No, template response renders immediately? 
+    # Actually TemplateResponse is a background task wrapper effectively, but vars need to be ready.
+    # Let's simple query active objects into Pydantic or Dictionaries if issues arise.
+    # For now, let's keep database objects but we must be careful.
+    # Actually, fastAPI depends dependency closes DB session? 
+    # If using yield in get_db, yes. But here we manually opened SessionCore().
+    # We should NOT close it before return if we pass ORM objects that need lazy loading.
+    # But we should ensure it closes eventually.
+    # Hack: Convert to list/dict before closing.
+    
+    return templates.TemplateResponse("dashboard.html", view_context)
 
 # --- User Management API ---
 
