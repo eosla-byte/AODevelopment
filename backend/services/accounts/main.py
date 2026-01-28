@@ -304,6 +304,49 @@ async def setup_admin():
     db.close()
     return "Initial admin created: admin@somosao.com / admin123"
 
+@app.get("/system/force_admin_reset")
+async def force_admin_reset():
+    """
+    Endpoint de emergencia para restaurar acceso admin en Produccion.
+    Sobreescribe la contraseña y rol del usuario admin@somosao.com.
+    """
+    db = SessionExt()
+    email = "admin@somosao.com"
+    
+    # 1. Buscar o Crear
+    user = db.query(AccountUser).filter(AccountUser.email == email).first()
+    
+    if user:
+        user.full_name = "System Admin"
+        user.role = "Admin"
+        user.hashed_password = get_password_hash("admin123")
+        user.is_active = True
+        # Asegurar acceso total
+        user.services_access = {
+            "AOdev": True, "AO HR & Finance": True, "AO Projects": True,
+            "AO Clients": True, "AODailyWork": True, "AOPlanSystem": True, "AOBuild": True
+        }
+        msg = "Admin actualizado correctamente."
+    else:
+        user = AccountUser(
+            id=str(uuid.uuid4()),
+            email=email,
+            full_name="System Admin",
+            role="Admin",
+            hashed_password=get_password_hash("admin123"),
+            is_active=True,
+            services_access={
+                "AOdev": True, "AO HR & Finance": True, "AO Projects": True,
+                "AO Clients": True, "AODailyWork": True, "AOPlanSystem": True, "AOBuild": True
+            }
+        )
+        db.add(user)
+        msg = "Admin creado correctamente."
+    
+    db.commit()
+    db.close()
+    return f"ÉXITO: {msg} Usa: {email} / admin123"
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8005))
     print(f"Starting Accounts Service on port {port}")
