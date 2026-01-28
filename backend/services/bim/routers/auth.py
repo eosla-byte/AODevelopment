@@ -33,29 +33,34 @@ async def login_page(request: Request):
 
 @router.post("/login")
 async def login_submit(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_core_db_dep)):
-    # Authenticate against Central Accounts
-    user = db.query(AccountUser).filter(AccountUser.email == email).first()
+    try:
+        # Authenticate against Central Accounts
+        user = db.query(AccountUser).filter(AccountUser.email == email).first()
+        
+        if not user or not verify_password(password, user.hashed_password):
+            return templates.TemplateResponse("login.html", {"request": request, "error": "Credenciales inválidas"})
+        
+        # Check Service Access
+        services_access = user.services_access or {}
+        if not services_access.get("AOPlanSystem", False):
+             return templates.TemplateResponse("login.html", {"request": request, "error": "No tienes acceso a PlanSystem. Contacta a tu administrador."})
     
-    if not user or not verify_password(password, user.hashed_password):
-        return templates.TemplateResponse("login.html", {"request": request, "error": "Credenciales inválidas"})
-    
-    # Check Service Access
-    services_access = user.services_access or {}
-    if not services_access.get("AOPlanSystem", False):
-         return templates.TemplateResponse("login.html", {"request": request, "error": "No tienes acceso a PlanSystem. Contacta a tu administrador."})
-
-    # Create Token (Mirroring capabilities of Accounts Service)
-    # We include 'org' as user.company for simple mapping for now
-    access_token = create_access_token(data={
-        "sub": user.email, 
-        "role": user.role, 
-        "org": user.company,
-        "services_access": services_access
-    })
-    
-    response = RedirectResponse(url="/dashboard", status_code=303)
-    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
-    return response
+        # Create Token (Mirroring capabilities of Accounts Service)
+        access_token = create_access_token(data={
+            "sub": user.email, 
+            "role": user.role, 
+            "org": user.company,
+            "services_access": services_access
+        })
+        
+        response = RedirectResponse(url="/dashboard", status_code=303)
+        response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
+        return response
+    except Exception as e:
+        import traceback
+        error_msg = f"Error Interno: {str(e)} - {traceback.format_exc()}"
+        print(error_msg)
+        return templates.TemplateResponse("login.html", {"request": request, "error": error_msg})
 
 @router.get("/logout")
 async def logout():
