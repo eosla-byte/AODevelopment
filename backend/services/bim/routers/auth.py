@@ -47,6 +47,12 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
         # Authenticate against Central Accounts
         user = db.query(AccountUser).filter(AccountUser.email == email).first()
         
+        # DEBUG: Print user status to logs
+        if user:
+            print(f"Login Attempt: {email} | Found User. | Hash Start: {user.hashed_password[:20] if user.hashed_password else 'None'}")
+        else:
+            print(f"Login Attempt: {email} | User NOT Found.")
+
         if not user or not verify_password_local(password, user.hashed_password):
             return templates.TemplateResponse("login.html", {"request": request, "error": "Credenciales inválidas"})
         
