@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["python3", "postgresql"]
+
+[phases.build]
+cmds = ["pip install -r backend/requirements.txt"]
+
+[start]
+cmd = "cd backend/services/accounts && python main.py"
