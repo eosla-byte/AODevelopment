@@ -11,7 +11,17 @@ from jose import JWTError, jwt
 # Import Shared Modules
 from common.database import SessionCore 
 from common.models import AccountUser
-from common.auth_utils import verify_password, get_password_hash, create_access_token
+from common.auth_utils import create_access_token # Removed verify_password, get_password_hash imports
+
+# Local Password Context (Bypassing stale shared code issue)
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password_local(plain, hashed):
+    if not hashed: return False
+    try:
+        return pwd_context.verify(plain, hashed)
+    except Exception:
+        return False
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -37,7 +47,7 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
         # Authenticate against Central Accounts
         user = db.query(AccountUser).filter(AccountUser.email == email).first()
         
-        if not user or not verify_password(password, user.hashed_password):
+        if not user or not verify_password_local(password, user.hashed_password):
             return templates.TemplateResponse("login.html", {"request": request, "error": "Credenciales inválidas"})
         
         # Check Service Access
