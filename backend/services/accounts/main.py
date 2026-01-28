@@ -151,45 +151,48 @@ async def login_page(request: Request):
 
 @app.post("/auth/login")
 async def login_action(email: str = Form(...), password: str = Form(...)):
+    print(f"Login Attempt: '{email}'")
+    email = email.strip().lower()
+    
     db = SessionCore()
-    user = db.query(AccountUser).filter(AccountUser.email == email).first()
-    db.close()
-    
-    if not user:
-        # Mock Init Admin if no users exist at all?
-        # For now, just fail
-        return JSONResponse({"status": "error", "message": "Invalid credentials or user not found."}, status_code=401)
+    try:
+        user = db.query(AccountUser).filter(AccountUser.email == email).first()
         
-    if not verify_password(password, user.hashed_password):
-        return JSONResponse({"status": "error", "message": "Invalid password."}, status_code=401)
+        if not user:
+            print(f"Login Failed: User '{email}' not found in DB.")
+            return JSONResponse({"status": "error", "message": f"User '{email}' not found."}, status_code=401)
+            
+        print(f"User found: {user.id}. Role: {user.role}. Verifying password...")
+        if not verify_password(password, user.hashed_password):
+            print("Login Failed: Password mismatch.")
+            return JSONResponse({"status": "error", "message": "Invalid password (hash mismatch)."}, status_code=401)
+            
+        valid_roles = ["Admin", "SuperAdmin"]
+        if user.role not in valid_roles:
+             # Check Organization Memberships for "Admin" role?
+             is_org_admin = db.query(models.OrganizationUser).filter(
+                models.OrganizationUser.user_id == user.id,
+                models.OrganizationUser.role == "Admin"
+             ).first()
+
+             if not is_org_admin:
+                 return JSONResponse({"status": "error", "message": "Access restricted to Administrators."}, status_code=403)
+
+        access_token = create_access_token(
+            data={
+                "sub": user.email, 
+                "role": user.role, 
+                "id": user.id,
+                "services_access": user.services_access or {}
+            },
+            expires_delta=datetime.timedelta(hours=12)
+        )
         
-    valid_roles = ["Admin", "SuperAdmin"]
-    if user.role not in valid_roles:
-         # Check Organization Memberships for "Admin" role?
-         # For V2, if a user is an Org Admin, their Global Role is "Standard"
-         # But they have an OrganizationUser entry with role="Admin".
-         # We need to check that.
-         is_org_admin = db.query(models.OrganizationUser).filter(
-            models.OrganizationUser.user_id == user.id,
-            models.OrganizationUser.role == "Admin"
-         ).first()
-
-         if not is_org_admin:
-             return JSONResponse({"status": "error", "message": "Access restricted to Administrators."}, status_code=403)
-
-    access_token = create_access_token(
-        data={
-            "sub": user.email, 
-            "role": user.role, 
-            "id": user.id,
-            "services_access": user.services_access or {}
-        },
-        expires_delta=datetime.timedelta(hours=12)
-    )
-    
-    response = JSONResponse({"status": "ok", "redirect": "/dashboard"})
-    response.set_cookie(key="accounts_access_token", value=f"Bearer {access_token}", httponly=True)
-    return response
+        response = JSONResponse({"status": "ok", "redirect": "/dashboard"})
+        response.set_cookie(key="accounts_access_token", value=f"Bearer {access_token}", httponly=True)
+        return response
+    finally:
+        db.close()
 
 @app.get("/auth/logout")
 async def logout():
