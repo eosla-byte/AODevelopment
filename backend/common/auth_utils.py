@@ -15,7 +15,10 @@ def verify_password(plain_password, hashed_password):
         hashed_password = hashed_password.encode('utf-8')
     if isinstance(plain_password, str):
         plain_password = plain_password.encode('utf-8')
-    return bcrypt.checkpw(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(plain_password, hashed_password)
+    except ValueError:
+        return False
 
 def get_password_hash(password):
     if isinstance(password, str):
