@@ -374,3 +374,32 @@ class BimActivity(Base):
     # Relationships
     version = relationship("BimScheduleVersion", back_populates="activities")
 
+
+# -----------------------------------------------------------------------------
+# SCHEMA: ACCOUNTS (accounts.somosao.com) -> Prefix 'accounts_'
+# -----------------------------------------------------------------------------
+
+class AccountUser(Base):
+    __tablename__ = 'accounts_users'
+    
+    id = Column(String, primary_key=True) # UUID
+    email = Column(String, unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False)
+    
+    # Profile Info
+    full_name = Column(String)
+    phone = Column(String)
+    company = Column(String)
+    role = Column(String, default="Member") # Admin, Member
+    status = Column(String, default="Active") # Active, Inactive
+    
+    # Access Control
+    # keys: AOdev, AO HR & Finance, AO Projects, AO Clients, AODailyWork, AOPlanSystem, AOBuild
+    services_access = Column(JSON, default={}) 
+    
+    docs_access = Column(Boolean, default=True)
+    insight_access = Column(Boolean, default=True)
+    
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
