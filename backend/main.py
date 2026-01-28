@@ -48,7 +48,8 @@ async def force_admin_reset():
     """
     try:
         # Importar User y save_user de las dependencias globales o database
-        from common.database import save_user, User, get_password_hash
+        from common.database import save_user, User
+        from common.auth_utils import get_password_hash
         
         admin = User(
             id="admin_01",
@@ -64,6 +65,10 @@ async def force_admin_reset():
         return "ÉXITO MONOLITO: Admin actualizado a admin@somosao.com / admin123"
     except Exception as e:
         return f"ERROR: {str(e)}"
+
+@app.get("/version_check")
+def version_check():
+    return {"version": "v3_monolith_fixed", "timestamp": datetime.datetime.now().isoformat()}
 
 # Include Plugin API
 # Include Plugin API

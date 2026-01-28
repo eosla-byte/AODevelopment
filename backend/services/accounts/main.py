@@ -30,7 +30,7 @@ app = FastAPI(title="AO Accounts & Identity")
 
 @app.get("/version_check")
 def version_check():
-    return {"version": "v2_fixed_session_core", "timestamp": datetime.datetime.now().isoformat()}
+    return {"version": "v3_accounts_fixed", "timestamp": datetime.datetime.now().isoformat()}
 
 # Mount Static
 # app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
