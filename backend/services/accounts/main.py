@@ -100,28 +100,43 @@ async def dashboard(request: Request, user = Depends(get_current_admin)):
     
     db = SessionExt()
     users = db.query(AccountUser).all()
-    # Serialize for template validity
-    users_list = []
+    
+    # Serialize and Group by Company
+    users_by_company = {}
+    
     for u in users:
-        users_list.append({
+        u_data = {
             "id": u.id,
             "full_name": u.full_name,
             "email": u.email,
-            "company": u.company,
+            "company": u.company or "Unassigned",
             "phone": u.phone,
             "role": u.role,
             "status": u.status,
-            "access_level": "Project", # Placeholder
+            "access_level": "Project", 
             "added_on": u.created_at.strftime("%Y-%m-%d") if u.created_at else "",
             "docs_access": u.docs_access,
             "insight_access": u.insight_access,
             "services_access": u.services_access or {}
-        })
+        }
+        
+        company_key = u_data["company"]
+        if company_key not in users_by_company:
+            users_by_company[company_key] = []
+        users_by_company[company_key].append(u_data)
+        
     db.close()
+    
+    # Sort companies alphabetically, put 'Unassigned' last if present
+    company_names = sorted(users_by_company.keys())
+    if "Unassigned" in company_names:
+        company_names.remove("Unassigned")
+        company_names.append("Unassigned")
     
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
-        "users": users_list,
+        "users_by_company": users_by_company,
+        "company_list": company_names,
         "admin_email": user["sub"]
     })
 
@@ -222,6 +237,33 @@ async def update_user(
     db.close()
     
     return JSONResponse({"status": "ok", "message": "User updated"})
+
+@app.post("/api/users/{user_id}/toggle_service")
+async def toggle_service_access(
+    user_id: str,
+    service_name: str = Form(...),
+    user_jwt = Depends(get_current_admin)
+):
+    if not user_jwt: raise HTTPException(status_code=401)
+    
+    db = SessionExt()
+    user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+    if not user:
+        db.close()
+        return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
+    
+    current_access = user.services_access or {}
+    # Toggle
+    new_state = not current_access.get(service_name, False)
+    current_access[service_name] = new_state
+    
+    # Re-assign to trigger mutation tracking if needed (for some ORMs/JSON types)
+    user.services_access = dict(current_access)
+    
+    db.commit()
+    db.close()
+    
+    return JSONResponse({"status": "ok", "state": new_state, "message": f"{service_name} access {'granted' if new_state else 'revoked'}"})
 
 @app.delete("/api/users/{user_id}")
 async def delete_user(user_id: str, user_jwt = Depends(get_current_admin)):
