@@ -40,7 +40,7 @@ def decode_access_token(token: str):
     except JWTError:
         return None
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token") # Adjust tokenUrl if needed, e.g. /api/plugin/login but this is for Swagger UI mainly
