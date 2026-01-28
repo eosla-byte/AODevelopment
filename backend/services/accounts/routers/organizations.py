@@ -213,4 +213,63 @@ def toggle_service(
         db.add(new_perm)
         
     db.commit()
+    db.commit()
     return {"status": "success", "service": permission.service_slug, "active": permission.is_active}
+
+
+class UserPermissionUpdate(BaseModel):
+    service_slug: str
+    is_active: bool
+
+@router.post("/{org_id}/members/{user_id}/permissions")
+def toggle_user_permission(
+    org_id: str,
+    user_id: str,
+    update: UserPermissionUpdate,
+    db: Session = Depends(get_core_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Toggle a specific service permission for a user within an organization.
+    Caller must be Admin of that organization.
+    """
+    user_email = current_user.get("sub")
+    caller_db = db.query(models.AccountUser).filter(models.AccountUser.email == user_email).first()
+    
+    # 1. Check permissions (Caller must be Org Admin or SuperAdmin)
+    is_super = caller_db.role == "SuperAdmin"
+    is_org_admin = False
+    
+    if not is_super:
+        caller_membership = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.organization_id == org_id,
+            models.OrganizationUser.user_id == caller_db.id,
+            models.OrganizationUser.role == "Admin"
+        ).first()
+        if caller_membership:
+            is_org_admin = True
+            
+    if not (is_super or is_org_admin):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+        
+    # 2. Get Target Membership
+    target_membership = db.query(models.OrganizationUser).filter(
+        models.OrganizationUser.organization_id == org_id,
+        models.OrganizationUser.user_id == user_id
+    ).first()
+    
+    if not target_membership:
+        raise HTTPException(status_code=404, detail="User membership not found")
+        
+    # 3. Update Permissions JSON
+    # Note: mutating JSON in SQLAlchemy requires re-assignment or flag_modified if mutable=False
+    current_perms = dict(target_membership.permissions or {})
+    current_perms[update.service_slug] = update.is_active
+    
+    target_membership.permissions = current_perms
+    
+    # Force update detection if needed (though re-assignment usually works)
+    db.add(target_membership) 
+    db.commit()
+    
+    return {"status": "success", "user_id": user_id, "permissions": target_membership.permissions}
