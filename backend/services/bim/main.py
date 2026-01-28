@@ -128,7 +128,7 @@ app.include_router(auth.router)
 # Use imported get_current_user from common.auth_utils
 
 @app.get("/", response_class=HTMLResponse)
-async def root(request: Request, user = Depends(get_current_user)):
+async def root(request: Request):
     """
     Root Entry Point.
     - If not logged in -> Login.

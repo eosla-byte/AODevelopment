@@ -44,7 +44,7 @@
             try {
                 const res = await fetch('/api/me/organizations', { credentials: 'include' });
                 if (res.status === 401) {
-                    window.location.href = '/login';
+                    window.location.href = '/auth/login';
                     return;
                 }
                 const orgs = await res.json();
@@ -97,7 +97,7 @@
             // Save Context
             localStorage.setItem('ao_org_id', orgId);
             // Redirect to Workspace
-            window.location.href = '/dashboard';
+            window.location.href = `/dashboard?org_id=${orgId}`;
         }
     </script>
 </body>

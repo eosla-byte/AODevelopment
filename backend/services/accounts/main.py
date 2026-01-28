@@ -193,7 +193,8 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             value=f"Bearer {access_token}", 
             httponly=True,
             samesite="lax",
-            secure=False # Set to True if strictly SSL, but False usually works on Railway internal/proxied
+            secure=False, # Set to True if strictly SSL coverage
+            domain=".somosao.com" # Allow sharing with *.somosao.com
         )
         print(f"Cookie set for {user.email}")
         return response
@@ -203,6 +204,8 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
 @app.get("/auth/logout")
 async def logout():
     response = RedirectResponse("/login")
+    response.delete_cookie("accounts_access_token", domain=".somosao.com")
+    # Also delete for host only just in case
     response.delete_cookie("accounts_access_token")
     return response
 
