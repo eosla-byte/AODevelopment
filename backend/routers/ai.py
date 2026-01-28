@@ -19,8 +19,16 @@ router = APIRouter(
     tags=["AI Assistant"]
 )
 
-# Initialize OpenAI Client
-aclient = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# Initialize OpenAI Client (Conditional)
+api_key = os.getenv("OPENAI_API_KEY")
+aclient = None
+if api_key:
+    try:
+        aclient = AsyncOpenAI(api_key=api_key)
+    except Exception as e:
+        print(f"Failed to initialize OpenAI client: {e}")
+else:
+    print("WARNING: OPENAI_API_KEY not found. AI features will stay in fallback mode.")
 
 class ChatAttachment(BaseModel):
     name: str
@@ -114,6 +122,9 @@ async def chat_endpoint(payload: ChatPayload):
                  full_context += f"[File: {att.name}]\nContent:\n{content_snippet}\n...\n"
 
     try:
+        if not aclient:
+            return fallback_logic(msg)
+
         response = await aclient.chat.completions.create(
             model="gpt-4o",
             messages=[
