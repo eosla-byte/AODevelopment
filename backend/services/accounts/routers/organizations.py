@@ -5,9 +5,9 @@ from pydantic import BaseModel
 import uuid
 import datetime
 
-from backend.common.database import get_core_db, SessionCore
-from backend.common import models
-from backend.common.auth_utils import get_current_user
+from common.database import get_core_db, SessionCore
+from common import models
+from common.auth_utils import get_current_user
 
 router = APIRouter(
     prefix="/api/organizations",
