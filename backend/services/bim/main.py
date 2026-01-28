@@ -28,7 +28,7 @@ elif sys.path[0] != BASE_DIR:
 
 from common.database import get_db, SessionExt 
 # Note: For this service, get_db should ideally point to SessionExt or we explicitely use SessionExt
-from common.auth_utils import decode_access_token
+from common.auth_utils import decode_access_token, require_org_access
 from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity
 try:
     from .schedule_parser import parse_schedule
@@ -36,12 +36,26 @@ except ImportError:
     from schedule_parser import parse_schedule
 
 try:
-    from .routers import auth
+    from routers import auth as auth
 except ImportError:
     # Fallback to direct import, relying on sys.path[0] == BASE_DIR
     import routers.auth as auth
 
 app = FastAPI(title="AO PlanSystem (BIM Portal)")
+
+@app.get("/api/context-debug")
+def debug_context(
+    ctx: dict = Depends(require_org_access("bim"))
+):
+    """
+    Debug Endpoint to verify Multi-Tenant Isolation.
+    Requires header X-Organization-ID and active service permission.
+    """
+    return {
+        "status": "authorized", 
+        "context": ctx,
+        "message": f"Welcome to BIM Workspace for Org {ctx['org_id']}"
+    }
 
 # Mount Static if needed (Shared assets or dedicated?)
 # For now, we can use CDN for tailwind, or mount shared if we want logos

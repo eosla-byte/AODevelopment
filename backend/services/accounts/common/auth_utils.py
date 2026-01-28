@@ -40,16 +40,12 @@ def decode_access_token(token: str):
     except JWTError:
         return None
 
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-# auto_error=False allows us to check for cookies if header is missing
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token", auto_error=False) 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token") # Adjust tokenUrl if needed, e.g. /api/plugin/login but this is for Swagger UI mainly
 
 def verify_token_dep(token: str = Depends(oauth2_scheme)):
-    # This function seems unused or legacy, but we'll leave it simple
-    if not token: 
-         raise HTTPException(status_code=401, detail="No token provided")
     payload = decode_access_token(token)
     if payload is None:
         raise HTTPException(
@@ -89,3 +85,82 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     return payload # Returns the dict (sub, role, etc)
+
+
+# --- Multi-Tenant Context Enforcement ---
+# Imports inside to avoid circular deps if possible, but standard practice is top-level.
+# We'll import here to be safe given the vendoring structure.
+import common.models as models
+from common.database import SessionCore
+
+def require_org_access(service_slug: str):
+    """
+    Factory that returns a dependency to enforce:
+    1. Organization Context (Header X-Organization-ID)
+    2. User Membership in Org
+    3. Org Access to Service
+    4. User Access to Service
+    """
+    async def dependency(
+        request: Request, 
+        current_user: dict = Depends(get_current_user)
+    ):
+        org_id = request.headers.get("X-Organization-ID")
+        
+        # If no Org ID and user is SuperAdmin, MAYBE allow? 
+        # But specifically for public services (BIM, Daily), we NEED a context.
+        if not org_id:
+             raise HTTPException(status_code=400, detail="Missing Organization Context (X-Organization-ID)")
+             
+        db = SessionCore()
+        try:
+            user_id = current_user.get("id")
+            # 1. Check Membership & User-Specific Service Permission
+            membership = db.query(models.OrganizationUser).filter(
+                models.OrganizationUser.organization_id == org_id,
+                models.OrganizationUser.user_id == user_id
+            ).first()
+            
+            if not membership:
+                raise HTTPException(status_code=403, detail="You are not a member of this Organization")
+                
+            # Check User Permission for this service (if set)
+            # permissions is a JSON dict e.g. {"bim": true}
+            # If key is missing, default to False? Or True? 
+            # Logic: If Org has it, does User have it? 
+            # In Dashboard we have checkboxes. So likely defaults to False if not explicitly set.
+            # But let's be lenient: If permissions dict is empty/null, maybe they are Admin?
+            # Admins always access? 
+            is_org_admin = membership.role == "Admin"
+            
+            # Simple check:
+            user_perms = membership.permissions or {}
+            # Check explicit toggle. If missing, assume FALSE unless Admin? 
+            # Let's assume FALSE to be safe, requiring explicit assignment.
+            # EXCEPT if functionality hasn't run yet. 
+            # Let's enforce: MUST BE TRUE.
+            if not is_org_admin and not user_perms.get(service_slug):
+                 raise HTTPException(status_code=403, detail=f"You do not have access to {service_slug} in this Organization")
+
+            # 2. Check Organization Service Permission (Master Switch)
+            org_perm = db.query(models.ServicePermission).filter(
+                models.ServicePermission.organization_id == org_id,
+                models.ServicePermission.service_slug == service_slug,
+                models.ServicePermission.is_active == True
+            ).first()
+            
+            if not org_perm:
+                raise HTTPException(status_code=403, detail=f"Organization does not have access to {service_slug}")
+                
+            # Return Context
+            return {
+                "org_id": org_id,
+                "user_id": user_id,
+                "role": membership.role,
+                "service_slug": service_slug
+            }
+            
+        finally:
+            db.close()
+            
+    return dependency
