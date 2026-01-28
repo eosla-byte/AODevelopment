@@ -37,10 +37,28 @@ def startup_event():
         admin_email = "admin@somosao.com"
         admin = db.query(AccountUser).filter(AccountUser.email == admin_email).first()
         if admin:
+            # FORCE RESET PASSWORD TO 'admin123' to ensure access
+            print(f"Reseting password for {admin_email}...")
+            admin.hashed_password = get_password_hash("admin123")
+            
             if admin.role != "SuperAdmin":
                 print(f"Promotion {admin_email} to SuperAdmin...")
                 admin.role = "SuperAdmin"
-                db.commit()
+            db.commit()
+        else:
+            # Create if not exists
+            print(f"Creating Admin User {admin_email}...")
+            new_admin = AccountUser(
+                id=str(uuid.uuid4()),
+                email=admin_email,
+                full_name="System Admin",
+                hashed_password=get_password_hash("admin123"),
+                role="SuperAdmin",
+                status="Active"
+            )
+            db.add(new_admin)
+            db.commit()
+            admin = new_admin
                 
         # 2. Ensure Default Organization
         default_org_name = "AO Development"
