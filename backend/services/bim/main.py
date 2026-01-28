@@ -82,7 +82,21 @@ async def dashboard(request: Request, user = Depends(get_current_user)):
     services_access = user.get("services_access", {})
     # If key doesn't exist (old token), denied. If false, denied.
     if not services_access.get("AOPlanSystem", False):
-         return HTMLResponse(content="<h1>Access Denied</h1><p>You do not have permission to access AO PlanSystem. Contact your administrator.</p>", status_code=403)
+         html_content = """
+         <html>
+            <body style="font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f8fafc;">
+                <h1 style="color: #ef4444;">Acceso Denegado / Access Denied</h1>
+                <p style="color: #475569; margin-bottom: 20px;">No tienes permisos para acceder a AO PlanSystem.</p>
+                <div style="background-color: #e2e8f0; padding: 15px; border-radius: 8px; font-size: 0.9em; margin-bottom: 20px;">
+                    <strong>Tip:</strong> Si te acaban de dar acceso, tu sesión actual es antigua.
+                </div>
+                <a href="/auth/logout" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Cerrar Sesión y Recargar Permisos
+                </a>
+            </body>
+         </html>
+         """
+         return HTMLResponse(content=html_content, status_code=403)
 
     # Fetch Org Name details?
     # Fetch Org Name details?
