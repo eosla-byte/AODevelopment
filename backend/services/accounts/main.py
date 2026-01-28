@@ -22,7 +22,7 @@ if BACKEND_ROOT not in sys.path:
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from common.database import get_db, SessionExt 
+from common.database import get_db, SessionCore 
 from common.auth_utils import verify_password, create_access_token, decode_access_token, get_password_hash
 from common.models import AccountUser
 
