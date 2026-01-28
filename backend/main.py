@@ -41,6 +41,30 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
+@app.get("/system/force_admin_reset")
+async def force_admin_reset():
+    """
+    Endpoint de emergencia para restaurar acceso admin en Produccion (Monolito).
+    """
+    try:
+        # Importar User y save_user de las dependencias globales o database
+        from common.database import save_user, User, get_password_hash
+        
+        admin = User(
+            id="admin_01",
+            name="Administrador",
+            email="admin@somosao.com",
+            role="admin",
+            is_active=True,
+            hashed_password=get_password_hash("admin123"),
+            permissions={},
+            assigned_projects=[]
+        )
+        save_user(admin)
+        return "ÉXITO MONOLITO: Admin actualizado a admin@somosao.com / admin123"
+    except Exception as e:
+        return f"ERROR: {str(e)}"
+
 # Include Plugin API
 # Include Plugin API
 from routers import plugin_api, plugin_cloud, ai, sheet_api, acc_manager
@@ -524,7 +548,7 @@ async def startup_event():
                 admin = User(
                     id="admin_01",
                     name="Administrador",
-                    email="admin@ao.com",
+                    email="admin@somosao.com",
                     role="admin",
                     is_active=True,
                     hashed_password=get_password_hash("admin123"),
@@ -532,7 +556,7 @@ async def startup_event():
                     assigned_projects=[]
                 )
                 save_user(admin)
-                print("Default Admin Created: admin@ao.com / admin123")
+                print("Default Admin Created: admin@somosao.com / admin123")
     except Exception as e:
         print(f"Startup Error (Non-Critical): {e}")
 
