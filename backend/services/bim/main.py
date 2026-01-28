@@ -85,17 +85,24 @@ async def dashboard(request: Request, user = Depends(get_current_user)):
          return HTMLResponse(content="<h1>Access Denied</h1><p>You do not have permission to access AO PlanSystem. Contact your administrator.</p>", status_code=403)
 
     # Fetch Org Name details?
-    db = SessionExt()
-    user_db = db.query(BimUser).filter(BimUser.email == user["sub"]).first()
+    # Fetch Org Name details?
+    from common.database import SessionCore
+    from common.models import AccountUser
+    
+    db = SessionCore()
+    # Find user in Core DB
+    user_db = db.query(AccountUser).filter(AccountUser.email == user["sub"]).first()
     org_name = "Organización"
-    if user_db and user_db.organization:
-        org_name = user_db.organization.name
+    
+    if user_db:
+        org_name = user_db.company or "AO Development"
+        
     db.close()
     
     return templates.TemplateResponse("dashboard.html", {
         "request": request, 
-        "user_name": user.get("sub"), # Or Full Name if in token/db
-        "user_initials": user.get("sub")[:2].upper(),
+        "user_name": user_db.full_name if user_db else user.get("sub"), 
+        "user_initials": (user_db.full_name[:2].upper()) if user_db and user_db.full_name else "AO",
         "org_name": org_name
     })
 

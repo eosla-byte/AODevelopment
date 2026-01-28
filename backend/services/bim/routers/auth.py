@@ -9,9 +9,8 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 
 # Import Shared Modules
-from common.database import get_db, SessionExt 
-# Note: SessionExt is perfect because we want to connect to EXT_DB_URL by default
-from common.models import BimUser, BimOrganization
+from common.database import SessionCore 
+from common.models import AccountUser
 from common.auth_utils import verify_password, get_password_hash, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -20,14 +19,9 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
-# DATABASE PROVIDER
-# We need a specific provider for External DB if get_db defaults to something else.
-# In database.py we made get_db default to SessionOps. 
-# We should import get_ext_db if we created it? Or just use SessionExt manually.
-# Let's check common/database.py imports availability.
-# Assuming we can use:
-def get_ext_db():
-    db = SessionExt()
+# Dependency for Core DB (where Accounts live)
+def get_core_db_dep():
+    db = SessionCore()
     try:
         yield db
     finally:
@@ -38,13 +32,26 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @router.post("/login")
-async def login_submit(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_ext_db)):
-    user = db.query(BimUser).filter(BimUser.email == email).first()
+async def login_submit(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_core_db_dep)):
+    # Authenticate against Central Accounts
+    user = db.query(AccountUser).filter(AccountUser.email == email).first()
+    
     if not user or not verify_password(password, user.hashed_password):
         return templates.TemplateResponse("login.html", {"request": request, "error": "Credenciales inválidas"})
     
-    # Create Token
-    access_token = create_access_token(data={"sub": user.email, "role": user.role, "org": user.organization_id})
+    # Check Service Access
+    services_access = user.services_access or {}
+    if not services_access.get("AOPlanSystem", False):
+         return templates.TemplateResponse("login.html", {"request": request, "error": "No tienes acceso a PlanSystem. Contacta a tu administrador."})
+
+    # Create Token (Mirroring capabilities of Accounts Service)
+    # We include 'org' as user.company for simple mapping for now
+    access_token = create_access_token(data={
+        "sub": user.email, 
+        "role": user.role, 
+        "org": user.company,
+        "services_access": services_access
+    })
     
     response = RedirectResponse(url="/dashboard", status_code=303)
     response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
@@ -58,45 +65,6 @@ async def logout():
 
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
-
-@router.post("/register")
-async def register_submit(
-    request: Request, 
-    org_name: str = Form(...), 
-    full_name: str = Form(...), 
-    email: str = Form(...), 
-    password: str = Form(...),
-    db: Session = Depends(get_ext_db)
-):
-    # Check existing
-    existing = db.query(BimUser).filter(BimUser.email == email).first()
-    if existing:
-        return templates.TemplateResponse("register.html", {"request": request, "error": "Email ya registrado"})
-        
-    # Create Org
-    new_org = BimOrganization(
-        id=str(uuid.uuid4()),
-        name=org_name
-    )
-    db.add(new_org)
-    db.commit()
-    db.refresh(new_org)
-    
-    # Create User (Owner)
-    new_user = BimUser(
-        id=str(uuid.uuid4()),
-        organization_id=new_org.id,
-        email=email,
-        hashed_password=get_password_hash(password),
-        full_name=full_name,
-        role="Owner"
-    )
-    db.add(new_user)
-    db.commit()
-    
-    # Auto Login
-    access_token = create_access_token(data={"sub": new_user.email, "role": new_user.role, "org": new_org.id})
-    response = RedirectResponse(url="/dashboard", status_code=303)
-    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
-    return response
+    # Registration is now centralized
+    # We can redirect to accounts or show a message
+    return RedirectResponse("https://accounts.somosao.com/login", status_code=303)
