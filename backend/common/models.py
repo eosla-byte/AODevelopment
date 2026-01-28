@@ -389,17 +389,79 @@ class AccountUser(Base):
     # Profile Info
     full_name = Column(String)
     phone = Column(String)
-    company = Column(String)
-    role = Column(String, default="Member") # Admin, Member
+    
+    # Global Role (Super Admin vs Standard User)
+    # The diagram distinguishes "Administradores AO" from "Usuarios Administradores (de Empresa)"
+    # This role handles "Administradores AO".
+    role = Column(String, default="Standard") # 'SuperAdmin', 'Standard'
     status = Column(String, default="Active") # Active, Inactive
     
-    # Access Control
-    # keys: AOdev, AO HR & Finance, AO Projects, AO Clients, AODailyWork, AOPlanSystem, AOBuild
+    # Legacy fields (Optional during migration)
+    company = Column(String, nullable=True)
     services_access = Column(JSON, default={}) 
-    
     docs_access = Column(Boolean, default=True)
     insight_access = Column(Boolean, default=True)
     
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # V2 Relationships
+    memberships = relationship("OrganizationUser", back_populates="user")
+
+class Organization(Base):
+    __tablename__ = 'accounts_organizations'
+    
+    id = Column(String, primary_key=True) # UUID
+    name = Column(String, nullable=False)
+    contact_email = Column(String)
+    tax_id = Column(String) # NIT/RFC
+    logo_url = Column(String)
+    status = Column(String, default="Active")
+    
+    created_at = Column(DateTime, default=func.now())
+    
+    users = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
+    service_permissions = relationship("ServicePermission", back_populates="organization", cascade="all, delete-orphan")
+
+class OrganizationUser(Base):
+    """
+    Link between User and Organization. Defines strict role within the company.
+    """
+    __tablename__ = 'accounts_organization_users'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    organization_id = Column(String, ForeignKey('accounts_organizations.id'))
+    user_id = Column(String, ForeignKey('accounts_users.id'))
+    
+    # Role within the organization: 'Admin' (Gestor de la empresa) or 'Member' (Empleado)
+    role = Column(String, default="Member") 
+    
+    # Granular permissions for this user specifically (optional override)
+    permissions = Column(JSON, default={}) 
+    
+    joined_at = Column(DateTime, default=func.now())
+    
+    organization = relationship("Organization", back_populates="users")
+    user = relationship("AccountUser", back_populates="memberships")
+
+class ServicePermission(Base):
+    """
+    Controls which services an Organization has access to.
+    Administered by 'Administradores AO'.
+    """
+    __tablename__ = 'accounts_service_permissions'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    organization_id = Column(String, ForeignKey('accounts_organizations.id'))
+    
+    # Service Slug: 'daily', 'bim', 'plugin', 'build', 'clients'
+    service_slug = Column(String, nullable=False)
+    
+    # Plan Level? (Free, Pro, Enterprise)
+    plan_level = Column(String, default="Standard")
+    
+    is_active = Column(Boolean, default=True)
+    valid_until = Column(DateTime, nullable=True)
+    
+    organization = relationship("Organization", back_populates="service_permissions")
 

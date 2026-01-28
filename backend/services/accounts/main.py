@@ -26,7 +26,62 @@ from common.database import get_db, SessionCore
 from common.auth_utils import verify_password, create_access_token, decode_access_token, get_password_hash
 from common.models import AccountUser
 
+from routers import organizations
+
 app = FastAPI(title="AO Accounts & Identity")
+
+app.include_router(organizations.router)
+
+@app.on_event("startup")
+def startup_event():
+    """
+    Ensure default 'AO Development' organization exists and Admin is SuperAdmin.
+    """
+    db = SessionCore()
+    try:
+        # 1. Update/Ensure Admin is SuperAdmin
+        admin_email = "admin@somosao.com"
+        admin = db.query(AccountUser).filter(AccountUser.email == admin_email).first()
+        if admin:
+            if admin.role != "SuperAdmin":
+                print(f"Promotion {admin_email} to SuperAdmin...")
+                admin.role = "SuperAdmin"
+                db.commit()
+                
+        # 2. Ensure Default Organization
+        default_org_name = "AO Development"
+        org = db.query(models.Organization).filter(models.Organization.name == default_org_name).first()
+        if not org:
+            print(f"Creating default Organization: {default_org_name}")
+            new_org = models.Organization(
+                id=str(uuid.uuid4()),
+                name=default_org_name,
+                status="Active"
+            )
+            db.add(new_org)
+            db.commit()
+            org = new_org
+            
+        # 3. Ensure Admin belongs to Default Org
+        if admin and org:
+            details = db.query(models.OrganizationUser).filter(
+                models.OrganizationUser.organization_id == org.id,
+                models.OrganizationUser.user_id == admin.id
+            ).first()
+            if not details:
+                print(f"Adding Admin to {default_org_name}...")
+                membership = models.OrganizationUser(
+                    organization_id=org.id,
+                    user_id=admin.id,
+                    role="Admin"
+                )
+                db.add(membership)
+                db.commit()
+                
+    except Exception as e:
+        print(f"Startup Logic Error: {e}")
+    finally:
+        db.close()
 
 @app.get("/version_check")
 def version_check():
