@@ -40,12 +40,16 @@ def decode_access_token(token: str):
     except JWTError:
         return None
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token") # Adjust tokenUrl if needed, e.g. /api/plugin/login but this is for Swagger UI mainly
+# auto_error=False allows us to check for cookies if header is missing
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token", auto_error=False) 
 
 def verify_token_dep(token: str = Depends(oauth2_scheme)):
+    # This function seems unused or legacy, but we'll leave it simple
+    if not token: 
+         raise HTTPException(status_code=401, detail="No token provided")
     payload = decode_access_token(token)
     if payload is None:
         raise HTTPException(
@@ -55,7 +59,28 @@ def verify_token_dep(token: str = Depends(oauth2_scheme)):
         )
     return token
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme)
+):
+    # 1. Try Token from Header (OAuth2PasswordBearer)
+    # 2. If missing, Try Cookie
+    if not token:
+        cookie_token = request.cookies.get("accounts_access_token")
+        if cookie_token:
+            # Handle "Bearer <token>" or just "<token>"
+            if cookie_token.startswith("Bearer "):
+                token = cookie_token.split(" ")[1]
+            else:
+                token = cookie_token
+    
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated (No Header or Cookie)",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     payload = decode_access_token(token)
     if payload is None:
         raise HTTPException(
