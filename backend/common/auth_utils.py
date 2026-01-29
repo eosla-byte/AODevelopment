@@ -60,10 +60,13 @@ async def get_current_user(
     request: Request,
     token: Optional[str] = Depends(oauth2_scheme)
 ):
-    # 1. Try Token from Header (OAuth2PasswordBearer)
-    # 2. If missing, Try Cookie
+    # Debug Logging
+    # print(f"DEBUG AUTH: Header Token: {True if token else False}")
+    
+    # 1. Try Token from Header (OAuth2PasswordBearer) -> 2. If missing, Try Cookie
     if not token:
         cookie_token = request.cookies.get("accounts_access_token")
+        # print(f"DEBUG AUTH: Cookie Token Found: {True if cookie_token else False}")
         if cookie_token:
             # Handle "Bearer <token>" or just "<token>"
             if cookie_token.startswith("Bearer "):
@@ -72,6 +75,7 @@ async def get_current_user(
                 token = cookie_token
     
     if not token:
+        print("DEBUG AUTH: No token found in Header OR Cookie.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated (No Header or Cookie)",
@@ -80,6 +84,7 @@ async def get_current_user(
 
     payload = decode_access_token(token)
     if payload is None:
+        print("DEBUG AUTH: Token decode failed (Invalid or Expired).")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
