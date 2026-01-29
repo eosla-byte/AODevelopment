@@ -63,7 +63,8 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
     
         # Create Token (Mirroring capabilities of Accounts Service)
         access_token = create_access_token(data={
-            "sub": user.email, 
+            "sub": user.email,
+            "id": user.id, # Required for Dashboard lookups 
             "role": user.role, 
             "org": user.company,
             "services_access": services_access
