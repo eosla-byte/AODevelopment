@@ -449,7 +449,7 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
     finally:
         db.close()
 
-@app.post("/projects/{project_id}/schedule/upload")
+@app.post("/api/projects/{project_id}/schedule")
 async def upload_schedule(project_id: str, file: UploadFile = File(...), user = Depends(get_current_user)):
     if not user: return RedirectResponse("/auth/login")
     
