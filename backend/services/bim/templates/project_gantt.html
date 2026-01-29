@@ -524,8 +524,10 @@
             }
 
             // --- GANTT RENDERING ---
-            function renderGantt(viewMode = 'Day') {
-                document.getElementById('gantt-chart').innerHTML = ''; // Clear
+            function renderGantt(viewMode = 'Week') {
+                const chartContainer = document.getElementById('gantt-chart');
+                if (!chartContainer) return;
+                chartContainer.innerHTML = ''; // Clear
 
                 // Transform tasks for Frappe
                 const ganttTasks = tasks.map(t => ({
@@ -535,40 +537,50 @@
                     end: formatDateInput(t.end),
                     progress: t.progress,
                     dependencies: t.dependencies,
-                    custom_class: t._style && t._style.fill ? `custom-fill-${t.id}` : '' // Hack for color
+                    custom_class: t._style && t._style.fill ? `custom-fill-${t.id}` : ''
                 }));
 
                 // Generate Dynamic CSS for custom fills
                 updateDynamicCSS();
 
-                gantt = new Gantt("#gantt-chart", ganttTasks, {
-                    header_height: 50,
-                    column_width: 30,
-                    step: 24,
-                    view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
-                    bar_height: 20,
-                    bar_corner_radius: 3,
-                    arrow_curve: 5,
-                    padding: 18,
-                    view_mode: viewMode,
-                    date_format: 'YYYY-MM-DD',
-                    language: 'es',
-                    on_date_change: (task, start, end) => {
-                        updateTaskDate(task.id, start, end);
-                    },
-                    on_click: (task) => {
-                        selectTask(task.id, { ctrlKey: false, shiftKey: false });
-                    },
-                    on_view_change: () => {
-                        syncScrolls();
+                try {
+                    if (ganttTasks.length === 0) {
+                        chartContainer.innerHTML = '<div class="text-gray-400 p-10 text-center">No hay tareas para mostrar</div>';
+                        return;
                     }
-                });
 
-                // Draw Today Line
-                setTimeout(drawTodayLine, 100);
+                    gantt = new Gantt("#gantt-chart", ganttTasks, {
+                        header_height: 50,
+                        column_width: 30,
+                        step: 24,
+                        view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+                        bar_height: 20,
+                        bar_corner_radius: 3,
+                        arrow_curve: 5,
+                        padding: 18,
+                        view_mode: viewMode,
+                        date_format: 'YYYY-MM-DD',
+                        language: 'es',
+                        on_date_change: (task, start, end) => {
+                            updateTaskDate(task.id, start, end);
+                        },
+                        on_click: (task) => {
+                            selectTask(task.id, { ctrlKey: false, shiftKey: false });
+                        },
+                        on_view_change: () => {
+                            syncScrolls();
+                        }
+                    });
+
+                    // Draw Today Line
+                    setTimeout(drawTodayLine, 100);
+
+                } catch (e) {
+                    console.error("Gantt Render Error:", e);
+                    chartContainer.innerHTML = `<div class="text-red-500 p-10">Error al renderizar el gráfico: ${e.message}</div>`;
+                }
 
                 // Bind Scroll Sync
-                const chartSvg = document.querySelector('#chart-area svg');
                 const gridDiv = document.getElementById('tasks-grid');
                 const chartDiv = document.getElementById('chart-area');
 
