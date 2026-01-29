@@ -42,6 +42,17 @@ def run_migration():
                      print(f"Skipping 'predecessors' (exists): {e}")
                  else:
                      print(f"Error adding 'predecessors': {e}")
+            
+             # 3. Add style
+             try:
+                 print("Adding column 'style'...")
+                 db.execute(text("ALTER TABLE bim_activities ADD COLUMN style VARCHAR"))
+                 print("Added 'style'.")
+             except Exception as e:
+                 if "duplicate column" in str(e):
+                     print(f"Skipping 'style' (exists): {e}")
+                 else:
+                     print(f"Error adding 'style': {e}")
                      
              db.commit()
         else:

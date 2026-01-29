@@ -529,7 +529,8 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
                     planned_finish=act.get("finish"),
                     pct_complete=act.get("pct_complete", 0.0),
                     contractor=act.get("contractor"),
-                    predecessors=act.get("predecessors")
+                    predecessors=act.get("predecessors"),
+                    style=act.get("style")
                 )
                 db.add(new_act)
                 count += 1
@@ -578,7 +579,8 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "progress": act.pct_complete or 0,
                 "dependencies": act.predecessors or "",
                 "custom_class": f"version-{act.version_id}", # Hook for styling if needed
-                "contractor": act.contractor or "N/A"
+                "contractor": act.contractor or "N/A",
+                "style": act.style
             })
             
         return tasks_json
@@ -586,10 +588,11 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
         db.close()
 
 class ActivityUpdateRequest(pydantic.BaseModel):
-    name: str = None
-    start: str = None
-    end: str = None
-    progress: float = None
+    name: Optional[str] = None
+    start: Optional[str] = None
+    end: Optional[str] = None
+    progress: Optional[float] = None
+    style: Optional[str] = None
 
 @app.put("/api/activities/{activity_id}")
 async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = Depends(get_current_user)):
@@ -623,6 +626,7 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
         if data.end:
             try: act.planned_finish = datetime.datetime.strptime(data.end, "%Y-%m-%d")
             except: pass
+        if data.style: act.style = data.style
             
         db.commit()
         return {"status": "success"}

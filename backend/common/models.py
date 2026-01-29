@@ -371,6 +371,7 @@ class BimActivity(Base):
     # Advanced Gantt Fields
     contractor = Column(String) # Empresa Encargada
     predecessors = Column(String) # JSON or String "1,2,3"
+    style = Column(String) # JSON: {"font": "Calibri", "fontSize": 11, "bold": true, "fill": "#ffff00", "color": "#ff0000"}
     
     # Hierarchy
     parent_wbs = Column(String)
