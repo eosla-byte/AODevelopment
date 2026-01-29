@@ -712,10 +712,20 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
     if not user: raise HTTPException(status_code=401, detail="Not authenticated")
     
     version_ids = [v.strip() for v in versions.split(",") if v.strip()]
-    if not version_ids: return []
     
     db = SessionExt()
     try:
+        # If no specific versions requested, default to LATEST version
+        if not version_ids:
+            latest = db.query(BimScheduleVersion).filter(
+                BimScheduleVersion.project_id == project_id
+            ).order_by(BimScheduleVersion.imported_at.desc()).first()
+            
+            if latest:
+                version_ids = [latest.id]
+            else:
+                return []
+
         activities = db.query(BimActivity).filter(BimActivity.version_id.in_(version_ids)).all()
         
         tasks_json = []

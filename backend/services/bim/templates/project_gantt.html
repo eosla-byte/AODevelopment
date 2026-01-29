@@ -376,7 +376,7 @@
 
     <script>
         // --- STATE ---
-        let tasks = [];
+        let tasks = {{ tasks_json | safe }} || [];
         let gantt;
         let selectedTaskIds = new Set();
         const projectId = "{{ project.id }}";
@@ -398,6 +398,22 @@
 
         async function loadTasks() {
             try {
+                // Use server-side data if available
+                if (tasks && tasks.length > 0) {
+                    // Process dates
+                    tasks = tasks.map(t => {
+                        t.start = new Date(t.start);
+                        t.end = new Date(t.end);
+                        if (t.style && typeof t.style === 'string') {
+                            try { t._style = JSON.parse(t.style); } catch (e) { }
+                        }
+                        return t;
+                    });
+                    renderGrid();
+                    renderGantt();
+                    return;
+                }
+
                 const res = await fetch(`/api/projects/${projectId}/activities`);
                 if (!res.ok) throw new Error("Error loading");
                 const data = await res.json();
