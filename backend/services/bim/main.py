@@ -437,6 +437,10 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
         all_versions = db.query(BimScheduleVersion).filter(
             BimScheduleVersion.project_id == project_id
         ).order_by(BimScheduleVersion.imported_at.desc()).all()
+        
+        print(f"DEBUG: View Project {project_id}. Found {len(all_versions)} versions.")
+        if all_versions:
+             print(f"DEBUG: Latest Version {all_versions[0].id} ({all_versions[0].version_name})")
 
         return templates.TemplateResponse("project_gantt.html", {
             "request": request,
@@ -477,6 +481,10 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
             db.add(new_version)
             db.commit()
             
+            # Verify Persistence
+            check_count = db.query(BimScheduleVersion).filter(BimScheduleVersion.project_id == project_id).count()
+            print(f"DEBUG: Saved Version {new_version.id}. Total Versions for Project {project_id}: {check_count}")
+
             # 4. Save Activities
             count = 0
             for act in schedule_data['activities']:
@@ -493,6 +501,8 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
                 count += 1
             
             db.commit()
+            print(f"DEBUG: Saved {count} activities for version {new_version.id}")
+            
             return {"status": "ok", "message": f"Schedule imported successfully. {count} activities."}
         except Exception as e:
             db.rollback()
