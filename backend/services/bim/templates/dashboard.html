@@ -110,8 +110,15 @@
                 <div class="border-t pt-4 flex justify-between items-center">
                     <span class="text-xs text-slate-400">Creado: {{ project.created_at.strftime('%Y-%m-%d') if
                         project.created_at else 'Reciente' }}</span>
-                    <a href="/projects/{{ project.id }}"
-                        class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Ver Tablero &rarr;</a>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="deleteProject('{{ project.id }}')"
+                            class="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition"
+                            title="Eliminar Proyecto">
+                            🗑️
+                        </button>
+                        <a href="/projects/{{ project.id }}"
+                            class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Ver Tablero &rarr;</a>
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -197,6 +204,25 @@
                 alert("Error de conexión");
                 btn.disabled = false;
                 btn.innerText = "Crear";
+            }
+        }
+
+        async function deleteProject(projectId) {
+            if (!confirm("¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer.")) return;
+
+            try {
+                const res = await fetch(`/api/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+
+                if (res.ok) {
+                    window.location.reload();
+                } else {
+                    alert("Error al eliminar proyecto");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error de conexión");
             }
         }
     </script>

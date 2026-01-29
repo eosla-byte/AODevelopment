@@ -36,19 +36,81 @@ def parse_xer(content: bytes):
     }
 
 def parse_xml(content: bytes):
-    # TODO: Implement MSP XML parsing
-    return {
-        "project_name": "Imported from MS Project",
-        "activities": []
-    }
+    import xml.etree.ElementTree as ET
+    from datetime import datetime
+    
+    try:
+        root = ET.fromstring(content)
+        
+        # MSP XML usually has a namespace. Let's handle it or strip it.
+        # Simple strategy: iterate all elements and check tag name ending.
+        
+        ns = ""
+        if '}' in root.tag:
+            ns = root.tag.split('}')[0] + '}'
+            
+        tasks = []
+        
+        # Find Tasks
+        tasks_xml = root.find(f"{ns}Tasks")
+        if tasks_xml is not None:
+            for task in tasks_xml.findall(f"{ns}Task"):
+                try:
+                    # Skip summary tasks or project summary if desired?
+                    # For now keep all.
+                    
+                    uid = task.find(f"{ns}UID")
+                    name = task.find(f"{ns}Name")
+                    start = task.find(f"{ns}Start")
+                    finish = task.find(f"{ns}Finish")
+                    percent = task.find(f"{ns}PercentComplete")
+                    
+                    if name is not None and uid is not None:
+                        t_data = {
+                            "activity_id": uid.text,
+                            "name": name.text,
+                            "start": None,
+                            "finish": None,
+                            "pct_complete": 0
+                        }
+                        
+                        if start is not None and start.text:
+                            # MSP date format: 2024-01-29T08:00:00
+                            t_data["start"] = start.text # Keep string or parse? Main expects datetime for SQL?
+                            # Let's keep strict text for now, main can convert if needed, or convert here.
+                            # SQL Alchemy DateTime expects python datetime.
+                            try:
+                                t_data["start"] = datetime.fromisoformat(start.text)
+                            except: pass
+                            
+                        if finish is not None and finish.text:
+                             try:
+                                t_data["finish"] = datetime.fromisoformat(finish.text)
+                             except: pass
+
+                        if percent is not None and percent.text:
+                            try:
+                                t_data["pct_complete"] = float(percent.text)
+                            except: pass
+                            
+                        tasks.append(t_data)
+                except Exception as e:
+                    print(f"Error parsing task: {e}")
+                    continue
+        
+        return {
+            "project_name": "Imported Project",
+            "activities": tasks
+        }
+    except Exception as e:
+        print(f"XML Parsing Error: {e}")
+        raise ValueError("Invalid XML File")
 
 def parse_mpp(content: bytes):
     """
     Stub for MS Project Binary format (.mpp).
-    Real parsing requires heavy libs (like mpxj or Aspose).
-    For now, we accept the file to store it, but return 0 activities.
     """
     return {
-        "project_name": "MS Project File (.mpp)",
-        "activities": []
+        "project_name": "MS Project File (.mpp) - Parsing Not Supported",
+        "activities": [] # Empty for now
     }

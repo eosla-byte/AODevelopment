@@ -64,7 +64,7 @@
                 class="font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300">PlanSystem</span>
         </div>
 
-        <nav class="flex-1 p-2 space-y-2 mt-4">
+        <nav class="flex-1 p-2 space-y-2 mt-4 overflow-y-auto">
             <a href="/dashboard"
                 class="flex items-center p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">
                 <span class="text-xl">📊</span>
@@ -76,6 +76,32 @@
                 <span class="ml-3 opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity">Proyecto
                     Actual</span>
             </a>
+
+            <!-- Versions List -->
+            <div class="mt-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Versiones</h4>
+                <div class="space-y-1">
+                    {% for version in all_versions %}
+                    <div
+                        class="flex items-center justify-between p-2 rounded hover:bg-slate-800 text-xs text-slate-300 cursor-pointer">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" data-ver-id="{{ version.id }}"
+                                class="rounded bg-slate-700 border-none text-indigo-500 focus:ring-0 version-check">
+                            <div class="truncate max-w-[100px]" title="{{ version.version_name }}">
+                                {{ version.version_name }}
+                            </div>
+                        </div>
+                        <span class="text-[10px] text-slate-500">{{ version.imported_at.strftime('%d/%m') }}</span>
+                    </div>
+                    {% else %}
+                    <div class="text-xs text-slate-600 italic px-2">Sin versiones</div>
+                    {% endfor %}
+                </div>
+                <button onclick="compareVersions()"
+                    class="mt-4 w-full py-1 bg-indigo-600 text-[10px] text-white rounded hover:bg-indigo-700 transition">
+                    Comparar Seleccionados
+                </button>
+            </div>
         </nav>
     </aside>
 
@@ -96,6 +122,14 @@
             </div>
 
             <div class="flex items-center gap-3">
+                <div class="bg-slate-100 rounded-lg p-1 flex items-center gap-2 px-3">
+                    <label
+                        class="cursor-pointer text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                        <span>☁️ Importar</span>
+                        <input type="file" class="hidden" onchange="uploadSchedule(this)">
+                    </label>
+                </div>
+
                 <!-- Zoom Controls -->
                 <div class="bg-slate-100 rounded-lg p-1 flex">
                     <button onclick="changeZoom('Day')"
@@ -138,11 +172,11 @@
                     <form id="uploadForm" class="space-y-4">
                         <label
                             class="block w-full cursor-pointer hover:bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl p-8 transition">
-                            <input type="file" id="scheduleFile" name="file" class="hidden"
+                            <input type="file" id="scheduleFile" name="file" class="hidden" multiple
                                 onchange="uploadSchedule(this)">
                             <span id="uploadText" class="text-sm font-medium text-slate-600">Haz clic para subir
-                                archivo</span>
-                            <span class="block text-xs text-slate-400 mt-1">Soporta .mpp, .xer y .xml</span>
+                                archivo(s)</span>
+                            <span class="block text-xs text-slate-400 mt-1">Soporta .mpp, .xer y .xml (Max 4)</span>
                         </label>
                     </form>
                 </div>
@@ -182,11 +216,91 @@
                             </div>
                         </div>
                     `;
-                }
+                },
+                on_date_change: function (task, start, end) {
+                    updateActivity(task.id, { start: start, end: end });
+                },
+                on_progress_change: function (task, progress) {
+                    updateActivity(task.id, { progress: progress });
+                },
             });
 
             function changeZoom(mode) {
                 gantt.change_view_mode(mode);
+            }
+        }
+
+        async function compareVersions() {
+            const checks = document.querySelectorAll('.version-check:checked');
+            if (checks.length === 0) return alert("Selecciona al menos una versión");
+            if (checks.length > 4) return alert("Máximo 4 versiones para comparar");
+
+            const ids = Array.from(checks).map(c => c.dataset.verId).join(',');
+
+            try {
+                const res = await fetch(`/api/projects/{{ project.id }}/activities?versions=${ids}`);
+                const data = await res.json();
+
+                if (data.length > 0) {
+                    new Gantt("#gantt-chart", data, {
+                        header_height: 50,
+                        column_width: 30,
+                        step: 24,
+                        view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+                        bar_height: 20,
+                        bar_corner_radius: 3,
+                        arrow_curve: 5,
+                        padding: 18,
+                        view_mode: 'Week',
+                        date_format: 'YYYY-MM-DD',
+                        custom_popup_html: function (task) {
+                            return `
+                                <div class="popup-wrapper p-4 w-64 shadow-2xl">
+                                    <div class="title font-bold text-sm mb-2 pb-2 border-slate-700">${task.name}</div>
+                                    <div class="subtitle text-xs text-slate-300">
+                                        <div>Inicio: ${task.start}</div>
+                                        <div>Fin: ${task.end}</div>
+                                        <div class="mt-2 text-indigo-400 font-bold">${task.progress}% Completado</div>
+                                    </div>
+                                </div>
+                            `;
+                        },
+                        on_date_change: function (task, start, end) {
+                            updateActivity(task.id, { start: start, end: end });
+                        },
+                        on_progress_change: function (task, progress) {
+                            updateActivity(task.id, { progress: progress });
+                        }
+                    });
+                } else {
+                    alert("No se encontraron actividades en las versiones seleccionadas");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error al cargar versiones");
+            }
+        }
+
+        async function updateActivity(taskId, data) {
+            // Handle Frappe conversion of dates if needed or pass string
+            // Frappe passes Date objects
+            let payload = {};
+            if (data.start) payload.start = data.start.toISOString().split('T')[0];
+            if (data.end) payload.end = data.end.toISOString().split('T')[0];
+            if (data.progress !== undefined) payload.progress = data.progress;
+
+            try {
+                const res = await fetch(`/api/activities/${taskId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) {
+                    alert("Error al guardar cambios");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error de conexión");
             }
         }
 
