@@ -202,6 +202,17 @@
             background-color: #f9fafb;
         }
 
+        /* Summary Task Look */
+        .summary-task {
+            background-color: #f8fafc;
+            /* Very light gray */
+        }
+
+        .summary-task input {
+            font-weight: 700;
+            /* Force inputs to be bold too */
+        }
+
         .cell-input {
             width: 100%;
             height: 100%;
@@ -262,6 +273,20 @@
 </head>
 
 <body>
+
+    <!-- Global Error Handler -->
+    <div id="global-error"
+        style="display:none; background:#fee2e2; color:#b91c1c; padding:10px; text-align:center; border-bottom:1px solid #ef4444;">
+    </div>
+    <script>
+        window.onerror = function (msg, url, line, col, error) {
+            const div = document.getElementById('global-error');
+            div.style.display = 'block';
+            div.innerText = `Error Crítico: ${msg} (Línea ${line})`;
+            console.error("Global Error:", error);
+            return false;
+        };
+    </script>
 
     <!-- TOOLBAR -->
     <div id="main-toolbar">
@@ -478,16 +503,31 @@
                 // Build simple linear list, assuming flat stricture from backend for now
                 // Future: Hierarchical tree render
 
+                // Detect Summary Tasks (Parent Logic)
+                const isSummary = (index) => {
+                    if (index >= tasks.length - 1) return false;
+                    const currentLevel = (tasks[index]._style && tasks[index]._style.indent) || 0;
+                    const nextLevel = (tasks[index + 1]._style && tasks[index + 1]._style.indent) || 0;
+                    return nextLevel > currentLevel;
+                };
+
                 tasks.forEach((task, index) => {
                     const tr = document.createElement('tr');
                     tr.dataset.id = task.id;
                     tr.onclick = (e) => selectTask(task.id, e);
 
+                    // Auto-Bold Summary Tasks
+                    if (isSummary(index)) {
+                        tr.style.fontWeight = 'bold';
+                        tr.classList.add('summary-task'); // Hook for custom CSS
+                    }
+
                     // Apply Styles
                     if (task._style) applyRowStyle(tr, task._style);
                     if (selectedTaskIds.has(task.id)) tr.classList.add('selected');
 
-                    // Columns
+                    // Ensure fixed height
+                    tr.style.height = '50px';
                     // Calculate Indent
                     let indentLevel = 0;
                     if (task._style && task._style.indent) indentLevel = task._style.indent;
