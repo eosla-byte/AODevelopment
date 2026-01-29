@@ -515,6 +515,19 @@ async def delete_project(project_id: str, user = Depends(get_current_user)):
         # We should really replicate the 'require_org_access' logic but we don't have request context here easily.
         # Let's trust they are authenticated.
         
+        # Custom Cascade Delete (Since Models might not have cascade="all, delete" set in relationship)
+        # 1. Get all versions
+        versions = db.query(BimScheduleVersion).filter(BimScheduleVersion.project_id == project_id).all()
+        version_ids = [v.id for v in versions]
+        
+        if version_ids:
+            # 2. Delete all activities for these versions
+            db.query(BimActivity).filter(BimActivity.version_id.in_(version_ids)).delete(synchronize_session=False)
+            
+            # 3. Delete versions
+            db.query(BimScheduleVersion).filter(BimScheduleVersion.project_id == project_id).delete(synchronize_session=False)
+        
+        # 4. Delete Project
         db.delete(project)
         db.commit()
         return {"status": "success", "message": "Project deleted"}

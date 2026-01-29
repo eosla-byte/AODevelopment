@@ -64,6 +64,7 @@ def parse_xml(content: bytes):
                     start = task.find(f"{ns}Start")
                     finish = task.find(f"{ns}Finish")
                     percent = task.find(f"{ns}PercentComplete")
+                    outline_level = task.find(f"{ns}OutlineLevel")
                     
                     if name is not None and uid is not None:
                         t_data = {
@@ -71,9 +72,28 @@ def parse_xml(content: bytes):
                             "name": name.text,
                             "start": None,
                             "finish": None,
-                            "pct_complete": 0
+                            "pct_complete": 0,
+                            "predecessors": "",
+                            "contractor": "",
+                            "style": {} 
                         }
                         
+                         # Indentation (WBS Level)
+                        if outline_level is not None:
+                            try:
+                                lvl = int(outline_level.text)
+                                t_data["style"] = {"indent": max(0, lvl - 1)}
+                            except: pass
+                            
+                        # Dependencies
+                        preds = []
+                        for link in task.findall(f"{ns}PredecessorLink"):
+                            pred_uid = link.find(f"{ns}PredecessorUID")
+                            if pred_uid is not None:
+                                preds.append(pred_uid.text)
+                        if preds:
+                            t_data["predecessors"] = ",".join(preds)
+
                         if start is not None and start.text:
                             # MSP date format: 2024-01-29T08:00:00
                             t_data["start"] = start.text # Keep string or parse? Main expects datetime for SQL?
@@ -100,12 +120,39 @@ def parse_xml(content: bytes):
         
 
         
-        # 2. Extract Assignments / Resources if needed for "Contractor"
-        # For now, we will add default fields to tasks
+        # 2. Resources (Simple lookup map)
+        resources = {}
+        res_xml = root.find(f"{ns}Resources")
+        if res_xml is not None:
+            for res in res_xml.findall(f"{ns}Resource"):
+                r_uid = res.find(f"{ns}UID")
+                r_name = res.find(f"{ns}Name")
+                if r_uid is not None and r_name is not None:
+                    resources[r_uid.text] = r_name.text
+        
+        # Assignments
+        assign_xml = root.find(f"{ns}Assignments")
+        if assign_xml is not None and resources:
+            for asn in assign_xml.findall(f"{ns}Assignment"):
+                task_uid = asn.find(f"{ns}TaskUID")
+                res_uid = asn.find(f"{ns}ResourceUID")
+                
+                if task_uid and res_uid and res_uid.text in resources:
+                    target_task = next((t for t in tasks if t["activity_id"] == task_uid.text), None)
+                    if target_task:
+                        r_name = resources[res_uid.text]
+                        if target_task["contractor"]:
+                            target_task["contractor"] += f", {r_name}"
+                        else:
+                            target_task["contractor"] = r_name
+
+        import json
         for t in tasks:
-            t['contractor'] = "AO" # Default or extract from XML if avail
-            t['predecessors'] = "" 
-            # TODO: Extract <PredecessorLink> if available in Task element
+            # Serialize style for storage
+            if t.get("style"):
+                t["style"] = json.dumps(t["style"])
+            else:
+                t["style"] = None
         
         return {
             "project_name": "Imported Project",
