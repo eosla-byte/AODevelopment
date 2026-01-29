@@ -413,6 +413,10 @@ async def delete_user(user_id: str, user_jwt = Depends(get_current_admin)):
     db = SessionCore()
     user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
     if user:
+        # Manual Cascade: Delete Organization Memberships first
+        db.query(OrganizationUser).filter(OrganizationUser.user_id == user_id).delete()
+        
+        # Then delete the user
         db.delete(user)
         db.commit()
     db.close()
