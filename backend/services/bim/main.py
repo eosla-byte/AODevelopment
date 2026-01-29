@@ -31,7 +31,36 @@ elif sys.path[0] != BASE_DIR:
 from common.database import get_db, SessionExt, SessionCore 
 # Note: For this service, get_db should ideally point to SessionExt or we explicitely use SessionExt
 from common.auth_utils import decode_access_token, require_org_access
-from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity
+from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity as GlobalBimActivity, Base
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
+
+# REDEFINITION FIX: Override imported BimActivity to ensure new fields act properly if common module is stale
+class BimActivity(Base):
+    __tablename__ = 'bim_activities'
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    version_id = Column(String, ForeignKey('bim_schedule_versions.id'))
+    activity_id = Column(String) 
+    wbs_code = Column(String)
+    name = Column(String, nullable=False)
+    planned_start = Column(DateTime)
+    planned_finish = Column(DateTime)
+    actual_start = Column(DateTime)
+    actual_finish = Column(DateTime)
+    duration = Column(Float)
+    pct_complete = Column(Float, default=0.0)
+    
+    # Advanced Gantt Fields
+    contractor = Column(String) 
+    predecessors = Column(String) 
+    style = Column(String)
+    
+    parent_wbs = Column(String)
+    
+    # relationship needs to mirror original or be omitted if not used eagerly here
+    # version = relationship("BimScheduleVersion", back_populates="activities") 
+    # Skipping relationship redef to avoid conflict, accessing FK directly is fine for insert.
 try:
     from schedule_parser import parse_schedule
 except ImportError:
