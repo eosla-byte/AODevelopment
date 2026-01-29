@@ -145,10 +145,12 @@
                         <div class="flex -space-x-2">
                             <!-- Show some user avatars -->
                             {% for u in org.users[:3] %}
+                            {% if u.user %}
                             <div class="h-8 w-8 rounded-full ring-2 ring-white bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-700"
                                 title="{{ u.user.full_name }}">
                                 {{ u.user.full_name[:2].upper() }}
                             </div>
+                            {% endif %}
                             {% endfor %}
                             {% if org.users|length > 3 %}
                             <div
@@ -227,6 +229,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-slate-200">
                         {% for membership in current_org.users %}
+                        {% if membership.user %}
                         <tr>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
@@ -281,6 +284,7 @@
                                 </button>
                             </td>
                         </tr>
+                        {% endif %}
                         {% endfor %}
                     </tbody>
                 </table>
