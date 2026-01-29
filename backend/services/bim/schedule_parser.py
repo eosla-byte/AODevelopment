@@ -21,17 +21,15 @@ def parse_schedule(file_content: bytes, filename: str) -> dict:
     """
     filename = filename.lower()
     
-    if filename.endswith(".xer"):
-        return parse_xer(file_content)
     elif filename.endswith(".xml"):
         return parse_xml(file_content)
+    elif filename.endswith(".mpp"):
+        return parse_mpp(file_content)
     else:
-        raise ValueError("Formato no soportado. Use .xer (Primavera) o .xml (MS Project)")
+        raise ValueError("Formato no soportado. Use .xer, .xml o .mpp")
 
 def parse_xer(content: bytes):
     # TODO: Implement robust XER parsing
-    # XER is a tab-separated text format (CP1252 usually)
-    # This is a stub.
     return {
         "project_name": "Imported from Primavera",
         "activities": []
@@ -41,5 +39,16 @@ def parse_xml(content: bytes):
     # TODO: Implement MSP XML parsing
     return {
         "project_name": "Imported from MS Project",
+        "activities": []
+    }
+
+def parse_mpp(content: bytes):
+    """
+    Stub for MS Project Binary format (.mpp).
+    Real parsing requires heavy libs (like mpxj or Aspose).
+    For now, we accept the file to store it, but return 0 activities.
+    """
+    return {
+        "project_name": "MS Project File (.mpp)",
         "activities": []
     }
