@@ -157,7 +157,8 @@
             <div id="gantt-chart" class="p-6 h-full"></div>
 
             <!-- Floating Upload / Import Interface if empty -->
-            {% if tasks|length == 0 %}
+            {% if all_versions|length == 0 %}
+            <!-- Case 1: No files ever uploaded -->
             <div class="absolute inset-0 flex items-center justify-center bg-slate-50/80 backdrop-blur-sm z-0">
                 <div class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-lg border border-slate-100">
                     <div
@@ -165,7 +166,7 @@
                         📅
                     </div>
                     <h3 class="text-xl font-bold text-slate-800 mb-2">Cronograma Vacío</h3>
-                    <p class="text-slate-500 mb-6">Importa un archivo .MPP (Project), .XER (Primavera) o .XML para
+                    <p class="text-slate-500 mb-6">Importa un archivo .XML (Microsoft Project) o .XER (Primavera) para
                         visualizar
                         el cronograma.</p>
 
@@ -179,6 +180,35 @@
                             <span class="block text-xs text-slate-400 mt-1">Soporta .mpp, .xer y .xml (Max 4)</span>
                         </label>
                     </form>
+                </div>
+            </div>
+            {% elif tasks|length == 0 %}
+            <!-- Case 2: Files uploaded but parser returned 0 tasks (e.g. MPP stub) -->
+            <div class="absolute inset-0 flex items-center justify-center bg-slate-50/80 backdrop-blur-sm z-0">
+                <div class="bg-white p-8 rounded-2xl shadow-xl text-center max-w-lg border-l-4 border-amber-400">
+                    <div
+                        class="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 text-2xl mx-auto mb-4">
+                        ⚠️
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">Archivo Procesado sin Tareas</h3>
+                    <p class="text-slate-500 mb-4 text-sm">
+                        Hemos recibido el archivo <strong>{{ version.source_filename }}</strong>, pero no pudimos
+                        extraer tareas visuales.
+                    </p>
+                    <div class="bg-slate-100 p-3 rounded text-xs text-left text-slate-600 mb-6">
+                        <strong>Posibles causas:</strong>
+                        <ul class="list-disc pl-4 mt-1 space-y-1">
+                            <li>Es un archivo <strong>.MPP</strong> (Solo almacenamiento, no visualización).</li>
+                            <li>El archivo XML no tiene el formato estándar de MS Project.</li>
+                        </ul>
+                    </div>
+                    <p class="text-indigo-600 font-bold text-sm mb-4">Por favor, intenta subir una versión XML.</p>
+
+                    <label
+                        class="block w-full cursor-pointer bg-indigo-600 text-white rounded-lg py-3 hover:bg-indigo-700 transition font-medium">
+                        <input type="file" class="hidden" onchange="uploadSchedule(this)">
+                        Subir Archivo XML
+                    </label>
                 </div>
             </div>
             {% endif %}
