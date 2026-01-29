@@ -26,7 +26,7 @@ elif sys.path[0] != BASE_DIR:
     sys.path.remove(BASE_DIR)
     sys.path.insert(0, BASE_DIR)
 
-from common.database import get_db, SessionExt 
+from common.database import get_db, SessionExt, SessionCore 
 # Note: For this service, get_db should ideally point to SessionExt or we explicitely use SessionExt
 from common.auth_utils import decode_access_token, require_org_access
 from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity
