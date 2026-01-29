@@ -58,7 +58,7 @@ def debug_context(
     }
 
 # Mount Static if needed (Shared assets or dedicated?)
-from common.models import Organization, OrganizationUser, ServicePermission
+from common.models import Organization, OrganizationUser, ServicePermission, AccountUser
 from common.auth_utils import get_current_user
 
 @app.get("/api/me/organizations")
@@ -468,14 +468,45 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
         print("DEBUG: Parsing schedule...")
         schedule_data = parse_schedule(content, file.filename)
         
-        # 3. Save Version
+        # 3. Sync User (Fix Foreign Key Violation)
+        # Ensure user exists in BIM DB
+        user_id = user['id']
+        bim_user = db.query(BimUser).filter(BimUser.id == user_id).first()
+        
+        if not bim_user:
+            print(f"DEBUG: Syncing User {user_id} to BIM Service")
+            core_db = SessionCore()
+            try:
+                # Fetch original user
+                acc_user = core_db.query(AccountUser).filter(AccountUser.id == user_id).first()
+                if acc_user:
+                    bim_user = BimUser(
+                        id=acc_user.id,
+                        email=acc_user.email,
+                        hashed_password=acc_user.hashed_password,
+                        full_name=acc_user.full_name,
+                        role="Member", # Default
+                        # We don't verify organization here, assuming looser coupling for now
+                    )
+                    db.add(bim_user)
+                    db.commit()
+                else:
+                     # Fallback if somehow account user is missing (should not happen with valid token)
+                     print(f"WARN: User {user_id} not found in Accounts DB!")
+            except Exception as e:
+                print(f"ERROR Syncing User: {e}")
+                # Don't block, might fail FK if not added
+            finally:
+                core_db.close()
+        
+        # 4. Save Version
         new_version = BimScheduleVersion(
             id=str(uuid.uuid4()),
             project_id=project_id,
             version_name=f"Import {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
             source_filename=file.filename,
             source_type=file.filename.split('.')[-1].upper(),
-            imported_by=user['sub'] # Ideally ID
+            imported_by=user_id # Fix: Use UUID not Email
         )
         db.add(new_version)
         db.commit()
