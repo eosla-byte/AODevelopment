@@ -338,8 +338,10 @@ async def update_user(
     full_name: str = Form(None),
     company: str = Form(None),
     role: str = Form(None),
+    password: Optional[str] = Form(None),
+    status: Optional[str] = Form(None),
     # Permissions
-    access_aodev: bool = Form(False), # If checkboxes are unchecked, they might not send data? Javascript should handle sending booleans explicitly.
+    access_aodev: bool = Form(False),
     access_hr: bool = Form(False),
     access_projects: bool = Form(False),
     access_clients: bool = Form(False),
@@ -360,19 +362,18 @@ async def update_user(
     if full_name: user.full_name = full_name
     if company: user.company = company
     if role: user.role = role
+    if status: user.status = status
     
-    # Update Services
-    # We construct the dict again. 
-    # Note: If we hadpartial updates we'd merge, but here the UI will likely send all.
-    user.services_access = {
-        "AOdev": access_aodev,
-        "AO HR & Finance": access_hr,
-        "AO Projects": access_projects,
-        "AO Clients": access_clients,
-        "AODailyWork": access_daily,
-        "AOPlanSystem": access_bim,
-        "AOBuild": access_build
-    }
+    # Password update logic
+    if password and len(password.strip()) > 0:
+        print(f"Updating password for user {user.email}")
+        user.hashed_password = get_password_hash(password)
+    
+    # Update Permissions (Naive implementation for now - frontend toggles aren't sending this right yet anyway)
+    # We will just preserve existing structure or update if needed. 
+    # For now, let's allow updating the map if we want, OR disable to prevent wipe.
+    # Disabling full rewrite to prevent accidental clear until frontend is ready.
+    # user.services_access = ... 
     
     db.commit()
     db.close()
