@@ -180,15 +180,14 @@
             overflow: hidden;
         }
 
-        .gantt-table td {
-            border-bottom: 1px solid #f3f4f6;
-            border-right: 1px solid #f3f4f6;
-            padding: 0 8px;
-            height: var(--row-height);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            cursor: pointer;
+        border-bottom: 1px solid #f3f4f6;
+        border-right: 1px solid #f3f4f6;
+        padding: 0 8px;
+        height: var(--row-height);
+        white-space: nowrap;
+        /* overflow: hidden;  <-- REMOVED to show content */
+        /* text-overflow: ellipsis; <-- REMOVED */
+        cursor: pointer;
         }
 
         .gantt-table tr.selected {
@@ -461,8 +460,8 @@
                     <td class="text-center text-gray-500">${index + 1}</td>
                     <td>
                         <!-- Indent Placeholder -->
-                        <span class="wbs-indent" style="width: ${indentLevel * 20}px; display: inline-block;"></span>
-                        <input class="cell-input" style="width: calc(100% - ${indentLevel * 20}px);" value="${task.name}" onblur="updateField('${task.id}', 'name', this.value)">
+                        <span class="wbs-indent" style="width: ${indentLevel * 10}px; display: inline-block;"></span>
+                        <input class="cell-input" style="width: calc(100% - ${indentLevel * 10}px);" value="${task.name}" onblur="updateField('${task.id}', 'name', this.value)">
                     </td>
                     <td>
                         <input class="cell-input" value="${task.contractor || ''}" onblur="updateField('${task.id}', 'contractor', this.value)">
