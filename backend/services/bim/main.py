@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request, Depends, HTTPException, status, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 import sys
