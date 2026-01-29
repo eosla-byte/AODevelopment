@@ -462,31 +462,31 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
     content = await file.read()
     print(f"DEBUG: Read {len(content)} bytes")
     
+    db = SessionExt()
     try:
         # 2. Parse
         print("DEBUG: Parsing schedule...")
         schedule_data = parse_schedule(content, file.filename)
         
         # 3. Save Version
-        db = SessionExt()
-        try:
-            new_version = BimScheduleVersion(
-                id=str(uuid.uuid4()),
-                project_id=project_id,
-                version_name=f"Import {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
-                source_filename=file.filename,
-                source_type=file.filename.split('.')[-1].upper(),
-                imported_by=user['sub'] # Ideally ID
-            )
-            db.add(new_version)
-            db.commit()
-            
-            # Verify Persistence
-            check_count = db.query(BimScheduleVersion).filter(BimScheduleVersion.project_id == project_id).count()
-            print(f"DEBUG: Saved Version {new_version.id}. Total Versions for Project {project_id}: {check_count}")
+        new_version = BimScheduleVersion(
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            version_name=f"Import {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            source_filename=file.filename,
+            source_type=file.filename.split('.')[-1].upper(),
+            imported_by=user['sub'] # Ideally ID
+        )
+        db.add(new_version)
+        db.commit()
+        
+        # Verify Persistence
+        check_count = db.query(BimScheduleVersion).filter(BimScheduleVersion.project_id == project_id).count()
+        print(f"DEBUG: Saved Version {new_version.id}. Total Versions for Project {project_id}: {check_count}")
 
-            # 4. Save Activities
-            count = 0
+        # 4. Save Activities
+        count = 0
+        if schedule_data.get('activities'):
             for act in schedule_data['activities']:
                 new_act = BimActivity(
                     version_id=new_version.id,
@@ -494,24 +494,25 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
                     name=act.get("name"),
                     planned_start=act.get("start"),
                     planned_finish=act.get("finish"),
-                    pct_complete=act.get("pct_complete", 0.0),
-                    # duration calc?
+                    pct_complete=act.get("pct_complete", 0.0)
                 )
                 db.add(new_act)
                 count += 1
             
             db.commit()
-            print(f"DEBUG: Saved {count} activities for version {new_version.id}")
-            
-            return {"status": "ok", "message": f"Schedule imported successfully. {count} activities."}
-        except Exception as e:
-            db.rollback()
-            raise e
-        finally:
-            db.close()
+        
+        print(f"DEBUG: Saved {count} activities for version {new_version.id}")
+        
+        return {"status": "ok", "message": f"Schedule imported successfully. {count} activities."}
         
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        # Return 500 to trigger frontend error handling
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 @app.get("/api/projects/{project_id}/activities")
 async def get_project_activities(project_id: str, versions: str = "", user = Depends(get_current_user)):
