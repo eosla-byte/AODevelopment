@@ -98,10 +98,7 @@ def parse_xml(content: bytes):
                     print(f"Error parsing task: {e}")
                     continue
         
-                        tasks.append(t_data)
-                except Exception as e:
-                    print(f"Error parsing task: {e}")
-                    continue
+
         
         # 2. Extract Assignments / Resources if needed for "Contractor"
         # For now, we will add default fields to tasks
