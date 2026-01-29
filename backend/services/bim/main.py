@@ -197,13 +197,24 @@ async def dashboard(
                      user_has_perm = False
                      if m.role == "Admin":
                          user_has_perm = True
-                     elif m.permissions:
-                         # Check any valid key
-                         for key in valid_slugs:
-                             if m.permissions.get(key):
-                                 user_has_perm = True
-                                 break
+                     else:
+                         # 1. Check Org-Specific Perms
+                         if m.permissions:
+                             for key in valid_slugs:
+                                 if m.permissions.get(key):
+                                     user_has_perm = True
+                                     break
+                         
+                         # 2. Check Global User License (AccountUser)
+                         # If not found in Org Perms, check if they have a global license
+                         if not user_has_perm and m.user and m.user.services_access:
+                             for key in valid_slugs:
+                                 if m.user.services_access.get(key):
+                                     user_has_perm = True
+                                     break
                      
+                     print(f"DEBUG: User Has Perm: {user_has_perm}")
+
                      if user_has_perm:
                          return RedirectResponse(f"/dashboard?org_id={m.organization_id}")
              
