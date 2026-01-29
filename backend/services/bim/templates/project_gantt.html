@@ -376,7 +376,7 @@
 
     <script>
         // --- STATE ---
-        let tasks = {{ tasks_json | safe }} || [];
+        let tasks = {{ tasks_json | tojson | safe }};
         let gantt;
         let selectedTaskIds = new Set();
         const projectId = "{{ project.id }}";
