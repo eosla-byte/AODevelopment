@@ -178,18 +178,29 @@ async def dashboard(
                  OrganizationUser.user_id == user_id
              ).all()
              
+             valid_slugs = ["plans", "bim", "AOPlanSystem"]
+             
              for m in memberships:
-                 # Check Service Perm for this Org
-                 # Use 'plans' as the standard slug (matching Accounts Service)
+                 # Check Service Perm for this Org (Defensive Check)
                  op = db.query(ServicePermission).filter(
                     ServicePermission.organization_id == m.organization_id,
-                    ServicePermission.service_slug == "plans",
+                    ServicePermission.service_slug.in_(valid_slugs),
                     ServicePermission.is_active == True
                  ).first()
                  
-                 # Also check User Perm if not Admin (Strict check)
+                 # Check User Perm (Defensive Check)
                  if op:
-                     if m.role == "Admin" or (m.permissions and m.permissions.get("plans")):
+                     user_has_perm = False
+                     if m.role == "Admin":
+                         user_has_perm = True
+                     elif m.permissions:
+                         # Check any valid key
+                         for key in valid_slugs:
+                             if m.permissions.get(key):
+                                 user_has_perm = True
+                                 break
+                     
+                     if user_has_perm:
                          return RedirectResponse(f"/dashboard?org_id={m.organization_id}")
              
              # If no valid orgs found
@@ -206,10 +217,10 @@ async def dashboard(
              return RedirectResponse("/")
              
          # Check Service Perm
-         # Use 'plans' slug
+         valid_slugs = ["plans", "bim", "AOPlanSystem"]
          org_perm = db.query(ServicePermission).filter(
             ServicePermission.organization_id == org_id,
-            ServicePermission.service_slug == "plans",
+            ServicePermission.service_slug.in_(valid_slugs),
             ServicePermission.is_active == True
          ).first()
          
