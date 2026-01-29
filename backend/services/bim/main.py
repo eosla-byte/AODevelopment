@@ -244,13 +244,26 @@ async def dashboard(
              
          org = membership.organization
          
+         # 3. FETCH PROJECTS
+         ext_db = SessionExt()
+         projects = []
+         try:
+             print(f"DEBUG: Fetching Projects for Org {org_id}")
+             projects = ext_db.query(BimProject).filter(BimProject.organization_id == org_id).all()
+             print(f"DEBUG: Found {len(projects)} projects")
+         except Exception as e:
+             print(f"ERROR fetching projects: {e}")
+         finally:
+             ext_db.close()
+         
          return templates.TemplateResponse("dashboard.html", {
             "request": request, 
             "user_name": user.get("sub"), 
             "user_initials": user.get("sub")[:2].upper(),
             "org_name": org.name,
             "org_id": org.id,
-            "role": membership.role
+            "role": membership.role,
+            "projects": projects
          })
     finally:
         db.close()
@@ -292,11 +305,13 @@ async def create_project(
 
         if not membership:
              # Check if global admin? No, explicit membership required for ownership.
+             print(f"DEBUG: User {user['id']} denied access to org {data.organization_id}")
              raise HTTPException(status_code=403, detail="You are not a member of this organization.")
 
         # 2. Check/Sync BimOrganization
         bim_org = db.query(BimOrganization).filter(BimOrganization.id == data.organization_id).first()
         if not bim_org:
+            print(f"DEBUG: Syncing Organization {data.organization_id} from Accounts to BIM")
             # Fetch details from Accounts
             acc_org = accounts_db.query(Organization).filter(Organization.id == data.organization_id).first()
             if not acc_org:
@@ -323,6 +338,8 @@ async def create_project(
         db.add(new_project)
         db.commit()
         db.refresh(new_project)
+        
+        print(f"DEBUG: Created Project {new_project.id} | Name: {new_project.name} | Org: {new_project.organization_id}")
         
         return {"status": "success", "project_id": new_project.id, "message": "Project created"}
 
