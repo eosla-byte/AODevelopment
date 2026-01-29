@@ -680,15 +680,14 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
                     )
                 except TypeError:
                     # Fallback for outdated Deployment Code (Model mismatch)
+                    # Exclude ALL new fields (contractor, predecessors, style)
                     new_act = BimActivity(
                         version_id=new_version.id,
                         activity_id=act.get("activity_id"),
                         name=act.get("name"),
                         planned_start=act.get("start"),
                         planned_finish=act.get("finish"),
-                        pct_complete=act.get("pct_complete", 0.0),
-                        contractor=act.get("contractor"),
-                        predecessors=act.get("predecessors")
+                        pct_complete=act.get("pct_complete", 0.0)
                     )
                 db.add(new_act)
                 count += 1
@@ -735,9 +734,9 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "start": start_str,
                 "end": end_str,
                 "progress": act.pct_complete or 0,
-                "dependencies": act.predecessors or "",
+                "dependencies": getattr(act, 'predecessors', "") or "",
                 "custom_class": f"version-{act.version_id}", # Hook for styling if needed
-                "contractor": act.contractor or "N/A",
+                "contractor": getattr(act, 'contractor', "N/A") or "N/A",
                 "style": getattr(act, 'style', None)
             })
             
