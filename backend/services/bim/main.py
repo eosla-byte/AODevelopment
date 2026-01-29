@@ -454,10 +454,13 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
     if not user: return RedirectResponse("/auth/login")
     
     # 1. Read File
+    print(f"DEBUG: Receiving file upload {file.filename}")
     content = await file.read()
+    print(f"DEBUG: Read {len(content)} bytes")
     
     try:
         # 2. Parse
+        print("DEBUG: Parsing schedule...")
         schedule_data = parse_schedule(content, file.filename)
         
         # 3. Save Version
