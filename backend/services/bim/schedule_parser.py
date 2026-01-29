@@ -98,6 +98,18 @@ def parse_xml(content: bytes):
                     print(f"Error parsing task: {e}")
                     continue
         
+                        tasks.append(t_data)
+                except Exception as e:
+                    print(f"Error parsing task: {e}")
+                    continue
+        
+        # 2. Extract Assignments / Resources if needed for "Contractor"
+        # For now, we will add default fields to tasks
+        for t in tasks:
+            t['contractor'] = "AO" # Default or extract from XML if avail
+            t['predecessors'] = "" 
+            # TODO: Extract <PredecessorLink> if available in Task element
+        
         return {
             "project_name": "Imported Project",
             "activities": tasks

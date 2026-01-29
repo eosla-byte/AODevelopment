@@ -368,6 +368,10 @@ class BimActivity(Base):
     duration = Column(Float)
     pct_complete = Column(Float, default=0.0)
     
+    # Advanced Gantt Fields
+    contractor = Column(String) # Empresa Encargada
+    predecessors = Column(String) # JSON or String "1,2,3"
+    
     # Hierarchy
     parent_wbs = Column(String)
     

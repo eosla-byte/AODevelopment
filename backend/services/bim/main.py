@@ -8,6 +8,8 @@ import os
 import sys
 import uuid
 import datetime
+import pydantic
+from typing import Optional, List
 
 # Path Setup to allow importing 'backend.common'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -525,7 +527,9 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
                     name=act.get("name"),
                     planned_start=act.get("start"),
                     planned_finish=act.get("finish"),
-                    pct_complete=act.get("pct_complete", 0.0)
+                    pct_complete=act.get("pct_complete", 0.0),
+                    contractor=act.get("contractor"),
+                    predecessors=act.get("predecessors")
                 )
                 db.add(new_act)
                 count += 1
@@ -572,8 +576,9 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "start": start_str,
                 "end": end_str,
                 "progress": act.pct_complete or 0,
-                "dependencies": "",
-                "custom_class": f"version-{act.version_id}" # Hook for styling if needed
+                "dependencies": act.predecessors or "",
+                "custom_class": f"version-{act.version_id}", # Hook for styling if needed
+                "contractor": act.contractor or "N/A"
             })
             
         return tasks_json
