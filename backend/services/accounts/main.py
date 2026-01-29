@@ -369,11 +369,14 @@ async def update_user(
         print(f"Updating password for user {user.email}")
         user.hashed_password = get_password_hash(password)
     
-    # Update Permissions (Naive implementation for now - frontend toggles aren't sending this right yet anyway)
-    # We will just preserve existing structure or update if needed. 
-    # For now, let's allow updating the map if we want, OR disable to prevent wipe.
-    # Disabling full rewrite to prevent accidental clear until frontend is ready.
-    # user.services_access = ... 
+    # Update Permissions (Partial update for now)
+    current_perms = dict(user.services_access or {})
+    
+    if access_bim: 
+        current_perms["AOPlanSystem"] = True
+    
+    # Re-assign to trigger SQLAlchemy detection
+    user.services_access = current_perms 
     
     db.commit()
     db.close()
