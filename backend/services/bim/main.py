@@ -31,40 +31,151 @@ elif sys.path[0] != BASE_DIR:
 from common.database import get_db, SessionExt, SessionCore 
 # Note: For this service, get_db should ideally point to SessionExt or we explicitely use SessionExt
 from common.auth_utils import decode_access_token, require_org_access
-from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity as GlobalBimActivity, Base
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
-
-# REDEFINITION FIX: Override imported BimActivity to ensure new fields act properly if common module is stale
-class BimActivity(Base):
-    __tablename__ = 'bim_activities'
-    __table_args__ = {'extend_existing': True}
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    version_id = Column(String, ForeignKey('bim_schedule_versions.id'))
-    activity_id = Column(String) 
-    wbs_code = Column(String)
-    name = Column(String, nullable=False)
-    planned_start = Column(DateTime)
-    planned_finish = Column(DateTime)
-    actual_start = Column(DateTime)
-    actual_finish = Column(DateTime)
-    duration = Column(Float)
-    pct_complete = Column(Float, default=0.0)
-    
-    # Advanced Gantt Fields
-    contractor = Column(String) 
-    predecessors = Column(String) 
-    style = Column(String)
-    
-    parent_wbs = Column(String)
-    
-    # relationship needs to mirror original or be omitted if not used eagerly here
-    # version = relationship("BimScheduleVersion", back_populates="activities") 
-    # Skipping relationship redef to avoid conflict, accessing FK directly is fine for insert.
+from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity
 try:
     from schedule_parser import parse_schedule
 except ImportError:
     from .schedule_parser import parse_schedule
+
+try:
+    from routers import auth as auth
+except ImportError:
+    # Fallback to direct import, relying on sys.path[0] == BASE_DIR
+    import routers.auth as auth
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+# --- ENDPOINTS ---
+
+@app.get("/api/projects/{project_id}/activities")
+async def get_project_activities(project_id: str, versions: str = "", user = Depends(get_current_user)):
+    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    version_ids = [v.strip() for v in versions.split(",") if v.strip()]
+    if not version_ids: return []
+    
+    db = SessionExt()
+    try:
+        activities = db.query(BimActivity).filter(BimActivity.version_id.in_(version_ids)).all()
+        
+        tasks_json = []
+        for act in activities:
+             start_str = act.planned_start.strftime("%Y-%m-%d") if act.planned_start else datetime.datetime.now().strftime("%Y-%m-%d")
+             end_str = act.planned_finish.strftime("%Y-%m-%d") if act.planned_finish else datetime.datetime.now().strftime("%Y-%m-%d")
+             
+             # Append Version info to name if comparing
+             name_display = act.name
+             # If multiple versions, maybe prefix?
+             # For now keep simple.
+             
+             # SAFE ACCESS to style
+             style_val = getattr(act, 'style', None)
+             
+             tasks_json.append({
+                "id": str(act.activity_id) if act.activity_id else str(act.id),
+                "name": name_display,
+                "start": start_str,
+                "end": end_str,
+                "progress": act.pct_complete or 0,
+                "dependencies": act.predecessors or "",
+                "custom_class": f"version-{act.version_id}", # Hook for styling if needed
+                "contractor": act.contractor or "N/A",
+                "style": style_val
+            })
+            
+        return tasks_json
+    finally:
+        db.close()
+        
+# ... (ActivityUpdateRequest defined later)
+
+@app.post("/api/projects/{project_id}/schedule")
+async def upload_schedule(project_id: str, file: UploadFile = File(...), user = Depends(get_current_user)):
+    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # 1. Read File
+    content = await file.read()
+    
+    # 2. Parse
+    try:
+        schedule_data = parse_schedule(content, file.filename)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error parsing file: {e}")
+
+    db = SessionExt()
+    core_db = SessionCore()
+    try:
+        # 3. Verify Project Exists
+        # ... existing logic ...
+        
+        # 4. Save Version
+        new_version = BimScheduleVersion(
+            id=str(uuid.uuid4()),
+            project_id=project_id,
+            version_name=f"Import {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            source_filename=file.filename,
+            source_type=file.filename.split('.')[-1].upper(),
+            imported_by=user_id 
+        )
+        db.add(new_version)
+        db.commit()
+        
+        # 4. Save Activities
+        count = 0
+        if schedule_data.get('activities'):
+            for act in schedule_data['activities']:
+                try:
+                    # Try creating with style
+                    new_act = BimActivity(
+                        version_id=new_version.id,
+                        activity_id=act.get("activity_id"),
+                        name=act.get("name"),
+                        planned_start=act.get("start"),
+                        planned_finish=act.get("finish"),
+                        pct_complete=act.get("pct_complete", 0.0),
+                        contractor=act.get("contractor"),
+                        predecessors=act.get("predecessors"),
+                        style=act.get("style")
+                    )
+                except TypeError:
+                    # Fallback for stale model definition (missing style kwarg)
+                    new_act = BimActivity(
+                        version_id=new_version.id,
+                        activity_id=act.get("activity_id"),
+                        name=act.get("name"),
+                        planned_start=act.get("start"),
+                        planned_finish=act.get("finish"),
+                        pct_complete=act.get("pct_complete", 0.0),
+                        contractor=act.get("contractor"),
+                        predecessors=act.get("predecessors")
+                    )
+                    
+                db.add(new_act)
+                count += 1
+            
+            db.commit()
+        
+        return {"status": "ok", "message": f"Schedule imported successfully. {count} activities."}
+        
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+        core_db.close()
 
 try:
     from routers import auth as auth
