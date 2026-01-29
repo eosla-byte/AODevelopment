@@ -160,19 +160,41 @@ async def login_page(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(
     request: Request, 
-    org_id: str, # REQUIRED param
-    user = Depends(get_current_user)
+    user = Depends(get_current_user),
+    org_id: str = None # Optional
 ):
     """
     Workspace Dashboard.
-    Requires org_id query param to define context.
+    If org_id missing, auto-select first valid org.
     """
     db = SessionCore()
     try:
-         # 1. Validate Access (Manual check akin to require_org_access)
-         # We do this here because we are in a GET HTML route, not API with Headers.
          user_id = user['id']
          
+         # 1. Handle Missing Org ID (Auto-Select)
+         if not org_id:
+             # Fetch valid memberships
+             memberships = db.query(OrganizationUser).filter(
+                 OrganizationUser.user_id == user_id
+             ).all()
+             
+             for m in memberships:
+                 # Check Service Perm for this Org
+                 op = db.query(ServicePermission).filter(
+                    ServicePermission.organization_id == m.organization_id,
+                    ServicePermission.service_slug == "bim",
+                    ServicePermission.is_active == True
+                 ).first()
+                 
+                 # Also check User Perm if not Admin (Strict check)
+                 if op:
+                     if m.role == "Admin" or (m.permissions and m.permissions.get("bim")):
+                         return RedirectResponse(f"/dashboard?org_id={m.organization_id}")
+             
+             # If no valid orgs found
+             return HTMLResponse("<h1>No accessible BIM Organizations found. Contact your Admin.</h1>", status_code=403)
+
+         # 2. Validate Specific Org Access
          membership = db.query(OrganizationUser).filter(
              OrganizationUser.organization_id == org_id,
              OrganizationUser.user_id == user_id
