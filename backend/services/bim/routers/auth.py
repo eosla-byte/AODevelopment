@@ -70,7 +70,16 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
         })
         
         response = RedirectResponse(url="/dashboard", status_code=303)
-        response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
+        # Standardize to 'accounts_access_token' for shared auth compatibility
+        # Set domain for SSO
+        response.set_cookie(
+            key="accounts_access_token", 
+            value=f"Bearer {access_token}", 
+            httponly=True,
+            samesite="lax",
+            domain=".somosao.com",
+            secure=False # Set True if SSL
+        )
         return response
     except Exception as e:
         import traceback
@@ -81,7 +90,9 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
 @router.get("/logout")
 async def logout():
     response = RedirectResponse(url="/auth/login", status_code=303)
-    response.delete_cookie("access_token")
+    response.delete_cookie("accounts_access_token", domain=".somosao.com")
+    # Also delete host-only just in case
+    response.delete_cookie("accounts_access_token") 
     return response
 
 @router.get("/register", response_class=HTMLResponse)
