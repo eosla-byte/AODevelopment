@@ -44,7 +44,7 @@ def decode_access_token(token: str):
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token") # Adjust tokenUrl if needed, e.g. /api/plugin/login but this is for Swagger UI mainly
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token", auto_error=False)
 
 def verify_token_dep(token: str = Depends(oauth2_scheme)):
     payload = decode_access_token(token)
