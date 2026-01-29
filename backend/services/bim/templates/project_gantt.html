@@ -41,6 +41,9 @@
             gap: 1.5rem;
             box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
             z-index: 20;
+            overflow-x: auto;
+            /* Allow scroll if screen is too narrow */
+            white-space: nowrap;
         }
 
         .toolbar-group {
@@ -914,14 +917,39 @@
                 const formData = new FormData();
                 formData.append('file', file);
 
+                // Show loading by changing button text temporarily
+                const btn = document.querySelector('button[onclick*="file-upload"]');
+                const originalContent = btn ? btn.innerHTML : '';
+                if (btn) {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+                    btn.disabled = true;
+                }
+
                 try {
                     const res = await fetch(`/api/projects/${projectId}/schedule`, {
                         method: 'POST',
                         body: formData
                     });
-                    if (res.ok) window.location.reload();
-                    else alert("Error upload");
-                } catch (err) { alert(err); }
+
+                    const data = await res.json();
+
+                    if (!res.ok) {
+                        throw new Error(data.detail || "Error al subir");
+                    }
+
+                    alert("Importación exitosa. La página se recargará.");
+                    location.reload();
+                } catch (err) {
+                    console.error(err);
+                    alert("Aviso: " + err.message);
+                } finally {
+                    if (btn) {
+                        btn.innerHTML = originalContent;
+                        btn.disabled = false;
+                    }
+                    // Reset input
+                    e.target.value = '';
+                }
             }
 
         </script>

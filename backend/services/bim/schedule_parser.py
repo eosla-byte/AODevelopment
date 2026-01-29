@@ -166,7 +166,5 @@ def parse_mpp(content: bytes):
     """
     Stub for MS Project Binary format (.mpp).
     """
-    return {
-        "project_name": "MS Project File (.mpp) - Parsing Not Supported",
-        "activities": [] # Empty for now
-    }
+    # Raising error to prompt user for XML
+    raise ValueError("El formato .MPP requiere conversión. Por favor guarde su archivo como .XML en MS Project e intente nuevamente.")
