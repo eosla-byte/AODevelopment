@@ -31,7 +31,7 @@ elif sys.path[0] != BASE_DIR:
 
 from common.database import get_db, SessionExt, SessionCore 
 # Note: For this service, get_db should ideally point to SessionExt or we explicitely use SessionExt
-from common.auth_utils import decode_access_token, require_org_access
+from common.auth_utils import decode_access_token, require_org_access, get_current_user
 from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity
 try:
     from schedule_parser import parse_schedule
