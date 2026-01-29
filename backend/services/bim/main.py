@@ -257,6 +257,84 @@ async def dashboard(
 
 
 
+
+# --- API Endpoints ---
+
+import pydantic
+
+class ProjectCreateRequest(pydantic.BaseModel):
+    name: str
+    description: str = ""
+    organization_id: str
+
+@app.post("/api/projects")
+async def create_project(
+    data: ProjectCreateRequest,
+    user = Depends(get_current_user)
+):
+    """
+    Create a new project.
+    Auto-syncs Organization if missing in BIM DB.
+    """
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    db = SessionExt() # BIM DB
+    accounts_db = SessionCore() # Accounts DB (for syncing)
+    try:
+        # 1. Validate Access to Org
+        # (Re-using logic or trusting payload + verification)
+        # Verify user is actually in this org in Accounts
+        membership = accounts_db.query(OrganizationUser).filter(
+            OrganizationUser.organization_id == data.organization_id,
+            OrganizationUser.user_id == user["id"]
+        ).first()
+
+        if not membership:
+             # Check if global admin? No, explicit membership required for ownership.
+             raise HTTPException(status_code=403, detail="You are not a member of this organization.")
+
+        # 2. Check/Sync BimOrganization
+        bim_org = db.query(BimOrganization).filter(BimOrganization.id == data.organization_id).first()
+        if not bim_org:
+            # Fetch details from Accounts
+            acc_org = accounts_db.query(Organization).filter(Organization.id == data.organization_id).first()
+            if not acc_org:
+                raise HTTPException(status_code=404, detail="Organization not found in Accounts System")
+            
+            # Create in BIM
+            bim_org = BimOrganization(
+                id=acc_org.id,
+                name=acc_org.name,
+                tax_id=acc_org.tax_id,
+                logo_url=acc_org.logo_url
+            )
+            db.add(bim_org)
+            db.commit() # Commit org first
+            
+        # 3. Create Project
+        new_project = BimProject(
+            id=str(uuid.uuid4()),
+            organization_id=data.organization_id,
+            name=data.name,
+            description=data.description,
+            status="Active"
+        )
+        db.add(new_project)
+        db.commit()
+        db.refresh(new_project)
+        
+        return {"status": "success", "project_id": new_project.id, "message": "Project created"}
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+        accounts_db.close()
+
+
 @app.get("/projects", response_class=HTMLResponse)
 async def projects_list(request: Request, user = Depends(get_current_user)):
     if not user: return RedirectResponse("/auth/login")
