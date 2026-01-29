@@ -9,18 +9,19 @@ SECRET_KEY = "AO_RESOURCES_SUPER_SECRET_KEY_CHANGE_THIS_IN_PROD"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 Hours
 
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 def verify_password(plain_password, hashed_password):
     if not hashed_password: return False
-    if isinstance(hashed_password, str):
-        hashed_password = hashed_password.encode('utf-8')
-    if isinstance(plain_password, str):
-        plain_password = plain_password.encode('utf-8')
-    return bcrypt.checkpw(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
 
 def get_password_hash(password):
-    if isinstance(password, str):
-        password = password.encode('utf-8')
-    return bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8')
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -43,7 +44,7 @@ def decode_access_token(token: str):
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token") # Adjust tokenUrl if needed, e.g. /api/plugin/login but this is for Swagger UI mainly
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token", auto_error=False)
 
 def verify_token_dep(token: str = Depends(oauth2_scheme)):
     payload = decode_access_token(token)
@@ -59,10 +60,13 @@ async def get_current_user(
     request: Request,
     token: Optional[str] = Depends(oauth2_scheme)
 ):
-    # 1. Try Token from Header (OAuth2PasswordBearer)
-    # 2. If missing, Try Cookie
+    # Debug Logging
+    # print(f"DEBUG AUTH: Header Token: {True if token else False}")
+    
+    # 1. Try Token from Header (OAuth2PasswordBearer) -> 2. If missing, Try Cookie
     if not token:
         cookie_token = request.cookies.get("accounts_access_token")
+        # print(f"DEBUG AUTH: Cookie Token Found: {True if cookie_token else False}")
         if cookie_token:
             # Handle "Bearer <token>" or just "<token>"
             if cookie_token.startswith("Bearer "):
@@ -71,6 +75,7 @@ async def get_current_user(
                 token = cookie_token
     
     if not token:
+        print("DEBUG AUTH: No token found in Header OR Cookie.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated (No Header or Cookie)",
@@ -79,6 +84,7 @@ async def get_current_user(
 
     payload = decode_access_token(token)
     if payload is None:
+        print("DEBUG AUTH: Token decode failed (Invalid or Expired).")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
