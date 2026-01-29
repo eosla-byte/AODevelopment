@@ -178,7 +178,9 @@ async def dashboard(
                  OrganizationUser.user_id == user_id
              ).all()
              
-             valid_slugs = ["plans", "bim", "AOPlanSystem"]
+             valid_slugs = ["plans", "bim", "AOPlanSystem", "PLANS", "BIM", "PlanSystem"]
+             
+             print(f"DEBUG: Checking {len(memberships)} memberships for user {user_id}")
              
              for m in memberships:
                  # Check Service Perm for this Org (Defensive Check)
@@ -187,6 +189,8 @@ async def dashboard(
                     ServicePermission.service_slug.in_(valid_slugs),
                     ServicePermission.is_active == True
                  ).first()
+                 
+                 print(f"DEBUG: Org {m.organization_id} | Role {m.role} | ServiceFound: {True if op else False} ({op.service_slug if op else 'None'})")
                  
                  # Check User Perm (Defensive Check)
                  if op:
@@ -217,7 +221,7 @@ async def dashboard(
              return RedirectResponse("/")
              
          # Check Service Perm
-         valid_slugs = ["plans", "bim", "AOPlanSystem"]
+         valid_slugs = ["plans", "bim", "AOPlanSystem", "PLANS", "BIM", "PlanSystem"]
          org_perm = db.query(ServicePermission).filter(
             ServicePermission.organization_id == org_id,
             ServicePermission.service_slug.in_(valid_slugs),
