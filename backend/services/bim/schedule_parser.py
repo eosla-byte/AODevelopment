@@ -21,7 +21,7 @@ def parse_schedule(file_content: bytes, filename: str) -> dict:
     """
     filename = filename.lower()
     
-    elif filename.endswith(".xml"):
+    if filename.endswith(".xml"):
         return parse_xml(file_content)
     elif filename.endswith(".mpp"):
         return parse_mpp(file_content)

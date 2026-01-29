@@ -31,9 +31,9 @@ from common.database import get_db, SessionExt, SessionCore
 from common.auth_utils import decode_access_token, require_org_access
 from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity
 try:
-    from .schedule_parser import parse_schedule
-except ImportError:
     from schedule_parser import parse_schedule
+except ImportError:
+    from .schedule_parser import parse_schedule
 
 try:
     from routers import auth as auth
