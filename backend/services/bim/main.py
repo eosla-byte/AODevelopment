@@ -180,15 +180,16 @@ async def dashboard(
              
              for m in memberships:
                  # Check Service Perm for this Org
+                 # Use 'plans' as the standard slug (matching Accounts Service)
                  op = db.query(ServicePermission).filter(
                     ServicePermission.organization_id == m.organization_id,
-                    ServicePermission.service_slug == "bim",
+                    ServicePermission.service_slug == "plans",
                     ServicePermission.is_active == True
                  ).first()
                  
                  # Also check User Perm if not Admin (Strict check)
                  if op:
-                     if m.role == "Admin" or (m.permissions and m.permissions.get("bim")):
+                     if m.role == "Admin" or (m.permissions and m.permissions.get("plans")):
                          return RedirectResponse(f"/dashboard?org_id={m.organization_id}")
              
              # If no valid orgs found
@@ -205,10 +206,10 @@ async def dashboard(
              return RedirectResponse("/")
              
          # Check Service Perm
-         # (Assuming if they got here via selector, they have it, but verify)
+         # Use 'plans' slug
          org_perm = db.query(ServicePermission).filter(
             ServicePermission.organization_id == org_id,
-            ServicePermission.service_slug == "bim",
+            ServicePermission.service_slug == "plans",
             ServicePermission.is_active == True
          ).first()
          
