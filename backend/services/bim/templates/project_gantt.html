@@ -186,8 +186,8 @@
             padding: 0 8px;
             height: var(--row-height);
             white-space: nowrap;
-            /* overflow: hidden;  <-- REMOVED to show content */
-            /* text-overflow: ellipsis; <-- REMOVED */
+            overflow: hidden;
+            text-overflow: ellipsis;
             cursor: pointer;
         }
 
@@ -421,8 +421,14 @@
                     if (tasks && tasks.length > 0) {
                         // Process dates
                         tasks = tasks.map(t => {
-                            t.start = new Date(t.start);
-                            t.end = new Date(t.end);
+                            // Safe Date Parsing
+                            const parseDate = (d) => {
+                                const date = new Date(d);
+                                return isNaN(date.getTime()) ? new Date() : date;
+                            };
+                            t.start = parseDate(t.start);
+                            t.end = parseDate(t.end);
+
                             if (t.style && typeof t.style === 'string') {
                                 try { t._style = JSON.parse(t.style); } catch (e) { }
                             }
@@ -486,8 +492,10 @@
                     <td class="text-center text-gray-500">${index + 1}</td>
                     <td>
                         <!-- Indent Placeholder -->
-                        <span class="wbs-indent" style="width: ${indentLevel * 10}px; display: inline-block;"></span>
-                        <input class="cell-input" style="width: calc(100% - ${indentLevel * 10}px);" value="${task.name}" onblur="updateField('${task.id}', 'name', this.value)">
+                        <div style="display: flex; align-items: center;" title="${task.name}">
+                             <span class="wbs-indent" style="width: ${indentLevel * 10}px; display: inline-block; flex-shrink: 0;"></span>
+                             <input class="cell-input" style="flex-grow: 1;" value="${task.name}" onblur="updateField('${task.id}', 'name', this.value)">
+                        </div>
                     </td>
                     <td>
                         <input class="cell-input" value="${task.contractor || ''}" onblur="updateField('${task.id}', 'contractor', this.value)">
