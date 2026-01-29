@@ -666,17 +666,30 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
         count = 0
         if schedule_data.get('activities'):
             for act in schedule_data['activities']:
-                new_act = BimActivity(
-                    version_id=new_version.id,
-                    activity_id=act.get("activity_id"),
-                    name=act.get("name"),
-                    planned_start=act.get("start"),
-                    planned_finish=act.get("finish"),
-                    pct_complete=act.get("pct_complete", 0.0),
-                    contractor=act.get("contractor"),
-                    predecessors=act.get("predecessors"),
-                    style=act.get("style")
-                )
+                try:
+                    new_act = BimActivity(
+                        version_id=new_version.id,
+                        activity_id=act.get("activity_id"),
+                        name=act.get("name"),
+                        planned_start=act.get("start"),
+                        planned_finish=act.get("finish"),
+                        pct_complete=act.get("pct_complete", 0.0),
+                        contractor=act.get("contractor"),
+                        predecessors=act.get("predecessors"),
+                        style=act.get("style")
+                    )
+                except TypeError:
+                    # Fallback for outdated Deployment Code (Model mismatch)
+                    new_act = BimActivity(
+                        version_id=new_version.id,
+                        activity_id=act.get("activity_id"),
+                        name=act.get("name"),
+                        planned_start=act.get("start"),
+                        planned_finish=act.get("finish"),
+                        pct_complete=act.get("pct_complete", 0.0),
+                        contractor=act.get("contractor"),
+                        predecessors=act.get("predecessors")
+                    )
                 db.add(new_act)
                 count += 1
             
@@ -725,7 +738,7 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "dependencies": act.predecessors or "",
                 "custom_class": f"version-{act.version_id}", # Hook for styling if needed
                 "contractor": act.contractor or "N/A",
-                "style": act.style
+                "style": getattr(act, 'style', None)
             })
             
         return tasks_json
@@ -771,7 +784,9 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
         if data.end:
             try: act.planned_finish = datetime.datetime.strptime(data.end, "%Y-%m-%d")
             except: pass
-        if data.style: act.style = data.style
+        if data.style: 
+            try: act.style = data.style
+            except: pass
             
         db.commit()
         return {"status": "success"}
