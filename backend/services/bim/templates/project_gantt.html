@@ -813,43 +813,149 @@
         } // End renderGantt
 
         function drawCommentIndicators() {
-            // Find bars with comments and append icon
+            const svg = document.getElementById('gantt-target');
+            if (!svg) return;
+
+            // Remove existing
+            svg.querySelectorAll('.comment-indicator').forEach(el => el.remove());
+
             tasks.forEach(t => {
                 if (t.comments && t.comments.length > 0) {
-                    const barWrapper = document.querySelector(`.bar-wrapper[data-id="${t.id}"]`);
+                    const barWrapper = svg.querySelector(`.bar-wrapper[data-id="${t.id}"]`);
                     if (!barWrapper) return;
 
                     const barGroup = barWrapper.querySelector('.bar-group');
                     if (!barGroup) return;
 
-                    // Get bar width/coords
-                    const bar = barGroup.querySelector('.bar');
+                    const bar = barWrapper.querySelector('.bar');
                     if (!bar) return;
+
                     const width = parseFloat(bar.getAttribute('width'));
-                    const height = parseFloat(bar.getAttribute('height'));
+                    const y = parseFloat(bar.getAttribute('y'));
                     const x = parseFloat(bar.getAttribute('x'));
 
-                    // Create Group for Icon
-                    // We want it slightly after the bar
-                    const iconX = x + width + 5;
-                    const iconY = 4; // Centered relative to bar height 20? 
-
-                    // SVG Bubble Icon
+                    // Create Indicator (Red Bubble)
                     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                    g.innerHTML = `
-                        <circle cx="${iconX + 6}" cy="${iconY + 6}" r="6" fill="white" stroke="#6b7280" stroke-width="1"></circle>
-                        <path d="M${iconX + 3} ${iconY + 6} H${iconX + 9}" stroke="#6b7280" stroke-width="2" stroke-linecap="round"></path>
-                        <title>Comentarios: ${t.comments.length}</title>
-                     `;
+                    g.classList.add('comment-indicator');
                     g.style.cursor = 'pointer';
+
+                    // Circle
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', x + width);
+                    circle.setAttribute('cy', y);
+                    circle.setAttribute('r', 5);
+                    circle.setAttribute('fill', '#ef4444');
+                    circle.setAttribute('stroke', 'white');
+                    circle.setAttribute('stroke-width', '1');
+
+                    g.appendChild(circle);
+
+                    // Interaction
                     g.onclick = (e) => {
                         e.stopPropagation();
-                        alert("Comentarios:\n" + t.comments.map(c => `- ${c.text}`).join('\n'));
+                        showTaskComments(t.id);
                     };
 
-                    barGroup.appendChild(g);
+                    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                    title.textContent = `${t.comments.length} Comentarios`;
+                    g.appendChild(title);
+
+                    barWrapper.appendChild(g);
                 }
             });
+        }
+
+        function showTaskComments(id) {
+            const t = tasks.find(x => x.id === id);
+            if (!t) return;
+
+            // Remove existing overlay
+            const existing = document.getElementById('comments-overlay');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'comments-overlay';
+            overlay.className = "fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center";
+            overlay.onclick = (e) => {
+                if (e.target === overlay) overlay.remove();
+            };
+
+            const content = document.createElement('div');
+            content.className = "bg-white rounded-lg shadow-xl w-96 p-4 max-h-[80vh] flex flex-col";
+
+            const header = document.createElement('div');
+            header.className = "flex justify-between items-center border-b pb-2 mb-2";
+            header.innerHTML = `<h3 class="font-bold text-gray-800 truncate" title="${t.name}">${t.name}</h3><button class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>`;
+            header.querySelector('button').onclick = () => overlay.remove();
+            content.appendChild(header);
+
+            const list = document.createElement('div');
+            list.className = "flex-1 overflow-y-auto space-y-3";
+
+            const renderList = () => {
+                list.innerHTML = '';
+                if (!t.comments || t.comments.length === 0) {
+                    list.innerHTML = '<div class="text-gray-400 text-xs italic text-center p-4">Sin comentarios</div>';
+                    return;
+                }
+                t.comments.forEach(c => {
+                    const item = document.createElement('div');
+                    item.className = "bg-gray-50 p-2 rounded text-sm";
+                    let dateStr = "Fecha desconocida";
+                    try { dateStr = new Date(c.date).toLocaleString(); } catch (e) { }
+
+                    item.innerHTML = `
+                        <div class="text-xs text-blue-600 font-semibold mb-1 flex justify-between">
+                            <span>${c.user || 'Usuario'}</span>
+                            <span class="text-gray-400 font-normal">${dateStr}</span>
+                        </div>
+                        <div class="text-gray-700 whitespace-pre-wrap">${c.text}</div>
+                    `;
+                    list.appendChild(item);
+                });
+                list.scrollTop = list.scrollHeight;
+            };
+            renderList();
+            content.appendChild(list);
+
+            // Footer
+            const footer = document.createElement('div');
+            footer.className = "mt-3 pt-2 border-t flex gap-2";
+            const input = document.createElement('input');
+            input.className = "flex-1 border rounded px-2 py-1 text-sm";
+            input.placeholder = "Escribe un comentario...";
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') btn.click();
+            };
+
+            const btn = document.createElement('button');
+            btn.className = "bg-blue-600 text-white px-3 py-1 rounded text-sm";
+            btn.innerText = "Enviar";
+            btn.onclick = async () => {
+                const txt = input.value.trim();
+                if (!txt) return;
+
+                if (!t.comments) t.comments = [];
+                t.comments.push({
+                    text: txt,
+                    date: new Date().toISOString(),
+                    user: "Usuario"
+                    // In real app, we'd get current user name from context or backend would set it
+                });
+
+                await updateField(t.id, 'comments', t.comments);
+
+                input.value = '';
+                renderList();
+                drawCommentIndicators(); // Refresh bubble
+            };
+
+            footer.appendChild(input);
+            footer.appendChild(btn);
+            content.appendChild(footer);
+
+            overlay.appendChild(content);
+            document.body.appendChild(overlay);
         }
 
 
