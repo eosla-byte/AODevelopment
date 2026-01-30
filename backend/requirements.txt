@@ -12,3 +12,4 @@ jinja2
 openai
 jpype1
 mpxj
+bcrypt==4.0.1

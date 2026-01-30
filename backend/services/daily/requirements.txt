@@ -8,3 +8,5 @@ python-multipart
 jinja2
 requests
 python-dotenv
+
+bcrypt==4.0.1

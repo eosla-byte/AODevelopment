@@ -11,3 +11,5 @@ pydantic
 python-dotenv
 jinja2
 openai
+
+bcrypt==4.0.1
