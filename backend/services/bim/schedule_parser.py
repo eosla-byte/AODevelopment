@@ -175,10 +175,57 @@ def parse_mpp(content: bytes) -> dict:
     import sys
     import glob
     
-    # 1. Ensure JVM is started and JAVA_HOME is set
+    import tarfile
+    import urllib.request
+    
+    # 1. Ensure JVM is started
     if not jpype.isJVMStarted():
         
-        # Helper to recursively find libjvm.so (critical for Nix/Railway)
+        def download_jdk():
+            """Downloads and extracts JDK to /tmp/jdk if missing."""
+            JDK_URL = "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.9%2B9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.9_9.tar.gz"
+            DEST_DIR = "/tmp/jdk"
+            LIBJVM_PATH = os.path.join(DEST_DIR, "lib", "server", "libjvm.so")
+            
+            # Check if likely already installed (e.g. from previous run if persistent /tmp?)
+            # Actually /tmp is usually ephemeral, so we assume fresh download or check existence
+            if os.path.exists(LIBJVM_PATH):
+                return LIBJVM_PATH
+
+            print(f"DEBUG: Downloading JDK from {JDK_URL}...")
+            try:
+                if not os.path.exists(DEST_DIR):
+                    os.makedirs(DEST_DIR)
+                
+                tar_path = os.path.join(DEST_DIR, "jdk.tar.gz")
+                urllib.request.urlretrieve(JDK_URL, tar_path)
+                
+                print("DEBUG: Extracting JDK...")
+                with tarfile.open(tar_path, "r:gz") as tar:
+                    # Strip first component (jdk-17...) to extract directly to DEST_DIR
+                    # Python tarfile doesn't support strip_components easily like cli
+                    # So we verify member names
+                    for member in tar.getmembers():
+                        # remove first path segment
+                        api_path = member.name.split('/', 1)
+                        if len(api_path) > 1:
+                            member.name = api_path[1]
+                            tar.extract(member, path=DEST_DIR)
+                
+                print("DEBUG: JDK Extracted.")
+                # Verify
+                # Recursive search in /tmp/jdk because structure might vary
+                found = find_libjvm(DEST_DIR)
+                if found: return found
+                
+            except Exception as e:
+                print(f"CRITICAL: Runtime JDK Download failed: {e}")
+                import traceback
+                traceback.print_exc()
+            
+            return None
+
+        # Helper to recursively find libjvm.so
         def find_libjvm(root_path):
             if not root_path or not os.path.exists(root_path): return None
             for root, dirs, files in os.walk(root_path):
@@ -186,8 +233,24 @@ def parse_mpp(content: bytes) -> dict:
                     return os.path.join(root, "libjvm.so")
             return None
 
-        # A. Resolve JAVA_HOME
+        # A. Resolve JAVA_HOME (Existing logic)
         java_home = os.environ.get("JAVA_HOME")
+        jvm_path = None
+        
+        # ... existing search logic ...
+        
+        # Strategy 3: RUNTIME DOWNLOAD (The Ultra-Nuclear Option)
+        if not jvm_path:
+            print("WARNING: No JVM found. Attempting Runtime Download...")
+            jvm_path = download_jdk()
+            if jvm_path:
+                print(f"DEBUG: Runtime Download successful. JVM at {jvm_path}")
+                # Set env vars for other tools if needed
+                os.environ["JAVA_HOME"] = os.path.dirname(os.path.dirname(os.path.dirname(jvm_path)))
+
+        if not jvm_path:
+             print("CRITICAL: libjvm.so not found via any method.")
+             # ... error handling ...
         if not java_home:
             java_path = shutil.which("java")
             print(f"DEBUG: shutil.which('java') returned: {java_path}")
