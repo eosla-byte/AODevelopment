@@ -875,28 +875,10 @@
                 }
 
                 if (color) {
-                    // Safe Selector using the custom class we added (custom-fill-{id} is sanitized in regex elsewhere? 
-                    // No, we used `custom_class: customClasses.join(' ')` in renderGantt.
-                    // We need to ensure the class name is safe.
-                    // In renderGantt we used: `custom-fill-${t.id}`.
-                    // UUID is safe.
-
-                    // Logic: 
-                    // .bar (Background) -> Lighter version of color OR Grey
-                    // .bar-progress (Foreground) -> The Color
-
-                    // Option A: Standard Gantt Look (Colored Bar, Darker Progress)
-                    // css += `.gantt .bar-wrapper.custom-fill-${t.id} .bar { fill: ${color} !important; }`;
-                    // css += `.gantt .bar-wrapper.custom-fill-${t.id} .bar-progress { fill: black !important; opacity: 0.3 !important; }`;
-
-                    // Option B: User Request "Avance con color" (Progress Colored, Rest Grey/White)
-                    // If the user sees "Solid Grey" now, it's confusing. 
-                    // Let's go with Option A but ensure the selector works.
-                    // AND make sure opacity is handled.
-
+                    // Safe Selector using data-id which is reliable in Frappe Gantt
                     css += `
-                        .gantt .bar-wrapper.custom-fill-${t.id} .bar { fill: ${color} !important; opacity: 0.4 !important; }
-                        .gantt .bar-wrapper.custom-fill-${t.id} .bar-progress { fill: ${color} !important; opacity: 1 !important; }
+                        .gantt .bar-wrapper[data-id="${t.id}"] .bar { fill: ${color} !important; opacity: 0.4 !important; }
+                        .gantt .bar-wrapper[data-id="${t.id}"] .bar-progress { fill: ${color} !important; opacity: 1 !important; }
                     `;
                 }
             });
@@ -1456,7 +1438,7 @@
                 let contractorHtml = '';
                 const comp = companies.find(c => c.name === companyName);
                 if (comp) {
-                    contractorHtml = `<div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${comp.color}"></div><span>${task.contractor}</span></div>`;
+                    contractorHtml = `<div class="flex items-center gap-1 overflow-hidden"><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${comp.color}"></div><span class="truncate min-w-0" title="${task.contractor}">${task.contractor}</span></div>`;
                 } else {
                     contractorHtml = `<input class="cell-input" value="${task.contractor || ''}" readonly>`;
                 }
@@ -1469,7 +1451,7 @@
                         <div style="display: flex; align-items: center; height:100%">
                             <span class="wbs-indent" style="width: ${indent * 20}px; flex-shrink: 0;"></span>
                             ${toggleHtml}
-                            <input class="cell-input" value="${task.name}" title="${task.name}" readonly style="min-width: 0;">
+                            <input class="cell-input" value="${task.name}" title="${task.name}" readonly style="flex: 1; min-width: 0; text-overflow: ellipsis;">
                         </div>
                     </td>
                     
@@ -1882,7 +1864,7 @@
                 body: JSON.stringify(payload)
             });
 
-            if (field === 'start' || field === 'end' || field === 'name') renderGantt(gantt.options.view_mode);
+            if (field === 'start' || field === 'end' || field === 'name' || field === 'progress') renderGantt(gantt.options.view_mode);
         }
 
         async function updateTaskDate(id, start, end) {
