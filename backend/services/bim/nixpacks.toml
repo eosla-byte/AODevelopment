@@ -1,6 +1,6 @@
 [phases.setup]
-nixPkgs = ["python3", "postgresql"]
-aptPkgs = ["openjdk-17-jdk-headless"]
+nixPkgs = ["python3", "postgresql", "openjdk", "zlib"]
+# aptPkgs = ["openjdk-17-jdk-headless"] # Apt failing, switching to Nix openjdk
 
 [start]
 cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"

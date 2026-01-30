@@ -262,8 +262,11 @@ def parse_mpp(content: bytes) -> dict:
              print("DEBUG: Listing /nix/store top level (filtered)...")
              try:
                  # Last ditch debug: print what jdk libs exist
-                 debug_glob = glob.glob("/nix/store/*jdk*")
+                 debug_glob = glob.glob("/nix/store/*jdk*") + glob.glob("/nix/store/*openjdk*")
                  print(f"DEBUG: Available JDK paths in store: {debug_glob[:5]}")
+                 print(f"DEBUG: All Keys: {list(os.environ.keys())}")
+                 if "JAVA_HOME" in os.environ:
+                     print(f"DEBUG: JAVA_HOME={os.environ['JAVA_HOME']}")
              except: pass
              
              raise ValueError("CRITICAL: libjvm.so not found! Please set JAVA_HOME validly.")
