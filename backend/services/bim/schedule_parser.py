@@ -258,6 +258,7 @@ def parse_mpp(content: bytes) -> dict:
 
         if not jvm_path:
              print("CRITICAL: libjvm.so not found via any method.")
+             print(f"DEBUG: CWD is {os.getcwd()}")
              print("DEBUG: Listing /nix/store top level (filtered)...")
              try:
                  # Last ditch debug: print what jdk libs exist
