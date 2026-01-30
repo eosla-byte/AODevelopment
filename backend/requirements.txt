@@ -10,3 +10,5 @@ pydantic
 python-dotenv
 jinja2
 openai
+jpype1
+mpxj
