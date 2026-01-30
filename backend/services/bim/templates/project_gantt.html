@@ -112,17 +112,51 @@
 
         /* --- Strict Split Layout --- */
         .gantt-table thead th {
-            height: 50px;
-            /* Match Frappe Gantt Header Height */
+            height: 50px !important;
+            box-sizing: border-box;
+
             vertical-align: middle;
             background: #f8fafc;
-            border-bottom: 1px solid #e5e7eb;
-            border-top: 1px solid #e5e7eb;
+            border-bottom: 1px solid #e0e0e0;
+            /* Match Gantt line color usually #e0e0e0 */
+            border-top: 1px solid #e0e0e0;
             color: #4b5563;
             font-weight: 600;
             font-size: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            padding: 0;
+            /* Remove padding delta */
+            display: table-cell;
+            /* Ensure standard behavior */
+        }
+
+        /* Fix Row Alignment */
+        #grid-body tr {
+            height: 38px !important;
+            /* Strict Height matching bar_height + padding */
+            box-sizing: border-box;
+        }
+
+        #grid-body td {
+            height: 38px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            border-bottom: 1px solid #e0e0e0;
+            /* Match Gantt row lines */
+        }
+
+        /* --- TOOLBAR Z-INDEX FIX --- */
+        #toolbar {
+            /* Ensure toolbar is above everything */
+            z-index: 50;
+            position: relative;
+        }
+
+        /* Dropdown specific fix */
+        #company-menu {
+            z-index: 9999 !important;
+            /* Force top */
         }
 
         #gantt-container {
