@@ -171,15 +171,36 @@ def parse_mpp(content: bytes) -> dict:
     import mpxj # This automatically adds mpxj jars to jpype classpath on import
     import tempfile
     import os
+    import shutil
+    import sys
     
-    # 1. Ensure JVM is started
+    # 1. Ensure JVM is started and JAVA_HOME is set
     if not jpype.isJVMStarted():
+        # Auto-detect JAVA_HOME if missing
+        if not os.environ.get("JAVA_HOME"):
+            java_path = shutil.which("java")
+            if java_path:
+                # Resolve full path (e.g. /nix/store/.../bin/java)
+                real_path = os.path.realpath(java_path)
+                # Go up from bin/java to root
+                java_home = os.path.dirname(os.path.dirname(real_path))
+                os.environ["JAVA_HOME"] = java_home
+                print(f"Auto-detected JAVA_HOME via 'java': {java_home}")
+            else:
+                print("WARNING: 'java' executable not found in PATH.")
+
         try:
             # Explicitly pass classpath from jpype.getClassPath() which mpxj populated
-            # This is robust against environments where default startJVM() ignores accumulated paths
             jpype.startJVM(classpath=jpype.getClassPath())
         except Exception as e:
             print(f"JVM Start Error: {e}")
+            # If critical, we should probably stop here.
+            # But jpype might say "already started" or similar non-fatal?
+            # If it's "JVMNotFound", it's fatal.
+            if "JVMNotFound" in str(e) or "shared library" in str(e):
+                 import traceback
+                 traceback.print_exc()
+                 raise ValueError(f"Server Environment Error: Java Runtime (JVM) could not be started. Error: {e}")
             pass
 
     # 2. Import Java Classes via JPype
