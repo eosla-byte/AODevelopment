@@ -1,0 +1,7 @@
+providers = ["python", "java"]
+
+[phases.setup]
+nixPkgs = ["postgresql"]
+
+[start]
+cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"
