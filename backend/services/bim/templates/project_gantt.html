@@ -486,32 +486,25 @@
     </div>
 
     <!-- MAIN CONTENT -->
-    <div id="gantt-container">
+    <div id="gantt-container" class="relative">
         <!-- GRID -->
         <div id="tasks-grid">
             <table class="gantt-table">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;">ID</th>
-                        <th style="width: 250px;">Nombre de Tarea</th>
-                        <th style="width: 120px;">Empresa</th>
-                        <th style="width: 70px;">Dur.</th>
-                        <th style="width: 90px;">Inicio</th>
-                        <th style="width: 90px;">Fin</th>
-                        <th style="width: 60px;">%</th>
-                    </tr>
-                </thead>
-                <tbody id="grid-body">
-                    <!-- Dynamic Rows -->
-                </tbody>
+                <!-- ... -->
             </table>
         </div>
 
         <!-- RESIZER -->
         <div id="resizer"></div>
 
+        <!-- CLONED STICKY HEADER (SVG) -->
+        <div id="gantt-header-sticky" class="overflow-hidden absolute top-0 right-0 bg-white z-20 pointer-events-none"
+            style="height: 50px; left: var(--grid-width, 420px); border-bottom: 1px solid #e0e0e0;">
+            <svg id="sticky-header-svg" height="100%" width="100%"></svg>
+        </div>
+
         <!-- CHART -->
-        <div id="chart-area" class="no-scroll">
+        <div id="chart-area" class="no-scroll relative">
             <svg id="gantt-target"></svg>
         </div>
     </div>
@@ -741,19 +734,14 @@
                     drawTodayLine();
                     if (typeof updateLookahead === 'function') updateLookahead();
                     drawCommentIndicators();
+                    cloneGanttHeader(); // NEW: Activate Sticky Header
                 }, 100);
 
             } catch (e) {
                 console.error("Gantt Render Error:", e);
             }
 
-            // Bind Scroll Sync
-            const gridDiv = document.getElementById('tasks-grid');
-            const chartDiv = document.getElementById('chart-area');
-            if (chartDiv && gridDiv) {
-                chartDiv.onscroll = () => gridDiv.scrollTop = chartDiv.scrollTop;
-                gridDiv.onscroll = () => chartDiv.scrollTop = gridDiv.scrollTop;
-            }
+            // Remove old Scroll Sync here as it is now handled in cloneGanttHeader
         } // End renderGantt
 
         function drawCommentIndicators() {
