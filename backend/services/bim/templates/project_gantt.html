@@ -867,27 +867,37 @@
                 // 1. Manual Style
                 if (t._style && t._style.fill) color = t._style.fill;
 
-                // 2. Company Style (Override?) or Fallback?
-                // User said "activarle color... a las empresas". Ideally Company Color takes precedence if set.
-                // Or maybe manual takes precedence?
-                // Let's use Company Color if exists, else manual.
+                // 2. Company Style (Priority)
                 const companyName = (t.contractor || '').trim();
                 const comp = companies.find(c => c.name === companyName);
                 if (comp && comp.color && comp.visible) {
-                    // Only if "enabled"? User said "activarle color".
-                    // The color input is always there. 
-                    // Let's assume if company color is active, use it?
-                    // But companies always have color.
-                    // Okay, let's prioritize Company Color.
                     color = comp.color;
                 }
 
                 if (color) {
-                    css += `.gantt .bar-wrapper[data-id="${t.id}"] .bar { fill: ${color} !important; } .gantt .bar-wrapper[data-id="${t.id}"] .bar-progress { fill: #00000033 !important; }`;
-                    // Note: Frappe Gantt 0.6.1 uses data-id on bar-wrapper? Maybe not.
-                    // We need to match the custom class or ensure we can target it.
-                    // Current mapping uses `custom-fill-${id}`.
-                    // So let's re-use that mechanism.
+                    // Safe Selector using the custom class we added (custom-fill-{id} is sanitized in regex elsewhere? 
+                    // No, we used `custom_class: customClasses.join(' ')` in renderGantt.
+                    // We need to ensure the class name is safe.
+                    // In renderGantt we used: `custom-fill-${t.id}`.
+                    // UUID is safe.
+
+                    // Logic: 
+                    // .bar (Background) -> Lighter version of color OR Grey
+                    // .bar-progress (Foreground) -> The Color
+
+                    // Option A: Standard Gantt Look (Colored Bar, Darker Progress)
+                    // css += `.gantt .bar-wrapper.custom-fill-${t.id} .bar { fill: ${color} !important; }`;
+                    // css += `.gantt .bar-wrapper.custom-fill-${t.id} .bar-progress { fill: black !important; opacity: 0.3 !important; }`;
+
+                    // Option B: User Request "Avance con color" (Progress Colored, Rest Grey/White)
+                    // If the user sees "Solid Grey" now, it's confusing. 
+                    // Let's go with Option A but ensure the selector works.
+                    // AND make sure opacity is handled.
+
+                    css += `
+                        .gantt .bar-wrapper.custom-fill-${t.id} .bar { fill: ${color} !important; opacity: 0.4 !important; }
+                        .gantt .bar-wrapper.custom-fill-${t.id} .bar-progress { fill: ${color} !important; opacity: 1 !important; }
+                    `;
                 }
             });
             styleEl.textContent = css;
@@ -1459,7 +1469,7 @@
                         <div style="display: flex; align-items: center; height:100%">
                             <span class="wbs-indent" style="width: ${indent * 20}px; flex-shrink: 0;"></span>
                             ${toggleHtml}
-                            <input class="cell-input" value="${task.name}" readonly>
+                            <input class="cell-input" value="${task.name}" title="${task.name}" readonly style="min-width: 0;">
                         </div>
                     </td>
                     
