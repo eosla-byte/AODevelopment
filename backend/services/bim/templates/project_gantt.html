@@ -337,150 +337,151 @@
                 <input type="file" id="file-upload" hidden accept=".xml,.mpp,.xer">
             </div>
         </div>
+    </div>
 
-        <!-- MAIN CONTENT -->
-        <div id="gantt-container">
-            <!-- GRID -->
-            <div id="tasks-grid">
-                <table class="gantt-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 40px;">ID</th>
-                            <th style="width: 250px;">Nombre de Tarea</th>
-                            <th style="width: 120px;">Empresa</th>
-                            <th style="width: 70px;">Dur.</th>
-                            <th style="width: 90px;">Inicio</th>
-                            <th style="width: 90px;">Fin</th>
-                            <th style="width: 60px;">%</th>
-                        </tr>
-                    </thead>
-                    <tbody id="grid-body">
-                        <!-- Dynamic Rows -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- RESIZER -->
-            <div id="resizer"></div>
-
-            <!-- CHART -->
-            <div id="chart-area" class="no-scroll">
-                <svg id="gantt-chart"></svg>
-            </div>
+    <!-- MAIN CONTENT -->
+    <div id="gantt-container">
+        <!-- GRID -->
+        <div id="tasks-grid">
+            <table class="gantt-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">ID</th>
+                        <th style="width: 250px;">Nombre de Tarea</th>
+                        <th style="width: 120px;">Empresa</th>
+                        <th style="width: 70px;">Dur.</th>
+                        <th style="width: 90px;">Inicio</th>
+                        <th style="width: 90px;">Fin</th>
+                        <th style="width: 60px;">%</th>
+                    </tr>
+                </thead>
+                <tbody id="grid-body">
+                    <!-- Dynamic Rows -->
+                </tbody>
+            </table>
         </div>
 
-        <script>
-            // --- STATE ---
-            let tasks = {{ tasks | tojson | safe}};
-            let gantt;
-            let selectedTaskIds = new Set();
-            const projectId = "{{ project.id }}";
+        <!-- RESIZER -->
+        <div id="resizer"></div>
 
-            // --- INITIALIZATION ---
-            document.addEventListener('DOMContentLoaded', async () => {
-                // 1. Fetch Data
-                await loadTasks();
+        <!-- CHART -->
+        <div id="chart-area" class="no-scroll">
+            <svg id="gantt-chart"></svg>
+        </div>
+    </div>
 
-                // 2. Setup Resizer
-                setupResizer();
+    <script>
+        // --- STATE ---
+        let tasks = {{ tasks | tojson | safe}};
+        let gantt;
+        let selectedTaskIds = new Set();
+        const projectId = "{{ project.id }}";
 
-                // 3. Setup File Upload
-                document.getElementById('file-upload').addEventListener('change', uploadSchedule);
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Fetch Data
+            await loadTasks();
 
-                // 4. Keyboard Shortcuts for Selection
-                document.addEventListener('keydown', handleKeySelection);
-            });
+            // 2. Setup Resizer
+            setupResizer();
 
-            async function loadTasks() {
-                try {
-                    // Use server-side data if available
-                    if (tasks && tasks.length > 0) {
-                        // Process dates
-                        tasks = tasks.map(t => {
-                            // Safe Date Parsing
-                            const parseDate = (d) => {
-                                if (!d) return new Date(); // Handle null/empty
-                                const date = new Date(d);
-                                return isNaN(date.getTime()) ? new Date() : date;
-                            };
-                            t.start = parseDate(t.start);
-                            t.end = parseDate(t.end);
+            // 3. Setup File Upload
+            document.getElementById('file-upload').addEventListener('change', uploadSchedule);
 
-                            if (t.style && typeof t.style === 'string') {
-                                try { t._style = JSON.parse(t.style); } catch (e) { }
-                            }
-                            return t;
-                        });
-                        renderGrid();
-                        renderGantt();
-                        return;
-                    }
+            // 4. Keyboard Shortcuts for Selection
+            document.addEventListener('keydown', handleKeySelection);
+        });
 
-                    const res = await fetch(`/api/projects/${projectId}/activities`);
-                    if (!res.ok) throw new Error("Error loading");
-                    const data = await res.json();
-
-                    // Process Styles from JSON string
-                    tasks = data.map(t => {
+        async function loadTasks() {
+            try {
+                // Use server-side data if available
+                if (tasks && tasks.length > 0) {
+                    // Process dates
+                    tasks = tasks.map(t => {
                         // Safe Date Parsing
                         const parseDate = (d) => {
+                            if (!d) return new Date(); // Handle null/empty
                             const date = new Date(d);
                             return isNaN(date.getTime()) ? new Date() : date;
                         };
                         t.start = parseDate(t.start);
                         t.end = parseDate(t.end);
 
-                        // Parse custom style if present
                         if (t.style && typeof t.style === 'string') {
                             try { t._style = JSON.parse(t.style); } catch (e) { }
                         }
                         return t;
                     });
-
                     renderGrid();
                     renderGantt();
+                    return;
+                }
 
-                } catch (e) { console.error(e); }
-            }
+                const res = await fetch(`/api/projects/${projectId}/activities`);
+                if (!res.ok) throw new Error("Error loading");
+                const data = await res.json();
 
-            // --- GRID RENDERING ---
-            function renderGrid() {
-                const tbody = document.getElementById('grid-body');
-                tbody.innerHTML = '';
+                // Process Styles from JSON string
+                tasks = data.map(t => {
+                    // Safe Date Parsing
+                    const parseDate = (d) => {
+                        const date = new Date(d);
+                        return isNaN(date.getTime()) ? new Date() : date;
+                    };
+                    t.start = parseDate(t.start);
+                    t.end = parseDate(t.end);
 
-                // Build simple linear list, assuming flat stricture from backend for now
-                // Future: Hierarchical tree render
-
-                // Detect Summary Tasks (Parent Logic)
-                const isSummary = (index) => {
-                    if (index >= tasks.length - 1) return false;
-                    const currentLevel = (tasks[index]._style && tasks[index]._style.indent) || 0;
-                    const nextLevel = (tasks[index + 1]._style && tasks[index + 1]._style.indent) || 0;
-                    return nextLevel > currentLevel;
-                };
-
-                tasks.forEach((task, index) => {
-                    const tr = document.createElement('tr');
-                    tr.dataset.id = task.id;
-                    tr.onclick = (e) => selectTask(task.id, e);
-
-                    // Auto-Bold Summary Tasks
-                    if (isSummary(index)) {
-                        tr.style.fontWeight = 'bold';
-                        tr.classList.add('summary-task'); // Hook for custom CSS
+                    // Parse custom style if present
+                    if (t.style && typeof t.style === 'string') {
+                        try { t._style = JSON.parse(t.style); } catch (e) { }
                     }
+                    return t;
+                });
 
-                    // Apply Styles
-                    if (task._style) applyRowStyle(tr, task._style);
-                    if (selectedTaskIds.has(task.id)) tr.classList.add('selected');
+                renderGrid();
+                renderGantt();
 
-                    // Ensure fixed height
-                    tr.style.height = '50px';
-                    // Calculate Indent
-                    let indentLevel = 0;
-                    if (task._style && task._style.indent) indentLevel = task._style.indent;
+            } catch (e) { console.error(e); }
+        }
 
-                    tr.innerHTML = `
+        // --- GRID RENDERING ---
+        function renderGrid() {
+            const tbody = document.getElementById('grid-body');
+            tbody.innerHTML = '';
+
+            // Build simple linear list, assuming flat stricture from backend for now
+            // Future: Hierarchical tree render
+
+            // Detect Summary Tasks (Parent Logic)
+            const isSummary = (index) => {
+                if (index >= tasks.length - 1) return false;
+                const currentLevel = (tasks[index]._style && tasks[index]._style.indent) || 0;
+                const nextLevel = (tasks[index + 1]._style && tasks[index + 1]._style.indent) || 0;
+                return nextLevel > currentLevel;
+            };
+
+            tasks.forEach((task, index) => {
+                const tr = document.createElement('tr');
+                tr.dataset.id = task.id;
+                tr.onclick = (e) => selectTask(task.id, e);
+
+                // Auto-Bold Summary Tasks
+                if (isSummary(index)) {
+                    tr.style.fontWeight = 'bold';
+                    tr.classList.add('summary-task'); // Hook for custom CSS
+                }
+
+                // Apply Styles
+                if (task._style) applyRowStyle(tr, task._style);
+                if (selectedTaskIds.has(task.id)) tr.classList.add('selected');
+
+                // Ensure fixed height (matches Gantt 20+18=38)
+                tr.style.height = '38px';
+                // Calculate Indent
+                let indentLevel = 0;
+                if (task._style && task._style.indent) indentLevel = task._style.indent;
+
+                tr.innerHTML = `
             <td class="text-center text-gray-500">${index + 1}</td>
             <td>
                         <!-- Indent Placeholder -->
@@ -497,463 +498,463 @@
             <td><input type="date" class="cell-input" value="${formatDateInput(task.end)}" onchange="updateField('${task.id}', 'end', this.value)"></td>
             <td class="text-center">${task.progress}%</td>
             `;
-                    tbody.appendChild(tr);
-                });
-            }
+                tbody.appendChild(tr);
+            });
+        }
 
-            function applyRowStyle(tr, style) {
-                if (style.fontFamily) tr.style.fontFamily = style.fontFamily;
-                if (style.fontSize) tr.style.fontSize = style.fontSize;
-                if (style.bold) tr.style.fontWeight = 'bold';
-                if (style.italic) tr.style.fontStyle = 'italic';
-                if (style.underline) tr.style.textDecoration = 'underline';
-                if (style.color) tr.style.color = style.color;
-                // Fill implies background for row, or bar color? User usually means Bar for fill, Text for row.
-                // We will apply fill to Bar, but maybe background for cell?
-            }
+        function applyRowStyle(tr, style) {
+            if (style.fontFamily) tr.style.fontFamily = style.fontFamily;
+            if (style.fontSize) tr.style.fontSize = style.fontSize;
+            if (style.bold) tr.style.fontWeight = 'bold';
+            if (style.italic) tr.style.fontStyle = 'italic';
+            if (style.underline) tr.style.textDecoration = 'underline';
+            if (style.color) tr.style.color = style.color;
+            // Fill implies background for row, or bar color? User usually means Bar for fill, Text for row.
+            // We will apply fill to Bar, but maybe background for cell?
+        }
 
-            // --- GANTT RENDERING ---
-            function renderGantt(viewMode = 'Week') {
-                const svgElement = document.getElementById('gantt-target');
-                if (!svgElement) return;
-                svgElement.innerHTML = ''; // Clear
+        // --- GANTT RENDERING ---
+        function renderGantt(viewMode = 'Week') {
+            const svgElement = document.getElementById('gantt-target');
+            if (!svgElement) return;
+            svgElement.innerHTML = ''; // Clear
 
-                // Transform tasks for Frappe
-                const ganttTasks = tasks.map(t => ({
-                    id: t.id,
-                    name: t.name,
-                    start: formatDateInput(t.start),
-                    end: formatDateInput(t.end),
-                    progress: t.progress,
-                    dependencies: t.dependencies,
-                    custom_class: t._style && t._style.fill ? `custom-fill-${t.id}` : ''
-                }));
+            // Transform tasks for Frappe
+            const ganttTasks = tasks.map(t => ({
+                id: t.id,
+                name: t.name,
+                start: formatDateInput(t.start),
+                end: formatDateInput(t.end),
+                progress: t.progress,
+                dependencies: t.dependencies,
+                custom_class: t._style && t._style.fill ? `custom-fill-${t.id}` : ''
+            }));
 
-                // Generate Dynamic CSS for custom fills
-                updateDynamicCSS();
+            // Generate Dynamic CSS for custom fills
+            updateDynamicCSS();
 
-                try {
-                    if (ganttTasks.length === 0) {
-                        chartContainer.innerHTML = '<div class="text-gray-400 p-10 text-center">No hay tareas para mostrar</div>';
-                        return;
+            try {
+                if (ganttTasks.length === 0) {
+                    chartContainer.innerHTML = '<div class="text-gray-400 p-10 text-center">No hay tareas para mostrar</div>';
+                    return;
+                }
+
+                gantt = new Gantt("#gantt-target", ganttTasks, {
+                    header_height: 50,
+                    column_width: 30,
+                    step: 24,
+                    view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+                    bar_height: 20,
+                    bar_corner_radius: 3,
+                    arrow_curve: 5,
+                    padding: 18,
+                    view_mode: viewMode,
+                    date_format: 'YYYY-MM-DD',
+                    language: 'es',
+                    on_date_change: (task, start, end) => {
+                        updateTaskDate(task.id, start, end);
+                    },
+                    on_click: (task) => {
+                        selectTask(task.id, { ctrlKey: false, shiftKey: false });
+                    },
+                    on_view_change: () => {
+                        syncScrolls();
                     }
+                });
 
-                    gantt = new Gantt("#gantt-target", ganttTasks, {
-                        header_height: 50,
-                        column_width: 30,
-                        step: 24,
-                        view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
-                        bar_height: 20,
-                        bar_corner_radius: 3,
-                        arrow_curve: 5,
-                        padding: 18,
-                        view_mode: viewMode,
-                        date_format: 'YYYY-MM-DD',
-                        language: 'es',
-                        on_date_change: (task, start, end) => {
-                            updateTaskDate(task.id, start, end);
-                        },
-                        on_click: (task) => {
-                            selectTask(task.id, { ctrlKey: false, shiftKey: false });
-                        },
-                        on_view_change: () => {
-                            syncScrolls();
-                        }
-                    });
+                // Draw Today Line
+                setTimeout(drawTodayLine, 100);
 
-                    // Draw Today Line
-                    setTimeout(drawTodayLine, 100);
-
-                } catch (e) {
-                    console.error("Gantt Render Error:", e);
-                    // chartContainer.innerHTML = ... (Cannot put div in SVG easily)
-                }
-
-                // Bind Scroll Sync
-                const gridDiv = document.getElementById('tasks-grid');
-                const chartDiv = document.getElementById('chart-area');
-
-                if (chartDiv) {
-                    chartDiv.onscroll = () => {
-                        gridDiv.scrollTop = chartDiv.scrollTop;
-                    };
-                    gridDiv.onscroll = () => {
-                        chartDiv.scrollTop = gridDiv.scrollTop;
-                    };
-                }
+            } catch (e) {
+                console.error("Gantt Render Error:", e);
+                // chartContainer.innerHTML = ... (Cannot put div in SVG easily)
             }
 
-            function updateDynamicCSS() {
-                let styleEl = document.getElementById('dynamic-gantt-styles');
-                if (!styleEl) {
-                    styleEl = document.createElement('style');
-                    styleEl.id = 'dynamic-gantt-styles';
-                    document.head.appendChild(styleEl);
-                }
+            // Bind Scroll Sync
+            const gridDiv = document.getElementById('tasks-grid');
+            const chartDiv = document.getElementById('chart-area');
 
-                let css = '';
-                tasks.forEach(t => {
-                    if (t._style && t._style.fill) {
-                        css += `
+            if (chartDiv) {
+                chartDiv.onscroll = () => {
+                    gridDiv.scrollTop = chartDiv.scrollTop;
+                };
+                gridDiv.onscroll = () => {
+                    chartDiv.scrollTop = gridDiv.scrollTop;
+                };
+            }
+        }
+
+        function updateDynamicCSS() {
+            let styleEl = document.getElementById('dynamic-gantt-styles');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'dynamic-gantt-styles';
+                document.head.appendChild(styleEl);
+            }
+
+            let css = '';
+            tasks.forEach(t => {
+                if (t._style && t._style.fill) {
+                    css += `
                         .custom-fill-${t.id} .bar-group .bar { fill: ${t._style.fill} !important; }
                         .custom-fill-${t.id} .bar-group .bar-progress { fill: #00000033 !important; }
                     `;
-                    }
-                });
-                styleEl.textContent = css;
-            }
+                }
+            });
+            styleEl.textContent = css;
+        }
 
-            // --- STYLING LOGIC ---
-            async function applyStyle(key, value) {
-                if (selectedTaskIds.size === 0) return alert("Selecciona una tarea primero.");
+        // --- STYLING LOGIC ---
+        async function applyStyle(key, value) {
+            if (selectedTaskIds.size === 0) return alert("Selecciona una tarea primero.");
 
-                const updates = [];
+            const updates = [];
 
-                selectedTaskIds.forEach(id => {
-                    const task = tasks.find(t => t.id === id);
-                    if (!task) return;
-
-                    if (!task._style) task._style = {};
-                    task._style[key] = value;
-
-                    // Optimistically update
-                    updates.push(saveTaskStyle(id, task._style));
-                });
-
-                await Promise.all(updates);
-                renderGrid();
-                renderGantt(gantt ? gantt.options.view_mode : 'Day');
-            }
-
-            async function toggleStyle(key) {
-                if (selectedTaskIds.size === 0) return;
-                const id = Array.from(selectedTaskIds)[0];
-                const task = tasks.find(t => t.id === id);
-                const current = task._style ? task._style[key] : false;
-                applyStyle(key, !current);
-            }
-
-            async function saveTaskStyle(id, styleObj) {
-                try {
-                    await fetch(`/api/activities/${id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ style: JSON.stringify(styleObj) })
-                    });
-                } catch (e) { console.error(e); }
-            }
-
-            // --- DATA EDITING ---
-            async function updateField(id, field, value) {
+            selectedTaskIds.forEach(id => {
                 const task = tasks.find(t => t.id === id);
                 if (!task) return;
 
-                // Local update
-                if (field === 'start' || field === 'end') value = value; // logic handled in date change
-                else task[field] = value;
+                if (!task._style) task._style = {};
+                task._style[key] = value;
 
-                // Server Update
-                const payload = {};
-                payload[field] = value;
+                // Optimistically update
+                updates.push(saveTaskStyle(id, task._style));
+            });
 
+            await Promise.all(updates);
+            renderGrid();
+            renderGantt(gantt ? gantt.options.view_mode : 'Day');
+        }
+
+        async function toggleStyle(key) {
+            if (selectedTaskIds.size === 0) return;
+            const id = Array.from(selectedTaskIds)[0];
+            const task = tasks.find(t => t.id === id);
+            const current = task._style ? task._style[key] : false;
+            applyStyle(key, !current);
+        }
+
+        async function saveTaskStyle(id, styleObj) {
+            try {
                 await fetch(`/api/activities/${id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({ style: JSON.stringify(styleObj) })
                 });
+            } catch (e) { console.error(e); }
+        }
 
-                if (field === 'start' || field === 'end' || field === 'name') renderGantt(gantt.options.view_mode);
+        // --- DATA EDITING ---
+        async function updateField(id, field, value) {
+            const task = tasks.find(t => t.id === id);
+            if (!task) return;
+
+            // Local update
+            if (field === 'start' || field === 'end') value = value; // logic handled in date change
+            else task[field] = value;
+
+            // Server Update
+            const payload = {};
+            payload[field] = value;
+
+            await fetch(`/api/activities/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (field === 'start' || field === 'end' || field === 'name') renderGantt(gantt.options.view_mode);
+        }
+
+        async function updateTaskDate(id, start, end) {
+            await updateField(id, 'start', start.toISOString().split('T')[0]);
+            await updateField(id, 'end', end.toISOString().split('T')[0]);
+
+            // Update Local array
+            const t = tasks.find(x => x.id == id);
+            if (t) { t.start = start; t.end = end; }
+            renderGrid(); // Refresh grid dates
+        }
+
+        // --- CRUD ACTIONS ---
+        async function addTask() {
+            const newId = "new-" + Date.now(); // Temp ID
+            const newTask = {
+                id: newId,
+                name: "Nueva Tarea",
+                start: new Date(),
+                end: new Date(Date.now() + 86400000), // +1 day
+                progress: 0,
+                dependencies: "",
+                contractor: "",
+                _style: { indent: 0 }
+            };
+
+            // Insert after selection or at end
+            if (selectedTaskIds.size > 0) {
+                const lastSelectedId = Array.from(selectedTaskIds).pop();
+                const idx = tasks.findIndex(t => t.id === lastSelectedId);
+                tasks.splice(idx + 1, 0, newTask);
+            } else {
+                tasks.push(newTask);
             }
 
-            async function updateTaskDate(id, start, end) {
-                await updateField(id, 'start', start.toISOString().split('T')[0]);
-                await updateField(id, 'end', end.toISOString().split('T')[0]);
+            // Persist (Create on backend usually, but for now just local update until Save)
+            // Ideally we call POST /api/activities
+            try {
+                await fetch(`/api/projects/${projectId}/activities`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newTask)
+                });
+            } catch (e) { console.error("Error creating task", e); } // Silently fail/continue
 
-                // Update Local array
-                const t = tasks.find(x => x.id == id);
-                if (t) { t.start = start; t.end = end; }
-                renderGrid(); // Refresh grid dates
-            }
+            renderGrid();
+            renderGantt(gantt ? gantt.options.view_mode : 'Day');
+        }
 
-            // --- CRUD ACTIONS ---
-            async function addTask() {
-                const newId = "new-" + Date.now(); // Temp ID
-                const newTask = {
-                    id: newId,
-                    name: "Nueva Tarea",
-                    start: new Date(),
-                    end: new Date(Date.now() + 86400000), // +1 day
-                    progress: 0,
-                    dependencies: "",
-                    contractor: "",
-                    _style: { indent: 0 }
-                };
+        async function deleteTask() {
+            if (selectedTaskIds.size === 0) return alert("Selecciona tareas para eliminar");
+            if (!confirm("¿Eliminar tareas seleccionadas?")) return;
 
-                // Insert after selection or at end
-                if (selectedTaskIds.size > 0) {
-                    const lastSelectedId = Array.from(selectedTaskIds).pop();
-                    const idx = tasks.findIndex(t => t.id === lastSelectedId);
-                    tasks.splice(idx + 1, 0, newTask);
-                } else {
-                    tasks.push(newTask);
+            const ids = Array.from(selectedTaskIds);
+
+            // Remove from backend
+            for (const id of ids) {
+                if (!id.startsWith("new-")) { // Only delete if persisted
+                    await fetch(`/api/activities/${id}`, { method: 'DELETE' });
                 }
-
-                // Persist (Create on backend usually, but for now just local update until Save)
-                // Ideally we call POST /api/activities
-                try {
-                    await fetch(`/api/projects/${projectId}/activities`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(newTask)
-                    });
-                } catch (e) { console.error("Error creating task", e); } // Silently fail/continue
-
-                renderGrid();
-                renderGantt(gantt ? gantt.options.view_mode : 'Day');
             }
 
-            async function deleteTask() {
-                if (selectedTaskIds.size === 0) return alert("Selecciona tareas para eliminar");
-                if (!confirm("¿Eliminar tareas seleccionadas?")) return;
+            tasks = tasks.filter(t => !selectedTaskIds.has(t.id));
+            selectedTaskIds.clear();
+            renderGrid();
+            renderGantt(gantt ? gantt.options.view_mode : 'Day');
+        }
 
-                const ids = Array.from(selectedTaskIds);
+        async function moveTask(direction) {
+            if (selectedTaskIds.size !== 1) return; // Only move single row for now
+            const id = Array.from(selectedTaskIds)[0];
+            const idx = tasks.findIndex(t => t.id === id);
 
-                // Remove from backend
-                for (const id of ids) {
-                    if (!id.startsWith("new-")) { // Only delete if persisted
-                        await fetch(`/api/activities/${id}`, { method: 'DELETE' });
-                    }
-                }
+            if (direction === -1 && idx > 0) {
+                // Swap with prev
+                [tasks[idx], tasks[idx - 1]] = [tasks[idx - 1], tasks[idx]];
+            } else if (direction === 1 && idx < tasks.length - 1) {
+                // Swap with next
+                [tasks[idx], tasks[idx + 1]] = [tasks[idx + 1], tasks[idx]];
+            }
+            renderGrid();
+            renderGantt(gantt ? gantt.options.view_mode : 'Day');
+        }
 
-                tasks = tasks.filter(t => !selectedTaskIds.has(t.id));
+        // --- SELECTION LOGIC ---
+        function selectTask(id, e) {
+            if (!clickedIdIsTask(id)) return;
+
+            if (e.ctrlKey || e.metaKey) {
+                if (selectedTaskIds.has(id)) selectedTaskIds.delete(id);
+                else selectedTaskIds.add(id);
+            } else if (e.shiftKey) {
+                // Range selection (simple implementation)
+                // TODO: Find index range
+                selectedTaskIds.add(id);
+            } else {
+                selectedTaskIds.clear();
+                selectedTaskIds.add(id);
+            }
+            renderGrid(); // Re-render to show highlight
+        }
+        function clickedIdIsTask(id) { return tasks.some(t => t.id === id); }
+
+        function handleKeySelection(e) {
+            if (e.key === 'Escape') {
                 selectedTaskIds.clear();
                 renderGrid();
-                renderGantt(gantt ? gantt.options.view_mode : 'Day');
             }
+        }
 
-            async function moveTask(direction) {
-                if (selectedTaskIds.size !== 1) return; // Only move single row for now
-                const id = Array.from(selectedTaskIds)[0];
-                const idx = tasks.findIndex(t => t.id === id);
+        // --- UTILS ---
+        function diffDays(d1, d2) {
+            return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
+        }
+        function formatDateInput(date) {
+            if (!date) return '';
+            return date.toISOString().split('T')[0];
+        }
 
-                if (direction === -1 && idx > 0) {
-                    // Swap with prev
-                    [tasks[idx], tasks[idx - 1]] = [tasks[idx - 1], tasks[idx]];
-                } else if (direction === 1 && idx < tasks.length - 1) {
-                    // Swap with next
-                    [tasks[idx], tasks[idx + 1]] = [tasks[idx + 1], tasks[idx]];
+        function changeView(mode) {
+            renderGantt(mode);
+        }
+
+        // --- ACTIONS ---
+        async function indentTask(direction) {
+            if (selectedTaskIds.size === 0) return;
+            // Simple visual indent for now by prepending spaces or updating style
+            // Real WBS logic requires tree traversal, acceptable to defer or do visual-only first.
+
+            const updates = [];
+            selectedTaskIds.forEach(id => {
+                const t = tasks.find(x => x.id === id);
+                if (!t) return;
+
+                // Use style.indent level
+                if (!t._style) t._style = {};
+                let level = t._style.indent || 0;
+                level += direction;
+                if (level < 0) level = 0;
+                t._style.indent = level;
+
+                updates.push(saveTaskStyle(id, t._style));
+            });
+
+            await Promise.all(updates);
+            renderGrid();
+        }
+
+        async function addLink() {
+            // Link selected tasks sequentially
+            const selected = Array.from(selectedTaskIds);
+            if (selected.length < 2) return alert("Selecciona al menos 2 tareas para vincular");
+
+            // Sort by current start date to guess order? Or selection order?
+            // Selection order by Set iteration is insertion order usually.
+
+            for (let i = 1; i < selected.length; i++) {
+                const predecessorId = selected[i - 1];
+                const successorId = selected[i];
+                const successor = tasks.find(t => t.id === successorId);
+
+                // Add dependency
+                let deps = successor.dependencies ? successor.dependencies.split(',') : [];
+                if (!deps.includes(predecessorId)) {
+                    deps.push(predecessorId);
+                    successor.dependencies = deps.join(',');
+                    await updateField(successorId, 'predecessors', successor.dependencies);
                 }
-                renderGrid();
-                renderGantt(gantt ? gantt.options.view_mode : 'Day');
             }
+            renderGantt(gantt.options.view_mode);
+        }
 
-            // --- SELECTION LOGIC ---
-            function selectTask(id, e) {
-                if (!clickedIdIsTask(id)) return;
+        async function removeLink() {
+            const selected = Array.from(selectedTaskIds);
+            if (selected.length === 0) return alert("Selecciona tareas para desvincular");
 
-                if (e.ctrlKey || e.metaKey) {
-                    if (selectedTaskIds.has(id)) selectedTaskIds.delete(id);
-                    else selectedTaskIds.add(id);
-                } else if (e.shiftKey) {
-                    // Range selection (simple implementation)
-                    // TODO: Find index range
-                    selectedTaskIds.add(id);
-                } else {
-                    selectedTaskIds.clear();
-                    selectedTaskIds.add(id);
-                }
-                renderGrid(); // Re-render to show highlight
-            }
-            function clickedIdIsTask(id) { return tasks.some(t => t.id === id); }
-
-            function handleKeySelection(e) {
-                if (e.key === 'Escape') {
-                    selectedTaskIds.clear();
-                    renderGrid();
+            for (const id of selected) {
+                const t = tasks.find(x => x.id === id);
+                if (t && t.dependencies) {
+                    t.dependencies = "";
+                    await updateField(id, 'predecessors', "");
                 }
             }
+            renderGantt(gantt.options.view_mode);
+        }
 
-            // --- UTILS ---
-            function diffDays(d1, d2) {
-                return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
-            }
-            function formatDateInput(date) {
-                if (!date) return '';
-                return date.toISOString().split('T')[0];
-            }
+        function drawTodayLine() {
+            const svg = document.getElementById('gantt-chart');
+            if (!svg) return;
 
-            function changeView(mode) {
-                renderGantt(mode);
-            }
+            // Frappe Gantt doesn't expose X scale easily publicly. 
+            // We can infer from specific DOM elements (grid header) or dates.
+            // Hacky but effective: Find the rect for "Today" if in view?
+            // Better: Calculate X based on (Today - StartDate) / TotalDuration * Width
 
-            // --- ACTIONS ---
-            async function indentTask(direction) {
-                if (selectedTaskIds.size === 0) return;
-                // Simple visual indent for now by prepending spaces or updating style
-                // Real WBS logic requires tree traversal, acceptable to defer or do visual-only first.
+            // For MVP: Just highlight the column in grid corresponding to today? Frappe highlights header.
+            // Let's try to append a line.
 
-                const updates = [];
-                selectedTaskIds.forEach(id => {
-                    const t = tasks.find(x => x.id === id);
-                    if (!t) return;
+            const today = new Date();
+            // This is hard to get pixel-perfect without access to Gantt internal X helpers.
+            // Let's rely on Frappe's built-in "Today" highlighting (it adds 'today' class to tick).
+            // We'll add a global CSS rule to extend that highlight down.
 
-                    // Use style.indent level
-                    if (!t._style) t._style = {};
-                    let level = t._style.indent || 0;
-                    level += direction;
-                    if (level < 0) level = 0;
-                    t._style.indent = level;
-
-                    updates.push(saveTaskStyle(id, t._style));
-                });
-
-                await Promise.all(updates);
-                renderGrid();
-            }
-
-            async function addLink() {
-                // Link selected tasks sequentially
-                const selected = Array.from(selectedTaskIds);
-                if (selected.length < 2) return alert("Selecciona al menos 2 tareas para vincular");
-
-                // Sort by current start date to guess order? Or selection order?
-                // Selection order by Set iteration is insertion order usually.
-
-                for (let i = 1; i < selected.length; i++) {
-                    const predecessorId = selected[i - 1];
-                    const successorId = selected[i];
-                    const successor = tasks.find(t => t.id === successorId);
-
-                    // Add dependency
-                    let deps = successor.dependencies ? successor.dependencies.split(',') : [];
-                    if (!deps.includes(predecessorId)) {
-                        deps.push(predecessorId);
-                        successor.dependencies = deps.join(',');
-                        await updateField(successorId, 'predecessors', successor.dependencies);
-                    }
-                }
-                renderGantt(gantt.options.view_mode);
-            }
-
-            async function removeLink() {
-                const selected = Array.from(selectedTaskIds);
-                if (selected.length === 0) return alert("Selecciona tareas para desvincular");
-
-                for (const id of selected) {
-                    const t = tasks.find(x => x.id === id);
-                    if (t && t.dependencies) {
-                        t.dependencies = "";
-                        await updateField(id, 'predecessors', "");
-                    }
-                }
-                renderGantt(gantt.options.view_mode);
-            }
-
-            function drawTodayLine() {
-                const svg = document.getElementById('gantt-chart');
-                if (!svg) return;
-
-                // Frappe Gantt doesn't expose X scale easily publicly. 
-                // We can infer from specific DOM elements (grid header) or dates.
-                // Hacky but effective: Find the rect for "Today" if in view?
-                // Better: Calculate X based on (Today - StartDate) / TotalDuration * Width
-
-                // For MVP: Just highlight the column in grid corresponding to today? Frappe highlights header.
-                // Let's try to append a line.
-
-                const today = new Date();
-                // This is hard to get pixel-perfect without access to Gantt internal X helpers.
-                // Let's rely on Frappe's built-in "Today" highlighting (it adds 'today' class to tick).
-                // We'll add a global CSS rule to extend that highlight down.
-
-                const fileCss = document.getElementById('custom-gantt-css');
-                if (!fileCss) {
-                    const style = document.createElement('style');
-                    style.id = 'custom-gantt-css';
-                    // Target the tick created by Frappe
-                    style.textContent = `
+            const fileCss = document.getElementById('custom-gantt-css');
+            if (!fileCss) {
+                const style = document.createElement('style');
+                style.id = 'custom-gantt-css';
+                // Target the tick created by Frappe
+                style.textContent = `
             .gantt .tick.today line {stroke: #f59e0b; stroke-width: 2px; opacity: 0.5; }
             .gantt .tick.today text {fill: #f59e0b; font-weight: bold; }
             `;
-                    document.head.appendChild(style);
+                document.head.appendChild(style);
+            }
+        }
+
+        // --- RESIZER ---
+        function setupResizer() {
+            const resizer = document.getElementById('resizer');
+            const leftPane = document.getElementById('tasks-grid');
+            let x = 0;
+            let w = 0;
+
+            const mouseDownHandler = function (e) {
+                x = e.clientX;
+                const rect = leftPane.getBoundingClientRect();
+                w = rect.width;
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+                resizer.classList.add('resizing');
+            };
+
+            const mouseMoveHandler = function (e) {
+                const dx = e.clientX - x;
+                leftPane.style.width = `${w + dx}px`;
+                document.documentElement.style.setProperty('--grid-width', `${w + dx}px`);
+                resizer.style.left = `${w + dx}px`;
+            };
+
+            const mouseUpHandler = function () {
+                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mouseup', mouseUpHandler);
+                resizer.classList.remove('resizing');
+            };
+
+            resizer.addEventListener('mousedown', mouseDownHandler);
+        }
+
+        async function uploadSchedule(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Show loading by changing button text temporarily
+            const btn = document.querySelector('button[onclick*="file-upload"]');
+            const originalContent = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+                btn.disabled = true;
+            }
+
+            try {
+                const res = await fetch(`/api/projects/${projectId}/schedule`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.detail || "Error al subir");
                 }
-            }
 
-            // --- RESIZER ---
-            function setupResizer() {
-                const resizer = document.getElementById('resizer');
-                const leftPane = document.getElementById('tasks-grid');
-                let x = 0;
-                let w = 0;
-
-                const mouseDownHandler = function (e) {
-                    x = e.clientX;
-                    const rect = leftPane.getBoundingClientRect();
-                    w = rect.width;
-                    document.addEventListener('mousemove', mouseMoveHandler);
-                    document.addEventListener('mouseup', mouseUpHandler);
-                    resizer.classList.add('resizing');
-                };
-
-                const mouseMoveHandler = function (e) {
-                    const dx = e.clientX - x;
-                    leftPane.style.width = `${w + dx}px`;
-                    document.documentElement.style.setProperty('--grid-width', `${w + dx}px`);
-                    resizer.style.left = `${w + dx}px`;
-                };
-
-                const mouseUpHandler = function () {
-                    document.removeEventListener('mousemove', mouseMoveHandler);
-                    document.removeEventListener('mouseup', mouseUpHandler);
-                    resizer.classList.remove('resizing');
-                };
-
-                resizer.addEventListener('mousedown', mouseDownHandler);
-            }
-
-            async function uploadSchedule(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-
-                const formData = new FormData();
-                formData.append('file', file);
-
-                // Show loading by changing button text temporarily
-                const btn = document.querySelector('button[onclick*="file-upload"]');
-                const originalContent = btn ? btn.innerHTML : '';
+                alert("Importación exitosa. La página se recargará.");
+                location.reload();
+            } catch (err) {
+                console.error(err);
+                alert("Aviso: " + err.message);
+            } finally {
                 if (btn) {
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-                    btn.disabled = true;
+                    btn.innerHTML = originalContent;
+                    btn.disabled = false;
                 }
-
-                try {
-                    const res = await fetch(`/api/projects/${projectId}/schedule`, {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    const data = await res.json();
-
-                    if (!res.ok) {
-                        throw new Error(data.detail || "Error al subir");
-                    }
-
-                    alert("Importación exitosa. La página se recargará.");
-                    location.reload();
-                } catch (err) {
-                    console.error(err);
-                    alert("Aviso: " + err.message);
-                } finally {
-                    if (btn) {
-                        btn.innerHTML = originalContent;
-                        btn.disabled = false;
-                    }
-                    // Reset input
-                    e.target.value = '';
-                }
+                // Reset input
+                e.target.value = '';
             }
+        }
 
-        </script>
+    </script>
 </body>
 
 </html>
