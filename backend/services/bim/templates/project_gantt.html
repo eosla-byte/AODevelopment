@@ -791,6 +791,14 @@
             renderGantt(mode);
         }
 
+        function syncScrolls() {
+            const gridDiv = document.getElementById('tasks-grid');
+            const chartDiv = document.getElementById('chart-area');
+            if (gridDiv && chartDiv) {
+                gridDiv.scrollTop = chartDiv.scrollTop;
+            }
+        }
+
         // --- ACTIONS ---
         async function indentTask(direction) {
             if (selectedTaskIds.size === 0) return;
