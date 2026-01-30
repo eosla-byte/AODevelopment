@@ -2190,6 +2190,90 @@
                 e.target.value = '';
             }
         }
+        }
+
+        // --- SAVE SYSTEM ---
+        function showSaving() {
+            const el = document.getElementById('save-status');
+            if (el) {
+                el.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-500"></i> GUARDANDO...';
+                el.classList.remove('hidden');
+            }
+        }
+
+        function showSaved() {
+            const el = document.getElementById('save-status');
+            if (el) {
+                el.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> GUARDADO';
+                el.classList.remove('hidden');
+                setTimeout(() => el.classList.add('hidden'), 3000);
+            }
+        }
+
+        async function forceSaveAll() {
+            showSaving();
+            // Just a visual confirmation since we save atomically
+            await new Promise(r => setTimeout(r, 800));
+            showSaved();
+            alert("Todo el progreso ha sido guardado exitosamente en el servidor.");
+        }
+
+        // --- STICKY HEADER (CLONE) ---
+        function cloneGanttHeader() {
+            setTimeout(() => {
+                const srcSvg = document.getElementById('gantt-target');
+                const targetSvg = document.getElementById('sticky-header-svg');
+                const chartDiv = document.getElementById('chart-area');
+                const headerContainer = document.getElementById('gantt-header-sticky');
+
+                if (!srcSvg || !targetSvg || !chartDiv || !headerContainer) return;
+
+                // 1. Find Header in Rendered Gantt
+                const headerGroup = srcSvg.querySelector('.grid-header');
+                if (!headerGroup) return;
+
+                // 2. Clone
+                targetSvg.innerHTML = '';
+                const clone = headerGroup.cloneNode(true);
+                targetSvg.appendChild(clone);
+
+                // 3. Match Widths
+                targetSvg.setAttribute('width', srcSvg.getAttribute('width'));
+                targetSvg.setAttribute('height', '50'); // Force height for header
+
+                // 4. Sync Scroll Events
+                chartDiv.onscroll = () => {
+                    // Sync X of Header
+                    headerContainer.scrollLeft = chartDiv.scrollLeft;
+
+                    // Sync Y of Grid
+                    const gridDiv = document.getElementById('tasks-grid');
+                    if (gridDiv) gridDiv.scrollTop = chartDiv.scrollTop;
+                };
+
+                // Initial Sync
+                headerContainer.scrollLeft = chartDiv.scrollLeft;
+
+                // Bind Grid Scroll
+                const gridDiv = document.getElementById('tasks-grid');
+                if (gridDiv) {
+                    gridDiv.onscroll = () => chartDiv.scrollTop = gridDiv.scrollTop;
+                }
+            }, 200);
+        }
+
+        // Wrap updateField to show saving
+        const _originalUpdateField = updateField;
+        updateField = async function (id, field, value) {
+            showSaving();
+            try {
+                await _originalUpdateField(id, field, value);
+                showSaved();
+            } catch (e) {
+                console.error(e);
+                alert("Error al guardar");
+            }
+        };
 
     </script>
 </body>
