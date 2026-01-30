@@ -425,36 +425,40 @@ def parse_mpp(content: bytes) -> dict:
             # Dates
             start_val = None
             if t_start:
-                 # MPXJ Date .toString() -> "Fri Jan 26 ..."
-                 # Try using start.toInstant() if available (Java 8+)
+                 # Raw is like: 2024-01-26T14:00
                  try:
-                     # DEBUG RAW
-                     # print(f"DEBUG: Raw Start: {t_start} Type: {type(t_start)}")
-                     start_val = t_start.toInstant().toString() # "2024-01-26T14:00:00Z"
-                     start_val = datetime.datetime.fromisoformat(str(start_val).replace('Z', '+00:00'))
-                 except Exception as e: 
-                     print(f"DEBUG: Error converting start date: {e}. Raw: {t_start}")
-                     # Fallback to simple str
+                     s_str = str(t_start)
+                     if 'T' in s_str:
+                         start_val = datetime.datetime.fromisoformat(s_str)
+                     else:
+                         # Fallback if just YYYY-MM-DD
+                         start_val = datetime.datetime.strptime(s_str, "%Y-%m-%d")
+                 except: 
                      pass
 
             finish_val = None
             if t_finish:
                  try:
-                     finish_val = t_finish.toInstant().toString()
-                     finish_val = datetime.datetime.fromisoformat(str(finish_val).replace('Z', '+00:00'))
-                 except Exception as e:
-                     print(f"DEBUG: Error converting finish date: {e}. Raw: {t_finish}")
-                     pass
+                     f_str = str(t_finish)
+                     if 'T' in f_str:
+                         finish_val = datetime.datetime.fromisoformat(f_str)
+                     else:
+                         finish_val = datetime.datetime.strptime(f_str, "%Y-%m-%d")
+                 except: pass
 
             # Percent
             pct_val = 0.0
             if t_pct:
-                 # print(f"DEBUG: Raw Pct: {t_pct} Type: {type(t_pct)}")
                  try:
                      pct_val = float(str(t_pct))
-                 except Exception as e:
-                     print(f"DEBUG: Error converting pct: {e}. Raw: {t_pct}") 
+                 except: pass
             
+            # Duration 
+            dur_val = "0 d"
+            t_dur = task.getDuration()
+            if t_dur:
+                dur_val = str(t_dur) # "5.0d" normally
+
             # Outline / Indent
             indent_level = 0
             if t_outline:
@@ -470,7 +474,6 @@ def parse_mpp(content: bytes) -> dict:
                      # org.mpxj.Relation
                      pt = rel.getPredecessorTask() 
                      if pt:
-                         p_ids.append(str(pt.getUniqueID()))
                          p_ids.append(str(pt.getUniqueID()))
                 preds_str = ",".join(p_ids)
 
@@ -490,6 +493,7 @@ def parse_mpp(content: bytes) -> dict:
             row = {
                 "activity_id": act_id,
                 "name": name,
+                "duration": dur_val,
                 "start": start_val,
                 "finish": finish_val,
                 "pct_complete": pct_val,
