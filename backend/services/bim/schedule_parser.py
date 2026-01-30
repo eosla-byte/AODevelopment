@@ -190,12 +190,16 @@ def parse_mpp(content: bytes) -> dict:
         java_home = os.environ.get("JAVA_HOME")
         if not java_home:
             java_path = shutil.which("java")
+            print(f"DEBUG: shutil.which('java') returned: {java_path}")
+            
             if java_path:
                 # /nix/store/.../bin/java -> go up two levels
                 real_path = os.path.realpath(java_path)
                 java_home = os.path.dirname(os.path.dirname(real_path))
                 os.environ["JAVA_HOME"] = java_home
                 print(f"Auto-detected JAVA_HOME: {java_home}")
+            else:
+                print(f"DEBUG: PATH env var: {os.environ.get('PATH')}")
         
         # B. Hunt for libjvm.so
         jvm_path = None
@@ -207,9 +211,10 @@ def parse_mpp(content: bytes) -> dict:
                 os.path.join(java_home, "lib", "server", "libjvm.so"),
                 os.path.join(java_home, "lib", "amd64", "server", "libjvm.so"),
                 os.path.join(java_home, "jre", "lib", "amd64", "server", "libjvm.so"),
+                os.path.join(java_home, "lib", "jvm.cfg"), # Check existence
             ]
             for c in candidates:
-                if os.path.exists(c):
+                if os.path.exists(c) and c.endswith("libjvm.so"):
                     jvm_path = c
                     break
             
@@ -217,16 +222,25 @@ def parse_mpp(content: bytes) -> dict:
             if not jvm_path:
                 jvm_path = find_libjvm(java_home)
 
-        # Strategy 2: Nix Store Wildcards (Last Resort)
+        # Strategy 2: Nix Store Wildcards (Last Resort - Very Broad)
         if not jvm_path:
-            print("Searching /nix/store for libjvm.so...")
-            # Limit scope to jdk/jre directories to check faster
-            nix_dirs = glob.glob("/nix/store/*-jdk-*/lib/server/libjvm.so") 
-            if not nix_dirs:
-                nix_dirs = glob.glob("/nix/store/*-headless-*/lib/server/libjvm.so")
+            print("Searching /nix/store for libjvm.so (Broad Search)...")
+            # 1. Broadest Search: Any package having lib/server/libjvm.so
+            nix_dirs = glob.glob("/nix/store/*/lib/server/libjvm.so") 
             
+            # 2. Arch specific
+            if not nix_dirs:
+                nix_dirs = glob.glob("/nix/store/*/lib/*/server/libjvm.so")
+
             if nix_dirs:
-                jvm_path = nix_dirs[0]
+                # Prefer one that looks like 'jdk' or 'headless'
+                best_match = nix_dirs[0]
+                for p in nix_dirs:
+                    if "jdk" in p and "headless" in p:
+                         best_match = p
+                         break
+                jvm_path = best_match
+                print(f"DEBUG: Found libjvm.so in nix store: {jvm_path}")
 
         if not jvm_path:
              # Final fallback: use default and pray (likely fails based on logs)
@@ -235,6 +249,14 @@ def parse_mpp(content: bytes) -> dict:
              except: pass
 
         if not jvm_path:
+             print("CRITICAL: libjvm.so not found via any method.")
+             print("DEBUG: Listing /nix/store top level (filtered)...")
+             try:
+                 # Last ditch debug: print what jdk libs exist
+                 debug_glob = glob.glob("/nix/store/*jdk*")
+                 print(f"DEBUG: Available JDK paths in store: {debug_glob[:5]}")
+             except: pass
+             
              raise ValueError("CRITICAL: libjvm.so not found! Please set JAVA_HOME validly.")
 
         print(f"Starting JVM with lib: {jvm_path}")
