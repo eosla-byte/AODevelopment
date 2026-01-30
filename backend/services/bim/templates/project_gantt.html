@@ -533,58 +533,59 @@
             // Generate Dynamic CSS for custom fills
             updateDynamicCSS();
 
-            // Ensure container is defined
-            const chartContainer = document.getElementById('chart-area');
+            try {
+                // Ensure container is defined
+                const chartContainer = document.getElementById('chart-area');
 
-            if (ganttTasks.length === 0) {
-                chartContainer.innerHTML = '<div class="text-gray-400 p-10 text-center">No hay tareas para mostrar</div>';
-                return;
+                if (ganttTasks.length === 0) {
+                    chartContainer.innerHTML = '<div class="text-gray-400 p-10 text-center">No hay tareas para mostrar</div>';
+                    return;
+                }
+
+                gantt = new Gantt("#gantt-target", ganttTasks, {
+                    header_height: 50,
+                    column_width: 30,
+                    step: 24,
+                    view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+                    bar_height: 20,
+                    bar_corner_radius: 3,
+                    arrow_curve: 5,
+                    padding: 18,
+                    view_mode: viewMode,
+                    date_format: 'YYYY-MM-DD',
+                    language: 'es',
+                    on_date_change: (task, start, end) => {
+                        updateTaskDate(task.id, start, end);
+                    },
+                    on_click: (task) => {
+                        selectTask(task.id, { ctrlKey: false, shiftKey: false });
+                    },
+                    on_view_change: () => {
+                        syncScrolls();
+                    }
+                });
+
+                // Draw Today Line
+                setTimeout(drawTodayLine, 100);
+
+            } catch (e) {
+                console.error("Gantt Render Error:", e);
+                const chartDiv = document.getElementById('chart-area');
+                if (chartDiv) chartDiv.innerHTML = `<div class="text-red-500 p-4">Error renderizando Gantt: ${e.message}</div>`;
             }
 
-            gantt = new Gantt("#gantt-target", ganttTasks, {
-                header_height: 50,
-                column_width: 30,
-                step: 24,
-                view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
-                bar_height: 20,
-                bar_corner_radius: 3,
-                arrow_curve: 5,
-                padding: 18,
-                view_mode: viewMode,
-                date_format: 'YYYY-MM-DD',
-                language: 'es',
-                on_date_change: (task, start, end) => {
-                    updateTaskDate(task.id, start, end);
-                },
-                on_click: (task) => {
-                    selectTask(task.id, { ctrlKey: false, shiftKey: false });
-                },
-                on_view_change: () => {
-                    syncScrolls();
-                }
-            });
-
-            // Draw Today Line
-            setTimeout(drawTodayLine, 100);
-
-        } catch (e) {
-            console.error("Gantt Render Error:", e);
+            // Bind Scroll Sync
+            const gridDiv = document.getElementById('tasks-grid');
             const chartDiv = document.getElementById('chart-area');
-            if (chartDiv) chartDiv.innerHTML = `<div class="text-red-500 p-4">Error renderizando Gantt: ${e.message}</div>`;
-        }
 
-        // Bind Scroll Sync
-        const gridDiv = document.getElementById('tasks-grid');
-        const chartDiv = document.getElementById('chart-area');
-
-        if (chartDiv) {
-            chartDiv.onscroll = () => {
-                gridDiv.scrollTop = chartDiv.scrollTop;
-            };
-            gridDiv.onscroll = () => {
-                chartDiv.scrollTop = gridDiv.scrollTop;
-            };
-        }
+            if (chartDiv) {
+                chartDiv.onscroll = () => {
+                    gridDiv.scrollTop = chartDiv.scrollTop;
+                };
+                gridDiv.onscroll = () => {
+                    chartDiv.scrollTop = gridDiv.scrollTop;
+                };
+            }
         }
 
         function updateDynamicCSS() {
