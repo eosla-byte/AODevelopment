@@ -1223,30 +1223,148 @@
         }
 
         // --- ACTIONS ---
+        // --- ACTIONS ---
         async function indentTask(direction) {
-            // Resolve IDs
-            const idsToUpdate = new Set(selectedTaskIds);
-            selectedCells.forEach(k => { const [id] = k.split(':'); idsToUpdate.add(id); });
+            // 1. Identify Unique Selected IDs
+            const allSelectedIds = new Set(selectedTaskIds);
+            selectedCells.forEach(k => { const [id] = k.split(':'); allSelectedIds.add(id); });
 
-            if (idsToUpdate.size === 0) return;
+            if (allSelectedIds.size === 0) return;
 
-            const updates = [];
-            idsToUpdate.forEach(id => {
-                const t = tasks.find(x => x.id === id);
-                if (!t) return;
+            // 2. Sort tasks by index to process top-down
+            const sortedIndices = [];
+            tasks.forEach((t, i) => {
+                if (allSelectedIds.has(t.id)) sortedIndices.push(i);
+            });
+            sortedIndices.sort((a, b) => a - b);
 
-                // Use style.indent level
-                if (!t._style) t._style = {};
-                let level = t._style.indent || 0;
-                level += direction;
-                if (level < 0) level = 0;
-                t._style.indent = level;
+            // 3. Identify "Root Selections" (exclude descendants of other selected tasks)
+            // This prevents double-shifting if user selects Parent + Child
+            const rootIndices = [];
+            sortedIndices.forEach(idx => {
+                // Check if any ancestor is also selected
+                let isDescendantOfSelected = false;
+                const currentIndent = (tasks[idx]._style && tasks[idx]._style.indent) || 0;
 
-                updates.push(saveTaskStyle(id, t._style));
+                // Walk backwards to find parents
+                for (let i = idx - 1; i >= 0; i--) {
+                    const t = tasks[i];
+                    const tIndent = (t._style && t._style.indent) || 0;
+                    if (tIndent < currentIndent) {
+                        // Found a parent/ancestor
+                        if (allSelectedIds.has(t.id)) {
+                            isDescendantOfSelected = true;
+                            break;
+                        }
+                        // Continue checking ancestors of this parent?
+                        // Actually, strict hierarchy means we just need to know if we are in the subtree of a selected task.
+                        // Simplified check: If we are inside the "scope" of a previous selected task.
+                        // Scope = contiguous block until indent <= parentIndent.
+                    }
+                }
+
+                // Optimization: Simple "Scope" check using the sorted list
+                // If `idx` is a descendant of the *last added root*, ignore it?
+                // Not necessarily. We could have: Sel(A), Sel(B is sibling of A). Both are roots.
+                // We could have: Sel(A), Sel(Child of A). Child is not root.
+
+                // Let's use getParent() helper approach
+                let parentIdx = getParentIndex(idx);
+                while (parentIdx !== -1) {
+                    if (allSelectedIds.has(tasks[parentIdx].id)) {
+                        isDescendantOfSelected = true;
+                        break;
+                    }
+                    parentIdx = getParentIndex(parentIdx);
+                }
+
+                if (!isDescendantOfSelected) {
+                    rootIndices.push(idx);
+                }
             });
 
-            await Promise.all(updates);
-            renderGrid();
+            // 4. Apply changes to Roots and their Subtrees
+            const updates = [];
+            const processedIds = new Set(); // Avoid double processing
+
+            for (const rootIdx of rootIndices) {
+                const root = tasks[rootIdx];
+                if (processedIds.has(root.id)) continue;
+
+                if (!root._style) root._style = { indent: 0 };
+                const currentLevel = root._style.indent || 0;
+
+                // VALIDATION: Can we indent?
+                if (direction > 0) {
+                    // Rule: Cannot indent if no predecessor (index 0)
+                    if (rootIdx === 0) continue;
+
+                    // Rule: Cannot exceed Predecessor.indent + 1
+                    const prev = tasks[rootIdx - 1];
+                    const prevIndent = (prev._style && prev._style.indent) || 0;
+                    if (currentLevel + 1 > prevIndent + 1) {
+                        // Block illogical indent (Project allows max +1 deeper than prev)
+                        continue;
+                    }
+                }
+
+                // VALIDATION: Can we outdent?
+                if (direction < 0) {
+                    if (currentLevel === 0) continue; // Cannot go negative
+                }
+
+                // Apply Delta
+                const delta = direction; // +1 or -1
+
+                // Collect tree (Root + Descendants)
+                const subtreeIndices = [rootIdx];
+                const rootBaseIndent = currentLevel;
+
+                // Find descendants: contiguous tasks with indent > rootBaseIndent
+                for (let i = rootIdx + 1; i < tasks.length; i++) {
+                    const t = tasks[i];
+                    const tIndent = (t._style && t._style.indent) || 0;
+                    if (tIndent > rootBaseIndent) {
+                        subtreeIndices.push(i);
+                    } else {
+                        break; // End of subtree
+                    }
+                }
+
+                // Apply updates
+                for (const idx of subtreeIndices) {
+                    const t = tasks[idx];
+                    if (!t._style) t._style = { indent: 0 };
+
+                    let newLevel = (t._style.indent || 0) + delta;
+                    if (newLevel < 0) newLevel = 0;
+                    t._style.indent = newLevel;
+
+                    if (!processedIds.has(t.id)) {
+                        updates.push(saveTaskStyle(t.id, t._style));
+                        processedIds.add(t.id);
+                    }
+                }
+            }
+
+            if (updates.length > 0) {
+                await Promise.all(updates);
+                renderGrid();
+            }
+        }
+
+        function getParentIndex(childIdx) {
+            if (childIdx <= 0) return -1;
+            const childIndent = (tasks[childIdx]._style && tasks[childIdx]._style.indent) || 0;
+
+            for (let i = childIdx - 1; i >= 0; i--) {
+                const t = tasks[i];
+                const tIndent = (t._style && t._style.indent) || 0;
+                if (tIndent < childIndent) {
+                    return i;
+                }
+            }
+            return -1;
         }
 
         async function addLink() {
