@@ -13,8 +13,8 @@
 
     <style>
         :root {
-            --header-height: 120px;
-            /* Increased for Toolbar */
+            --header-height: 64px;
+            /* Compact Toolbar */
             --grid-width: 40%;
             --row-height: 38px;
             --border-color: #e5e7eb;
@@ -30,7 +30,7 @@
             flex-direction: column;
         }
 
-        /* --- Toolbar (Ribbon Style) --- */
+        /* --- Toolbar (Single Row Modern) --- */
         #main-toolbar {
             height: var(--header-height);
             background: white;
@@ -38,78 +38,76 @@
             display: flex;
             align-items: center;
             padding: 0 1rem;
-            gap: 1.5rem;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            gap: 1rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
             z-index: 20;
             overflow-x: auto;
-            /* Allow scroll if screen is too narrow */
             white-space: nowrap;
         }
 
-        .toolbar-group {
+        .toolbar-section {
             display: flex;
-            flex-direction: column;
-            gap: 4px;
-            border-right: 1px solid #eee;
-            padding-right: 1rem;
-            justify-content: center;
-            height: 80%;
-        }
-
-        .toolbar-group-title {
-            font-size: 10px;
-            color: #888;
-            text-align: center;
-            margin-top: auto;
-        }
-
-        .toolbar-top-row,
-        .toolbar-bottom-row {
-            display: flex;
-            gap: 4px;
             align-items: center;
+            gap: 0.5rem;
+            padding-right: 1rem;
+            border-right: 1px solid #e5e7eb;
+            height: 60%;
+        }
+
+        .toolbar-section:last-child {
+            border-right: none;
+        }
+
+        .toolbar-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1f2937;
+            margin-right: 0.5rem;
         }
 
         .tool-btn {
-            padding: 4px 8px;
-            border-radius: 4px;
-            color: #374151;
-            font-size: 13px;
-            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            color: #4b5563;
             transition: all 0.2s;
             border: 1px solid transparent;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 2px;
+            background: transparent;
         }
 
         .tool-btn:hover {
             background: #f3f4f6;
-            border-color: #d1d5db;
+            color: #111827;
         }
 
         .tool-btn.active {
             background: #e0f2fe;
             color: #0284c7;
-            border-color: #7dd3fc;
+            border-color: #bae6fd;
         }
 
         .tool-btn i {
-            font-size: 16px;
+            font-size: 14px;
         }
 
-        .tool-btn span {
-            font-size: 10px;
-        }
-
-        /* Select Inputs in Toolbar */
+        /* Input Controls */
         .tool-select {
+            height: 28px;
             border: 1px solid #d1d5db;
-            border-radius: 3px;
-            font-size: 12px;
-            padding: 2px;
-            width: 80px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #374151;
+            padding: 0 4px;
+            background-color: white;
+        }
+
+        .tool-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 1px var(--primary-color);
         }
 
         /* --- Strict Split Layout --- */
@@ -238,104 +236,92 @@
 
     <!-- TOOLBAR -->
     <div id="main-toolbar">
-        <div class="flex items-center gap-2">
-            <h1 class="text-lg font-bold text-gray-800 tracking-tight mr-4">{{ project.name }}</h1>
+        <div class="toolbar-section">
+            <h1 class="toolbar-title">{{ project.name }}</h1>
         </div>
 
-        <!-- Standard Actions -->
-        <div class="toolbar-group">
-            <div class="toolbar-top-row">
-                <button class="tool-btn" onclick="addLink()" title="Vincular Tareas"><i
-                        class="fas fa-link"></i></button>
-                <button class="tool-btn" onclick="removeLink()" title="Desvincular"><i
-                        class="fas fa-unlink"></i></button>
-            </div>
-            <div class="toolbar-bottom-row">
-                <button class="tool-btn" onclick="indentTask(1)" title="Indentar"><i class="fas fa-indent"></i></button>
-                <button class="tool-btn" onclick="indentTask(-1)" title="Desindentar"><i
-                        class="fas fa-outdent"></i></button>
-            </div>
-            <span class="toolbar-group-title">Jerarquía</span>
+        <!-- ACTIONS -->
+        <div class="toolbar-section">
+            <button class="tool-btn" onclick="addLink()" title="Vincular Tareas (Link)">
+                <i class="fas fa-link"></i>
+            </button>
+            <button class="tool-btn" onclick="removeLink()" title="Desvincular (Unlink)">
+                <i class="fas fa-unlink"></i>
+            </button>
+            <div class="w-px h-6 bg-gray-200 mx-1"></div>
+            <button class="tool-btn" onclick="indentTask(1)" title="Indentar (Tab)">
+                <i class="fas fa-indent"></i>
+            </button>
+            <button class="tool-btn" onclick="indentTask(-1)" title="Desindentar (Shift+Tab)">
+                <i class="fas fa-outdent"></i>
+            </button>
         </div>
 
-        <!-- CRUD Actions -->
-        <div class="toolbar-group">
-            <div class="toolbar-top-row">
-                <button class="tool-btn" onclick="addTask()" title="Nueva Tarea"><i
-                        class="fas fa-plus text-green-600"></i></button>
-                <button class="tool-btn" onclick="deleteTask()" title="Eliminar"><i
-                        class="fas fa-trash text-red-600"></i></button>
-            </div>
-            <div class="toolbar-bottom-row">
-                <button class="tool-btn" onclick="moveTask(-1)" title="Mover Arriba"><i
-                        class="fas fa-arrow-up"></i></button>
-                <button class="tool-btn" onclick="moveTask(1)" title="Mover Abajo"><i
-                        class="fas fa-arrow-down"></i></button>
-            </div>
-            <span class="toolbar-group-title">Edición</span>
+        <!-- CRUD -->
+        <div class="toolbar-section">
+            <button class="tool-btn hover:bg-green-50 hover:text-green-600" onclick="addTask()" title="Nueva Tarea">
+                <i class="fas fa-plus"></i>
+            </button>
+            <button class="tool-btn hover:bg-red-50 hover:text-red-600" onclick="deleteTask()" title="Eliminar Tarea">
+                <i class="fas fa-trash"></i>
+            </button>
+            <div class="w-px h-6 bg-gray-200 mx-1"></div>
+            <button class="tool-btn" onclick="moveTask(-1)" title="Mover Arriba">
+                <i class="fas fa-arrow-up"></i>
+            </button>
+            <button class="tool-btn" onclick="moveTask(1)" title="Mover Abajo">
+                <i class="fas fa-arrow-down"></i>
+            </button>
         </div>
 
-        <div class="toolbar-group">
+        <!-- FONT & STYLE -->
+        <div class="toolbar-section">
+            <select id="font-family" class="tool-select w-24" onchange="applyStyle('fontFamily', this.value)">
+                <option value="Segoe UI">Segoe UI</option>
+                <option value="Calibri">Calibri</option>
+                <option value="Arial">Arial</option>
+                <option value="Times New Roman">Times</option>
+            </select>
+            <select id="font-size" class="tool-select w-14" onchange="applyStyle('fontSize', this.value + 'px')">
+                <option value="11">11</option>
+                <option value="12" selected>12</option>
+                <option value="14">14</option>
+                <option value="16">16</option>
+            </select>
+            <div class="w-px h-6 bg-gray-200 mx-1"></div>
+            <button class="tool-btn font-bold" onclick="toggleStyle('bold')" title="Negrita">N</button>
+            <button class="tool-btn italic" onclick="toggleStyle('italic')" title="Cursiva">K</button>
+            <button class="tool-btn underline" onclick="toggleStyle('underline')" title="Subrayado">S</button>
 
-            <!-- Formatting Actions -->
-            <div class="toolbar-group">
-                <div class="toolbar-top-row">
-                    <select id="font-family" class="tool-select" onchange="applyStyle('fontFamily', this.value)">
-                        <option value="Segoe UI">Segoe UI</option>
-                        <option value="Calibri">Calibri</option>
-                        <option value="Arial">Arial</option>
-                        <option value="Times New Roman">Times</option>
-                    </select>
-                    <select id="font-size" class="tool-select w-[50px]"
-                        onchange="applyStyle('fontSize', this.value + 'px')">
-                        <option value="11">11</option>
-                        <option value="12" selected>12</option>
-                        <option value="14">14</option>
-                        <option value="16">16</option>
-                    </select>
-                </div>
-                <div class="toolbar-bottom-row">
-                    <button class="tool-btn font-bold" onclick="toggleStyle('bold')" title="Negrita">N</button>
-                    <button class="tool-btn italic" onclick="toggleStyle('italic')" title="Cursiva">K</button>
-                    <button class="tool-btn underline" onclick="toggleStyle('underline')" title="Subrayado">S</button>
-                    <div class="w-[1px] h-4 bg-gray-300 mx-1"></div>
+            <div class="w-px h-6 bg-gray-200 mx-1"></div>
 
-                    <div class="relative group">
-                        <button class="tool-btn" title="Color de Relleno (Barra)"><i class="fas fa-fill-drip"
-                                style="color: #666"></i></button>
-                        <input type="color" class="absolute inset-0 opacity-0 cursor-pointer"
-                            onchange="applyStyle('fill', this.value)">
-                        <div id="fill-indicator" class="h-1 w-full bg-yellow-400 mt-[-4px]"></div>
-                    </div>
-
-                    <div class="relative group">
-                        <button class="tool-btn" title="Color de Texto"><i class="fas fa-font"
-                                style="color: #666"></i></button>
-                        <input type="color" class="absolute inset-0 opacity-0 cursor-pointer"
-                            onchange="applyStyle('color', this.value)">
-                        <div id="text-indicator" class="h-1 w-full bg-black mt-[-4px]"></div>
-                    </div>
-                </div>
-                <span class="toolbar-group-title">Fuente</span>
+            <!-- Color Pickers with Icon Labels -->
+            <div class="relative group flex items-center">
+                <button class="tool-btn" title="Color de Relleno"><i class="fas fa-fill-drip"></i></button>
+                <input type="color" class="absolute inset-0 opacity-0 cursor-pointer w-8"
+                    onchange="applyStyle('fill', this.value)">
             </div>
-
-            <!-- View Controls -->
-            <div class="toolbar-group">
-                <div class="toolbar-top-row">
-                    <button class="tool-btn" onclick="changeView('Day')">Día</button>
-                    <button class="tool-btn" onclick="changeView('Week')">Semana</button>
-                    <button class="tool-btn" onclick="changeView('Month')">Mes</button>
-                </div>
-                <span class="toolbar-group-title">Vista</span>
+            <div class="relative group flex items-center">
+                <button class="tool-btn" title="Color de Texto"><i class="fas fa-font"></i></button>
+                <input type="color" class="absolute inset-0 opacity-0 cursor-pointer w-8"
+                    onchange="applyStyle('color', this.value)">
             </div>
+        </div>
 
-            <div class="ml-auto flex gap-2">
-                <button onclick="document.getElementById('file-upload').click()"
-                    class="bg-green-600 text-white px-3 py-1 rounded text-xs flex items-center gap-2 hover:bg-green-700">
-                    <i class="fas fa-file-import"></i> Importar MPP/XML
-                </button>
-                <input type="file" id="file-upload" hidden accept=".xml,.mpp,.xer">
-            </div>
+        <!-- VIEW MODE -->
+        <div class="toolbar-section">
+            <button class="tool-btn px-3 w-auto text-xs font-semibold" onclick="changeView('Day')">Dia</button>
+            <button class="tool-btn px-3 w-auto text-xs font-semibold" onclick="changeView('Week')">Sem</button>
+            <button class="tool-btn px-3 w-auto text-xs font-semibold" onclick="changeView('Month')">Mes</button>
+        </div>
+
+        <!-- IMPORT (Right Aligned) -->
+        <div class="ml-auto">
+            <button onclick="document.getElementById('file-upload').click()"
+                class="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-emerald-700 shadow-sm transition-colors">
+                <i class="fas fa-file-import"></i> Importar
+            </button>
+            <input type="file" id="file-upload" hidden accept=".xml,.mpp,.xer">
         </div>
     </div>
 
