@@ -708,6 +708,14 @@
             } catch (e) {
                 console.error("Gantt Render Error:", e);
             }
+
+            // Bind Scroll Sync
+            const gridDiv = document.getElementById('tasks-grid');
+            const chartDiv = document.getElementById('chart-area');
+            if (chartDiv && gridDiv) {
+                chartDiv.onscroll = () => gridDiv.scrollTop = chartDiv.scrollTop;
+                gridDiv.onscroll = () => chartDiv.scrollTop = gridDiv.scrollTop;
+            }
         } // End renderGantt
 
         function drawCommentIndicators() {
@@ -749,13 +757,7 @@
                 }
             });
         }
-        const gridDiv = document.getElementById('tasks-grid');
-        const chartDiv = document.getElementById('chart-area');
-        if (chartDiv && gridDiv) {
-            chartDiv.onscroll = () => gridDiv.scrollTop = chartDiv.scrollTop;
-            gridDiv.onscroll = () => chartDiv.scrollTop = gridDiv.scrollTop;
-        }
-        }
+
 
         function updateDynamicCSS() {
             let styleEl = document.getElementById('dynamic-gantt-styles');
