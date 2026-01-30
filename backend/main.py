@@ -48,6 +48,7 @@ async def force_admin_reset():
     """
     try:
         # Importar User y save_user de las dependencias globales o database
+        # TRIGGER DEPLOY CHECK 2
         from common.database import save_user, User
         from common.auth_utils import get_password_hash
         
