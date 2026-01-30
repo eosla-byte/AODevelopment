@@ -173,12 +173,31 @@ def parse_mpp(content: bytes) -> dict:
     import os
     import shutil
     import sys
+    import glob
     
     # 1. Ensure JVM is started and JAVA_HOME is set
     if not jpype.isJVMStarted():
         # Auto-detect JAVA_HOME if missing
         if not os.environ.get("JAVA_HOME"):
             java_path = shutil.which("java")
+            
+            # Fallback: Deep search for Nix/Linux paths
+            if not java_path:
+                print("WARNING: 'java' executable not found in PATH. Attempting deep search...")
+                # Search patterns for common JDK locations
+                search_patterns = [
+                    "/nix/store/*-openjdk-*/bin/java",
+                    "/nix/store/*-jdk-*/bin/java",
+                    "/usr/lib/jvm/*/bin/java",
+                    "/usr/java/*/bin/java"
+                ]
+                for pattern in search_patterns:
+                    matches = glob.glob(pattern)
+                    if matches:
+                        java_path = matches[0]
+                        print(f"Deep search found java: {java_path}")
+                        break
+            
             if java_path:
                 # Resolve full path (e.g. /nix/store/.../bin/java)
                 real_path = os.path.realpath(java_path)
@@ -187,13 +206,14 @@ def parse_mpp(content: bytes) -> dict:
                 os.environ["JAVA_HOME"] = java_home
                 print(f"Auto-detected JAVA_HOME via 'java': {java_home}")
             else:
-                print("WARNING: 'java' executable not found in PATH.")
+                print("CRITICAL: Java executable not found anywhere.")
 
         try:
             # Explicitly pass classpath from jpype.getClassPath() which mpxj populated
             jpype.startJVM(classpath=jpype.getClassPath())
         except Exception as e:
             print(f"JVM Start Error: {e}")
+            pass
             # If critical, we should probably stop here.
             # But jpype might say "already started" or similar non-fatal?
             # If it's "JVMNotFound", it's fatal.
@@ -201,7 +221,6 @@ def parse_mpp(content: bytes) -> dict:
                  import traceback
                  traceback.print_exc()
                  raise ValueError(f"Server Environment Error: Java Runtime (JVM) could not be started. Error: {e}")
-            pass
 
     # 2. Import Java Classes via JPype
     try:
