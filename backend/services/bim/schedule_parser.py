@@ -428,9 +428,12 @@ def parse_mpp(content: bytes) -> dict:
                  # MPXJ Date .toString() -> "Fri Jan 26 ..."
                  # Try using start.toInstant() if available (Java 8+)
                  try:
+                     # DEBUG RAW
+                     # print(f"DEBUG: Raw Start: {t_start} Type: {type(t_start)}")
                      start_val = t_start.toInstant().toString() # "2024-01-26T14:00:00Z"
                      start_val = datetime.datetime.fromisoformat(str(start_val).replace('Z', '+00:00'))
-                 except: 
+                 except Exception as e: 
+                     print(f"DEBUG: Error converting start date: {e}. Raw: {t_start}")
                      # Fallback to simple str
                      pass
 
@@ -439,12 +442,18 @@ def parse_mpp(content: bytes) -> dict:
                  try:
                      finish_val = t_finish.toInstant().toString()
                      finish_val = datetime.datetime.fromisoformat(str(finish_val).replace('Z', '+00:00'))
-                 except: pass
+                 except Exception as e:
+                     print(f"DEBUG: Error converting finish date: {e}. Raw: {t_finish}")
+                     pass
 
             # Percent
             pct_val = 0.0
             if t_pct:
-                 pct_val = float(str(t_pct)) 
+                 # print(f"DEBUG: Raw Pct: {t_pct} Type: {type(t_pct)}")
+                 try:
+                     pct_val = float(str(t_pct))
+                 except Exception as e:
+                     print(f"DEBUG: Error converting pct: {e}. Raw: {t_pct}") 
             
             # Outline / Indent
             indent_level = 0
