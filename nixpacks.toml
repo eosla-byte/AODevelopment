@@ -1,7 +1,6 @@
-providers = ["python", "java"]
-
 [phases.setup]
 nixPkgs = ["python3", "postgresql"]
+aptPkgs = ["openjdk-17-jre-headless"]
 
 [phases.build]
 cmds = ["pip install -r backend/requirements.txt"]
