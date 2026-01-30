@@ -605,6 +605,24 @@
         }
 
         // --- GRID RENDERING (Optimized for Interaction) ---
+        // State for collapsed parents
+        let collapsedTasks = new Set();
+
+        function toggleCollapse(index) {
+            const parent = tasks[index];
+            if (!parent) return;
+
+            if (collapsedTasks.has(parent.id)) {
+                collapsedTasks.delete(parent.id);
+            } else {
+                collapsedTasks.add(parent.id);
+            }
+            renderGrid();
+            // Optional: Filter tasks passed to Gantt chart to match grid visibility
+            // For now, let's just update grid. Chart might show all or we need to filter there too.
+            renderGantt();
+        }
+
         function renderGrid() {
             const tbody = document.getElementById('grid-body');
             tbody.innerHTML = '';
@@ -616,30 +634,70 @@
                 return n > c;
             };
 
+            // Helper to determine visibility based on collapsed parents
+            // We need to know if any ancestor is collapsed
+            // This is O(N^2) or O(N*Depth) in naive approach. 
+            // Linear scan with stack is better.
+
+            let visible = true;
+            let collapsedLevel = -1; // -1 means no ancestor is collapsed
+
             tasks.forEach((task, index) => {
+                let indent = (task._style && task._style.indent) ? task._style.indent : 0;
+
+                // Visibility Check
+                if (collapsedLevel !== -1) {
+                    // We are inside a collapsed block
+                    if (indent > collapsedLevel) {
+                        return; // Skip rendering (hidden)
+                    } else {
+                        // We exited the block
+                        collapsedLevel = -1;
+                    }
+                }
+
+                // Parent Check
+                const isParent = isSummary(index);
+
+                // Update Collapse State Logic for *next* iterations
+                if (isParent && collapsedTasks.has(task.id)) {
+                    if (collapsedLevel === -1) {
+                        collapsedLevel = indent;
+                    }
+                }
+
                 const tr = document.createElement('tr');
                 tr.dataset.id = task.id;
                 tr.dataset.index = index;
 
                 // Style Logic
-                if (isSummary(index)) {
+                if (isParent) {
                     tr.style.fontWeight = 'bold';
                     tr.classList.add('summary-task');
                 }
                 if (task._style) applyRowStyle(tr, task._style);
 
                 tr.style.height = '38px';
-                let indent = (task._style && task._style.indent) ? task._style.indent : 0;
+
+                // Toggle Icon
+                let toggleHtml = '';
+                if (isParent) {
+                    const isCollapsed = collapsedTasks.has(task.id);
+                    const icon = isCollapsed ? 'fa-caret-right' : 'fa-caret-down';
+                    toggleHtml = `<i class="fas ${icon} toggle-icon" onclick="toggleCollapse(${index})"></i>`;
+                } else {
+                    toggleHtml = `<span class="toggle-icon"></span>`; // Spacer
+                }
 
                 // Helper to render cell
-                // We add data-field to identify columns
                 tr.innerHTML = `
                     <td class="text-center text-gray-500 text-xs">${index + 1}</td>
                     
                     <!-- NAME -->
                     <td class="grid-cell" data-field="name" data-id="${task.id}">
                         <div style="display: flex; align-items: center; height:100%">
-                            <span class="wbs-indent" style="width: ${indent * 10}px; flex-shrink: 0;"></span>
+                            <span class="wbs-indent" style="width: ${indent * 20}px; flex-shrink: 0;"></span>
+                            ${toggleHtml}
                             <input class="cell-input" value="${task.name}" readonly>
                         </div>
                     </td>
@@ -649,9 +707,9 @@
                         <input class="cell-input" value="${task.contractor || ''}" readonly>
                     </td>
                     
-                    <!-- DURATION (Calc) -->
+                    <!-- DURATION -->
                     <td class="text-center text-xs text-gray-800" style="vertical-align: middle;">
-                        ${diffDays(task.start, task.end)} d
+                         ${task.duration || (diffDays(task.start, task.end) + ' d')}
                     </td>
                     
                     <!-- START -->
