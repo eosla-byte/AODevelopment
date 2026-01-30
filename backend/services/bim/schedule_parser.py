@@ -459,7 +459,14 @@ def parse_mpp(content: bytes) -> dict:
                 p_ids = []
                 for rel in rels:
                      # org.mpxj.Relation
-                     pt = rel.getSourceTask() # Predecessor
+                     try:
+                         pt = rel.getSourceTask() # Predecessor
+                     except AttributeError:
+                         print(f"DEBUG: Relation object type: {type(rel)}")
+                         print(f"DEBUG: Relation attributes: {dir(rel)}")
+                         # Fallback or strict error
+                         raise
+                     
                      if pt:
                          p_ids.append(str(pt.getUniqueID()))
                 preds_str = ",".join(p_ids)
