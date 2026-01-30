@@ -471,25 +471,74 @@
         </div>
     </div>
 
+    <!-- COMPANIES SIDE PANEL (Kept outside toolbar) -->
+    <div id="company-panel-overlay" class="fixed inset-0 bg-black bg-opacity-30 z-[60] hidden"
+        onclick="toggleCompanyMenu()"></div>
+    <div id="company-menu"
+        class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b bg-gray-50">
+            <h3 class="font-bold text-gray-700"><i class="fas fa-building mr-2"></i> Empresas</h3>
+            <button onclick="toggleCompanyMenu()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="p-4 flex flex-col gap-2 border-b bg-white">
+            <label class="text-xs font-bold text-gray-500 uppercase">Agregar Nueva</label>
+            <div class="flex items-center gap-2">
+                <input id="new-company-name" type="text" placeholder="Nombre de empresa..."
+                    class="text-sm border border-gray-300 rounded px-3 py-2 flex-1 focus:ring-2 focus:ring-blue-500 outline-none">
+                <button onclick="addCompany()"
+                    class="bg-blue-600 text-white rounded w-8 h-8 flex items-center justify-center hover:bg-blue-700 shadow-sm">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="company-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
+            <!-- Dynamic Items -->
+        </div>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="gantt-container" class="relative">
+        <!-- GRID -->
+        <div id="tasks-grid">
+            <table class="gantt-table">
+                <thead>
+                    <tr>
+                        <th style="width: 40px; text-align: center;">#</th>
+                        <th style="width: 14px;"></th> <!-- Collapse Icon -->
+                        <th style="width: 250px;">Nombre de Tarea</th>
+                        <th style="width: 90px;">Inicio</th>
+                        <th style="width: 90px;">Fin</th>
+                        <th style="width: 80px;">Duración</th>
+                        <th style="width: 60px;">%</th>
+                        <!-- <th style="width: 120px;">Empresa</th> -->
+                    </tr>
+                </thead>
+                <tbody id="grid-body">
+                    <!-- Rows rendered by JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- RESIZER -->
+        <div id="resizer"></div>
+
+        <!-- CLONED STICKY HEADER (SVG) -->
+        <div id="gantt-header-sticky" class="overflow-hidden absolute top-0 right-0 bg-white z-20 pointer-events-none"
+            style="height: 50px; left: var(--grid-width, 420px); border-bottom: 1px solid #e0e0e0;">
+            <svg id="sticky-header-svg" height="100%" width="100%"></svg>
+        </div>
+
+        <!-- CHART -->
+        <div id="chart-area" class="no-scroll relative">
+            <svg id="gantt-target"></svg>
+        </div>
+    </div>
+
     <style>
-        /* Fix Sticky Header Black Bar Issue */
-        #gantt-header-sticky svg {
-            background-color: #ffffff;
-            /* Force White BG */
-        }
-
-        #gantt-header-sticky .grid-header {
-            fill: #ffffff;
-            /* Ensure background rects are white */
-        }
-
-        #gantt-header-sticky text {
-            fill: #374151;
-            /* Text Color Gray-700 */
-        }
-
-        <style>
-
         /* Fix Sticky Header Black Bar Issue */
         #gantt-header-sticky svg {
             background-color: #ffffff;
@@ -508,60 +557,66 @@
 
         /* ... Previous Styles ... */
         .gantt-table thead th {
-            /* ... Previous Styles ... */
+            position: sticky;
+            top: 0;
+            background: #f9fafb;
+            z-index: 20;
+            /* Ensure it stays above rows */
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
 
-            .lookahead-row {
-                background-color: #fef2f2 !important;
-                /* Red 50 */
-                border-left: 3px solid #ef4444;
-            }
+        .lookahead-row {
+            background-color: #fef2f2 !important;
+            /* Red 50 */
+            border-left: 3px solid #ef4444;
+        }
 
-            .lookahead-row td {
-                color: #b91c1c;
-                /* Red 700 */
-            }
+        .lookahead-row td {
+            color: #b91c1c;
+            /* Red 700 */
+        }
 
-            /* Today Line */
-            .today-line {
-                stroke: #ef4444;
-                stroke-width: 2;
-                stroke-dasharray: 4;
-                opacity: 0.8;
-                pointer-events: none;
-                z-index: 50;
-            }
+        /* Today Line */
+        .today-line {
+            stroke: #ef4444;
+            stroke-width: 2;
+            stroke-dasharray: 4;
+            opacity: 0.8;
+            pointer-events: none;
+            z-index: 50;
+        }
 
-            /* Grid Interactive Styles */
-            .grid-cell {
-                position: relative;
-                padding: 0;
-                height: 100%;
-                cursor: cell;
-                outline: none;
-            }
+        /* Grid Interactive Styles */
+        .grid-cell {
+            position: relative;
+            padding: 0;
+            height: 100%;
+            cursor: cell;
+            outline: none;
+        }
 
-            .grid-cell.selected {
-                box-shadow: inset 0 0 0 2px #3b82f6;
-                background-color: rgba(59, 130, 246, 0.05);
-            }
+        .grid-cell.selected {
+            box-shadow: inset 0 0 0 2px #3b82f6;
+            background-color: rgba(59, 130, 246, 0.05);
+        }
 
-            .grid-cell.editing .cell-input {
-                pointer-events: auto;
-                background: white;
-                box-shadow: inset 0 0 0 2px #3b82f6;
-            }
+        .grid-cell.editing .cell-input {
+            pointer-events: auto;
+            background: white;
+            box-shadow: inset 0 0 0 2px #3b82f6;
+        }
 
-            .cell-input {
-                width: 100%;
-                height: 100%;
-                border: none;
-                outline: none;
-                background: transparent;
-                font-family: inherit;
-                padding: 0 6px;
-                pointer-events: none;
-                /* Default: Selection Mode */
-            }
+        .cell-input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            outline: none;
+            background: transparent;
+            font-family: inherit;
+            padding: 0 6px;
+            pointer-events: none;
+            /* Default: Selection Mode */
+        }
     </style>
 
 
