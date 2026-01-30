@@ -315,6 +315,30 @@
             <button class="tool-btn px-3 w-auto text-xs font-semibold" onclick="changeView('Month')">Mes</button>
         </div>
 
+        <!-- LOOKAHEAD -->
+        <div class="toolbar-section"
+            style="border-right:none; padding-left: 1rem; background: #fff1f2; border-radius: 6px; margin-right: 1rem;">
+            <div class="flex items-center gap-2">
+                <button id="btn-lookahead"
+                    class="tool-btn w-auto px-2 text-xs font-bold text-red-600 border border-red-200 bg-red-50"
+                    onclick="toggleLookahead()" title="Activar Lookahead">
+                    LOOKAHEAD
+                </button>
+
+                <div class="flex flex-col">
+                    <label class="text-[10px] text-red-500 font-bold leading-none">FECHA INICIO</label>
+                    <input type="date" id="lookahead-start" class="tool-select h-5 text-xs border-red-200"
+                        onchange="updateLookahead()">
+                </div>
+
+                <div class="flex flex-col w-16">
+                    <label class="text-[10px] text-red-500 font-bold leading-none">SEMANAS</label>
+                    <input type="number" id="lookahead-weeks" class="tool-select h-5 text-xs border-red-200 text-center"
+                        value="4" min="1" max="52" onchange="updateLookahead()">
+                </div>
+            </div>
+        </div>
+
         <!-- IMPORT (Right Aligned) -->
         <div class="ml-auto">
             <button onclick="document.getElementById('file-upload').click()"
@@ -358,6 +382,17 @@
 
     <style>
         /* ... Previous Styles ... */
+
+        .lookahead-row {
+            background-color: #fef2f2 !important;
+            /* Red 50 */
+            border-left: 3px solid #ef4444;
+        }
+
+        .lookahead-row td {
+            color: #b91c1c;
+            /* Red 700 */
+        }
 
         /* Today Line */
         .today-line {
@@ -519,10 +554,14 @@
                     on_view_change: () => {
                         syncScrolls();
                         drawTodayLine();
+                        if (typeof updateLookahead === 'function') updateLookahead();
                     }
                 });
 
-                setTimeout(drawTodayLine, 100);
+                setTimeout(() => {
+                    drawTodayLine();
+                    if (typeof updateLookahead === 'function') updateLookahead();
+                }, 100);
 
             } catch (e) {
                 console.error("Gantt Render Error:", e);
@@ -603,6 +642,139 @@
 
             svg.appendChild(line);
         }
+
+        // --- LOOKAHEAD LOGIC ---
+        let lookaheadActive = false;
+
+        function toggleLookahead() {
+            lookaheadActive = !lookaheadActive;
+            const btn = document.getElementById('btn-lookahead');
+            if (lookaheadActive) {
+                btn.classList.add('bg-red-600', 'text-white');
+                btn.classList.remove('bg-red-50', 'text-red-600');
+
+                // Default date to Today if empty
+                const dateInput = document.getElementById('lookahead-start');
+                if (!dateInput.value) {
+                    dateInput.value = new Date().toISOString().split('T')[0];
+                }
+            } else {
+                btn.classList.remove('bg-red-600', 'text-white');
+                btn.classList.add('bg-red-50', 'text-red-600');
+            }
+            updateLookahead();
+        }
+
+        function updateLookahead() {
+            if (!lookaheadActive) {
+                removeLookaheadOverlay();
+                clearLookaheadHighlights();
+                return;
+            }
+            drawLookaheadOverlay();
+            highlightLookaheadTasks();
+        }
+
+        function removeLookaheadOverlay() {
+            const svg = document.getElementById('gantt-target');
+            if (!svg) return;
+            const existing = svg.querySelector('.lookahead-overlay');
+            if (existing) existing.remove();
+        }
+
+        function clearLookaheadHighlights() {
+            document.querySelectorAll('.lookahead-row').forEach(el => el.classList.remove('lookahead-row'));
+        }
+
+        function drawLookaheadOverlay() {
+            const svg = document.getElementById('gantt-target');
+            if (!svg || !gantt) return;
+
+            removeLookaheadOverlay();
+
+            const startVal = document.getElementById('lookahead-start').value;
+            const weeksVal = parseInt(document.getElementById('lookahead-weeks').value) || 4;
+            if (!startVal) return;
+
+            const startDate = new Date(startVal);
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + (weeksVal * 7));
+
+            // Coordinates
+            if (!gantt.gantt_start || !gantt.gantt_end) return;
+
+            // Map Date to X
+            const totalDuration = gantt.gantt_end - gantt.gantt_start;
+            const svgWidth = parseFloat(svg.getAttribute('width'));
+            const svgHeight = parseFloat(svg.getAttribute('height'));
+
+            const getX = (date) => {
+                const diff = date - gantt.gantt_start;
+                return (diff / totalDuration) * svgWidth;
+            };
+
+            const x1 = getX(startDate);
+            const x2 = getX(endDate);
+            const width = x2 - x1;
+
+            if (width <= 0) return;
+
+            // Draw Rect
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', x1);
+            rect.setAttribute('y', 0);
+            rect.setAttribute('width', width);
+            rect.setAttribute('height', svgHeight);
+            rect.setAttribute('class', 'lookahead-overlay');
+            rect.setAttribute('fill', 'rgba(239, 68, 68, 0.1)'); // Red 500, 10%
+            rect.setAttribute('stroke', '#ef4444');
+            rect.setAttribute('stroke-width', '2');
+            rect.setAttribute('pointer-events', 'none');
+
+            // Prepend to avoid covering tooltips/interactions? 
+            // Append puts it on TOP. Prepend puts it BEHIND bars.
+            // User requested "frame", suggesting overlay. "Transparent" suggests overlay.
+            // Let's Append but ensure pointer-events: none.
+            svg.appendChild(rect);
+        }
+
+        function highlightLookaheadTasks() {
+            clearLookaheadHighlights();
+            const startVal = document.getElementById('lookahead-start').value;
+            const weeksVal = parseInt(document.getElementById('lookahead-weeks').value) || 4;
+            if (!startVal) return;
+
+            const lhStart = new Date(startVal);
+            const lhEnd = new Date(lhStart);
+            lhEnd.setDate(lhStart.getDate() + (weeksVal * 7));
+
+            // Check intersections
+            tasks.forEach((t, index) => {
+                // Ignore Summary? Usually Lookahead cares about actionable tasks.
+                // But let's highlight everything intersecting.
+
+                const tStart = new Date(t.start);
+                const tEnd = new Date(t.end);
+
+                // Intersection Logic:
+                // (TaskStart < LHEnd) && (TaskEnd > LHStart)
+                if (tStart < lhEnd && tEnd > lhStart) {
+                    // Highlight Row in Grid
+                    const tr = document.querySelector(`tr[data-id="${t.id}"]`);
+                    if (tr) {
+                        tr.classList.add('lookahead-row');
+
+                        // Optional: Compute status (Starting, Ending, In Process)
+                        // Could add tooltip or specific color class
+                    }
+                }
+            });
+        }
+
+        // Hook into Gantt View Change
+        const originalViewChange = gantt ? gantt.options.on_view_change : null;
+        // Logic handled in renderGantt setup... wait.
+        // We need to re-hook whenever we re-create Gantt.
 
         // --- GRID RENDERING (Optimized for Interaction) ---
         // State for collapsed parents
