@@ -402,7 +402,7 @@
         }
     </style>
 
-    /* ... HTML BODY ... */
+
 
     <script>
         // --- STATE ---
@@ -435,6 +435,123 @@
             gridBody.addEventListener('mousedown', handleGridMouseDown);
             gridBody.addEventListener('dblclick', handleGridDoubleClick);
         });
+
+        async function loadTasks() {
+            try {
+                // Use server-side data if available (passed via Jinja)
+                if (tasks && tasks.length > 0) {
+                    tasks = tasks.map(t => {
+                        const parseDate = (d) => {
+                            if (!d) return new Date();
+                            const date = new Date(d);
+                            return isNaN(date.getTime()) ? new Date() : date;
+                        };
+                        t.start = parseDate(t.start);
+                        t.end = parseDate(t.end);
+                        if (t.style && typeof t.style === 'string') {
+                            try { t._style = JSON.parse(t.style); } catch (e) { }
+                        }
+                        return t;
+                    });
+                    renderGrid();
+                    renderGantt();
+                    return;
+                }
+
+                // Fallback catch-all (usually not needed if Jinja works)
+                const res = await fetch(`/api/projects/${projectId}/activities`);
+                if (!res.ok) throw new Error("Error loading");
+                const data = await res.json();
+                tasks = data.map(t => {
+                    t.start = new Date(t.start);
+                    t.end = new Date(t.end);
+                    if (t.style && typeof t.style === 'string') {
+                        try { t._style = JSON.parse(t.style); } catch (e) { }
+                    }
+                    return t;
+                });
+                renderGrid();
+                renderGantt();
+            } catch (e) { console.error(e); }
+        }
+
+        function renderGantt(viewMode = 'Week') {
+            const svgElement = document.getElementById('gantt-target');
+            if (!svgElement) return;
+            svgElement.innerHTML = '';
+
+            const ganttTasks = tasks.map(t => ({
+                id: t.id,
+                name: t.name,
+                start: formatDateInput(t.start),
+                end: formatDateInput(t.end),
+                progress: t.progress,
+                dependencies: t.dependencies,
+                custom_class: t._style && t._style.fill ? `custom-fill-${t.id}` : ''
+            }));
+
+            updateDynamicCSS();
+
+            try {
+                if (ganttTasks.length === 0) {
+                    document.getElementById('chart-area').innerHTML = '<div class="text-gray-400 p-10 text-center">No hay tareas para mostrar</div>';
+                    return;
+                }
+
+                gantt = new Gantt("#gantt-target", ganttTasks, {
+                    header_height: 50,
+                    column_width: 30,
+                    step: 24,
+                    view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+                    bar_height: 20,
+                    bar_corner_radius: 3,
+                    arrow_curve: 5,
+                    padding: 18,
+                    view_mode: viewMode,
+                    date_format: 'YYYY-MM-DD',
+                    language: 'es',
+                    on_date_change: (task, start, end) => {
+                        updateTaskDate(task.id, start, end);
+                    },
+                    on_click: (task) => {
+                        // Optional: Sync selection
+                    },
+                    on_view_change: () => {
+                        syncScrolls();
+                        drawTodayLine();
+                    }
+                });
+
+                setTimeout(drawTodayLine, 100);
+
+            } catch (e) {
+                console.error("Gantt Render Error:", e);
+            }
+
+            // Bind Scroll Sync
+            const gridDiv = document.getElementById('tasks-grid');
+            const chartDiv = document.getElementById('chart-area');
+            if (chartDiv && gridDiv) {
+                chartDiv.onscroll = () => gridDiv.scrollTop = chartDiv.scrollTop;
+                gridDiv.onscroll = () => chartDiv.scrollTop = gridDiv.scrollTop;
+            }
+        }
+
+        function updateDynamicCSS() {
+            let styleEl = document.getElementById('dynamic-gantt-styles');
+            if (!styleEl) {
+                styleEl = document.createElement('style');
+                styleEl.id = 'dynamic-gantt-styles';
+                document.head.appendChild(styleEl);
+            }
+            let css = '';
+            tasks.forEach(t => {
+                if (t._style && t._style.fill) {
+                    css += `.custom-fill-${t.id} .bar-group .bar { fill: ${t._style.fill} !important; } .custom-fill-${t.id} .bar-group .bar-progress { fill: #00000033 !important; }`;
+                }
+            });
+            styleEl.textContent = css;
+        }
 
         // --- TODAY LINE LOGIC ---
         function drawTodayLine() {
@@ -1049,12 +1166,14 @@
 
         // --- ACTIONS ---
         async function indentTask(direction) {
-            if (selectedTaskIds.size === 0) return;
-            // Simple visual indent for now by prepending spaces or updating style
-            // Real WBS logic requires tree traversal, acceptable to defer or do visual-only first.
+            // Resolve IDs
+            const idsToUpdate = new Set(selectedTaskIds);
+            selectedCells.forEach(k => { const [id] = k.split(':'); idsToUpdate.add(id); });
+
+            if (idsToUpdate.size === 0) return;
 
             const updates = [];
-            selectedTaskIds.forEach(id => {
+            idsToUpdate.forEach(id => {
                 const t = tasks.find(x => x.id === id);
                 if (!t) return;
 
@@ -1074,11 +1193,8 @@
 
         async function addLink() {
             // Link selected tasks sequentially
-            const selected = Array.from(selectedTaskIds);
+            const selected = Array.from(new Set([...selectedTaskIds, ...Array.from(selectedCells).map(k => k.split(':')[0])]));
             if (selected.length < 2) return alert("Selecciona al menos 2 tareas para vincular");
-
-            // Sort by current start date to guess order? Or selection order?
-            // Selection order by Set iteration is insertion order usually.
 
             for (let i = 1; i < selected.length; i++) {
                 const predecessorId = selected[i - 1];
@@ -1097,7 +1213,7 @@
         }
 
         async function removeLink() {
-            const selected = Array.from(selectedTaskIds);
+            const selected = Array.from(new Set([...selectedTaskIds, ...Array.from(selectedCells).map(k => k.split(':')[0])]));
             if (selected.length === 0) return alert("Selecciona tareas para desvincular");
 
             for (const id of selected) {
@@ -1110,35 +1226,7 @@
             renderGantt(gantt.options.view_mode);
         }
 
-        function drawTodayLine() {
-            const svg = document.getElementById('gantt-chart');
-            if (!svg) return;
 
-            // Frappe Gantt doesn't expose X scale easily publicly. 
-            // We can infer from specific DOM elements (grid header) or dates.
-            // Hacky but effective: Find the rect for "Today" if in view?
-            // Better: Calculate X based on (Today - StartDate) / TotalDuration * Width
-
-            // For MVP: Just highlight the column in grid corresponding to today? Frappe highlights header.
-            // Let's try to append a line.
-
-            const today = new Date();
-            // This is hard to get pixel-perfect without access to Gantt internal X helpers.
-            // Let's rely on Frappe's built-in "Today" highlighting (it adds 'today' class to tick).
-            // We'll add a global CSS rule to extend that highlight down.
-
-            const fileCss = document.getElementById('custom-gantt-css');
-            if (!fileCss) {
-                const style = document.createElement('style');
-                style.id = 'custom-gantt-css';
-                // Target the tick created by Frappe
-                style.textContent = `
-            .gantt .tick.today line {stroke: #f59e0b; stroke-width: 2px; opacity: 0.5; }
-            .gantt .tick.today text {fill: #f59e0b; font-weight: bold; }
-            `;
-                document.head.appendChild(style);
-            }
-        }
 
         // --- RESIZER ---
         function setupResizer() {
