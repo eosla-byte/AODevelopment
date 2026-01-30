@@ -1,6 +1,6 @@
 [phases.setup]
-nixPkgs = ["python3", "postgresql", "jdk17"]
-# aptPkgs removed to prefer Nix environment
+nixPkgs = ["python3", "postgresql"]
+aptPkgs = ["openjdk-17-jdk-headless"]
 
 [phases.build]
 cmds = ["pip install -r backend/requirements.txt"]

@@ -222,6 +222,14 @@ def parse_mpp(content: bytes) -> dict:
             if not jvm_path:
                 jvm_path = find_libjvm(java_home)
 
+        # Strategy 1.5: System Paths (Apt/Debian/Ubuntu)
+        if not jvm_path:
+             print("Searching /usr/lib/jvm for libjvm.so...")
+             jvm_path = find_libjvm("/usr/lib/jvm")
+             
+        if not jvm_path and os.path.exists("/usr/java"):
+             jvm_path = find_libjvm("/usr/java")
+
         # Strategy 2: Nix Store Wildcards (Last Resort - Very Broad)
         if not jvm_path:
             print("Searching /nix/store for libjvm.so (Broad Search)...")
