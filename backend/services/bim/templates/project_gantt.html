@@ -544,7 +544,8 @@
 
     <script>
         // --- STATE ---
-        let tasks = {{ tasks | tojson | safe}};
+        var tasks = {{ tasks | tojson | safe}};
+        console.log("Loaded Tasks:", tasks); // DEBUG
         let gantt;
         let selectedTaskIds = new Set(); // Row selection (Legacy, arguably can merge with cell selection but keeping for row ops)
         const projectId = "{{ project.id }}";
