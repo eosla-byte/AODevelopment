@@ -13,10 +13,10 @@ from sqlalchemy.orm.attributes import flag_modified
 # DATABASE SETUP
 # Multi-DB Configuration for Microservices/Monolith Hybrid
 
-CORE_DB_URL = os.getenv("CORE_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip()
-OPS_DB_URL = os.getenv("OPS_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip()
-PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip()
-EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip()
+CORE_DB_URL = os.getenv("CORE_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+OPS_DB_URL = os.getenv("OPS_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
 
 print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'}")
 print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'}")
