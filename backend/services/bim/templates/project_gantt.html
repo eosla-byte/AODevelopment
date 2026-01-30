@@ -464,7 +464,21 @@
         <!-- GRID -->
         <div id="tasks-grid">
             <table class="gantt-table">
-                <!-- ... -->
+                <thead>
+                    <tr>
+                        <th style="width: 40px; text-align: center;">#</th>
+                        <th style="width: 14px;"></th> <!-- Collapse Icon -->
+                        <th style="width: 250px;">Nombre de Tarea</th>
+                        <th style="width: 90px;">Inicio</th>
+                        <th style="width: 90px;">Fin</th>
+                        <th style="width: 80px;">Duración</th>
+                        <th style="width: 60px;">%</th>
+                        <!-- <th style="width: 120px;">Empresa</th> -->
+                    </tr>
+                </thead>
+                <tbody id="grid-body">
+                    <!-- Rows rendered by JS -->
+                </tbody>
             </table>
         </div>
 
