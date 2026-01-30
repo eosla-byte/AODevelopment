@@ -222,10 +222,14 @@ def parse_mpp(content: bytes) -> dict:
             if not jvm_path:
                 jvm_path = find_libjvm(java_home)
 
-        # Strategy 1.5: System Paths (Apt/Debian/Ubuntu)
+        # Strategy 1.5: System Paths (Apt/Debian/Ubuntu/Manual)
         if not jvm_path:
-             print("Searching /usr/lib/jvm for libjvm.so...")
-             jvm_path = find_libjvm("/usr/lib/jvm")
+             print("Searching /app/jdk and /usr/lib/jvm for libjvm.so...")
+             if os.path.exists("/app/jdk"):
+                 jvm_path = find_libjvm("/app/jdk")
+             
+             if not jvm_path:
+                 jvm_path = find_libjvm("/usr/lib/jvm")
              
         if not jvm_path and os.path.exists("/usr/java"):
              jvm_path = find_libjvm("/usr/java")
