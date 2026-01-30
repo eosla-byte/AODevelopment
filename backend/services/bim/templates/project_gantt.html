@@ -1381,13 +1381,11 @@
                     dateInput.value = new Date().toISOString().split('T')[0];
                     if (typeof updateLookahead === 'function') updateLookahead();
                 }
-                dateInput.value = new Date().toISOString().split('T')[0];
+            } else {
+                btn.classList.remove('bg-red-600', 'text-white');
+                btn.classList.add('bg-red-50', 'text-red-600');
             }
-        } else {
-            btn.classList.remove('bg-red-600', 'text-white');
-            btn.classList.add('bg-red-50', 'text-red-600');
-        }
-        updateLookahead();
+            updateLookahead();
         }
 
         function updateLookahead() {
