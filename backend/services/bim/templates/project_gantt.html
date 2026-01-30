@@ -472,10 +472,11 @@
     </div>
 
     <!-- COMPANIES SIDE PANEL (Kept outside toolbar) -->
-    <div id="company-panel-overlay" class="fixed inset-0 bg-black bg-opacity-30 z-[60] hidden"
+    <!-- COMPANIES SIDE PANEL (Kept outside toolbar) -->
+    <div id="company-panel-overlay" class="fixed inset-0 bg-black bg-opacity-30 z-[100] hidden"
         onclick="toggleCompanyMenu()"></div>
     <div id="company-menu"
-        class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-[70] transform translate-x-full transition-transform duration-300 flex flex-col">
+        class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-[110] transform translate-x-full transition-transform duration-300 flex flex-col">
         <div class="flex items-center justify-between p-4 border-b bg-gray-50">
             <h3 class="font-bold text-gray-700"><i class="fas fa-building mr-2"></i> Empresas</h3>
             <button onclick="toggleCompanyMenu()" class="text-gray-400 hover:text-gray-600">
@@ -1045,27 +1046,54 @@
         // State
         let companies = []; // { name, color, visible }
         const DEFAULT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+        const STORAGE_KEY = `gantt_companies_${projectId}`;
 
-        function initCompanies() {
-            // Extract unique companies from tasks
-            const unique = new Set();
-            tasks.forEach(t => {
-                if (t.contractor) unique.add(t.contractor.trim());
-            });
-
-            unique.forEach((name, i) => {
-                companies.push({
-                    name: name,
-                    color: DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-                    visible: true
-                });
-            });
-            renderCompanyMenu();
+        function saveCompaniesLocally() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(companies));
+            } catch (e) { console.error("Save company error", e); }
         }
 
-        function toggleCompanyMenu() {
-            const menu = document.getElementById('company-menu');
-            menu.classList.toggle('hidden');
+        function initCompanies() {
+            // 1. Load from Storage
+            let stored = [];
+            try {
+                const s = localStorage.getItem(STORAGE_KEY);
+                if (s) stored = JSON.parse(s);
+            } catch (e) { console.error(e); }
+
+            // 2. Extract unique from tasks (to catch new ones)
+            const uniqueTasks = new Set();
+            tasks.forEach(t => {
+                if (t.contractor) uniqueTasks.add(t.contractor.trim());
+            });
+
+            // 3. Merge
+            // Existing Stored Companies (keep color/visibility)
+            const merged = [];
+            const seen = new Set();
+
+            stored.forEach(c => {
+                merged.push(c);
+                seen.add(c.name);
+            });
+
+            // Add new from Task Data
+            let cIdx = 0;
+            uniqueTasks.forEach(name => {
+                if (!seen.has(name)) {
+                    merged.push({
+                        name: name,
+                        color: DEFAULT_COLORS[cIdx % DEFAULT_COLORS.length],
+                        visible: true
+                    });
+                    cIdx++;
+                }
+            });
+
+            companies = merged;
+            saveCompaniesLocally(); // Sync back
+            renderCompanyMenu();
         }
 
         function toggleCompanyMenu() {
@@ -1116,6 +1144,20 @@
             });
         }
 
+        // Helper wrappers
+        function updateCompanyColor(idx, color) {
+            if (companies[idx]) {
+                companies[idx].color = color;
+                saveCompaniesLocally();
+                // Refresh Gantt
+                renderGrid();
+                renderGantt(gantt ? gantt.options.view_mode : 'Day');
+            }
+        }
+
+        // ... (toggleCompanyVisibility is below)
+
+
         // --- STICKY GANTT HEADER LOGIC ---
         function updateGanttHeaderPosition() {
             const svg = document.getElementById('gantt-target');
@@ -1141,6 +1183,7 @@
                 color: DEFAULT_COLORS[companies.length % DEFAULT_COLORS.length],
                 visible: true
             });
+            saveCompaniesLocally();
 
             input.value = '';
             renderCompanyMenu();
@@ -1148,8 +1191,11 @@
 
         function toggleCompanyVisibility(idx) {
             companies[idx].visible = !companies[idx].visible;
-            renderGrid();
-            renderGantt(gantt ? gantt.options.view_mode : 'Day');
+            saveCompaniesLocally();
+            renderGantt(gantt ? gantt.options.view_mode : 'Day'); // Re-filter
+        }
+        renderGrid();
+        renderGantt(gantt ? gantt.options.view_mode : 'Day');
         }
 
         function updateCompanyColor(idx, color) {
@@ -1335,12 +1381,15 @@
                 const dateInput = document.getElementById('lookahead-start');
                 if (!dateInput.value) {
                     dateInput.value = new Date().toISOString().split('T')[0];
+                    if (typeof updateLookahead === 'function') updateLookahead();
                 }
-            } else {
-                btn.classList.remove('bg-red-600', 'text-white');
-                btn.classList.add('bg-red-50', 'text-red-600');
+                dateInput.value = new Date().toISOString().split('T')[0];
             }
-            updateLookahead();
+        } else {
+            btn.classList.remove('bg-red-600', 'text-white');
+            btn.classList.add('bg-red-50', 'text-red-600');
+        }
+        updateLookahead();
         }
 
         function updateLookahead() {
