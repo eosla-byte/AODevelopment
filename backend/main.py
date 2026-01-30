@@ -66,6 +66,44 @@ async def force_admin_reset():
     except Exception as e:
         return f"ERROR: {str(e)}"
 
+@app.get("/debug-auth")
+async def debug_auth_endpoint(email: str = "eosla@somosao.com"):
+    """
+    DIAGNOSTIC ENDPOINT
+    Checks:
+    1. DB Connection active
+    2. User exists
+    3. Password hash presence
+    """
+    try:
+        from common.database import get_user_by_email, CORE_DB_URL
+        from common.auth_utils import verify_password
+        
+        # Mask URL
+        masked_url = CORE_DB_URL
+        if "@" in masked_url:
+            masked_url = masked_url.replace(masked_url.split("@")[0].split("//")[1].split(":")[1], "****")
+            
+        user = get_user_by_email(email)
+        
+        result = {
+            "db_url_masked": masked_url,
+            "user_found": user is not None,
+        }
+        
+        if user:
+            result.update({
+                "email": user.email,
+                "role": user.role,
+                "is_active": user.is_active,
+                "has_password": bool(user.hashed_password),
+                "hash_prefix": user.hashed_password[:10] if user.hashed_password else "None",
+            })
+            
+        return result
+    except Exception as e:
+        return {"status": "error", "details": str(e)}
+
 @app.get("/version_check")
 def version_check():
     return {"version": "v3_monolith_fixed", "timestamp": datetime.datetime.now().isoformat()}
