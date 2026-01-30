@@ -237,6 +237,23 @@ def parse_mpp(content: bytes) -> dict:
         # Strategy 2: Nix Store Wildcards (Last Resort - Very Broad)
         if not jvm_path:
             print("Searching /nix/store for libjvm.so (Broad Search)...")
+            
+            # DEBUG: Walk nix store level 2 to see what packages exist
+            try:
+                print("DEBUG: Walking /nix/store to find jdk...")
+                for root, dirs, files in os.walk("/nix/store"):
+                    if root.count(os.sep) - "/nix/store".count(os.sep) > 2:
+                        del dirs[:] # Don't go deep
+                        continue
+                    for d in dirs:
+                        if "jdk" in d or "jvm" in d or "headless" in d:
+                            print(f"DEBUG: Found candidate dir: {d}")
+                            # Check if libjvm exists inside
+                            find_libjvm(os.path.join(root, d))
+            except Exception as e:
+                print(f"DEBUG: Error walking nix store: {e}")
+
+            # 1. Broadest Search: Any package having lib/server/libjvm.so
             # 1. Broadest Search: Any package having lib/server/libjvm.so
             nix_dirs = glob.glob("/nix/store/*/lib/server/libjvm.so") 
             
