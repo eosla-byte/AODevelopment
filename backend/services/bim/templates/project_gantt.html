@@ -583,6 +583,7 @@
             try {
                 // Use server-side data if available (passed via Jinja)
                 if (tasks && tasks.length > 0) {
+                    console.log("Initializing with", tasks.length, "tasks");
                     tasks = tasks.map(t => {
                         const parseDate = (d) => {
                             if (!d) return new Date();
@@ -596,9 +597,23 @@
                         }
                         return t;
                     });
-                    renderGrid();
-                    renderGantt();
+
+                    try {
+                        renderGrid();
+                    } catch (e) {
+                        console.error("Grid Render Failed:", e);
+                        alert("Error renderizando tabla: " + e.message);
+                    }
+
+                    try {
+                        renderGantt();
+                    } catch (e) {
+                        console.error("Gantt Render Failed:", e);
+                        alert("Error renderizando gráfica: " + e.message);
+                    }
                     return;
+                } else {
+                    console.warn("No tasks loaded from server template.");
                 }
 
                 // Fallback catch-all (usually not needed if Jinja works)
@@ -615,7 +630,7 @@
                 });
                 renderGrid();
                 renderGantt();
-            } catch (e) { console.error(e); }
+            } catch (e) { console.error(e); alert("Critico: " + e.message); }
         }
 
         function renderGantt(viewMode = 'Week') {
