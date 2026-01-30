@@ -1,5 +1,7 @@
+providers = ["python", "java"]
+
 [phases.setup]
-nixPkgs = ["python3", "postgresql", "jdk"]
+nixPkgs = ["python3", "postgresql"]
 
 [phases.build]
 cmds = ["pip install -r backend/requirements.txt"]
