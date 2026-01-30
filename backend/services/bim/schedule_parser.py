@@ -177,50 +177,80 @@ def parse_mpp(content: bytes) -> dict:
     
     # 1. Ensure JVM is started and JAVA_HOME is set
     if not jpype.isJVMStarted():
-        # Auto-detect JAVA_HOME if missing
-        if not os.environ.get("JAVA_HOME"):
+        
+        # Helper to recursively find libjvm.so (critical for Nix/Railway)
+        def find_libjvm(root_path):
+            if not root_path or not os.path.exists(root_path): return None
+            for root, dirs, files in os.walk(root_path):
+                if "libjvm.so" in files:
+                    return os.path.join(root, "libjvm.so")
+            return None
+
+        # A. Resolve JAVA_HOME
+        java_home = os.environ.get("JAVA_HOME")
+        if not java_home:
             java_path = shutil.which("java")
-            
-            # Fallback: Deep search for Nix/Linux paths
-            if not java_path:
-                print("WARNING: 'java' executable not found in PATH. Attempting deep search...")
-                # Search patterns for common JDK locations
-                search_patterns = [
-                    "/nix/store/*-openjdk-*/bin/java",
-                    "/nix/store/*-jdk-*/bin/java",
-                    "/usr/lib/jvm/*/bin/java",
-                    "/usr/java/*/bin/java"
-                ]
-                for pattern in search_patterns:
-                    matches = glob.glob(pattern)
-                    if matches:
-                        java_path = matches[0]
-                        print(f"Deep search found java: {java_path}")
-                        break
-            
             if java_path:
-                # Resolve full path (e.g. /nix/store/.../bin/java)
+                # /nix/store/.../bin/java -> go up two levels
                 real_path = os.path.realpath(java_path)
-                # Go up from bin/java to root
                 java_home = os.path.dirname(os.path.dirname(real_path))
                 os.environ["JAVA_HOME"] = java_home
-                print(f"Auto-detected JAVA_HOME via 'java': {java_home}")
-            else:
-                print("CRITICAL: Java executable not found anywhere.")
+                print(f"Auto-detected JAVA_HOME: {java_home}")
+        
+        # B. Hunt for libjvm.so
+        jvm_path = None
+        
+        # Strategy 1: Standard Search in Home
+        if java_home:
+            # Try specific common subpaths first for speed
+            candidates = [
+                os.path.join(java_home, "lib", "server", "libjvm.so"),
+                os.path.join(java_home, "lib", "amd64", "server", "libjvm.so"),
+                os.path.join(java_home, "jre", "lib", "amd64", "server", "libjvm.so"),
+            ]
+            for c in candidates:
+                if os.path.exists(c):
+                    jvm_path = c
+                    break
+            
+            # If not in obvious spots, deep search inside Home
+            if not jvm_path:
+                jvm_path = find_libjvm(java_home)
+
+        # Strategy 2: Nix Store Wildcards (Last Resort)
+        if not jvm_path:
+            print("Searching /nix/store for libjvm.so...")
+            # Limit scope to jdk/jre directories to check faster
+            nix_dirs = glob.glob("/nix/store/*-jdk-*/lib/server/libjvm.so") 
+            if not nix_dirs:
+                nix_dirs = glob.glob("/nix/store/*-headless-*/lib/server/libjvm.so")
+            
+            if nix_dirs:
+                jvm_path = nix_dirs[0]
+
+        if not jvm_path:
+             # Final fallback: use default and pray (likely fails based on logs)
+             try:
+                 jvm_path = jpype.getDefaultJVMPath()
+             except: pass
+
+        if not jvm_path:
+             raise ValueError("CRITICAL: libjvm.so not found! Please set JAVA_HOME validly.")
+
+        print(f"Starting JVM with lib: {jvm_path}")
 
         try:
             # Explicitly pass classpath from jpype.getClassPath() which mpxj populated
-            jpype.startJVM(classpath=jpype.getClassPath())
+            jpype.startJVM(jvm_path, classpath=jpype.getClassPath())
         except Exception as e:
-            print(f"JVM Start Error: {e}")
-            pass
-            # If critical, we should probably stop here.
-            # But jpype might say "already started" or similar non-fatal?
-            # If it's "JVMNotFound", it's fatal.
-            if "JVMNotFound" in str(e) or "shared library" in str(e):
-                 import traceback
-                 traceback.print_exc()
-                 raise ValueError(f"Server Environment Error: Java Runtime (JVM) could not be started. Error: {e}")
+            if "JVM is already started" in str(e):
+                pass
+            else:
+                print(f"JVM Start Error: {e}")
+                # Analyze common crashers
+                if "libjvm.so" in str(e):
+                     raise ValueError(f"JVM Link Error: {e}")
+                raise e
 
     # 2. Import Java Classes via JPype
     try:
