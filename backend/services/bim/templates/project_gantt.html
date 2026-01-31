@@ -800,11 +800,13 @@
                 });
 
                 setTimeout(() => {
-                    drawTodayLine();
-                    if (typeof updateLookahead === 'function') updateLookahead();
-                    drawCommentIndicators();
-                    cloneGanttHeader(); // NEW: Activate Sticky Header
-                }, 100);
+                    try {
+                        drawTodayLine();
+                        if (typeof updateLookahead === 'function') updateLookahead();
+                        if (typeof drawCommentIndicators === 'function') drawCommentIndicators();
+                        cloneGanttHeader();
+                    } catch (e) { console.error("Post-render error", e); }
+                }, 300); // Increased timeout to ensure DOM is ready
 
             } catch (e) {
                 console.error("Gantt Render Error:", e);
@@ -1378,7 +1380,11 @@
                 // Default date to Today if empty
                 const dateInput = document.getElementById('lookahead-start');
                 if (!dateInput.value) {
-                    dateInput.value = new Date().toISOString().split('T')[0];
+                    const today = new Date();
+                    const yyyy = today.getFullYear();
+                    const mm = String(today.getMonth() + 1).padStart(2, '0');
+                    const dd = String(today.getDate()).padStart(2, '0');
+                    dateInput.value = `${yyyy}-${mm}-${dd}`;
                     if (typeof updateLookahead === 'function') updateLookahead();
                 }
             } else {
