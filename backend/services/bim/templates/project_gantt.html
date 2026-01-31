@@ -119,14 +119,14 @@
             position: sticky;
             /* Feature: Sticky Header */
             top: 0;
-            z-index: 20;
-            /* Above rows, below toolbar (50) */
+            z-index: 45;
 
             vertical-align: middle;
-            background: #f8fafc;
-            border-bottom: 1px solid #e0e0e0;
-            border-top: 1px solid #e0e0e0;
-            color: #4b5563;
+            background: #1e3a8a;
+            /* Dark Blue */
+            color: #ffffff;
+            border-bottom: 1px solid #172554;
+            border-top: 1px solid #172554;
             font-weight: 600;
             font-size: 0.75rem;
             text-transform: uppercase;
@@ -561,20 +561,22 @@
     </div>
 
     <style>
-        /* Fix Sticky Header Black Bar Issue */
+        /* Fix Sticky Header Colors */
         #gantt-header-sticky svg {
-            background-color: #ffffff;
-            /* Force White BG */
+            background-color: transparent !important;
         }
 
         #gantt-header-sticky .grid-header {
-            fill: #ffffff;
-            /* Ensure background rects are white */
+            fill: transparent !important;
         }
 
         #gantt-header-sticky text {
-            fill: #374151;
-            /* Text Color Gray-700 */
+            fill: #ffffff !important;
+            /* White Text */
+        }
+
+        #gantt-header-sticky line {
+            stroke: rgba(255, 255, 255, 0.2) !important;
         }
 
         /* ... Previous Styles ... */
@@ -628,10 +630,11 @@
             position: sticky;
             top: var(--header-offset, 60px);
             /* Dynamic variable */
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(8px);
-            z-index: 40;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            background: #1e3a8a;
+            /* Dark Blue Force */
+            color: white;
+            z-index: 45;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         #gantt-header-sticky {
