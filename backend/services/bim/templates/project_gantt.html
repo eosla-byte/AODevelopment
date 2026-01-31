@@ -1160,16 +1160,62 @@
         // ... (toggleCompanyVisibility is below)
 
 
-        // --- STICKY GANTT HEADER LOGIC ---
-        function updateGanttHeaderPosition() {
-            const svg = document.getElementById('gantt-target');
-            if (!svg) return;
-            // Usually the first <g> inside .gantt-container is the header.
-            const headerGroup = svg.querySelector('.grid-header');
-            const chartDiv = document.getElementById('chart-area');
-            if (headerGroup && chartDiv) {
-                headerGroup.setAttribute('transform', `translate(0, ${chartDiv.scrollTop})`);
+        // --- STICKY GANTT HEADER LOGIC (CLONED SVG) ---
+        function cloneGanttHeader() {
+            const sourceSvg = document.getElementById('gantt-target');
+            const targetContainer = document.getElementById('gantt-header-sticky');
+            if (!sourceSvg || !targetContainer) return;
+
+            // 1. Find the header group in Frappe Gantt
+            const headerGroup = sourceSvg.querySelector('.grid-header');
+            if (!headerGroup) return;
+
+            // 2. Clone it
+            const clone = headerGroup.cloneNode(true);
+
+            // 3. Create a wrapper SVG
+            const width = sourceSvg.getAttribute('width');
+            const wrapperSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            wrapperSvg.setAttribute('width', width);
+            wrapperSvg.setAttribute('height', '50'); // Fixed header height
+            wrapperSvg.classList.add('gantt-header-svg'); // Styling
+
+            // Append clone
+            wrapperSvg.appendChild(clone);
+
+            // Clear and Append to sticky container
+            targetContainer.innerHTML = '';
+            targetContainer.appendChild(wrapperSvg);
+
+            // Apply Liquid Glass to the container
+            targetContainer.classList.add('liquid-glass');
+            targetContainer.style.height = '40px'; // Visual height
+            targetContainer.style.pointerEvents = 'none'; // Passthrough clicks? No, date clicks?
+            // Actually, date clicks (Day/Week) often trigger view changes. 
+            // If we clone, onclick handlers might be lost unless inline. Frappe uses delegated events usually.
+            // For now, let's keep it visual.
+            targetContainer.style.pointerEvents = 'auto';
+
+            // Adjust clone position if needed (translate Y up if source has padding)
+            // Header usually starts at y=0.
+
+            // 4. Sync Scroll Setup (One time)
+            if (!window.headerSyncSet) {
+                const chartArea = document.getElementById('chart-area');
+                chartArea.addEventListener('scroll', () => {
+                    targetContainer.scrollLeft = chartArea.scrollLeft;
+                });
+                window.headerSyncSet = true;
             }
+
+            // Initial Sync
+            const chartArea = document.getElementById('chart-area');
+            targetContainer.scrollLeft = chartArea.scrollLeft;
+        }
+
+        // --- PREVIOUS STICKY LOGIC REMOVED/REPLACED ---
+        function updateGanttHeaderPosition() {
+            // Deprecated by cloneGanttHeader
         }
 
         function addCompany() {
