@@ -548,40 +548,79 @@
         <!-- RESIZER -->
         <div id="resizer"></div>
 
-        <!-- CLONED STICKY HEADER (SVG) -->
-        <div id="gantt-header-sticky" class="liquid-glass pointer-events-auto"
-            style="height: 50px; left: var(--grid-width, 420px); border-bottom: 1px solid #e0e0e0;">
-            <svg id="sticky-header-svg" height="100%" width="100%"></svg>
-        </div>
-
         <!-- CHART -->
         <div id="chart-area" class="no-scroll relative">
+            <!-- CLONED STICKY HEADER (Moved Inside) -->
+            <div id="gantt-header-sticky"></div>
             <svg id="gantt-target"></svg>
         </div>
     </div>
 
     <style>
-        /* Fix Sticky Header Colors */
+        /* --- STICKY LAYOUT FIXES --- */
+
+        /* 1. Left Panel Header */
+        .gantt-table thead th {
+            position: sticky;
+            top: 0;
+            /* Align to top of grid container */
+            z-index: 50;
+
+            height: 50px !important;
+            vertical-align: middle;
+            background: #1e3a8a !important;
+            /* Force Dark Blue */
+            color: #ffffff !important;
+            border-bottom: 1px solid #172554;
+            border-top: 1px solid #172554;
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 2. Right Panel Header (Timeline) */
+        #gantt-header-sticky {
+            position: sticky;
+            top: 0;
+            z-index: 45;
+            height: 50px;
+            background: #1e3a8a !important;
+            /* Dark Blue Background */
+            border-bottom: 1px solid #172554;
+            overflow: hidden;
+            /* Clip extra content */
+            pointer-events: none;
+            margin-bottom: -50px;
+            /* Overlap the original SVG header */
+            display: block;
+        }
+
+        /* 3. SVG Visibility Fixes */
         #gantt-header-sticky svg {
             background-color: transparent !important;
         }
 
         #gantt-header-sticky .grid-header {
             fill: transparent !important;
+            /* Hide original background rects */
         }
 
         #gantt-header-sticky text {
             fill: #ffffff !important;
-            /* White Text */
+            /* Force Text White */
+            font-weight: 600 !important;
+            opacity: 1 !important;
         }
 
-        #gantt-header-sticky line {
+        #gantt-header-sticky line,
+        #gantt-header-sticky path {
             stroke: rgba(255, 255, 255, 0.2) !important;
+            /* Make ticks visible */
         }
 
-        /* ... Previous Styles ... */
-
-
+        /* --- Preserved Styles --- */
         .lookahead-row {
             background-color: #fef2f2 !important;
             /* Red 50 */
@@ -594,7 +633,6 @@
         }
 
         /* Today Line */
-        /* Today Line */
         .today-line {
             stroke: #ef4444;
             stroke-width: 2;
@@ -604,53 +642,10 @@
             z-index: 50;
         }
 
-        /* Grid Header Sticky - Offset by Toolbar */
-        .gantt-table thead th {
-            position: sticky;
-            top: var(--header-offset, 60px);
-            /* Dynamic variable */
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(8px);
-            z-index: 40;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-
-        #gantt-header-sticky {
-            position: absolute;
-            top: 0;
-            right: 0;
-            z-index: 40;
-            background: rgba(255, 255, 255, 0.85);
-            overflow: hidden;
-        }
-
         /* Grid Interactive Styles */
-        /* Grid Header Sticky - Offset by Toolbar */
-        .gantt-table thead th {
-            position: sticky;
-            top: var(--header-offset, 60px);
-            /* Dynamic variable */
-            background: #1e3a8a;
-            /* Dark Blue Force */
-            color: white;
-            z-index: 45;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
+        /* Note: Duplicate .gantt-table blocks removed */
 
-        #gantt-header-sticky {
-            position: absolute;
-            top: 0;
-            right: 0;
-            z-index: 40;
-            background: rgba(30, 58, 138, 0.95);
-            /* Dark Blue (blue-900) */
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(8px);
-            overflow: hidden;
-        }
-
-        /* Ensure text inside sticky header is visible */
+        /* Ensure text inside sticky header is visible (Redundant safety) */
         #gantt-header-sticky text {
             fill: #ffffff !important;
             font-weight: 600;
@@ -717,6 +712,18 @@
             const gridBody = document.getElementById('grid-body');
             gridBody.addEventListener('mousedown', handleGridMouseDown);
             gridBody.addEventListener('dblclick', handleGridDoubleClick);
+
+            // 6. Sync Vertical Scroll (Grid <-> Chart)
+            const grid = document.getElementById('tasks-grid');
+            const chart = document.getElementById('chart-area');
+
+            // Simple Mutual Sync
+            grid.addEventListener('scroll', () => {
+                if (chart.scrollTop !== grid.scrollTop) chart.scrollTop = grid.scrollTop;
+            });
+            chart.addEventListener('scroll', () => {
+                if (grid.scrollTop !== chart.scrollTop) grid.scrollTop = chart.scrollTop;
+            });
         });
 
         async function loadTasks() {
@@ -1255,7 +1262,7 @@
         // ... (toggleCompanyVisibility is below)
 
 
-        // --- STICKY GANTT HEADER LOGIC (CLONED SVG) ---
+        // --- UPDATED CLONE HEADER LOGIC ---
         function cloneGanttHeader() {
             const sourceSvg = document.getElementById('gantt-target');
             const targetContainer = document.getElementById('gantt-header-sticky');
@@ -1268,19 +1275,16 @@
             // 2. Clone it
             const clone = headerGroup.cloneNode(true);
 
-            // Measure Toolbar Offset (Essential for visibility)
-            const toolbar = document.getElementById('main-toolbar');
-            if (toolbar) {
-                const h = toolbar.offsetHeight;
-                document.documentElement.style.setProperty('--header-offset', `${h}px`);
-            }
-
             // 3. Create a wrapper SVG
             const width = sourceSvg.getAttribute('width');
+
+            // Sync Width to allow Horizontal Scroll
+            targetContainer.style.width = width + 'px';
+
             const wrapperSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
             wrapperSvg.setAttribute('width', width);
             wrapperSvg.setAttribute('height', '50'); // Fixed header height
-            wrapperSvg.classList.add('gantt-header-svg'); // Styling
+            wrapperSvg.classList.add('gantt-header-svg');
 
             // Append clone
             wrapperSvg.appendChild(clone);
@@ -1289,31 +1293,18 @@
             targetContainer.innerHTML = '';
             targetContainer.appendChild(wrapperSvg);
 
-            // Apply Liquid Glass to the container
-            targetContainer.classList.add('liquid-glass');
-            targetContainer.style.height = '40px'; // Visual height
-            targetContainer.style.pointerEvents = 'none'; // Passthrough clicks? No, date clicks?
-            // Actually, date clicks (Day/Week) often trigger view changes. 
-            // If we clone, onclick handlers might be lost unless inline. Frappe uses delegated events usually.
-            // For now, let's keep it visual.
-            targetContainer.style.pointerEvents = 'auto';
+            // Ensure Text Visibility explicitly via JS as fallback
+            wrapperSvg.querySelectorAll('text').forEach(t => {
+                t.style.fill = '#ffffff';
+                t.setAttribute('fill', '#ffffff');
+                t.style.fontWeight = '600';
+            });
 
-            // Adjust clone position if needed (translate Y up if source has padding)
-            // Header usually starts at y=0.
-
-            // 4. Sync Scroll Setup (One time)
-            if (!window.headerSyncSet) {
-                const chartArea = document.getElementById('chart-area');
-                chartArea.addEventListener('scroll', () => {
-                    targetContainer.scrollLeft = chartArea.scrollLeft;
-                });
-                window.headerSyncSet = true;
-            }
-
-            // Initial Sync
-            const chartArea = document.getElementById('chart-area');
-            targetContainer.scrollLeft = chartArea.scrollLeft;
+            // No need for Scroll Sync listeners - Native flow handles it!
         }
+
+        // Disable old sync if it exists by flag
+        window.headerSyncSet = true;
 
         function scrollToToday() {
             setTimeout(() => {
