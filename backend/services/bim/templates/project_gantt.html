@@ -1286,6 +1286,13 @@
             // 2. Clone it
             const clone = headerGroup.cloneNode(true);
 
+            // Measure Toolbar Offset (Essential for visibility)
+            const toolbar = document.getElementById('main-toolbar');
+            if (toolbar) {
+                const h = toolbar.offsetHeight;
+                document.documentElement.style.setProperty('--header-offset', `${h}px`);
+            }
+
             // 3. Create a wrapper SVG
             const width = sourceSvg.getAttribute('width');
             const wrapperSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
