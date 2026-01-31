@@ -628,12 +628,31 @@
         }
 
         /* Grid Interactive Styles */
-        .grid-cell {
-            position: relative;
-            padding: 0;
-            height: 100%;
-            cursor: cell;
-            outline: none;
+        /* Grid Header Sticky - Offset by Toolbar */
+        .gantt-table thead th {
+            position: sticky;
+            top: var(--header-offset, 60px);
+            /* Dynamic variable */
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            z-index: 40;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        #gantt-header-sticky {
+            position: absolute;
+            top: 0;
+            /* Note: Absolute top 0 inside relative container. 
+               If container starts *after* toolbar, 0 is correct relative to container.
+               If container includes toolbar, we need offset.
+               Based on HTML structure, #gantt-container is sibling to #main-toolbar? 
+               Let's check HTML structure again. 
+               If #gantt-container is below #main-toolbar, then top: 0 IS correct.
+            */
+            right: 0;
+            z-index: 40;
+            background: rgba(255, 255, 255, 0.85);
+            overflow: hidden;
         }
 
         .grid-cell.selected {
