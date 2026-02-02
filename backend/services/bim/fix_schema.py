@@ -28,6 +28,19 @@ def run_migration():
         except Exception as e:
             print(f"Predecessors column check: {e}")
             
+        # 4. Add comments column
+        try:
+            # Check DB type? Assuming Postgres (JSONB) or SQLite (JSON/TEXT)
+            # Using generic JSON or TEXT if not supported?
+            # SQLAlchemy `JSON` maps to JSON in PG.
+            # Raw SQL: "ADD COLUMN ... JSON" might fail on SQLite if not enabled? 
+            # SQLite supports JSON as TEXT usually.
+            # Let's try flexible approach.
+            db.execute(text("ALTER TABLE bim_activities ADD COLUMN IF NOT EXISTS comments JSON"))
+            print("Added comments column")
+        except Exception as e:
+            print(f"Comments column check: {e}")
+            
         db.commit()
         print("Schema update complete.")
     except Exception as e:
