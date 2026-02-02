@@ -1406,16 +1406,8 @@
         function updateCompanyColor(idx, color) {
             companies[idx].color = color;
             // Re-render to apply color
-            // NEW: Clone Header explicitly after render
-            setTimeout(() => {
-                if (typeof cloneGanttHeader === 'function') {
-                    cloneGanttHeader();
-                }
-            }, 100);
-
-        } catch (ex) {
-            console.error("Gantt Render Error:", ex);
-        }
+            renderGrid();
+            renderGantt(gantt ? gantt.options.view_mode : 'Day');
         }
 
         // --- CONTEXT MENU (Empresas) ---
