@@ -423,52 +423,174 @@
         function renderTimelineTicks(svg) {
             svg.innerHTML = '';
             const zoom = State.zoom;
-            let x = 0;
-            let curr = new Date(State.startDate);
-            let step = 100;
-            // Simplify scaling for ticks
-            if (zoom === 'DAY') step = 50;
-            if (zoom === 'MONTH') step = 200;
+            let tickW = 50;
 
+            // Tier 1 (Bottom) - The detailed tick
+            // Tier 2 (Top) - The grouping tick (Month/Year)
+
+            // CONFIG BASED ON ZOOM
+            let bottomTierUnit = 'd'; // d=day, w=week, m=month
+            let topTierUnit = 'm';    // m=month, y=year
+            let bottomStep = 1;       // 1 day, 1 week
+
+            if (zoom === 'DAY') { tickW = 40; bottomTierUnit = 'd'; topTierUnit = 'm'; }
+            else if (zoom === 'WEEK') { tickW = 60; bottomTierUnit = 'w'; topTierUnit = 'm'; }
+            else if (zoom === 'MONTH') { tickW = 100; bottomTierUnit = 'm'; topTierUnit = 'y'; }
+
+            State.pxPerMin = tickW / (bottomTierUnit === 'd' ? 1440 : (bottomTierUnit === 'w' ? 10080 : 43200));
+
+            // We need to re-render renderHeader to apply pxPerMin changes immediately if we set it here?
+            // Better: use State.pxPerMin to derive tickW, not vice versa.
+            // Let's invert: 
+            // tickW = duration * pxPerMin
+
+            // REFINED APPROACH: Use current pxPerMin to determine tick placement
+            // Just draw ticks starting from startDate
+
+            let curr = new Date(State.startDate);
+            let x = 0;
+            const H_TOP = 25;
+            const H_BOT = 35; // Total 60
+
+            // 1. Draw Bottom Tier & Grid Lines
             while (x < State.totalWidth) {
+                // Determine next date and label
+                let nextDate = new Date(curr);
+                let label = '';
+
+                if (zoom === 'DAY') {
+                    nextDate.setDate(curr.getDate() + 1);
+                    label = curr.getDate().toString();
+                    // Weekday letter?
+                    const days = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+                    label = days[curr.getDay()] + ' ' + label;
+                } else if (zoom === 'WEEK') {
+                    nextDate.setDate(curr.getDate() + 7);
+                    label = `Sem ${getWeekNumber(curr)}`;
+                } else { // MONTH
+                    nextDate.setMonth(curr.getMonth() + 1);
+                    label = curr.toLocaleDateString('es-ES', { month: 'short' });
+                }
+
+                const w = timeToX(nextDate) - timeToX(curr);
+
+                // Rect
                 const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                rect.setAttribute('x', x); rect.setAttribute('y', 30);
-                rect.setAttribute('width', step); rect.setAttribute('height', 30);
-                rect.setAttribute('fill', 'none'); rect.setAttribute('stroke', '#eee');
+                rect.setAttribute('x', x);
+                rect.setAttribute('y', 30);
+                rect.setAttribute('width', w);
+                rect.setAttribute('height', 30);
+                rect.setAttribute('fill', 'white');
+                rect.setAttribute('stroke', '#e5e7eb');
                 svg.appendChild(rect);
 
+                // Text
                 const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                text.setAttribute('x', x + 5); text.setAttribute('y', 50);
-                // Formatting based on zoom
-                text.textContent = curr.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
-                text.setAttribute('font-size', '10'); text.setAttribute('fill', '#666');
+                text.setAttribute('x', x + w / 2);
+                text.setAttribute('y', 50);
+                text.setAttribute('text-anchor', 'middle');
+                text.textContent = label;
+                text.setAttribute('font-size', '11');
+                text.setAttribute('fill', '#6b7280');
                 svg.appendChild(text);
 
-                // Increment
-                if (zoom === 'DAY') curr.setDate(curr.getDate() + 1);
-                else if (zoom === 'WEEK') curr.setDate(curr.getDate() + 7);
-                else curr.setMonth(curr.getMonth() + 1);
-
-                x += step;
+                curr = nextDate;
+                x = timeToX(curr);
             }
+
+            // 2. Draw Top Tier (Months/Years)
+            curr = new Date(State.startDate);
+            x = 0;
+            // Snap to first month/year boundary for smoother look? 
+            // For now, just iterate safely.
+
+            // We need to handle "Group By" rendering. 
+            // Simpler approach: Iterate by Top Unit
+            // But x is linear. 
+
+            // Let's reset curr to start
+            curr = new Date(State.startDate);
+            // Snap curr to start of month if zoom is day/week
+            if (zoom !== 'MONTH') curr.setDate(1);
+            if (zoom === 'MONTH') curr.setMonth(0); // Year start
+
+            // Adjust starting X (might be negative if startDate is mid-month)
+            // We'll just draw valid months that overlap [0, totalWidth]
+
+            let safety = 0;
+            while (x < State.totalWidth && safety < 1000) {
+                safety++;
+                let nextTop = new Date(curr);
+                let topLabel = '';
+
+                if (zoom === 'MONTH') {
+                    nextTop.setFullYear(curr.getFullYear() + 1);
+                    topLabel = curr.getFullYear();
+                } else { // DAY/WEEK -> Group by Month
+                    nextTop.setMonth(curr.getMonth() + 1);
+                    topLabel = curr.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+                }
+
+                const xStart = Math.max(0, timeToX(curr));
+                const xEnd = timeToX(nextTop);
+
+                if (xEnd > 0) {
+                    const w = xEnd - xStart;
+                    const topRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    topRect.setAttribute('x', xStart); topRect.setAttribute('y', 0);
+                    topRect.setAttribute('width', w); topRect.setAttribute('height', 30);
+                    topRect.setAttribute('fill', '#f9fafb'); topRect.setAttribute('stroke', '#e5e7eb');
+                    svg.appendChild(topRect);
+
+                    const topText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    topText.setAttribute('x', xStart + 10); topText.setAttribute('y', 20);
+                    topText.textContent = topLabel;
+                    topText.setAttribute('font-size', '12'); topText.setAttribute('font-weight', 'bold');
+                    topText.setAttribute('fill', '#374151');
+                    svg.appendChild(topText);
+                }
+
+                curr = nextTop;
+                if (timeToX(curr) > State.totalWidth) break;
+            }
+        }
+
+        function getWeekNumber(d) {
+            d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+            var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return weekNo;
         }
 
         function renderBody() {
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
 
+            // Dependency Overlay Logic
+            let depSvg = document.getElementById('dependency-svg');
+            const masterScroll = document.getElementById('master-scroll');
+            if (!depSvg) {
+                depSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                depSvg.id = 'dependency-svg';
+                depSvg.style.position = 'absolute';
+                depSvg.style.top = '60px';
+                depSvg.style.pointerEvents = 'none';
+                masterScroll.appendChild(depSvg);
+            }
+            depSvg.style.left = getTotalStickyWidth() + 'px';
+            depSvg.style.width = State.totalWidth + 'px';
+            depSvg.style.height = Math.max(State.tasks.length * 32, 500) + 'px';
+
             let hiddenLevel = -1;
 
             State.tasks.forEach(task => {
-                // Hiding Logic
                 if (hiddenLevel > -1 && task.level > hiddenLevel) return;
                 if (hiddenLevel > -1 && task.level <= hiddenLevel) hiddenLevel = -1;
                 if (task.isSummary && task.collapsed && hiddenLevel === -1) hiddenLevel = task.level;
 
                 const tr = document.createElement('tr');
-                if (State.selectedIds.has(task.id)) {
-                    tr.style.backgroundColor = 'var(--selection-blue)';
-                }
+                if (State.selectedIds.has(task.id)) tr.style.backgroundColor = 'var(--selection-blue)'; // #eff6ff
 
                 tr.onclick = (e) => {
                     const mode = e.ctrlKey ? 'multi' : (e.shiftKey ? 'range' : 'single');
@@ -483,7 +605,6 @@
                     td.style.width = col.width + 'px';
                     td.style.minWidth = col.width + 'px';
 
-                    // INDENTATION
                     if (col.id === 'name') {
                         td.style.paddingLeft = (task.level * 20 + 8) + 'px';
                         td.style.display = 'flex'; td.style.alignItems = 'center';
@@ -495,16 +616,16 @@
                         }
                     }
 
-                    // EDITABLE
                     const span = document.createElement('span');
                     let val = task[col.id];
-                    if (col.id === 'start' || col.id === 'end') val = val ? val.split('T')[0] : '';
+                    if (col.id === 'start' || col.id === 'end') val = val ? val.toString().split('T')[0] : '';
                     if (col.id === 'progress') val = Math.round(val || 0) + '%';
 
                     span.innerText = val || '';
                     span.style.width = "100%";
                     if (col.editable) {
                         span.contentEditable = true;
+                        span.onblur = (e) => { task[col.id] = e.target.innerText; }; // Simple mock save
                         span.onclick = (e) => e.stopPropagation();
                     }
                     td.appendChild(span);
@@ -512,7 +633,6 @@
                     leftOffset += col.width;
                 });
 
-                // GANTT BAR
                 const ganttTd = document.createElement('td');
                 ganttTd.className = 'gantt-cell';
                 const barSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -525,21 +645,47 @@
                     const w = timeToX(task.end) - x;
 
                     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute('x', x); rect.setAttribute('y', 6);
-                    rect.setAttribute('width', Math.max(w, 5));
-                    rect.setAttribute('height', task.isSummary ? 12 : 20); // Skinnier summary
+
+                    let barH = 20;
+                    let barY = 6;
+                    let barColor = '#3b82f6';
+                    let barRadius = 3;
 
                     if (task.isSummary) {
-                        rect.setAttribute('fill', '#000'); // Black Summary
-                        // Brackets logic (simple rect for now)
-                        // Add triangle ends?
-                        rect.setAttribute('y', 6);
+                        barH = 12; barY = 6; barColor = '#000'; barRadius = 0;
+                        // Summary Bar (Black Bracket)
+                        const rect = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        // Draw bracket shape
+                        // M x,y+h L x,y L x+w,y L x+w,y+h
+                        const d = `M ${x},${barY + barH} L ${x},${barY} L ${x + w},${barY} L ${x + w},${barY + barH}`;
+                        rect.setAttribute('d', d);
+                        rect.setAttribute('fill', 'none');
+                        rect.setAttribute('stroke', '#000');
+                        rect.setAttribute('stroke-width', '2');
+                        g.appendChild(rect);
                     } else {
-                        rect.setAttribute('fill', '#3b82f6');
-                        rect.setAttribute('rx', 3);
+                        // Standard Task Bar
+                        // 1. Background (Light Blue)
+                        const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        bgRect.setAttribute('x', x); bgRect.setAttribute('y', barY);
+                        bgRect.setAttribute('width', Math.max(w, 5)); bgRect.setAttribute('height', barH);
+                        bgRect.setAttribute('fill', '#dbeafe'); // Light Blue
+                        bgRect.setAttribute('rx', barRadius);
+                        g.appendChild(bgRect);
+
+                        // 2. Progress (Dark Blue)
+                        const pct = parseFloat(task.progress || 0) / 100;
+                        if (pct > 0) {
+                            const progRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                            progRect.setAttribute('x', x); progRect.setAttribute('y', barY + 4); // Slightly thinner? No, full height
+                            progRect.setAttribute('y', barY);
+                            progRect.setAttribute('width', Math.max(w * pct, 0));
+                            progRect.setAttribute('height', barH);
+                            progRect.setAttribute('fill', '#3b82f6'); // Dark Blue
+                            progRect.setAttribute('rx', barRadius);
+                            g.appendChild(progRect);
+                        }
                     }
-                    g.appendChild(rect);
                     barSvg.appendChild(g);
                 }
                 ganttTd.appendChild(barSvg);
