@@ -4,2779 +4,699 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ project.name }} - Cronograma Avanzado</title>
+    <title>{{ project.name }} - Scheduling Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Frappe Gantt -->
-    <script src="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt@0.6.1/dist/frappe-gantt.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
         :root {
-            --header-height: 64px;
-            /* Compact Toolbar */
-            --grid-width: 40%;
-            --row-height: 38px;
-            --border-color: #e5e7eb;
-            --primary-color: #3b82f6;
+            /* MS Project Palette */
+            --header-bg: #f3f4f6;
+            /* Light gray for headers (Excel style) or #2c3e50 for Dark */
+            --header-text: #1f2937;
+            --border-color: #d1d5db;
+            --grid-line: #e5e7eb;
+            --row-hover: #f3f4f6;
+            --selection-blue: rgba(59, 130, 246, 0.1);
+            --primary-blue: #2563eb;
+
+            --row-height: 32px;
+            /* Denser rows like MS Project */
+            --header-height: 60px;
+            /* Double height (Month + Day) */
         }
 
-        body {
-            height: 100vh;
+        body,
+        html {
+            height: 100%;
+            margin: 0;
             overflow: hidden;
-            background: #f9fafb;
-            font-family: 'Inter', sans-serif;
+            /* App Shell */
+            font-family: 'Segoe UI', system-ui, sans-serif;
             font-size: 13px;
+            /* Smaller, pro font size */
+        }
+
+        /* --- APP SHELL --- */
+        #app-container {
             display: flex;
             flex-direction: column;
+            height: 100vh;
         }
 
-        /* --- Toolbar (Single Row Modern) --- */
-        #main-toolbar {
-            height: var(--header-height);
-            background: white;
+        #toolbar {
+            height: 48px;
+            background: #ffffff;
             border-bottom: 1px solid var(--border-color);
             display: flex;
             align-items: center;
-            padding: 0 1rem;
-            gap: 1rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            padding: 0 16px;
+            gap: 12px;
+            flex-shrink: 0;
             z-index: 20;
+        }
+
+        /* --- MAIN WORKSPACE --- */
+        #workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- UNIFIED HEADER (Fixed) --- */
+        #unified-header {
+            display: flex;
+            height: var(--header-height);
+            border-bottom: 1px solid var(--border-color);
+            background: var(--header-bg);
+            flex-shrink: 0;
+        }
+
+        #grid-header-container {
+            width: 400px;
+            /* Initial Width */
+            border-right: 1px solid var(--border-color);
+            overflow: hidden;
+            /* No scroll here */
+            position: relative;
+        }
+
+        #gantt-header-container {
+            flex: 1;
+            overflow: hidden;
+            /* Syncs with Body Scroll X */
+            position: relative;
+        }
+
+        /* --- UNIFIED BODY (Global Scroll Y) --- */
+        #unified-body {
+            flex: 1;
+            display: flex;
+            overflow-y: auto;
+            /* The ONE scrollbar */
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        #grid-body-container {
+            width: 400px;
+            /* Matches header */
+            border-right: 1px solid var(--border-color);
+            flex-shrink: 0;
+            position: relative;
+            background: white;
+        }
+
+        #gantt-body-container {
+            flex: 1;
             overflow-x: auto;
-            white-space: nowrap;
+            /* Horizontal Scroll Only */
+            position: relative;
+            background: white;
         }
 
-        .toolbar-section {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding-right: 1rem;
-            border-right: 1px solid #e5e7eb;
-            height: 60%;
-        }
-
-        .toolbar-section:last-child {
-            border-right: none;
-        }
-
-        .toolbar-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #1f2937;
-            margin-right: 0.5rem;
-        }
-
-        .tool-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 32px;
-            height: 32px;
-            border-radius: 6px;
-            color: #4b5563;
-            transition: all 0.2s;
-            border: 1px solid transparent;
+        /* --- COMPONENTS --- */
+        .resizer {
+            width: 5px;
+            cursor: col-resize;
             background: transparent;
-        }
-
-        .tool-btn:hover {
-            background: #f3f4f6;
-            color: #111827;
-        }
-
-        .tool-btn.active {
-            background: #e0f2fe;
-            color: #0284c7;
-            border-color: #bae6fd;
-        }
-
-        .tool-btn i {
-            font-size: 14px;
-        }
-
-        /* Input Controls */
-        .tool-select {
-            height: 28px;
-            border: 1px solid #d1d5db;
-            border-radius: 4px;
-            font-size: 13px;
-            color: #374151;
-            padding: 0 4px;
-            background-color: white;
-        }
-
-        .tool-select:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 1px var(--primary-color);
-        }
-
-        /* --- Strict Split Layout --- */
-        .gantt-table thead th {
-            height: 70px !important;
-            box-sizing: border-box;
-
-            position: sticky;
-            /* Feature: Sticky Header */
+            position: absolute;
+            right: 0;
             top: 0;
-            z-index: 45;
-
-            vertical-align: middle;
-            background: #1e3a8a;
-            /* Dark Blue */
-            color: #ffffff;
-            border-bottom: 1px solid #172554;
-            border-top: 1px solid #172554;
-            font-weight: 600;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 0;
-            display: table-cell;
+            bottom: 0;
+            z-index: 100;
         }
 
-        /* Fix Row Alignment */
-        #grid-body tr {
-            height: 38px !important;
-            /* Strict Height matching bar_height + padding */
-            box-sizing: border-box;
+        .resizer:hover {
+            background: var(--primary-blue);
         }
 
-        #grid-body td {
-            height: 38px !important;
-            padding-top: 0 !important;
-            padding-bottom: 0 !important;
-            border-bottom: 1px solid #e0e0e0;
-            /* Match Gantt row lines */
-        }
-
-        /* Progress Bar High Contrast */
-        .gantt .bar-progress {
-            fill: rgba(0, 0, 0, 0.4) !important;
-            /* Darker overlay for visibility */
-        }
-
-        /* Comment Indicator */
-        .comment-indicator {
-            fill: #fff;
-            stroke: #4b5563;
-            stroke-width: 1px;
-            cursor: pointer;
-        }
-
-        .comment-indicator:hover {
-            fill: #fbbf24;
-            /* Amber */
-        }
-
-        /* --- TOOLBAR Z-INDEX FIX --- */
-        #toolbar {
-            /* Ensure toolbar is above everything */
-            z-index: 50;
-            position: relative;
-        }
-
-        /* Dropdown specific fix */
-        #company-menu {
-            z-index: 9999 !important;
-            /* Force top */
-        }
-
-        #gantt-container {
-            flex: 1;
-            display: flex;
-            flex-direction: row;
-            /* Horizontal Split */
-            overflow: hidden;
-            position: relative;
+        table {
+            border-collapse: collapse;
             width: 100%;
+            table-layout: fixed;
         }
 
-        /* Left Pane: Data Grid */
-        #tasks-grid {
-            width: var(--grid-width);
-            min-width: 400px;
-            /* Ensure enough space for columns */
-            max-width: 70%;
-            overflow: auto;
-            background: white;
-            border-right: 3px solid #d1d5db;
-            /* Visible Divider */
-            display: flex;
-            flex-direction: column;
-            z-index: 10;
-        }
-
-        /* Chart Area (Override for Split Pane context) */
-        /* See #right-split-pane definitions below */
-
-        #gantt-target {
-            /* Let library control size */
-            display: block;
-        }
-
-        /* --- Restored Styles --- */
-        .gantt-table tr.selected {
-            background-color: #eff6ff;
-        }
-
-        .gantt-table tr:hover {
-            background-color: #f9fafb;
-        }
-
-        .summary-task {
-            background-color: #f8fafc;
-        }
-
-        .summary-task input {
-            font-weight: 700;
-        }
-
-        .cell-input {
-            width: 100%;
-            height: 100%;
-            background: transparent;
-            border: none;
-            outline: none;
-            font-family: inherit;
-        }
-
-        .cell-input:focus {
-            background: white;
-            box-shadow: inset 0 0 0 1px #3b82f6;
-        }
-
-        .wbs-indent {
-            display: inline-block;
-            width: 0px;
-        }
-
-        .toggle-icon {
-            cursor: pointer;
-            color: #6b7280;
-            font-size: 10px;
-            margin-right: 4px;
-            width: 12px;
-            display: inline-block;
-            text-align: center;
-        }
-
-        .gantt .grid-row {
+        th,
+        td {
             height: var(--row-height);
-            fill: white;
-        }
-
-        .gantt .grid-row:nth-child(even) {
-            fill: #fcfcfc;
-        }
-
-        .gantt .row-line {
-            border-top: 1px solid #f0f0f0;
-        }
-
-        .today-highlight {
-            stroke: #f59e0b;
-            stroke-width: 2;
-            stroke-dasharray: 4;
-            opacity: 0.7;
-        }
-
-        /* --- LIQUID GLASS STYLE --- */
-        .liquid-glass {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            z-index: 50;
-        }
-
-        #main-toolbar {
-            position: sticky;
-            top: 0;
-            z-index: 60;
-            /* Higher than header */
-            border-radius: 0;
-            margin-bottom: 0 !important;
-            width: 100%;
-        }
-
-        /* Grid Header Sticky */
-        .gantt-table thead th {
-            position: sticky;
-            top: 0;
-            /* Will be pushed down by toolbar if needed, but if toolbar is fixed, we might need top: X */
-            /* Actually, if toolbar is sticky, and this is sticky, they stack if in flow. */
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(8px);
-            z-index: 40;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        }
-
-        /* --- STICKY HEADER (CLEAN IMPLEMENTATION) --- */
-        /* --- SPLIT PANE ARCHITECTURE (NEW) --- */
-        #right-split-pane {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
+            padding: 0 8px;
+            border-bottom: 1px solid var(--grid-line);
+            border-right: 1px solid var(--grid-line);
+            white-space: nowrap;
             overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        th {
+            background: var(--header-bg);
+            font-weight: 600;
+            text-align: left;
             position: relative;
-            background: #fff;
-        }
-
-        #timeline-header-container {
-            flex: 0 0 50px;
-            /* Fixed Height matching header */
-            overflow: hidden;
-            /* No scrollbars shown, synced via JS */
-            background: #1e3a8a;
-            /* Dark Blue */
-            border-bottom: 1px solid #172554;
-            z-index: 40;
-            width: 100%;
-        }
-
-        #chart-area {
-            flex: 1;
-            overflow: auto;
-            /* Scrollable Body */
-            position: relative;
-            /* No sticky header inside here anymore */
-        }
-
-        /* Hide Original Header in Scrollable Area to avoid double headers */
-        #chart-area .grid-header {
-            visibility: hidden;
-            opacity: 0;
-        }
-
-        .gantt-header-svg {
-            display: block;
-            pointer-events: none;
         }
     </style>
 </head>
 
 <body>
 
-    <!-- Global Error Handler -->
-    <div id="global-error"
-        style="display:none; background:#fee2e2; color:#b91c1c; padding:10px; text-align:center; border-bottom:1px solid #ef4444;">
-    </div>
-    <script>
-        window.onerror = function (msg, url, line, col, error) {
-            const div = document.getElementById('global-error');
-            div.style.display = 'block';
-            div.innerText = `Error Crítico: ${msg} (Línea ${line})`;
-            console.error("Global Error:", error);
-            return false;
-        };
-    </script>
+    <div id="app-container">
+        <!-- TOP TOOLBAR -->
+        <div id="toolbar">
+            <h1 class="font-bold text-lg mr-4">{{ project.name }}</h1>
 
-    <!-- TOOLBAR -->
-    <!-- TOOLBAR -->
-    <div id="main-toolbar" class="liquid-glass flex justify-between items-center p-2 mb-0 border-b relative">
-        <div class="toolbar-section">
-            <h1 class="toolbar-title">{{ project.name }}</h1>
-        </div>
+            <div class="h-6 w-px bg-gray-300 mx-2"></div>
 
-        <!-- ACTIONS -->
-        <div class="toolbar-section">
-            <button class="tool-btn" onclick="addLink()" title="Vincular Tareas (Link)">
-                <i class="fas fa-link"></i>
-            </button>
-            <button class="tool-btn" onclick="removeLink()" title="Desvincular (Unlink)">
-                <i class="fas fa-unlink"></i>
-            </button>
-            <div class="w-px h-6 bg-gray-200 mx-1"></div>
-            <button class="tool-btn" onclick="indentTask(1)" title="Indentar (Tab)">
-                <i class="fas fa-indent"></i>
-            </button>
-            <button class="tool-btn" onclick="indentTask(-1)" title="Desindentar (Shift+Tab)">
-                <i class="fas fa-outdent"></i>
-            </button>
-        </div>
+            <button class="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Outdent"><i
+                    class="fas fa-outdent"></i></button>
+            <button class="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Indent"><i
+                    class="fas fa-indent"></i></button>
 
-        <!-- CRUD -->
-        <div class="toolbar-section">
-            <button class="tool-btn hover:bg-green-50 hover:text-green-600" onclick="addTask()" title="Nueva Tarea">
-                <i class="fas fa-plus"></i>
-            </button>
-            <button class="tool-btn hover:bg-red-50 hover:text-red-600" onclick="deleteTask()" title="Eliminar Tarea">
-                <i class="fas fa-trash"></i>
-            </button>
-            <div class="w-px h-6 bg-gray-200 mx-1"></div>
-            <button class="tool-btn" onclick="moveTask(-1)" title="Mover Arriba">
-                <i class="fas fa-arrow-up"></i>
-            </button>
-            <button class="tool-btn" onclick="moveTask(1)" title="Mover Abajo">
-                <i class="fas fa-arrow-down"></i>
-            </button>
-        </div>
+            <div class="h-6 w-px bg-gray-300 mx-2"></div>
 
-        <!-- FONT & STYLE -->
-        <div class="toolbar-section">
-            <select id="font-family" class="tool-select w-24" onchange="applyStyle('fontFamily', this.value)">
-                <option value="Segoe UI">Segoe UI</option>
-                <option value="Calibri">Calibri</option>
-                <option value="Arial">Arial</option>
-                <option value="Times New Roman">Times</option>
-            </select>
-            <select id="font-size" class="tool-select w-14" onchange="applyStyle('fontSize', this.value + 'px')">
-                <option value="11">11</option>
-                <option value="12" selected>12</option>
-                <option value="14">14</option>
-                <option value="16">16</option>
-            </select>
-            <div class="w-px h-6 bg-gray-200 mx-1"></div>
-            <button class="tool-btn font-bold" onclick="toggleStyle('bold')" title="Negrita">N</button>
-            <button class="tool-btn italic" onclick="toggleStyle('italic')" title="Cursiva">K</button>
-            <button class="tool-btn underline" onclick="toggleStyle('underline')" title="Subrayado">S</button>
+            <button class="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Link"><i
+                    class="fas fa-link"></i></button>
+            <button class="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Unlink"><i
+                    class="fas fa-unlink"></i></button>
 
-            <div class="w-px h-6 bg-gray-200 mx-1"></div>
+            <div class="flex-1"></div>
 
-            <!-- Color Pickers with Icon Labels -->
-            <div class="relative group flex items-center">
-                <button class="tool-btn" title="Color de Relleno"><i class="fas fa-fill-drip"></i></button>
-                <input type="color" class="absolute inset-0 opacity-0 cursor-pointer w-8"
-                    onchange="applyStyle('fill', this.value)">
-            </div>
-            <div class="relative group flex items-center">
-                <button class="tool-btn" title="Color de Texto"><i class="fas fa-font"></i></button>
-                <input type="color" class="absolute inset-0 opacity-0 cursor-pointer w-8"
-                    onchange="applyStyle('color', this.value)">
+            <!-- Zoom Controls -->
+            <div class="flex items-center gap-1 border rounded px-1">
+                <button class="p-1 hover:bg-gray-100 rounded text-xs" onclick="AO.Gantt.zoomOut()"><i
+                        class="fas fa-minus"></i></button>
+                <span id="zoom-level-label" class="text-xs font-mono w-16 text-center">WEEK</span>
+                <button class="p-1 hover:bg-gray-100 rounded text-xs" onclick="AO.Gantt.zoomIn()"><i
+                        class="fas fa-plus"></i></button>
             </div>
         </div>
 
-        <!-- COMPANIES -->
-        <div class="toolbar-section relative" style="border-right:none;">
-            <button
-                class="tool-btn w-auto px-3 text-xs font-bold text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 flex items-center gap-2"
-                onclick="toggleCompanyMenu()">
-                <i class="fas fa-building"></i> EMPRESAS
-            </button>
-        </div>
-
-        <!-- COMPANIES SIDE PANEL MOVED TO BODY END -->
-
-        <!-- VIEW MODE -->
-        <div class="toolbar-section">
-            <button class="tool-btn px-3 w-auto text-xs font-semibold" onclick="changeView('Day')">Dia</button>
-            <button class="tool-btn px-3 w-auto text-xs font-semibold" onclick="changeView('Week')">Sem</button>
-            <button class="tool-btn px-3 w-auto text-xs font-semibold" onclick="changeView('Month')">Mes</button>
-        </div>
-
-        <!-- LOOKAHEAD -->
-        <div class="toolbar-section"
-            style="border-right:none; padding-left: 1rem; background: #fff1f2; border-radius: 6px; margin-right: 1rem;">
-            <div class="flex items-center gap-2">
-                <button id="btn-lookahead"
-                    class="tool-btn w-auto px-2 text-xs font-bold text-red-600 border border-red-200 bg-red-50"
-                    onclick="toggleLookahead()" title="Activar Lookahead">
-                    LOOKAHEAD
-                </button>
-
-                <div class="flex flex-col">
-                    <label class="text-[10px] text-red-500 font-bold leading-none">FECHA INICIO</label>
-                    <input type="date" id="lookahead-start" class="tool-select h-5 text-xs border-red-200"
-                        onchange="updateLookahead()">
+        <!-- MAIN WORKSPACE -->
+        <div id="workspace">
+            <!-- GLOBAL HEADER ROW -->
+            <div id="unified-header">
+                <!-- Grid Header -->
+                <div id="grid-header-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 40px; text-align: center;">ID</th>
+                                <th style="width: 24px;">i</th> <!-- Indicators -->
+                                <th style="width: 200px;">Task Name</th>
+                                <th style="width: 80px;">Start</th>
+                                <th style="width: 80px;">Finish</th>
+                                <th style="width: 60px;">Dur</th>
+                                <th style="width: 60px;">%</th>
+                            </tr>
+                        </thead>
+                    </table>
+                    <div class="resizer" id="split-pane-resizer"></div>
                 </div>
 
-                <div class="flex flex-col w-16">
-                    <label class="text-[10px] text-red-500 font-bold leading-none">SEMANAS</label>
-                    <input type="number" id="lookahead-weeks" class="tool-select h-5 text-xs border-red-200 text-center"
-                        value="4" min="1" max="52" onchange="updateLookahead()">
+                <!-- Gantt Timeline Header -->
+                <div id="gantt-header-container">
+                    <!-- SVG Timeline Rendered Here -->
+                    <svg id="timeline-svg" style="width: 100%; height: 100%; display:block;"></svg>
+                </div>
+            </div>
+
+            <!-- GLOBAL BODY ROW (Vertical Scroll Container) -->
+            <div id="unified-body">
+                <!-- Grid Body -->
+                <div id="grid-body-container">
+                    <table id="grid-table">
+                        <tbody id="grid-tbody">
+                            <!-- Virtual Rows Here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Gantt Body -->
+                <div id="gantt-body-container">
+                    <!-- SVG Canvas -->
+                    <svg id="gantt-svg" style="width: 2000px; height: 1px; display:block;">
+                        <defs>
+                            <pattern id="gridPattern" width="100" height="100" patternUnits="userSpaceOnUse">
+                                <path d="M 100 0 L 0 0 0 100" fill="none" stroke="gray" stroke-width="0.5" />
+                            </pattern>
+                        </defs>
+                        <!-- Layers -->
+                        <g id="layer-grid"></g>
+                        <g id="layer-dependencies"></g>
+                        <g id="layer-bars"></g>
+                        <g id="layer-highlights"></g>
+                    </svg>
                 </div>
             </div>
         </div>
-
-
-
-        <!-- IMPORT & SAVE (Right Aligned) -->
-        <div class="ml-auto flex items-center gap-2">
-            <!-- Save Status -->
-            <div id="save-status"
-                class="text-xs font-bold text-gray-400 mr-2 opacity-0 transition-opacity duration-300">
-                GUARDADO
-            </div>
-
-            <!-- Manual Save Button -->
-            <button onclick="forceSaveAll()"
-                class="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-bold flex items-center gap-2 hover:bg-blue-700 shadow-md">
-                <i class="fas fa-save"></i> GUARDAR
-            </button>
-
-            <button onclick="document.getElementById('file-upload').click()"
-                class="bg-emerald-600 text-white px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-emerald-700 shadow-sm transition-colors">
-                <i class="fas fa-file-import"></i> Importar
-            </button>
-            <input type="file" id="file-upload" hidden accept=".xml,.mpp,.xer">
-        </div>
     </div>
 
-    <!-- COMPANIES SIDE PANEL (Kept outside toolbar) -->
-    <!-- COMPANIES SIDE PANEL (Kept outside toolbar) -->
-    <div id="company-panel-overlay" class="fixed inset-0 bg-black bg-opacity-30 z-[100] hidden"
-        onclick="toggleCompanyMenu()"></div>
-    <div id="company-menu"
-        class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-[110] transform translate-x-full transition-transform duration-300 flex flex-col">
-        <div class="flex items-center justify-between p-4 border-b bg-gray-50">
-            <h3 class="font-bold text-gray-700"><i class="fas fa-building mr-2"></i> Empresas</h3>
-            <button onclick="toggleCompanyMenu()" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
+    <!-- MODULES: AO.Gantt Engine -->
+    <script type="module">
+        // --- NAMESPACE ---
+        window.AO = window.AO || {};
 
-        <div class="p-4 flex flex-col gap-2 border-b bg-white">
-            <label class="text-xs font-bold text-gray-500 uppercase">Agregar Nueva</label>
-            <div class="flex items-center gap-2">
-                <input id="new-company-name" type="text" placeholder="Nombre de empresa..."
-                    class="text-sm border border-gray-300 rounded px-3 py-2 flex-1 focus:ring-2 focus:ring-blue-500 outline-none">
-                <button onclick="addCompany()"
-                    class="bg-blue-600 text-white rounded w-8 h-8 flex items-center justify-center hover:bg-blue-700 shadow-sm">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-        </div>
-
-        <div id="company-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-            <!-- Dynamic Items -->
-        </div>
-    </div>
-
-    <!-- MAIN CONTENT -->
-    <div id="gantt-container" class="relative">
-        <!-- GRID -->
-        <div id="tasks-grid">
-            <table class="gantt-table">
-                <thead>
-                    <tr>
-                        <th style="width: 40px; text-align: center;">#</th>
-                        <th style="width: 300px;">Nombre de Tarea</th>
-                        <th style="width: 120px;">Empresa</th>
-                        <th style="width: 80px;">Duración</th>
-                        <th style="width: 90px;">Inicio</th>
-                        <th style="width: 90px;">Fin</th>
-                        <th style="width: 80px;">Pred.</th>
-                        <th style="width: 60px;">%</th>
-                    </tr>
-                </thead>
-                <tbody id="grid-body">
-                    <!-- Rows rendered by JS -->
-                </tbody>
-            </table>
-        </div>
-
-        <!-- RESIZER -->
-        <div id="resizer"></div>
-
-        <!-- RIGHT SPLIT PANE -->
-        <div id="right-split-pane">
-            <!-- 1. FIXED HEADER PANE -->
-            <div id="timeline-header-container">
-                <svg id="gantt-header-target" width="100%" height="70"></svg>
-            </div>
-
-            <!-- 2. SCROLLABLE BODY PANE -->
-            <div id="chart-area" class="no-scroll">
-                <svg id="gantt-target"></svg>
-            </div>
-        </div>
-    </div>
-
-    <style>
-        /* --- STICKY LAYOUT FIXES --- */
-
-        /* 1. Left Panel Header */
-        .gantt-table thead th {
-            position: sticky;
-            top: 0;
-            /* Align to top of grid container */
-            z-index: 50;
-
-            height: 70px !important;
-            vertical-align: middle;
-            background: #1e3a8a !important;
-            /* Force Dark Blue */
-            color: #ffffff !important;
-            border-bottom: 1px solid #172554;
-            border-top: 1px solid #172554;
-            font-weight: 600;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        /* 2. Right Panel Header (Timeline) */
-        /* --- DUAL GANTT STYLING --- */
-        #timeline-header-container {
-            height: 70px;
-            background-color: #1e3a8a;
-            border-bottom: 1px solid #172554;
-            overflow: hidden;
-            /* Hide the body of the header instance */
-            position: relative;
-        }
-
-        /* HIDE BODY in Header Instance */
-        #gantt-header-target .bar-wrapper,
-        #gantt-header-target .grid-row,
-        #gantt-header-target .arrow,
-        #gantt-header-target .grid-background {
-            display: none !important;
-        }
-
-        /* HIDE HEADER in Body Instance */
-        #gantt-target .grid-header {
-            display: none !important;
-        }
-
-        /* Adjust Body Top Margin (Shift up to hide empty header space) */
-        #gantt-target {
-            margin-top: -70px !important;
-        }
-
-        /* --- Preserved Styles --- */
-        .lookahead-row {
-            background-color: #fef2f2 !important;
-            /* Red 50 */
-            border-left: 3px solid #ef4444;
-        }
-
-        .lookahead-row td {
-            color: #b91c1c;
-            /* Red 700 */
-        }
-
-        /* Today Line */
-        .today-line {
-            stroke: #ef4444;
-            stroke-width: 2;
-            stroke-dasharray: 4;
-            opacity: 0.8;
-            pointer-events: none;
-            z-index: 50;
-        }
-
-        /* Grid Interactive Styles */
-        /* Note: Duplicate .gantt-table blocks removed */
-
-        /* Ensure text inside sticky header is visible (Redundant safety) */
-        #gantt-header-sticky text {
-            fill: #ffffff !important;
-            font-weight: 600;
-        }
-
-        /* Force Timeline Header Text Visibility */
-        #gantt-header-target .tick text {
-            fill: #374151 !important;
-            /* Gray-700 */
-            font-size: 11px;
-            font-weight: 500;
-        }
-
-        #gantt-header-target .path {
-            opacity: 0.1;
-            /* Subtler Grid Lines in Header */
-        }
-
-        .grid-cell.selected {
-            box-shadow: inset 0 0 0 2px #3b82f6;
-            background-color: rgba(59, 130, 246, 0.05);
-        }
-
-        .grid-cell.editing .cell-input {
-            pointer-events: auto;
-            background: white;
-            box-shadow: inset 0 0 0 2px #3b82f6;
-        }
-
-        .cell-input {
-            width: 100%;
-            height: 100%;
-            border: none;
-            outline: none;
-            background: transparent;
-            font-family: inherit;
-            padding: 0 6px;
-            pointer-events: none;
-            /* Default: Selection Mode */
-        }
-    </style>
-
-
-
-    <script>
         // --- STATE ---
-        var tasks = {{ tasks | tojson | safe}};
-        console.log("Loaded Tasks:", tasks); // DEBUG
-        let gantt;
-        let selectedTaskIds = new Set(); // Row selection (Legacy, arguably can merge with cell selection but keeping for row ops)
-        const projectId = "{{ project.id }}";
+        const State = {
+            tasks: [],
+            taskMap: new Map(),
+            displayOrder: [], // Array of IDs
 
-        // Grid Selection State
-        let selectedCells = new Set(); // Strings: "rowId:field"
-        let lastSelectedCell = null;   // For Range Select {id, field, index}
-        let isEditing = false;
+            view: {
+                zoomLevel: 'WEEK', // YEAR, QUARTER, MONTH, WEEK, DAY
+                pxPerMinute: 0.1,  // Dynamic scale
+                rowHeight: 32,
+                headerHeight: 60,
+
+                // Dimensions
+                gridWidth: 400,
+                totalGanttWidth: 2000,
+            },
+
+            ui: {
+                scrollTop: 0,
+                scrollLeft: 0, // Gantt Only
+            }
+        };
 
         // --- INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', async () => {
-            // 1. Fetch Data
-            await loadTasks();
+            console.log("AO Gantt Engine: Starting...");
 
-            // 1b. Init Companies
-            initCompanies();
-            setupContextMenu();
+            // 1. Setup Resizer
+            setupSplitPane();
 
-            // 2. Setup Resizer
-            setupResizer();
+            // 2. Setup Scroll Sync
+            setupScrollSync();
 
-            // 3. Setup File Upload
-            document.getElementById('file-upload').addEventListener('change', uploadSchedule);
+            // 3. Load Data
+            const serverTasks = {{ tasks | tojson | safe
+        }};
+        loadData(serverTasks);
 
-            // 4. Keyboard Shortcuts for Selection & Clipboard
-            document.addEventListener('keydown', handleGlobalKeydown);
+        // 4. Initial Render
+        render();
+    });
 
-            // 5. Grid Selection Listeners (Delegated)
-            const gridBody = document.getElementById('grid-body');
-            gridBody.addEventListener('mousedown', handleGridMouseDown);
-            gridBody.addEventListener('dblclick', handleGridDoubleClick);
+        // --- CORE LAYOUT FUNCTIONS ---
 
-            // 6. Sync Vertical Scroll (Grid <-> Chart)
-            const grid = document.getElementById('tasks-grid');
-            const chart = document.getElementById('chart-area');
+        function setupSplitPane() {
+            const resizer = document.getElementById('split-pane-resizer');
+            const gridHeader = document.getElementById('grid-header-container');
+            const gridBody = document.getElementById('grid-body-container');
+            const unifiedHeader = document.getElementById('unified-header');
 
-            // Simple Mutual Sync
-            // 6. Sync Scroll (Unified)
-            syncScrolls();
+            let isResizing = false;
 
-            // 7. Grid Listeners (Grid -> Chart)
-            // Re-use existing references if available, or get them if not
-            const gridRef = document.getElementById('tasks-grid');
-            const chartRef = document.getElementById('chart-area');
-            if (gridRef && chartRef) {
-                gridRef.addEventListener('scroll', () => {
-                    // Sync Vertical
-                    if (chartRef.scrollTop !== gridRef.scrollTop) chartRef.scrollTop = gridRef.scrollTop;
-                });
-            }
-        }); // End DOMContentLoaded
-
-
-        // Helper for Date Formatting
-        function formatDateInput(date) {
-            if (!date) return '';
-            const d = new Date(date);
-            if (isNaN(d.getTime())) return '';
-            return d.toISOString().split('T')[0];
-        }
-
-        async function loadTasks() {
-            try {
-                // Use server-side data if available (passed via Jinja)
-                if (tasks && tasks.length > 0) {
-                    console.log("Initializing with", tasks.length, "tasks");
-                    tasks = tasks.map(t => {
-                        const parseDate = (d) => {
-                            if (!d) return new Date();
-                            const date = new Date(d);
-                            return isNaN(date.getTime()) ? new Date() : date;
-                        };
-                        t.start = parseDate(t.start);
-                        t.end = parseDate(t.end);
-                        if (t.style && typeof t.style === 'string') {
-                            try { t._style = JSON.parse(t.style); } catch (e) { }
-                        }
-                        return t;
-                    });
-
-                    try {
-                        renderGrid();
-                    } catch (e) {
-                        console.error("Grid Render Failed:", e);
-                        alert("Error renderizando tabla: " + e.message);
-                    }
-
-                    try {
-                        renderGantt();
-                    } catch (e) {
-                        console.error("Gantt Render Failed:", e);
-                        alert("Error renderizando gráfica: " + e.message);
-                    }
-                    return;
-                } else {
-                    console.warn("No tasks loaded from server template.");
-                }
-
-                // Fallback catch-all (usually not needed if Jinja works)
-                const res = await fetch(`/api/projects/${projectId}/activities`);
-                if (!res.ok) throw new Error("Error loading");
-                const data = await res.json();
-                tasks = data.map(t => {
-                    t.start = new Date(t.start);
-                    t.end = new Date(t.end);
-                    if (t.style && typeof t.style === 'string') {
-                        try { t._style = JSON.parse(t.style); } catch (e) { }
-                    }
-                    return t;
-                });
-                renderGrid();
-                renderGantt();
-            } catch (e) { console.error(e); alert("Critico: " + e.message); }
-        }
-
-        function updateDynamicCSS() {
-            let style = document.getElementById('dynamic-company-styles');
-            if (!style) {
-                style = document.createElement('style');
-                style.id = 'dynamic-company-styles';
-                document.head.appendChild(style);
-            }
-            let css = '';
-
-            // 1. Company Styles (Efficient Class-based)
-            companies.forEach(c => {
-                if (c.color) {
-                    const safeName = c.name.replace(/\s+/g, '-');
-                    css += `
-                         .company-${safeName} .bar-progress { fill: ${c.color} !important; }
-                         .company-${safeName} .bar { fill: ${c.color}33 !important; stroke: ${c.color} !important; }
-                     `;
-                }
-            });
-
-            // 2. Manual Overrides (ID-based, for legacy or specific overrides)
-            tasks.forEach(t => {
-                if (t._style && t._style.fill) {
-                    css += `
-                        .gantt .bar-wrapper[data-id="${t.id}"] .bar { fill: ${t._style.fill} !important; opacity: 0.6 !important; }
-                        .gantt .bar-wrapper[data-id="${t.id}"] .bar-progress { fill: ${t._style.fill} !important; }
-                    `;
-                }
-            });
-
-            style.innerHTML = css;
-        }
-
-        function renderGantt(viewMode = 'Week') {
-            const container = document.getElementById('gantt-target');
-            if (!container) return;
-
-            // Clear both
-            container.innerHTML = '';
-            const headerTarget = document.getElementById('gantt-header-target');
-            if (headerTarget) headerTarget.innerHTML = '';
-
-            const ganttTasks = [];
-            tasks.forEach(t => {
-                const customClasses = [];
-                // logic to determine color/class...
-                const co = companies.find(c => c.name === (t.contractor || ''));
-                if (co) {
-                    // We inject color as inline style via hook or just use class if possible.
-                    // Frappe Gantt doesn't support inline color easily without custom HTML.
-                    // We'll rely on updateDynamicCSS() which we call below.
-                    customClasses.push(`company-${co.name.replace(/\s+/g, '-')}`);
-                    if (!co.visible) customClasses.push('hidden-task');
-                }
-
-                ganttTasks.push({
-                    id: t.id,
-                    name: t.name,
-                    start: formatDateInput(t.start),
-                    end: formatDateInput(t.end),
-                    progress: t.progress,
-                    dependencies: t.dependencies,
-                    custom_class: customClasses.join(' '),
-                    comments: t.comments || []
-                });
-            });
-
-            updateDynamicCSS();
-
-            try {
-                if (ganttTasks.length === 0) {
-                    document.getElementById('chart-area').innerHTML = '<div class="text-gray-400 p-10 text-center">No hay tareas para mostrar</div>';
-                    return;
-                }
-
-                const commonOptions = {
-                    header_height: 70, // Matched to container
-                    column_width: 30,
-                    step: 24,
-                    view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
-                    bar_height: 20,
-                    bar_corner_radius: 3,
-                    arrow_curve: 5,
-                    padding: 18,
-                    view_mode: viewMode,
-                    date_format: 'YYYY-MM-DD',
-                    language: 'es',
-                    on_date_change: (task, start, end) => updateTaskDate(task.id, start, end),
-                    on_progress_change: (task, progress) => {
-                        const t = tasks.find(x => x.id === task.id);
-                        if (t) {
-                            t.progress = progress;
-                            saveProjectDataLocally();
-                            updateField(task.id, 'progress', progress);
-                        }
-                    },
-                    on_click: (task) => { },
-                    on_view_change: () => {
-                        drawTodayLine();
-                        if (typeof updateLookahead === 'function') updateLookahead();
-                        // Sync wrapper?
-                    }
-                };
-
-                // 1. RENDER HEADER INSTANCE (Top)
-                if (headerTarget) {
-                    ganttHeaderInstance = new Gantt("#gantt-header-target", ganttTasks, {
-                        ...commonOptions,
-                        // We don't need callbacks here really, but keeping consistency is safer for alignment
-                    });
-
-                    // Styles to Hide Body in Header
-                    // We can do this via JS or global CSS. JS is safer to target specific instance?
-                    // Frappe Gantt generates SVG content relative to root.
-                    // We'll trust global CSS targeting #gantt-header-target
-                }
-
-                // 2. RENDER BODY INSTANCE (Bottom)
-                gantt = new Gantt("#gantt-target", ganttTasks, commonOptions);
-                ganttBodyInstance = gantt; // Alias
-
-                // 3. POST-RENDER SYNC & CLEANUP
-                setTimeout(() => {
-                    try {
-                        drawTodayLine();
-                        if (typeof updateLookahead === 'function') updateLookahead();
-                        if (typeof drawCommentIndicators === 'function') drawCommentIndicators();
-
-                        // Force Scroll Sync Initial
-                        const chartArea = document.getElementById('chart-area');
-                        const headerContainer = document.getElementById('timeline-header-container');
-                        if (chartArea && headerContainer) {
-                            headerContainer.scrollLeft = chartArea.scrollLeft;
-
-                            // Bind One-Way Sync (Chart -> Header)
-                            chartArea.onscroll = function () {
-                                headerContainer.scrollLeft = chartArea.scrollLeft;
-                            };
-                        }
-
-                        scrollToToday();
-
-                    } catch (e) { console.error("Post-render error", e); }
-                }, 300);
-
-            } catch (e) {
-                console.error("Gantt Render Error:", e);
-            }
-        }
-
-        function drawCommentIndicators() {
-            const svg = document.getElementById('gantt-target');
-            if (!svg) return;
-
-            // Remove existing
-            svg.querySelectorAll('.comment-indicator').forEach(el => el.remove());
-
-            tasks.forEach(t => {
-                if (t.comments && t.comments.length > 0) {
-                    const barWrapper = svg.querySelector(`.bar-wrapper[data-id="${t.id}"]`);
-                    if (!barWrapper) return;
-
-                    const barGroup = barWrapper.querySelector('.bar-group');
-                    if (!barGroup) return;
-
-                    const bar = barWrapper.querySelector('.bar');
-                    if (!bar) return;
-
-                    const width = parseFloat(bar.getAttribute('width'));
-                    const y = parseFloat(bar.getAttribute('y'));
-                    const x = parseFloat(bar.getAttribute('x'));
-
-                    // Create Indicator (Red Bubble)
-                    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                    g.classList.add('comment-indicator');
-                    g.style.cursor = 'pointer';
-
-                    // Circle
-                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                    circle.setAttribute('cx', x + width);
-                    circle.setAttribute('cy', y);
-                    circle.setAttribute('r', 5);
-                    circle.setAttribute('fill', '#ef4444');
-                    circle.setAttribute('stroke', 'white');
-                    circle.setAttribute('stroke-width', '1');
-
-                    g.appendChild(circle);
-
-                    // Interaction
-                    g.onclick = (e) => {
-                        e.stopPropagation();
-                        showTaskComments(t.id);
-                    };
-
-                    const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                    title.textContent = `${t.comments.length} Comentarios`;
-                    g.appendChild(title);
-
-                    barWrapper.appendChild(g);
-                }
-            });
-        }
-
-        function showTaskComments(id) {
-            const t = tasks.find(x => x.id === id);
-            if (!t) return;
-
-            // Remove existing overlay
-            const existing = document.getElementById('comments-overlay');
-            if (existing) existing.remove();
-
-            const overlay = document.createElement('div');
-            overlay.id = 'comments-overlay';
-            overlay.className = "fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center";
-            overlay.onclick = (e) => {
-                if (e.target === overlay) overlay.remove();
-            };
-
-            const content = document.createElement('div');
-            content.className = "bg-white rounded-lg shadow-xl w-96 p-4 max-h-[80vh] flex flex-col";
-
-            const header = document.createElement('div');
-            header.className = "flex justify-between items-center border-b pb-2 mb-2";
-            header.innerHTML = `<h3 class="font-bold text-gray-800 truncate" title="${t.name}">${t.name}</h3><button class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>`;
-            header.querySelector('button').onclick = () => overlay.remove();
-            content.appendChild(header);
-
-            const list = document.createElement('div');
-            list.className = "flex-1 overflow-y-auto space-y-3";
-
-            const renderList = () => {
-                list.innerHTML = '';
-                if (!t.comments || t.comments.length === 0) {
-                    list.innerHTML = '<div class="text-gray-400 text-xs italic text-center p-4">Sin comentarios</div>';
-                    return;
-                }
-                t.comments.forEach(c => {
-                    const item = document.createElement('div');
-                    item.className = "bg-gray-50 p-2 rounded text-sm";
-                    let dateStr = "Fecha desconocida";
-                    try { dateStr = new Date(c.date).toLocaleString(); } catch (e) { }
-
-                    item.innerHTML = `
-                        <div class="text-xs text-blue-600 font-semibold mb-1 flex justify-between">
-                            <span>${c.user || 'Usuario'}</span>
-                            <span class="text-gray-400 font-normal">${dateStr}</span>
-                        </div>
-                        <div class="text-gray-700 whitespace-pre-wrap">${c.text}</div>
-                    `;
-                    list.appendChild(item);
-                });
-                // Auto scroll to bottom
-                list.scrollTop = list.scrollHeight;
-            };
-
-            renderList();
-            content.appendChild(list);
-
-            // Footer (Input)
-            const footer = document.createElement('div');
-            footer.className = "mt-4 border-t pt-3 flex gap-2";
-            footer.innerHTML = `
-                <input type="text" id="new-comment-input" class="flex-1 border rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500" placeholder="Escribir comentario...">
-                <button id="btn-add-comment" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Enviar</button>
-            `;
-
-            const addFn = async () => {
-                const input = footer.querySelector('input');
-                const text = input.value.trim();
-                if (!text) return;
-
-                if (!t.comments) t.comments = [];
-                t.comments.push({
-                    text: text,
-                    date: new Date().toISOString(),
-                    user: "Usuario"
-                });
-
-                // Update UI
-                renderList();
-                input.value = '';
-
-                // Save
-                saveProjectDataLocally();
-                await updateField(t.id, 'comments', t.comments);
-            };
-
-            footer.querySelector('button').onclick = addFn;
-            footer.querySelector('input').onkeydown = (e) => {
-                if (e.key === 'Enter') addFn();
-            };
-
-            content.appendChild(footer);
-
-            overlay.appendChild(content);
-            document.body.appendChild(overlay);
-        }
-
-
-
-
-
-        // --- TODAY LINE LOGIC ---
-        function drawTodayLine() {
-            const svg = document.getElementById('gantt-target');
-            if (!svg || !gantt) return;
-
-            // Remove existing
-            const existing = svg.querySelector('.today-line');
-            if (existing) existing.remove();
-
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-
-            // Helper to find X. Frappe doesn't expose public API easily, 
-            // but we can infer from the time scale.
-            // x = (date - start) / (end - start) * width
-            // Or rely on tasks?
-            // HACK: Use the library's internal date mapping if possible
-            // Re-use logic from bar positioning? 
-            // Better: Iterate through the rendered .tick elements? No.
-
-            // Let's use the 'gantt_start' and 'gantt_end' from the gantt object logic
-            // Frappe 0.6.1 usually sets these on the instance.
-
-            if (!gantt.gantt_start || !gantt.gantt_end) return;
-
-            const totalDuration = gantt.gantt_end - gantt.gantt_start;
-            const progress = (today - gantt.gantt_start) / totalDuration;
-
-            if (progress < 0 || progress > 1) return; // Today is out of view
-
-            // Width of the date area
-            // SVG width usually includes padding?
-            // The library renders bars in a group.
-            // Let's assume linear mapping over the SVG width (or the scrollable area width?)
-            // Actually, Frappe sets SVG width explicitly.
-            const svgWidth = svg.getAttribute('width');
-            const svgHeight = svg.getAttribute('height');
-
-            const x = progress * svgWidth;
-
-            // Create Line
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', x);
-            line.setAttribute('y1', 0);
-            line.setAttribute('x2', x);
-            line.setAttribute('y2', svgHeight);
-            line.classList.add('today-line');
-
-            svg.appendChild(line);
-        }
-
-        // --- COMPANIES LOGIC ---
-        // State
-        let companies = []; // { name, color, visible }
-        const DEFAULT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-        const STORAGE_KEY = `gantt_companies_${projectId} `;
-
-        const DATA_KEY = `gantt_data_${projectId} `;
-
-        // Save Companies AND Assignments/Comments to LocalStorage
-        function saveProjectDataLocally() {
-            try {
-                // 1. Companies Definitions
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(companies));
-
-                // 2. Task Metadata (Assignments & Comments)
-                const metadata = {};
-                tasks.forEach(t => {
-                    if (t.contractor || (t.comments && t.comments.length > 0)) {
-                        metadata[t.id] = {
-                            contractor: t.contractor,
-                            comments: t.comments
-                        };
-                    }
-                });
-                localStorage.setItem(DATA_KEY, JSON.stringify(metadata));
-            } catch (e) { console.error("Save local error", e); }
-        }
-
-        // --- OLD SAVE WRAPPER ALIAS ---
-        function saveCompaniesLocally() { saveProjectDataLocally(); } // Alias for backward compat in this file
-
-        function initCompanies() {
-            // 0. Load Task Metadata FIRST (Assignments & Comments)
-            try {
-                const metaStr = localStorage.getItem(DATA_KEY);
-                if (metaStr) {
-                    const metadata = JSON.parse(metaStr);
-                    tasks.forEach(t => {
-                        if (metadata[t.id]) {
-                            // Restore fields if missing from backend
-                            if (metadata[t.id].contractor) t.contractor = metadata[t.id].contractor;
-                            if (metadata[t.id].comments) t.comments = metadata[t.id].comments;
-                        }
-                    });
-                }
-            } catch (e) { console.error("Load meta error", e); }
-
-            // 1. Load Companies Definitions
-            let stored = [];
-            try {
-                const s = localStorage.getItem(STORAGE_KEY);
-                if (s) stored = JSON.parse(s);
-            } catch (e) { console.error(e); }
-
-            // 2. Extract unique from tasks (now enriched with local data)
-            const uniqueTasks = new Set();
-            tasks.forEach(t => {
-                if (t.contractor) uniqueTasks.add(t.contractor.trim());
-            });
-
-            // 3. Merge
-            const merged = [];
-            const seen = new Set();
-
-            stored.forEach(c => {
-                merged.push(c);
-                seen.add(c.name);
-            });
-
-            let cIdx = 0;
-            uniqueTasks.forEach(name => {
-                if (!seen.has(name)) {
-                    merged.push({
-                        name: name,
-                        color: DEFAULT_COLORS[cIdx % DEFAULT_COLORS.length],
-                        visible: true
-                    });
-                    cIdx++;
-                }
-            });
-
-            companies = merged;
-            saveProjectDataLocally(); // Sync normalized data
-            renderCompanyMenu();
-        }
-
-        function toggleCompanyMenu() {
-            const menu = document.getElementById('company-menu');
-            const overlay = document.getElementById('company-panel-overlay');
-
-            if (menu.classList.contains('translate-x-full')) {
-                // Open
-                menu.classList.remove('translate-x-full');
-                overlay.classList.remove('hidden');
-            } else {
-                // Close
-                menu.classList.add('translate-x-full');
-                overlay.classList.add('hidden');
-            }
-        }
-
-        function renderCompanyMenu() {
-            const container = document.getElementById('company-list');
-            container.innerHTML = '';
-
-            if (companies.length === 0) {
-                container.innerHTML = '<div class="text-sm text-gray-400 italic text-center p-10">No hay empresas registradas.<br>Agrega una arriba.</div>';
-                return;
-            }
-
-            companies.forEach((c, idx) => {
-                const div = document.createElement('div');
-                div.className = "flex items-center gap-3 p-3 bg-white border border-gray-100 shadow-sm rounded-lg hover:shadow-md transition-shadow group";
-                div.innerHTML = `
-            < div class="relative w-8 h-8 rounded-full border border-gray-200 cursor-pointer shadow-inner"
-        style = "background-color: ${c.color}" >
-                        <input type="color" value="${c.color}" 
-                            class="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                            title="Cambiar Color"
-                            onchange="updateCompanyColor(${idx}, this.value)">
-                    </div>
-                    
-                    <span class="text-sm font-medium text-gray-700 flex-1 truncate select-none">${c.name}</span>
-                    
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <span class="text-xs text-gray-400">Visible</span>
-                        <input type="checkbox" ${c.visible ? 'checked' : ''} 
-                            onchange="toggleCompanyVisibility(${idx})" class="form-checkbox h-4 w-4 text-blue-600 rounded">
-                    </label>
-        `;
-                container.appendChild(div);
-            });
-        }
-
-        // Helper wrappers
-        function updateCompanyColor(idx, color) {
-            if (companies[idx]) {
-                companies[idx].color = color;
-                saveCompaniesLocally();
-                // Refresh Gantt
-                renderGrid();
-                renderGantt(gantt ? gantt.options.view_mode : 'Day');
-            }
-        }
-
-        // ... (toggleCompanyVisibility is below)
-
-
-        // --- NEW SPLIT PANE HEADER LOGIC ---
-
-
-        // --- STRATEGY 3: MARGIN SHIFT & FULL CLONE ---
-
-
-        function addCompany() {
-            const input = document.getElementById('new-company-name');
-            const name = input.value.trim();
-            if (!name) return;
-
-            // Check dupes
-            if (companies.find(c => c.name === name)) return alert('Empresa ya existe');
-
-            companies.push({
-                name: name,
-                color: DEFAULT_COLORS[companies.length % DEFAULT_COLORS.length],
-                visible: true
-            });
-            saveCompaniesLocally();
-
-            input.value = '';
-            renderCompanyMenu();
-        }
-
-        function toggleCompanyVisibility(idx) {
-            companies[idx].visible = !companies[idx].visible;
-            saveCompaniesLocally();
-            renderGantt(gantt ? gantt.options.view_mode : 'Day'); // Re-filter
-        }
-
-
-        function updateCompanyColor(idx, color) {
-            companies[idx].color = color;
-            // Re-render to apply color
-            renderGrid();
-            renderGantt(gantt ? gantt.options.view_mode : 'Day');
-        }
-
-        // --- CONTEXT MENU (Empresas) ---
-        let contextMenuEl = null;
-
-        function setupContextMenu() {
-            // Create Menu DOM
-            contextMenuEl = document.createElement('div');
-            contextMenuEl.id = 'ctx-menu-companies';
-            contextMenuEl.className = 'fixed bg-white border border-gray-200 shadow-xl rounded-md py-1 z-[100] hidden min-w-[160px]';
-            document.body.appendChild(contextMenuEl);
-
-            // Listeners
-            document.addEventListener('contextmenu', (e) => {
-                // Check if target is inside Grid row (not header)
-                const row = e.target.closest('tr');
-                if (!row || row.closest('thead')) return;
-
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                document.body.style.cursor = 'col-resize';
                 e.preventDefault();
-                showContextMenu(e.clientX, e.clientY, row.dataset.id);
             });
 
-            document.addEventListener('click', () => hideContextMenu());
+            document.addEventListener('mousemove', (e) => {
+                if (!isResizing) return;
+                // Calculate new width relative to app container
+                const newWidth = e.clientX;
+                if (newWidth > 100 && newWidth < (window.innerWidth - 100)) {
+                    State.view.gridWidth = newWidth;
+                    gridHeader.style.width = newWidth + 'px';
+                    gridBody.style.width = newWidth + 'px';
+                }
+            });
+
+            document.addEventListener('mouseup', () => {
+                isResizing = false;
+                document.body.style.cursor = 'default';
+            });
         }
 
-        function showContextMenu(x, y, hoveredId) {
-            // Logic: If selection exists, modify selection. 
-            // If right-clicked ID is NOT in selection, clear selection and select just that one?
-            // Windows behavior: If right click outside selection, select that one. If inside, keep selection.
+        function setupScrollSync() {
+            const unifiedBody = document.getElementById('unified-body');
+            const ganttBody = document.getElementById('gantt-body-container');
+            const ganttHeader = document.getElementById('gantt-header-container');
 
-            if (!selectedTaskIds.has(hoveredId)) {
-                // Clicked outside selection
-                selectedTaskIds.clear();
-                selectedTaskIds.add(hoveredId);
-                // Also clear cell selection? Yes.
-                selectedCells.clear();
-                renderGrid(); // update visuals
-            }
+            // 1. Vertical Scroll (Native on #unified-body)
+            // No sync needed! It moves both grid-body and gantt-body containers naturally.
 
-            // Build Menu Items
-            contextMenuEl.innerHTML = '';
+            // 2. Horizontal Scroll (Gantt Body -> Gantt Header)
+            ganttBody.addEventListener('scroll', (e) => {
+                const left = ganttBody.scrollLeft;
+                ganttHeader.scrollLeft = left; // Sync Header
+                State.ui.scrollLeft = left;
 
-            const title = document.createElement('div');
-            title.className = "px-3 py-1 text-xs font-bold text-gray-500 border-b mb-1";
-            title.innerText = "Asignar a Empresa";
-            contextMenuEl.appendChild(title);
+                // Trigger Virtual Column Render if needed
+                // renderTimelineLabels();
+            });
+        }
 
-            if (companies.length === 0) {
-                const empty = document.createElement('div');
-                empty.className = "px-3 py-1 text-xs text-gray-400 italic";
-                empty.innerText = "Crear empresas primero";
-                contextMenuEl.appendChild(empty);
-            } else {
-                companies.forEach(c => {
-                    const item = document.createElement('button');
-                    item.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 flex items-center gap-2";
-                    item.innerHTML = `<span class="w-2 h-2 rounded-full" style="background:${c.color}"></span> ${c.name}`;
-                    item.onclick = (e) => {
-                        e.stopPropagation();
-                        assignCompanyToSelection(c.name);
-                        hideContextMenu();
-                    };
-                    contextMenuEl.appendChild(item);
+        // --- TIME ENGINE (Coordinate System) ---
+        const TimeEngine = {
+            // Configuration
+            baseDate: new Date(), // Will be set to project start
+
+            init(tasks) {
+                // Find Min/Max
+                if (!tasks.length) return;
+                let min = new Date(tasks[0].start || new Date());
+                let max = new Date(tasks[0].end || new Date());
+
+                tasks.forEach(t => {
+                    if (t.start) { const d = new Date(t.start); if (d < min) min = d; }
+                    if (t.end) { const d = new Date(t.end); if (d > max) max = d; }
                 });
+
+                // Add Buffer (1 month before, 1 month after)
+                min.setDate(min.getDate() - 30);
+                max.setDate(max.getDate() + 30);
+
+                this.baseDate = min;
+                State.view.startDate = min;
+                State.view.endDate = max;
+
+                // Calculate Total Width
+                const minutes = (max - min) / 1000 / 60;
+                State.view.totalGanttWidth = minutes * State.view.pxPerMinute;
+
+                // Update Container
+                document.getElementById('gantt-svg').style.width = State.view.totalGanttWidth + 'px';
+                document.getElementById('timeline-svg').style.width = State.view.totalGanttWidth + 'px';
+            },
+
+            timeToX(date) {
+                if (!date) return 0;
+                const validDate = typeof date === 'string' ? new Date(date) : date;
+                const diffMinutes = (validDate - this.baseDate) / 1000 / 60;
+                return diffMinutes * State.view.pxPerMinute;
+            },
+
+            xToTime(x) {
+                const minutes = x / State.view.pxPerMinute;
+                return new Date(this.baseDate.getTime() + minutes * 60 * 1000);
             }
+        };
 
-            // Unassign Option
-            const unassign = document.createElement('button');
-            unassign.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-500 border-t mt-1";
-            unassign.innerText = "Sin Asignar / Borrar";
-            unassign.onclick = (e) => {
-                e.stopPropagation();
-                assignCompanyToSelection("");
-                hideContextMenu();
-            };
-            contextMenuEl.appendChild(unassign);
+        // --- TIMELINE RENDERER (SVG) ---
+        const TimelineRenderer = {
+            render() {
+                const svg = document.getElementById('timeline-svg');
+                svg.innerHTML = ''; // Clear
 
-            // --- Feature: ADD COMMENTS ---
-            const addCommentBtn = document.createElement('button');
-            addCommentBtn.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 text-gray-700 border-t mt-1 flex items-center gap-2";
-            addCommentBtn.innerHTML = `< i class="fas fa-comment" ></i > Agregar Comentario`;
-            addCommentBtn.onclick = (e) => {
-                e.stopPropagation();
-                addCommentToTask(hoveredId);
-                hideContextMenu();
-            };
-            contextMenuEl.appendChild(addCommentBtn);
+                const zoom = State.view.zoomLevel;
+                const start = State.view.startDate;
+                const end = State.view.endDate;
 
-            // --- Feature: REGISTER DELAY ---
-            const delayBtn = document.createElement('button');
-            delayBtn.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 border-top mt-1 flex items-center gap-2";
-            delayBtn.innerHTML = `< i class="fas fa-clock" ></i > Registrar Atraso`;
-            delayBtn.onclick = (e) => {
-                e.stopPropagation();
-                registerDelay(hoveredId);
-                hideContextMenu();
-            };
-            contextMenuEl.appendChild(delayBtn);
+                // Generate Ticks based on Zoom Level
+                // Logic for "WEEK" Zoom: 
+                // Top Row: Months
+                // Bottom Row: Weeks
 
-            // Position
-            contextMenuEl.style.left = x + 'px';
-            contextMenuEl.style.top = y + 'px';
-            contextMenuEl.classList.remove('hidden');
-        }
+                // 1. Bottom Row (Minor Ticks - Weeks/Days)
+                let curr = new Date(start);
+                // Snap to Monday
+                const day = curr.getDay();
+                const diff = curr.getDate() - day + (day == 0 ? -6 : 1);
+                curr.setDate(diff);
 
-        function hideContextMenu() {
-            if (contextMenuEl) contextMenuEl.classList.add('hidden');
-        }
+                while (curr < end) {
+                    const x = TimeEngine.timeToX(curr);
+                    const next = new Date(curr);
+                    next.setDate(next.getDate() + 7); // +1 Week
+                    const w = TimeEngine.timeToX(next) - x;
 
-        async function addCommentToTask(id) {
-            const t = tasks.find(x => x.id === id);
-            if (!t) return;
+                    // Group
+                    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
 
-            const comment = prompt("Agregar comentario a: " + t.name, "");
-            if (!comment) return;
+                    // Rectangle
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute("x", x);
+                    rect.setAttribute("y", 30); // Bottom Half
+                    rect.setAttribute("width", w);
+                    rect.setAttribute("height", 30);
+                    rect.setAttribute("fill", "white");
+                    rect.setAttribute("stroke", "#e5e7eb");
 
-            if (!t.comments) t.comments = [];
-            t.comments.push({
-                text: comment,
-                date: new Date().toISOString(),
-                user: "Usuario" // Placeholder
-            });
+                    // Label
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute("x", x + w / 2);
+                    text.setAttribute("y", 50);
+                    text.setAttribute("text-anchor", "middle");
+                    text.setAttribute("font-size", "11");
+                    text.setAttribute("fill", "#6b7280");
+                    text.textContent = `Sem ${getWeekNumber(curr)}`;
 
-            // Save metadata? We reuse updateField or specialized endpoint?
-            // Sending generic 'meta' object if supported, or assuming backend saves generic fields.
-            // For now, let's assume we can save 'comments' field.
-            // Save to Local Metadata (Primary Persistence since backend lacks field)
-            saveProjectDataLocally();
+                    g.appendChild(rect);
+                    g.appendChild(text);
+                    svg.appendChild(g);
 
-            // Attempt Backend Save too (Best Effort)
-            await updateField(id, 'comments', t.comments);
-
-            renderGantt(gantt ? gantt.options.view_mode : 'Day');
-        }
-
-        async function registerDelay(id) {
-            const t = tasks.find(x => x.id === id);
-            if (!t) return;
-
-            const daysStr = prompt("¿Cuántos días de atraso?", "1");
-            if (!daysStr) return;
-            const days = parseInt(daysStr);
-            if (isNaN(days) || days <= 0) return alert("Número inválido");
-
-            const reason = prompt("Razón del atraso:", "Operativo");
-
-            // 1. Update End Date
-            // Ensure we work with Date objects
-            const oldEnd = new Date(t.end);
-            const newEnd = new Date(oldEnd);
-            newEnd.setDate(newEnd.getDate() + days);
-
-            // 2. Add Comment/Log
-            if (!t.comments) t.comments = [];
-            const logEntry = `[ATRASO REGISTRADO]+${days} días.Razón: ${reason || 'N/A'} `;
-            t.comments.push({
-                text: logEntry,
-                date: new Date().toISOString(),
-                user: "Usuario"
-            });
-
-            // 3. Apply Updates
-            // Save Comment Local & Backend
-            saveProjectDataLocally();
-            await updateField(id, 'comments', t.comments);
-
-            // Save Date Change (API + Grid)
-            // This will also trigger renderGrid()
-            await updateTaskDate(id, t.start, newEnd);
-
-            // 4. Feedback
-            alert(`Atraso registrado.Nueva fecha fin: ${newEnd.toISOString().split('T')[0]} `);
-        }
-
-
-
-        async function assignCompanyToSelection(companyName) {
-            // MERGE Logic: Row Selection (checkbox/row click) AND Cell Selection (drag/ctrl+click)
-            const ids = new Set(selectedTaskIds);
-            selectedCells.forEach(k => {
-                const [id] = k.split(':');
-                ids.add(id);
-            });
-
-            const finalIds = Array.from(ids);
-            if (finalIds.length === 0) return alert("Selecciona tareas primero");
-
-            const updates = [];
-            finalIds.forEach(id => {
-                const t = tasks.find(x => x.id === id);
-                if (t) {
-                    t.contractor = companyName;
-                    saveProjectDataLocally(); // Save immediately
-                    updates.push(updateField(id, 'contractor', companyName));
+                    curr = next;
                 }
-            });
 
-            await Promise.all(updates);
-            renderGrid();
-            renderGantt(gantt.options.view_mode);
-        }
+                // 2. Top Row (Major Ticks - Months)
+                curr = new Date(start);
+                curr.setDate(1); // Snap to 1st
 
-        // --- LOOKAHEAD LOGIC ---
-        let lookaheadActive = false;
+                while (curr < end) {
+                    const x = TimeEngine.timeToX(curr);
+                    const next = new Date(curr);
+                    next.setMonth(next.getMonth() + 1);
+                    const w = TimeEngine.timeToX(next) - x;
 
-        function toggleLookahead() {
-            lookaheadActive = !lookaheadActive;
-            const btn = document.getElementById('btn-lookahead');
-            if (lookaheadActive) {
-                btn.classList.add('bg-red-600', 'text-white');
-                btn.classList.remove('bg-red-50', 'text-red-600');
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute("x", x);
+                    rect.setAttribute("y", 0);
+                    rect.setAttribute("width", w);
+                    rect.setAttribute("height", 30);
+                    rect.setAttribute("fill", "#f9fafb");
+                    rect.setAttribute("stroke", "#e5e7eb");
 
-                // Default date to Today if empty
-                const dateInput = document.getElementById('lookahead-start');
-                if (!dateInput.value) {
-                    const today = new Date();
-                    const yyyy = today.getFullYear();
-                    const mm = String(today.getMonth() + 1).padStart(2, '0');
-                    const dd = String(today.getDate()).padStart(2, '0');
-                    dateInput.value = `${yyyy} -${mm} -${dd} `;
-                    if (typeof updateLookahead === 'function') updateLookahead();
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute("x", x + 5); // Left align
+                    text.setAttribute("y", 20);
+                    text.setAttribute("font-weight", "bold");
+                    text.setAttribute("font-size", "12");
+                    text.setAttribute("fill", "#374151");
+                    text.textContent = curr.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+
+                    svg.appendChild(rect);
+                    svg.appendChild(text);
+
+                    curr = next;
                 }
-            } else {
-                btn.classList.remove('bg-red-600', 'text-white');
-                btn.classList.add('bg-red-50', 'text-red-600');
             }
-            updateLookahead();
+        };
+
+        function getWeekNumber(d) {
+            d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+            var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+            return weekNo;
         }
 
-        function updateLookahead() {
-            if (!lookaheadActive) {
-                removeLookaheadOverlay();
-                clearLookaheadHighlights();
-                return;
-            }
-            drawLookaheadOverlay();
-            highlightLookaheadTasks();
+        // --- MAIN RENDER LOOP ---
+
+        function loadData(rawTasks) {
+            // Hydrate State
+            State.tasks = rawTasks;
+            State.taskMap = new Map(rawTasks.map(t => [t.id, t]));
+            State.displayOrder = rawTasks.map(t => t.id);
+
+            console.log(`Loaded ${State.tasks.length} tasks.`);
+
+            // Init Time Engine
+            TimeEngine.init(State.tasks);
         }
 
-        function removeLookaheadOverlay() {
-            const svg = document.getElementById('gantt-target');
-            if (!svg) return;
-            const existing = svg.querySelector('.lookahead-overlay');
-            if (existing) existing.remove();
+        function render() {
+            // 1. Render Grid
+            renderGridRows();
+
+            // 2. Render Timeline Header
+            TimelineRenderer.render();
+
+            // 3. Render Gantt Bars
+            renderGanttBars();
         }
 
-        function clearLookaheadHighlights() {
-            document.querySelectorAll('.lookahead-row').forEach(el => el.classList.remove('lookahead-row'));
-        }
+        // --- RENDERERS (Placeholder for Phase 2) ---
 
-        function drawLookaheadOverlay() {
-            const svg = document.getElementById('gantt-target');
-            if (!svg || !gantt) return;
-
-            removeLookaheadOverlay();
-
-            const startVal = document.getElementById('lookahead-start').value;
-            const weeksVal = parseInt(document.getElementById('lookahead-weeks').value) || 4;
-            if (!startVal) return;
-
-            const startDate = new Date(startVal);
-            const endDate = new Date(startDate);
-            endDate.setDate(startDate.getDate() + (weeksVal * 7));
-
-            // Coordinates
-            if (!gantt.gantt_start || !gantt.gantt_end) return;
-
-            // Map Date to X
-            const totalDuration = gantt.gantt_end - gantt.gantt_start;
-            const svgWidth = parseFloat(svg.getAttribute('width'));
-            const svgHeight = parseFloat(svg.getAttribute('height'));
-
-            const getX = (date) => {
-                const diff = date - gantt.gantt_start;
-                return (diff / totalDuration) * svgWidth;
-            };
-
-            const x1 = getX(startDate);
-            const x2 = getX(endDate);
-            const width = x2 - x1;
-
-            if (width <= 0) return;
-
-            // Draw Rect
-            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            rect.setAttribute('x', x1);
-            rect.setAttribute('y', 0);
-            rect.setAttribute('width', width);
-            rect.setAttribute('height', svgHeight);
-            rect.setAttribute('class', 'lookahead-overlay');
-            rect.setAttribute('fill', 'rgba(239, 68, 68, 0.1)'); // Red 500, 10%
-            rect.setAttribute('stroke', '#ef4444');
-            rect.setAttribute('stroke-width', '2');
-            rect.setAttribute('pointer-events', 'none');
-
-            // Prepend to avoid covering tooltips/interactions? 
-            // Append puts it on TOP. Prepend puts it BEHIND bars.
-            // User requested "frame", suggesting overlay. "Transparent" suggests overlay.
-            // Let's Append but ensure pointer-events: none.
-            svg.appendChild(rect);
-        }
-
-        function highlightLookaheadTasks() {
-            clearLookaheadHighlights();
-            const startVal = document.getElementById('lookahead-start').value;
-            const weeksVal = parseInt(document.getElementById('lookahead-weeks').value) || 4;
-            if (!startVal) return;
-
-            const lhStart = new Date(startVal);
-            const lhEnd = new Date(lhStart);
-            lhEnd.setDate(lhStart.getDate() + (weeksVal * 7));
-
-            // Check intersections
-            tasks.forEach((t, index) => {
-                // Ignore Summary? Usually Lookahead cares about actionable tasks.
-                // But let's highlight everything intersecting.
-
-                const tStart = new Date(t.start);
-                const tEnd = new Date(t.end);
-
-                // Intersection Logic:
-                // (TaskStart < LHEnd) && (TaskEnd > LHStart)
-                if (tStart < lhEnd && tEnd > lhStart) {
-                    // Highlight Row in Grid
-                    const tr = document.querySelector(`tr[data-id="${t.id}"]`);
-                    if (tr) {
-                        tr.classList.add('lookahead-row');
-
-                        // Optional: Compute status (Starting, Ending, In Process)
-                        // Could add tooltip or specific color class
-                    }
-                }
-            });
-        }
-
-        // Hook into Gantt View Change
-        const originalViewChange = gantt ? gantt.options.on_view_change : null;
-        // Logic handled in renderGantt setup... wait.
-        // We need to re-hook whenever we re-create Gantt.
-
-        // --- GRID RENDERING (Optimized for Interaction) ---
-        // State for collapsed parents
-        let collapsedTasks = new Set();
-
-        function toggleCollapse(index) {
-            const parent = tasks[index];
-            if (!parent) return;
-
-            if (collapsedTasks.has(parent.id)) {
-                collapsedTasks.delete(parent.id);
-            } else {
-                collapsedTasks.add(parent.id);
-            }
-            renderGrid();
-            // Optional: Filter tasks passed to Gantt chart to match grid visibility
-            // For now, let's just update grid. Chart might show all or we need to filter there too.
-            renderGantt();
-        }
-
-        function renderGrid() {
-            const tbody = document.getElementById('grid-body');
+        function renderGridRows() {
+            const tbody = document.getElementById('grid-tbody');
             tbody.innerHTML = '';
 
-            const isSummary = (index) => {
-                if (index >= tasks.length - 1) return false;
-                const c = (tasks[index]._style && tasks[index]._style.indent) || 0;
-                const n = (tasks[index + 1]._style && tasks[index + 1]._style.indent) || 0;
-                return n > c;
-            };
-
-            // COLLAPSE LOGIC + FILTERING
-            let visible = true;
-            let collapsedLevel = -1;
-
-            tasks.forEach((task, index) => {
-                // 1. Company Filter
-                const companyName = (task.contractor || '').trim();
-                if (companyName) {
-                    const c = companies.find(x => x.name === companyName);
-                    // If company exists and is NOT visible, skip
-                    if (c && !c.visible) return;
-                }
-                // If task has company but we haven't created it yet? Show by default.
-
-                // 2. Indentation Logic (existing)
-                let indent = (task._style && task._style.indent) ? task._style.indent : 0;
-                if (collapsedLevel !== -1) {
-                    if (indent > collapsedLevel) return;
-                    else collapsedLevel = -1;
-                }
-                const isParent = isSummary(index);
-                if (isParent && collapsedTasks.has(task.id)) {
-                    if (collapsedLevel === -1) collapsedLevel = indent;
-                }
-
-                // 3. Render Row
+            State.tasks.forEach(task => {
                 const tr = document.createElement('tr');
-                tr.dataset.id = task.id;
-                tr.dataset.index = index;
+                tr.id = `row-${task.id}`;
 
-                // ENABLE DRAG AND DROP
-                tr.draggable = true;
-                tr.addEventListener('dragstart', handleDragStart);
-                tr.addEventListener('dragover', handleDragOver);
-                tr.addEventListener('drop', handleDrop);
-                tr.addEventListener('dragend', handleDragEnd);
-
-                // Style Logic
-                if (isParent) {
-                    tr.style.fontWeight = 'bold';
-                    tr.classList.add('summary-task');
-                }
-                if (task._style) applyRowStyle(tr, task._style);
-
-                // --- COMPANY COLOR HIGHLIGHT (Grid) ---
-                if (companyName) {
-                    const c = companies.find(x => x.name === companyName);
-                    if (c && c.visible && c.color) {
-                        // Apply left border or background tint?
-                        // User said "activarle color y resalte".
-                        // Let's create a subtle pill or text color in the contractor column
-                        // AND maybe a left border on the row?
-                        tr.style.borderLeft = `3px solid ${c.color} `;
-                    }
-                }
-
-                tr.style.height = '38px';
-
-                let toggleHtml = '';
-                if (isParent) {
-                    const isCollapsed = collapsedTasks.has(task.id);
-                    const icon = isCollapsed ? 'fa-caret-right' : 'fa-caret-down';
-                    toggleHtml = `<i class="fas ${icon} toggle-icon" onclick="toggleCollapse(${index})"></i>`;
-                } else {
-                    toggleHtml = `<span class="toggle-icon"></span>`;
-                }
-
-                // Contractor Cell with Color Pill
-                let contractorHtml = '';
-                const comp = companies.find(c => c.name === companyName);
-                if (comp) {
-                    contractorHtml = `<div class="flex items-center gap-1 overflow-hidden" ><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${comp.color}"></div><span class="truncate min-w-0" title="${task.contractor}">${task.contractor}</span></div>`;
-                } else {
-                    contractorHtml = `<input class="cell-input" value="${task.contractor || ''}" readonly>`;
-                }
-
+                // Check for valid dates
+                const s = task.start ? task.start.split('T')[0] : '';
+                const e = task.end ? task.end.split('T')[0] : '';
 
                 tr.innerHTML = `
-            <td class="text-center text-gray-500 text-xs">${index + 1}</td>
-                    
-                    <td class="grid-cell" data-field="name" data-id="${task.id}">
-                        <div style="display: flex; align-items: center; height:100%">
-                            <span class="wbs-indent" style="width: ${indent * 20}px; flex-shrink: 0;"></span>
-                            ${toggleHtml}
-                            <input class="cell-input" value="${task.name}" title="${task.name}" readonly style="flex: 1; min-width: 0; text-overflow: ellipsis;">
-                        </div>
-                    </td>
-                    
-                    <td class="grid-cell" data-field="contractor" data-id="${task.id}">
-                         ${comp ? contractorHtml : `<input class="cell-input" value="${task.contractor || ''}" readonly>`}
-                    </td>
-                    
-                    <td class="text-center text-xs text-gray-800" style="vertical-align: middle;">
-                         ${task.duration || (diffDays(task.start, task.end) + ' d')}
-                    </td>
-                    
-                    <td class="grid-cell" data-field="start" data-id="${task.id}">
-                        <input type="date" class="cell-input" value="${formatDateInput(task.start)}" readonly>
-                    </td>
-                    
-                    <td class="grid-cell" data-field="end" data-id="${task.id}">
-                        <input type="date" class="cell-input" value="${formatDateInput(task.end)}" readonly>
-                    </td>
-                    
-                    <td class="grid-cell" data-field="predecessors" data-id="${task.id}">
-                        <input type="text" class="cell-input" value="${task.dependencies || ''}" readonly title="Use IDs separadas por coma">
-                    </td>
-
-                    <td class="grid-cell text-center" data-field="progress" data-id="${task.id}">
-                         <input type="number" class="cell-input text-center" value="${task.progress}" readonly>
-                    </td>
-        `;
+                <td style="text-align:center;">${task.id}</td>
+                <td style="text-align:center;"><i class="fas fa-circle text-[8px] text-green-500"></i></td>
+                <td>${task.name}</td>
+                <td>${s}</td>
+                <td>${e}</td>
+                <td style="text-align:center;">${task.duration || '-'} d</td>
+                <td style="text-align:center;">${task.progress || 0}%</td>
+            `;
                 tbody.appendChild(tr);
             });
 
-            renderSelection();
-            if (lookaheadActive) highlightLookaheadTasks(); // Re-apply lookahead
+            // Adjust Canvas Height
+            const totalHeight = State.tasks.length * State.view.rowHeight;
+            document.getElementById('gantt-svg').style.height = totalHeight + 'px';
+
+            // Draw Grid Lines on Gantt for row alignment
+            drawGanttRows(totalHeight);
         }
 
-        // --- INTERACTION HANDLERS ---
+        function drawGanttRows(totalHeight) {
+            const layer = document.getElementById('layer-grid');
+            layer.innerHTML = '';
 
-        function handleGridMouseDown(e) {
-            // Find Cell
-            const cell = e.target.closest('.grid-cell');
-            if (!cell) return;
-
-            // If currently editing another cell, commit it first? 
-            // Blur event usually handles commit, but click might happen before blur finishes?
-            // Let blur handle logic.
-
-            const id = cell.dataset.id;
-            const field = cell.dataset.field;
-            const index = parseInt(cell.closest('tr').dataset.index);
-
-            if (isEditing) {
-                // If we click inside the SAME cell while editing, do nothing (allow text selection)
-                if (cell.classList.contains('editing')) {
-                    return; // Let native behavior happen
-                }
-                // Else, stop editing previous
-                finishEditing(); // Helper to clear editing state
+            // Horizontal Lines
+            for (let y = 0; y <= totalHeight; y += State.view.rowHeight) {
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", 0);
+                line.setAttribute("y1", y);
+                line.setAttribute("x2", "100%");
+                line.setAttribute("y2", y);
+                line.setAttribute("stroke", "#e5e7eb");
+                line.setAttribute("stroke-width", "1");
+                layer.appendChild(line);
             }
 
-            // Selection Logic
-            if (e.ctrlKey) {
-                toggleSelectCell(id, field);
-            } else if (e.shiftKey && lastSelectedCell) {
-                selectRange(lastSelectedCell.index, index, lastSelectedCell.field, field);
-            } else {
-                // Single Select
-                selectedCells.clear();
-                selectCell(id, field);
-            }
-
-            lastSelectedCell = { id, field, index };
-            renderSelection();
+            // Today Line
+            const nowX = TimeEngine.timeToX(new Date());
+            const today = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            today.setAttribute("x1", nowX);
+            today.setAttribute("y1", 0);
+            today.setAttribute("x2", nowX);
+            today.setAttribute("y2", totalHeight);
+            today.setAttribute("stroke", "red");
+            today.setAttribute("stroke-dasharray", "4");
+            layer.appendChild(today);
         }
 
-        function handleGridDoubleClick(e) {
-            const cell = e.target.closest('.grid-cell');
-            if (!cell) return;
+        function renderGanttBars() {
+            const layer = document.getElementById('layer-bars');
+            layer.innerHTML = '';
 
-            startEditing(cell);
-        }
+            State.tasks.forEach((task, i) => {
+                if (!task.start || !task.end) return;
 
-        function toggleSelectCell(id, field) {
-            const key = `${id}:${field} `;
-            if (selectedCells.has(key)) selectedCells.delete(key);
-            else selectedCells.add(key);
-        }
+                const startX = TimeEngine.timeToX(task.start);
+                const endX = TimeEngine.timeToX(task.end);
+                const width = Math.max(2, endX - startX);
 
-        function selectCell(id, field) {
-            selectedCells.add(`${id}:${field} `);
-        }
+                const y = i * State.view.rowHeight + 6; // Center in 32px row
+                const height = 20;
 
-        function selectRange(idx1, idx2, field1, field2) {
-            // Simplification: Select rectangular block
-            // Need to know column order
-            const cols = ['name', 'contractor', 'start', 'end', 'progress'];
-            const c1 = cols.indexOf(field1);
-            const c2 = cols.indexOf(field2);
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
 
-            if (c1 === -1 || c2 === -1) return;
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                rect.setAttribute("x", startX);
+                rect.setAttribute("y", y);
+                rect.setAttribute("width", width);
+                rect.setAttribute("height", height);
+                rect.setAttribute("fill", "#3b82f6");
+                rect.setAttribute("rx", "3");
+                rect.setAttribute("cursor", "pointer");
+                // Hover Title
+                const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                title.textContent = `${task.name}\n${task.start} - ${task.end}`;
+                rect.appendChild(title);
 
-            const startRow = Math.min(idx1, idx2);
-            const endRow = Math.max(idx1, idx2);
-            const startCol = Math.min(c1, c2);
-            const endCol = Math.max(c1, c2);
+                // Hover Effects
+                rect.onmouseenter = () => highlightRow(task.id, true);
+                rect.onmouseleave = () => highlightRow(task.id, false);
 
-            selectedCells.clear();
+                g.appendChild(rect);
 
-            for (let i = startRow; i <= endRow; i++) {
-                const t = tasks[i];
-                for (let j = startCol; j <= endCol; j++) {
-                    selectedCells.add(`${t.id}:${cols[j]} `);
-                }
-            }
-        }
+                // Label right of bar
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute("x", startX + width + 5);
+                text.setAttribute("y", y + 14);
+                text.setAttribute("fill", "#4b5563");
+                text.setAttribute("font-size", "11");
+                text.textContent = task.name;
+                g.appendChild(text);
 
-        function renderSelection() {
-            // Clear all visual
-            document.querySelectorAll('.grid-cell.selected').forEach(el => el.classList.remove('selected'));
-
-            selectedCells.forEach(key => {
-                const [id, field] = key.split(':');
-                const cell = document.querySelector(`.grid - cell[data - id="${id}"][data - field="${field}"]`);
-                if (cell) cell.classList.add('selected');
+                layer.appendChild(g);
             });
         }
 
-        // --- EDITING LOGIC ---
-        let currentEditCell = null;
-
-        function startEditing(cell) {
-            if (isEditing) finishEditing();
-
-            isEditing = true;
-            currentEditCell = cell;
-            cell.classList.add('editing');
-
-            const input = cell.querySelector('input');
-            if (input) {
-                input.readOnly = false;
-                input.focus();
-                // input.select(); // Optional: select all text
-
-                // Bind blur to save
-                input.onblur = () => {
-                    // Commit changes
-                    const id = cell.dataset.id;
-                    const field = cell.dataset.field;
-                    updateField(id, field, input.value); // Existing server update fn
-                    finishEditing();
-                };
-
-                // Bind Enter to save
-                input.onkeydown = (e) => {
-                    if (e.key === 'Enter') {
-                        input.blur();
-                    }
-                }
+        function highlightRow(taskId, active) {
+            // Highlight Grid Row
+            const tr = document.getElementById(`row-${taskId}`);
+            if (tr) {
+                tr.style.background = active ? 'var(--row-hover)' : 'transparent';
             }
+            // Highlight Gantt Bar (Optional, can add stroke)
         }
 
-        function finishEditing() {
-            if (!currentEditCell) return;
-            const input = currentEditCell.querySelector('input');
-            if (input) input.readOnly = true;
-            currentEditCell.classList.remove('editing');
-
-            // Cleanup events
-            if (input) {
-                input.onblur = null;
-                input.onkeydown = null;
-            }
-
-            isEditing = false;
-            currentEditCell = null;
-        }
-
-        // --- CLIPBOARD ---
-        async function handleGlobalKeydown(e) {
-            if (isEditing) return; // Allow normal keys in edit mode
-
-            if (e.ctrlKey && e.key === 'c') {
-                e.preventDefault();
-                copySelection();
-            } else if (e.ctrlKey && e.key === 'v') {
-                e.preventDefault();
-                pasteSelection();
-            } else if (e.key === 'Delete' || e.key === 'Backspace') {
-                deleteSelection();
-            }
-        }
-
-        function copySelection() {
-            if (selectedCells.size === 0) return;
-
-            // We need to order the data to make a nice table string
-            // Group by Row Index
-            const rows = {}; // index -> { colIndex -> value }
-            const cols = ['name', 'contractor', 'start', 'end', 'progress'];
-
-            selectedCells.forEach(key => {
-                const [id, field] = key.split(':');
-                const task = tasks.find(t => t.id === id);
-                if (!task) return;
-                const idx = tasks.indexOf(task);
-                const colIdx = cols.indexOf(field);
-
-                if (!rows[idx]) rows[idx] = {};
-
-                let val = task[field];
-                if (field === 'start' || field === 'end') val = formatDateInput(val);
-                rows[idx][colIdx] = val;
-            });
-
-            // Convert to string
-            const sortedRowIndices = Object.keys(rows).sort((a, b) => a - b);
-            if (sortedRowIndices.length === 0) return;
-
-            // Normalize columns (smallest col index in selection)
-            // Actually, usually clipboard is just the rect.
-            // Let's just output lines.
-
-            let text = "";
-            sortedRowIndices.forEach((rIdx, i) => {
-                const rowData = rows[rIdx];
-                const sortedCols = Object.keys(rowData).sort((a, b) => a - b);
-                const line = sortedCols.map(c => rowData[c]).join('\t');
-                text += line + (i < sortedRowIndices.length - 1 ? '\n' : '');
-            });
-
-            navigator.clipboard.writeText(text).then(() => {
-                // Visual feedback?
-                console.log("Copied to clipboard");
-            });
-        }
-
-        async function pasteSelection() {
-            if (selectedCells.size === 0) return;
-
-            // Paste starting at the "Anchor" (first selected cell)
-            // Or if range selected, maybe restrict? 
-            // Standard Excel: If 1 cell selected, paste expands. If range selected, paste repeats or fits.
-            // Let's implement: Paste expands from TOP-LEFT of selection.
-
-            // Find Top-Left
-            const cols = ['name', 'contractor', 'start', 'end', 'progress'];
-            let minRow = Infinity;
-            let minCol = Infinity;
-
-            selectedCells.forEach(key => {
-                const [id, field] = key.split(':');
-                const t = tasks.find(x => x.id === id);
-                const r = tasks.indexOf(t);
-                const c = cols.indexOf(field);
-                if (r < minRow) minRow = r;
-                if (c < minCol) minCol = c;
-            });
-
-            if (minRow === Infinity) return;
-
-            try {
-                const text = await navigator.clipboard.readText();
-                const lines = text.split(/r?\n/);
-
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    if (!line) continue;
-                    const vals = line.split('\t');
-
-                    const targetRowIdx = minRow + i;
-                    if (targetRowIdx >= tasks.length) break; // Out of bounds
-
-                    const task = tasks[targetRowIdx];
-
-                    for (let j = 0; j < vals.length; j++) {
-                        const targetColIdx = minCol + j;
-                        if (targetColIdx >= cols.length) break;
-
-                        const field = cols[targetColIdx];
-                        const val = vals[j];
-
-                        // Update Data
-                        updateField(task.id, field, val); // Server update
-                        // Local update usually handled in updateField but we might want batch update?
-                        // updateField re-renders Gantt/Grid. If we do 50 pastes, 50 re-renders is bad.
-                        // We should suppress re-render until end.
-
-                        // Optimize: Manually update local cache, then Render ONCE
-                    }
-                }
-
-                // Force Reload after bulk
-                setTimeout(() => {
-                    renderGrid();
-                    renderGantt(gantt ? gantt.options.view_mode : 'Day');
-                }, 500);
-
-            } catch (e) {
-                console.error("Paste failed", e);
-            }
-        }
-
-        function deleteSelection() {
-            if (!confirm("¿Borrar contenido de celdas seleccionadas?")) return;
-
-            selectedCells.forEach(key => {
-                const [id, field] = key.split(':');
-                updateField(id, field, ""); // Clear value
-            });
-        }
-
-        // --- EXISTING FNS (Modified to prevent conflict) ---
-        // updateField needs to NOT call full render if we are just blurring?
-        // Actually full render is fine for valid data consistency.
-
-        // ... Load, ApplyStyle, AddTask ... need to ensure they don't break selection state
-        // Re-rendering grid clears selection DOM, so renderGrid calls renderSelection() at end.
-
-        // Also update renderGantt to call drawTodayLine()
-
-        // --- STYLING LOGIC ---
-        function applyRowStyle(tr, style) {
-            if (!style) return;
-            // Font Styles
-            if (style.fontWeight) tr.style.fontWeight = style.fontWeight;
-            if (style.fontStyle) tr.style.fontStyle = style.fontStyle;
-            if (style.textDecoration) tr.style.textDecoration = style.textDecoration;
-            if (style.fontFamily) tr.style.fontFamily = style.fontFamily;
-            if (style.fontSize) tr.style.fontSize = style.fontSize;
-
-            // Colors
-            if (style.color) {
-                tr.style.color = style.color;
-                // Also force inputs to inherit
-                const inputs = tr.querySelectorAll('input');
-                inputs.forEach(i => i.style.color = style.color);
-            }
-            if (style.fill) {
-                // Background for the row
-                tr.style.backgroundColor = style.fill + '20'; // Add transparency? Or solid?
-                // User likely wants highlight. Let's use it as bg.
-                // But wait, selection uses bg.
-                // Let's set it, but allow selection to override or blend.
-                // tr.style.backgroundColor = style.fill; 
-            }
-        }
-
-        async function applyStyle(key, value) {
-            // Resolve IDs from Row Selection OR Grid Selection
-            const idsToUpdate = new Set(selectedTaskIds);
-
-            selectedCells.forEach(k => {
-                const [id, field] = k.split(':');
-                idsToUpdate.add(id);
-            });
-
-            if (idsToUpdate.size === 0) return alert("Selecciona una tarea o celdas primero.");
-
-            const updates = [];
-
-            idsToUpdate.forEach(id => {
-                const task = tasks.find(t => t.id === id);
-                if (!task) return;
-
-                if (!task._style) task._style = {};
-                task._style[key] = value;
-
-                // Optimistically update
-                updates.push(saveTaskStyle(id, task._style));
-            });
-
-            await Promise.all(updates);
-            renderGrid();
-            renderGantt(gantt ? gantt.options.view_mode : 'Day');
-        }
-
-        async function toggleStyle(key) {
-            // Resolve IDs
-            const idsToUpdate = new Set(selectedTaskIds);
-            selectedCells.forEach(k => { const [id] = k.split(':'); idsToUpdate.add(id); });
-
-            if (idsToUpdate.size === 0) return;
-
-            const id = Array.from(idsToUpdate)[0]; // Toggle based on first
-            const task = tasks.find(t => t.id === id);
-            const current = task._style ? task._style[key] : false;
-            applyStyle(key, !current);
-        }
-
-        async function saveTaskStyle(id, styleObj) {
-            try {
-                await fetch(`/ api / activities / ${id} `, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ style: JSON.stringify(styleObj) })
-                });
-            } catch (e) { console.error(e); }
-        }
-
-        // --- DRAG AND DROP REORDERING ---
-        let dragSrcEl = null;
-
-        function handleDragStart(e) {
-            dragSrcEl = this;
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/html', this.innerHTML);
-            e.dataTransfer.setData('text/plain', this.dataset.id);
-            this.classList.add('dragging');
-        }
-
-        function handleDragOver(e) {
-            if (e.preventDefault) e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            return false;
-        }
-
-        async function handleDrop(e) {
-            if (e.stopPropagation) e.stopPropagation();
-            const draggedId = e.dataTransfer.getData('text/plain');
-            const targetRow = this; // 'this' is the row dropped on
-            const targetId = targetRow.dataset.id;
-
-            if (draggedId !== targetId) {
-                // Reorder Logic
-                const oldIndex = tasks.findIndex(t => t.id === draggedId);
-                const newIndex = tasks.findIndex(t => t.id === targetId);
-
-                if (oldIndex > -1 && newIndex > -1) {
-                    // Move item
-                    const item = tasks.splice(oldIndex, 1)[0];
-                    tasks.splice(newIndex, 0, item);
-
-                    // Update display_order based on new array order
-                    // We need to persist this new order for ALL tasks 
-                    // (or at least the range affected).
-                    // For Simplicity: Update ALL display_orders locally and save.
-                    // To optimize, valid only locally first then background save?
-
-                    showSaving();
-
-                    const updates = [];
-                    tasks.forEach((t, i) => {
-                        const newOrder = (i + 1) * 10; // Spaced by 10 for future insertions
-                        if (t.display_order !== newOrder) {
-                            t.display_order = newOrder;
-                            updates.push(updateField(t.id, 'display_order', newOrder));
-                        }
-                    });
-
-                    // Wait for updates? Or just let them fly.
-                    // Better to let them fly but show saving
-                    // await Promise.all(updates); 
-
-                    renderGrid();
-                    renderGantt(gantt.options.view_mode);
-                    setTimeout(showSaved, 1000);
-                }
-            }
-            return false;
-        }
-
-        function handleDragEnd(e) {
-            this.classList.remove('dragging');
-            const rows = document.querySelectorAll('#grid-body tr');
-            rows.forEach(row => row.classList.remove('dragging'));
-        }
-
-        // --- DATA EDITING ---
-        async function updateField(id, field, value) {
-            const task = tasks.find(t => t.id === id);
-            if (!task) return;
-
-            // Local update
-            if (field === 'start' || field === 'end') value = value; // logic handled in date change
-            else task[field] = value;
-
-            // Sync Dependencies if needed
-            if (field === 'predecessors') task.dependencies = value;
-
-            // Server Update
-            const payload = {};
-            payload[field] = value;
-
-            try {
-                await fetch(`/ api / activities / ${id} `, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-            } catch (e) { console.error(e); }
-
-            if (field === 'start' || field === 'end' || field === 'name' || field === 'progress' || field === 'predecessors') {
-                renderGantt(gantt.options.view_mode);
-            }
-        }
-
-
-
-        // --- CRUD ACTIONS ---
-        async function addTask() {
-            const newId = "new-" + Date.now(); // Temp ID
-            const newTask = {
-                id: newId,
-                name: "Nueva Tarea",
-                start: new Date(),
-                end: new Date(Date.now() + 86400000), // +1 day
-                progress: 0,
-                dependencies: "",
-                contractor: "",
-                _style: { indent: 0 }
-            };
-
-            // Insert after selection or at end
-            if (selectedTaskIds.size > 0) {
-                const lastSelectedId = Array.from(selectedTaskIds).pop();
-                const idx = tasks.findIndex(t => t.id === lastSelectedId);
-                tasks.splice(idx + 1, 0, newTask);
-            } else {
-                tasks.push(newTask);
-            }
-
-            // Persist (Create on backend usually, but for now just local update until Save)
-            // Ideally we call POST /api/activities
-            try {
-                await fetch(`/ api / projects / ${projectId}/activities`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newTask)
-                });
-            } catch (e) { console.error("Error creating task", e); } // Silently fail/continue
-
-            renderGrid();
-            renderGantt(gantt ? gantt.options.view_mode : 'Day');
-        }
-
-        async function deleteTask() {
-            if (selectedTaskIds.size === 0) return alert("Selecciona tareas para eliminar");
-            if (!confirm("¿Eliminar tareas seleccionadas?")) return;
-
-            const ids = Array.from(selectedTaskIds);
-
-            // Remove from backend
-            for (const id of ids) {
-                if (!id.startsWith("new-")) { // Only delete if persisted
-                    await fetch(`/api/activities/${id}`, { method: 'DELETE' });
-                }
-            }
-
-            tasks = tasks.filter(t => !selectedTaskIds.has(t.id));
-            selectedTaskIds.clear();
-            renderGrid();
-            renderGantt(gantt ? gantt.options.view_mode : 'Day');
-        }
-
-        async function moveTask(direction) {
-            if (selectedTaskIds.size !== 1) return; // Only move single row for now
-            const id = Array.from(selectedTaskIds)[0];
-            const idx = tasks.findIndex(t => t.id === id);
-
-            if (direction === -1 && idx > 0) {
-                // Swap with prev
-                [tasks[idx], tasks[idx - 1]] = [tasks[idx - 1], tasks[idx]];
-            } else if (direction === 1 && idx < tasks.length - 1) {
-                // Swap with next
-                [tasks[idx], tasks[idx + 1]] = [tasks[idx + 1], tasks[idx]];
-            }
-            renderGrid();
-            renderGantt(gantt ? gantt.options.view_mode : 'Day');
-        }
-
-        // --- SELECTION LOGIC ---
-        function selectTask(id, e) {
-            if (!clickedIdIsTask(id)) return;
-
-            if (e.ctrlKey || e.metaKey) {
-                if (selectedTaskIds.has(id)) selectedTaskIds.delete(id);
-                else selectedTaskIds.add(id);
-            } else if (e.shiftKey) {
-                // Range selection (simple implementation)
-                // TODO: Find index range
-                selectedTaskIds.add(id);
-            } else {
-                selectedTaskIds.clear();
-                selectedTaskIds.add(id);
-            }
-            renderGrid(); // Re-render to show highlight
-        }
-        function clickedIdIsTask(id) { return tasks.some(t => t.id === id); }
-
-        function handleKeySelection(e) {
-            if (e.key === 'Escape') {
-                selectedTaskIds.clear();
-                renderGrid();
-            }
-        }
-
-        // --- UTILS ---
-        function diffDays(d1, d2) {
-            return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
-        }
-
-
-        function changeView(mode) {
-            renderGantt(mode);
-        }
-
-        function syncScrolls() {
-            const gridDiv = document.getElementById('tasks-grid');
-            const chartDiv = document.getElementById('chart-area');
-            if (gridDiv && chartDiv) {
-                gridDiv.scrollTop = chartDiv.scrollTop;
-            }
-        }
-
-        // --- ACTIONS ---
-        // --- ACTIONS ---
-        async function indentTask(direction) {
-            // 1. Identify Unique Selected IDs
-            const allSelectedIds = new Set(selectedTaskIds);
-            selectedCells.forEach(k => { const [id] = k.split(':'); allSelectedIds.add(id); });
-
-            if (allSelectedIds.size === 0) return;
-
-            // 2. Sort tasks by index to process top-down
-            const sortedIndices = [];
-            tasks.forEach((t, i) => {
-                if (allSelectedIds.has(t.id)) sortedIndices.push(i);
-            });
-            sortedIndices.sort((a, b) => a - b);
-
-            // 3. Identify "Root Selections" (exclude descendants of other selected tasks)
-            // This prevents double-shifting if user selects Parent + Child
-            const rootIndices = [];
-            sortedIndices.forEach(idx => {
-                // Check if any ancestor is also selected
-                let isDescendantOfSelected = false;
-                const currentIndent = (tasks[idx]._style && tasks[idx]._style.indent) || 0;
-
-                // Walk backwards to find parents
-                for (let i = idx - 1; i >= 0; i--) {
-                    const t = tasks[i];
-                    const tIndent = (t._style && t._style.indent) || 0;
-                    if (tIndent < currentIndent) {
-                        // Found a parent/ancestor
-                        if (allSelectedIds.has(t.id)) {
-                            isDescendantOfSelected = true;
-                            break;
-                        }
-                        // Continue checking ancestors of this parent?
-                        // Actually, strict hierarchy means we just need to know if we are in the subtree of a selected task.
-                        // Simplified check: If we are inside the "scope" of a previous selected task.
-                        // Scope = contiguous block until indent <= parentIndent.
-                    }
-                }
-
-                // Optimization: Simple "Scope" check using the sorted list
-                // If `idx` is a descendant of the *last added root*, ignore it?
-                // Not necessarily. We could have: Sel(A), Sel(B is sibling of A). Both are roots.
-                // We could have: Sel(A), Sel(Child of A). Child is not root.
-
-                // Let's use getParent() helper approach
-                let parentIdx = getParentIndex(idx);
-                while (parentIdx !== -1) {
-                    if (allSelectedIds.has(tasks[parentIdx].id)) {
-                        isDescendantOfSelected = true;
-                        break;
-                    }
-                    parentIdx = getParentIndex(parentIdx);
-                }
-
-                if (!isDescendantOfSelected) {
-                    rootIndices.push(idx);
+        // --- LOOKAHEAD ---
+        function applyLookahead(weeks) {
+            const start = new Date();
+            const end = new Date();
+            end.setDate(end.getDate() + (weeks * 7));
+
+            State.tasks.forEach(task => {
+                const tr = document.getElementById(`row-${task.id}`);
+                if (!tr) return;
+
+                const tStart = new Date(task.start);
+                const tEnd = new Date(task.end);
+
+                if (tStart < end && tEnd > start) {
+                    tr.style.borderLeft = "4px solid red";
+                    tr.style.backgroundColor = "#fef2f2";
+                } else {
+                    tr.style.borderLeft = "1px solid var(--grid-line)";
+                    tr.style.backgroundColor = "transparent";
                 }
             });
-
-            // 4. Apply changes to Roots and their Subtrees
-            const updates = [];
-            const processedIds = new Set(); // Avoid double processing
-
-            for (const rootIdx of rootIndices) {
-                const root = tasks[rootIdx];
-                if (processedIds.has(root.id)) continue;
-
-                if (!root._style) root._style = { indent: 0 };
-                const currentLevel = root._style.indent || 0;
-
-                // VALIDATION: Can we indent?
-                if (direction > 0) {
-                    // Rule: Cannot indent if no predecessor (index 0)
-                    if (rootIdx === 0) continue;
-
-                    // Rule: Cannot exceed Predecessor.indent + 1
-                    const prev = tasks[rootIdx - 1];
-                    const prevIndent = (prev._style && prev._style.indent) || 0;
-                    if (currentLevel + 1 > prevIndent + 1) {
-                        // Block illogical indent (Project allows max +1 deeper than prev)
-                        continue;
-                    }
-                }
-
-                // VALIDATION: Can we outdent?
-                if (direction < 0) {
-                    if (currentLevel === 0) continue; // Cannot go negative
-                }
-
-                // Apply Delta
-                const delta = direction; // +1 or -1
-
-                // Collect tree (Root + Descendants)
-                const subtreeIndices = [rootIdx];
-                const rootBaseIndent = currentLevel;
-
-                // Find descendants: contiguous tasks with indent > rootBaseIndent
-                for (let i = rootIdx + 1; i < tasks.length; i++) {
-                    const t = tasks[i];
-                    const tIndent = (t._style && t._style.indent) || 0;
-                    if (tIndent > rootBaseIndent) {
-                        subtreeIndices.push(i);
-                    } else {
-                        break; // End of subtree
-                    }
-                }
-
-                // Apply updates
-                for (const idx of subtreeIndices) {
-                    const t = tasks[idx];
-                    if (!t._style) t._style = { indent: 0 };
-
-                    let newLevel = (t._style.indent || 0) + delta;
-                    if (newLevel < 0) newLevel = 0;
-                    t._style.indent = newLevel;
-
-                    if (!processedIds.has(t.id)) {
-                        updates.push(saveTaskStyle(t.id, t._style));
-                        processedIds.add(t.id);
-                    }
-                }
-            }
-
-            if (updates.length > 0) {
-                await Promise.all(updates);
-                renderGrid();
-            }
         }
 
-        function getParentIndex(childIdx) {
-            if (childIdx <= 0) return -1;
-            const childIndent = (tasks[childIdx]._style && tasks[childIdx]._style.indent) || 0;
+        // --- INTERACTIONS ---
 
-            for (let i = childIdx - 1; i >= 0; i--) {
-                const t = tasks[i];
-                const tIndent = (t._style && t._style.indent) || 0;
-                if (tIndent < childIndent) {
-                    return i;
-                }
-            }
-            return -1;
-        }
+        function setZoom(level) {
+            State.view.zoomLevel = level;
+            const label = document.getElementById('zoom-level-label');
+            if (label) label.innerText = level;
 
-        async function addLink() {
-            // Link selected tasks sequentially
-            const selected = Array.from(new Set([...selectedTaskIds, ...Array.from(selectedCells).map(k => k.split(':')[0])]));
-            if (selected.length < 2) return alert("Selecciona al menos 2 tareas para vincular");
-
-            for (let i = 1; i < selected.length; i++) {
-                const predecessorId = selected[i - 1];
-                const successorId = selected[i];
-                const successor = tasks.find(t => t.id === successorId);
-
-                // Add dependency
-                let deps = successor.dependencies ? successor.dependencies.split(',') : [];
-                if (!deps.includes(predecessorId)) {
-                    deps.push(predecessorId);
-                    successor.dependencies = deps.join(',');
-                    await updateField(successorId, 'predecessors', successor.dependencies);
-                }
-            }
-            renderGantt(gantt.options.view_mode);
-        }
-
-        async function removeLink() {
-            const selected = Array.from(new Set([...selectedTaskIds, ...Array.from(selectedCells).map(k => k.split(':')[0])]));
-            if (selected.length === 0) return alert("Selecciona tareas para desvincular");
-
-            for (const id of selected) {
-                const t = tasks.find(x => x.id === id);
-                if (t && t.dependencies) {
-                    t.dependencies = "";
-                    await updateField(id, 'predecessors', "");
-                }
-            }
-            renderGantt(gantt.options.view_mode);
-        }
-
-
-
-        // --- RESIZER ---
-        function setupResizer() {
-            const resizer = document.getElementById('resizer');
-            const leftPane = document.getElementById('tasks-grid');
-            let x = 0;
-            let w = 0;
-
-            const mouseDownHandler = function (e) {
-                x = e.clientX;
-                const rect = leftPane.getBoundingClientRect();
-                w = rect.width;
-                document.addEventListener('mousemove', mouseMoveHandler);
-                document.addEventListener('mouseup', mouseUpHandler);
-                resizer.classList.add('resizing');
-            };
-
-            const mouseMoveHandler = function (e) {
-                const dx = e.clientX - x;
-                leftPane.style.width = `${w + dx}px`;
-                document.documentElement.style.setProperty('--grid-width', `${w + dx}px`);
-                resizer.style.left = `${w + dx}px`;
-            };
-
-            const mouseUpHandler = function () {
-                document.removeEventListener('mousemove', mouseMoveHandler);
-                document.removeEventListener('mouseup', mouseUpHandler);
-                resizer.classList.remove('resizing');
-            };
-
-            resizer.addEventListener('mousedown', mouseDownHandler);
-        }
-
-        async function uploadSchedule(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('file', file);
-
-            // Show loading by changing button text temporarily
-            const btn = document.querySelector('button[onclick*="file-upload"]');
-            const originalContent = btn ? btn.innerHTML : '';
-            if (btn) {
-                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-                btn.disabled = true;
+            // Scale Factor (Pixels per minute)
+            switch (level) {
+                case 'MONTH': State.view.pxPerMinute = 0.002; break; // Very zoomed out
+                case 'WEEK': State.view.pxPerMinute = 0.01; break;  // Standard
+                case 'DAY': State.view.pxPerMinute = 0.05; break;  // Detailed
             }
 
-            try {
-                const res = await fetch(`/api/projects/${projectId}/schedule`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    throw new Error(data.detail || "Error al subir");
-                }
-
-                alert("Importación exitosa. La página se recargará.");
-                location.reload();
-            } catch (err) {
-                console.error(err);
-                alert("Aviso: " + err.message);
-            } finally {
-                if (btn) {
-                    btn.innerHTML = originalContent;
-                    btn.disabled = false;
-                }
-                // Reset input
-                e.target.value = '';
-            }
+            // Re-calcs
+            TimeEngine.init(State.tasks);
+            render();
         }
 
-        // --- SAVE SYSTEM ---
-        function showSaving() {
-            const el = document.getElementById('save-status');
-            if (el) {
-                el.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-500"></i> GUARDANDO...';
-                el.classList.remove('hidden');
-            }
-        }
-
-        function showSaved() {
-            const el = document.getElementById('save-status');
-            if (el) {
-                el.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> GUARDADO';
-                el.classList.remove('hidden');
-                setTimeout(() => el.classList.add('hidden'), 3000);
-            }
-        }
-
-        async function forceSaveAll() {
-            showSaving();
-            // Just a visual confirmation since we save atomically
-            await new Promise(r => setTimeout(r, 800));
-            showSaved();
-            alert("Todo el progreso ha sido guardado exitosamente en el servidor.");
-        }
-
-        // --- LEGACY UPDATE WRAPPERS ---
-
-        async function updateTaskDate(id, start, end) {
-            // Update local state first for responsiveness
-            const t = tasks.find(x => x.id === id);
-            if (t) {
-                t.start = new Date(start);
-                t.end = new Date(end);
-            }
-
-            // Call API
-            showSaving();
-            try {
-                const s = start.toISOString().split('T')[0];
-                const e = end.toISOString().split('T')[0];
-                await fetch(`/api/activities/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ start: s, end: e })
-                });
-                showSaved();
-            } catch (err) {
-                console.error(err);
-                alert("Error actualizando fechas");
-            }
-        }
-
-        // Wrap updateField to show saving
-        // Note: updateField is defined above as async.
-        // We can decorate it if we want, but it already calls showSaving inside.
-        // So we don't need to wrap it again!
-        // The garbage code below was likely an old patch.
-        // I will remove the wrapper to avoid recursion or double saving.
-
+        // Export for Debugging
+        window.AO.Gantt = {
+            zoomIn: () => {
+                const levels = ['MONTH', 'WEEK', 'DAY'];
+                const idx = levels.indexOf(State.view.zoomLevel);
+                if (idx < levels.length - 1) setZoom(levels[idx + 1]);
+            },
+            zoomOut: () => {
+                const levels = ['MONTH', 'WEEK', 'DAY'];
+                const idx = levels.indexOf(State.view.zoomLevel);
+                if (idx > 0) setZoom(levels[idx - 1]);
+            },
+            State,
+            setZoom // Expose for testing
+        };
     </script>
-
-    <!-- COMPANIES SIDE PANEL (Moved to Root) -->
-    <div id="company-panel-overlay" class="fixed inset-0 bg-black bg-opacity-30 z-[9998] hidden"
-        onclick="toggleCompanyMenu()"></div>
-    <div id="company-menu"
-        class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-[9999] transform translate-x-full transition-transform duration-300 flex flex-col">
-        <div class="flex items-center justify-between p-4 border-b bg-gray-50">
-            <h3 class="font-bold text-gray-700"><i class="fas fa-building mr-2"></i> Empresas</h3>
-            <button onclick="toggleCompanyMenu()" class="text-gray-400 hover:text-gray-600">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-
-        <div class="p-4 flex flex-col gap-2 border-b bg-white">
-            <label class="text-xs font-bold text-gray-500 uppercase">Agregar Nueva</label>
-            <div class="flex items-center gap-2">
-                <input id="new-company-name" type="text" placeholder="Nombre de empresa..."
-                    class="text-sm border border-gray-300 rounded px-3 py-2 flex-1 focus:ring-2 focus:ring-blue-500 outline-none">
-                <button onclick="addCompany()"
-                    class="bg-blue-600 text-white rounded w-8 h-8 flex items-center justify-center hover:bg-blue-700 shadow-sm">
-                    <i class="fas fa-plus"></i>
-                </button>
-            </div>
-        </div>
-
-        <div id="company-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-            <!-- Dynamic Items -->
-        </div>
-    </div>
 </body>
 
 </html>
