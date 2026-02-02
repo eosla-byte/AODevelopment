@@ -2761,85 +2761,71 @@
             showSaved();
             alert("Todo el progreso ha sido guardado exitosamente en el servidor.");
         }
+
+        // --- LEGACY UPDATE WRAPPERS ---
+
+        async function updateTaskDate(id, start, end) {
+            // Update local state first for responsiveness
+            const t = tasks.find(x => x.id === id);
+            if (t) {
+                t.start = new Date(start);
+                t.end = new Date(end);
+            }
+
+            // Call API
+            showSaving();
+            try {
+                const s = start.toISOString().split('T')[0];
+                const e = end.toISOString().split('T')[0];
+                await fetch(`/api/activities/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ start: s, end: e })
+                });
+                showSaved();
+            } catch (err) {
+                console.error(err);
+                alert("Error actualizando fechas");
+            }
+        }
+
+        // Wrap updateField to show saving
+        // Note: updateField is defined above as async.
+        // We can decorate it if we want, but it already calls showSaving inside.
+        // So we don't need to wrap it again!
+        // The garbage code below was likely an old patch.
+        // I will remove the wrapper to avoid recursion or double saving.
+
     </script>
-</body>
 
-</html> --- LEGACY STICKY REMOVED ---
-// (Cleaned up to prevent override)
-
-// Wrap updateField to show saving
-const _originalUpdateField = updateField;
-
-async function updateTaskDate(id, start, end) {
-// Update local state first for responsiveness
-const t = tasks.find(x => x.id === id);
-if (t) {
-t.start = new Date(start);
-t.end = new Date(end);
-}
-
-// Call API
-showSaving();
-try {
-const s = start.toISOString().split('T')[0];
-const e = end.toISOString().split('T')[0];
-await fetch(`/api/activities/${id}`, {
-method: 'PUT',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ start: s, end: e })
-});
-showSaved();
-} catch (err) {
-console.error(err);
-alert("Error actualizando fechas");
-}
-}
-
-updateField = async function (id, field, value) {
-showSaving();
-try {
-await _originalUpdateField(id, field, value);
-showSaved();
-} catch (e) {
-console.error(e);
-alert("Error al guardar");
-}
-};
-
-
-
-
-
-</script>
-
-<!-- COMPANIES SIDE PANEL (Moved to Root) -->
-<div id="company-panel-overlay" class="fixed inset-0 bg-black bg-opacity-30 z-[9998] hidden"
-    onclick="toggleCompanyMenu()"></div>
-<div id="company-menu"
-    class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-[9999] transform translate-x-full transition-transform duration-300 flex flex-col">
-    <div class="flex items-center justify-between p-4 border-b bg-gray-50">
-        <h3 class="font-bold text-gray-700"><i class="fas fa-building mr-2"></i> Empresas</h3>
-        <button onclick="toggleCompanyMenu()" class="text-gray-400 hover:text-gray-600">
-            <i class="fas fa-times"></i>
-        </button>
-    </div>
-
-    <div class="p-4 flex flex-col gap-2 border-b bg-white">
-        <label class="text-xs font-bold text-gray-500 uppercase">Agregar Nueva</label>
-        <div class="flex items-center gap-2">
-            <input id="new-company-name" type="text" placeholder="Nombre de empresa..."
-                class="text-sm border border-gray-300 rounded px-3 py-2 flex-1 focus:ring-2 focus:ring-blue-500 outline-none">
-            <button onclick="addCompany()"
-                class="bg-blue-600 text-white rounded w-8 h-8 flex items-center justify-center hover:bg-blue-700 shadow-sm">
-                <i class="fas fa-plus"></i>
+    <!-- COMPANIES SIDE PANEL (Moved to Root) -->
+    <div id="company-panel-overlay" class="fixed inset-0 bg-black bg-opacity-30 z-[9998] hidden"
+        onclick="toggleCompanyMenu()"></div>
+    <div id="company-menu"
+        class="fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-[9999] transform translate-x-full transition-transform duration-300 flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b bg-gray-50">
+            <h3 class="font-bold text-gray-700"><i class="fas fa-building mr-2"></i> Empresas</h3>
+            <button onclick="toggleCompanyMenu()" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
             </button>
         </div>
-    </div>
 
-    <div id="company-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
-        <!-- Dynamic Items -->
+        <div class="p-4 flex flex-col gap-2 border-b bg-white">
+            <label class="text-xs font-bold text-gray-500 uppercase">Agregar Nueva</label>
+            <div class="flex items-center gap-2">
+                <input id="new-company-name" type="text" placeholder="Nombre de empresa..."
+                    class="text-sm border border-gray-300 rounded px-3 py-2 flex-1 focus:ring-2 focus:ring-blue-500 outline-none">
+                <button onclick="addCompany()"
+                    class="bg-blue-600 text-white rounded w-8 h-8 flex items-center justify-center hover:bg-blue-700 shadow-sm">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="company-list" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2">
+            <!-- Dynamic Items -->
+        </div>
     </div>
-</div>
 </body>
 
 </html>
