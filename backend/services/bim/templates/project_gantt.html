@@ -197,11 +197,12 @@
         // --- CONFIG ---
         const Config = {
             columns: [
-                { id: 'wbs', label: 'ID', width: 60, align: 'left' }, // Changed ID to WBS
+                { id: 'contractor', label: 'Empresa', width: 150, align: 'left', editable: true }, // Replaced ID (WBS)
                 { id: 'name', label: 'Tarea', width: 300, align: 'left', editable: true },
+                { id: 'duration', label: 'Duración', width: 80, align: 'center', editable: true }, // New Duration
                 { id: 'start', label: 'Inicio', width: 100, align: 'center', editable: true },
                 { id: 'end', label: 'Fin', width: 100, align: 'center', editable: true },
-                { id: 'progress', label: '%', width: 60, align: 'center', editable: true } // Mapped "pct" to "progress"
+                { id: 'progress', label: '%', width: 60, align: 'center', editable: true }
             ],
             rowHeight: 32,
             headerHeight: 60
@@ -586,6 +587,8 @@
                 const c = t.contractor;
                 if (c && c.trim() !== '' && c !== 'N/A') contractors.add(c.trim());
             });
+            // Also add from companyColors keys (manual adds)
+            Object.keys(State.companyColors).forEach(k => contractors.add(k));
 
             let overlay = document.getElementById('modal-overlay');
             if (!overlay) {
@@ -604,33 +607,84 @@
             header.innerHTML = '<h3 class="text-lg font-bold text-gray-800">Gestión de Empresas</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>';
             modal.appendChild(header);
 
+            // --- NEW: Add Company Section ---
+            const addIdx = document.createElement('div');
+            addIdx.className = "px-6 py-3 border-b bg-gray-50 flex space-x-2";
+            const inputNew = document.createElement('input');
+            inputNew.placeholder = "Nueva Empresa...";
+            inputNew.className = "border rounded px-2 py-1 text-sm flex-1";
+
+            const btnAdd = document.createElement('button');
+            btnAdd.className = "bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600";
+            btnAdd.innerText = "+";
+            btnAdd.onclick = () => {
+                const val = inputNew.value.trim();
+                if (val) {
+                    if (!State.companyColors[val]) {
+                        State.companyColors[val] = getRandomColor();
+                        // Force re-render of modal
+                        openCompanyModal();
+                    }
+                }
+            };
+            addIdx.appendChild(inputNew);
+            addIdx.appendChild(btnAdd);
+            modal.appendChild(addIdx);
+            // --------------------------------
+
             const body = document.createElement('div');
             body.className = "p-6 overflow-y-auto flex-1";
 
             if (contractors.size === 0) {
-                body.innerHTML = '<p class="text-gray-500 italic text-center">No hay empresas asignadas en las tareas.</p>';
+                body.innerHTML = '<p class="text-gray-500 italic text-center">No hay empresas. Agrega una arriba.</p>';
             } else {
                 contractors.forEach(c => {
                     const row = document.createElement('div');
                     row.className = "flex items-center justify-between mb-3";
 
-                    const label = document.createElement('span');
-                    label.innerText = c;
-                    label.className = "font-medium text-gray-700 truncate mr-4";
+                    const left = document.createElement('div');
+                    left.className = "flex items-center";
 
-                    const input = document.createElement('input');
-                    input.type = 'color';
-                    input.className = "w-8 h-8 rounded cursor-pointer border-0 p-0";
-                    input.value = State.companyColors[c] || stringToColor(c);
-                    if (!State.companyColors[c]) State.companyColors[c] = input.value; // Save default
-
-                    input.onchange = (e) => {
+                    const colorInput = document.createElement('input');
+                    colorInput.type = 'color';
+                    colorInput.className = "w-6 h-6 rounded cursor-pointer border-0 mr-3 p-0";
+                    // Get existing or assign default
+                    if (!State.companyColors[c]) State.companyColors[c] = stringToColor(c);
+                    colorInput.value = State.companyColors[c];
+                    colorInput.onchange = (e) => {
                         State.companyColors[c] = e.target.value;
-                        render();
+                        render(); // Re-render Gantt to update bars
                     };
 
-                    row.appendChild(label);
-                    row.appendChild(input);
+                    const name = document.createElement('span');
+                    name.className = "text-sm font-medium text-gray-700";
+                    name.innerText = c;
+
+                    // Assign Button (For Selection)
+                    const btnAssign = document.createElement('button');
+                    btnAssign.className = "ml-2 text-xs text-blue-500 hover:text-blue-700 underline";
+                    btnAssign.innerText = "Asignar";
+                    btnAssign.onclick = () => {
+                        // Assign 'c' to all selected tasks
+                        if (State.selectedIds.size === 0) {
+                            alert("Selecciona tareas en el Gantt primero.");
+                            return;
+                        }
+                        State.selectedIds.forEach(id => {
+                            const t = State.tasks.find(tk => tk.id === id);
+                            if (t) {
+                                t.contractor = c;
+                                triggerAutoSave(t.id);
+                            }
+                        });
+                        render();
+                        // Optional: Highlight success?
+                    };
+
+                    left.appendChild(colorInput);
+                    left.appendChild(name);
+                    left.appendChild(btnAssign);
+                    row.appendChild(left);
                     body.appendChild(row);
                 });
             }
@@ -1167,6 +1221,7 @@
                         }
                     }
 
+
                     const span = document.createElement('span');
                     let val = task[col.id];
                     if (col.id === 'start' || col.id === 'end') val = val ? val.toString().split('T')[0] : '';
@@ -1175,12 +1230,56 @@
                         if (isNaN(n)) n = 0;
                         val = Math.round(n) + '%';
                     }
+                    if (col.id === 'duration') {
+                        // Calculate Duration
+                        if (task.start && task.end) {
+                            const d1 = new Date(task.start);
+                            const d2 = new Date(task.end);
+                            const diffTime = Math.abs(d2 - d1);
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            val = diffDays + ' días';
+                        } else {
+                            val = '';
+                        }
+                    }
 
                     span.innerText = val || '';
                     span.style.width = "100%";
                     if (col.editable) {
                         span.contentEditable = true;
-                        span.onblur = (e) => { task[col.id] = e.target.innerText; }; // Simple mock save
+                        span.onblur = (e) => {
+                            let newVal = e.target.innerText;
+
+                            if (col.id === 'duration') {
+                                // Logic to update End Date
+                                const days = parseInt(newVal) || 0;
+                                if (task.start && days > 0) {
+                                    const d = new Date(task.start);
+                                    d.setDate(d.getDate() + days); // Add days
+                                    task.end = d.toISOString().split('T')[0];
+                                    triggerAutoSave(task.id);
+                                    HierarchyEngine.recalculate(State.tasks);
+                                    render();
+                                }
+                            } else if (col.id === 'start') {
+                                task.start = newVal;
+                                // If duration exists, maintain duration? Or maintain End and update Duration?
+                                // User: "si yo cambio alguna de las fechas se actualizara DURACION"
+                                // So Start/End updates -> Duration re-renders automatically (calc on fly).
+                                // We just save the date.
+                                triggerAutoSave(task.id);
+                                HierarchyEngine.recalculate(State.tasks);
+                                render();
+                            } else if (col.id === 'end') {
+                                task.end = newVal;
+                                triggerAutoSave(task.id);
+                                HierarchyEngine.recalculate(State.tasks);
+                                render();
+                            } else {
+                                task[col.id] = newVal;
+                                triggerAutoSave(task.id);
+                            }
+                        };
                         span.onclick = (e) => e.stopPropagation();
                     }
                     td.appendChild(span);
@@ -1320,6 +1419,15 @@
                 zoomOut: () => { State.pxPerMin *= 0.8; render(); }
             }
         };
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
     </script>
 </body>
 
