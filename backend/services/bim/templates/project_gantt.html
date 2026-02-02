@@ -823,7 +823,7 @@
             let css = '';
             companies.forEach(c => {
                 if (c.color) {
-                    const safeName = c.name.replace(/+/g, '-');
+                    const safeName = c.name.replace(/\s+/g, '-');
                     css += `
                          .company-${safeName} .bar-progress { fill: ${c.color} !important; }
                          .company-${safeName} .bar { fill: ${c.color}40 !important; stroke: ${c.color} !important; }
@@ -846,12 +846,12 @@
             tasks.forEach(t => {
                 const customClasses = [];
                 // logic to determine color/class...
-                const co = companies.find(c => c.name === t.company);
+                const co = companies.find(c => c.name === (t.contractor || ''));
                 if (co) {
                     // We inject color as inline style via hook or just use class if possible.
                     // Frappe Gantt doesn't support inline color easily without custom HTML.
                     // We'll rely on updateDynamicCSS() which we call below.
-                    customClasses.push(`company-${co.name.replace(/+/g, '-')}`);
+                    customClasses.push(`company-${co.name.replace(/\s+/g, '-')}`);
                     if (!co.visible) customClasses.push('hidden-task');
                 }
 
