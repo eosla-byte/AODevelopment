@@ -775,6 +775,9 @@ class ActivityUpdateRequest(pydantic.BaseModel):
     end: Optional[str] = None
     progress: Optional[float] = None
     style: Optional[str] = None
+    contractor: Optional[str] = None
+    predecessors: Optional[str] = None
+    comments: Optional[List[dict]] = None
 
 @app.put("/api/activities/{activity_id}")
 async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = Depends(get_current_user)):
@@ -810,7 +813,12 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
             except: pass
         if data.style: 
             try: act.style = data.style
-            except: pass
+            except: pass # Allow raw string?
+        
+        # New Fields
+        if data.contractor is not None: act.contractor = data.contractor
+        if data.predecessors is not None: act.predecessors = data.predecessors
+        if data.comments is not None: act.comments = data.comments
             
         db.commit()
         return {"status": "success"}
