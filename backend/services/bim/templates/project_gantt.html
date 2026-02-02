@@ -12,7 +12,6 @@
         :root {
             /* MS Project Palette */
             --header-bg: #f3f4f6;
-            /* Light gray for headers (Excel style) or #2c3e50 for Dark */
             --header-text: #1f2937;
             --border-color: #d1d5db;
             --grid-line: #e5e7eb;
@@ -21,27 +20,35 @@
             --primary-blue: #2563eb;
 
             --row-height: 32px;
-            /* Denser rows like MS Project */
             --header-height: 60px;
-            /* Double height (Month + Day) */
+        }
+
+        * {
+            box-sizing: border-box;
+            /* CRITICAL FIX for double scroll */
         }
 
         body,
         html {
             height: 100%;
             margin: 0;
+            padding: 0;
             overflow: hidden;
-            /* App Shell */
+            /* Strict App Shell */
             font-family: 'Segoe UI', system-ui, sans-serif;
             font-size: 13px;
-            /* Smaller, pro font size */
         }
 
         /* --- APP SHELL --- */
         #app-container {
             display: flex;
             flex-direction: column;
+            width: 100vw;
             height: 100vh;
+            /* Fallback */
+            height: 100dvh;
+            /* Dynamic Viewport Height */
+            overflow: hidden;
         }
 
         #toolbar {
