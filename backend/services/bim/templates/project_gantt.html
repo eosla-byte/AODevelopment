@@ -1293,33 +1293,34 @@
             });
 
             // Lines/Ticks
+            // Lines/Ticks
             const lines = clone.querySelectorAll('line, path');
             lines.forEach(l => {
                 l.setAttribute('stroke', 'rgba(255,255,255,0.3)');
-                l.style.stroke = 'rgba(255,255,255,0.3)');
-        });
+                l.style.stroke = 'rgba(255,255,255,0.3)';
+            });
 
-        // Background Rects (if any exist in .grid-header)
-        // If Frappe puts a big white rect behind, we need to make it transparent
-        const rects = clone.querySelectorAll('rect');
-        rects.forEach(r => {
-            r.setAttribute('fill', 'transparent');
-            r.style.fill = 'transparent';
-        });
+            // Background Rects (if any exist in .grid-header)
+            // If Frappe puts a big white rect behind, we need to make it transparent
+            const rects = clone.querySelectorAll('rect');
+            rects.forEach(r => {
+                r.setAttribute('fill', 'transparent');
+                r.style.fill = 'transparent';
+            });
 
-        // Append to Wrapper
-        wrapperSvg.appendChild(clone);
+            // Append to Wrapper
+            wrapperSvg.appendChild(clone);
 
-        // Append Wrapper to Container
-        stickyContainer.appendChild(wrapperSvg);
+            // Append Wrapper to Container
+            stickyContainer.appendChild(wrapperSvg);
 
-        // 6. SYNC WIDTH SCROLL
-        // The sticky container is sticky, so it doesn't scroll horizontally with the document window if overflow is on body.
-        // But here clean layout means #chart-area overflow auto.
-        // Sticky behavior inside overflow container:
-        // It sticks to top, but scrolls left/right with content.
-        // So we just need width to be correct.
-        stickyContainer.style.width = totalWidth ? totalWidth + 'px' : '100%';
+            // 6. SYNC WIDTH SCROLL
+            // The sticky container is sticky, so it doesn't scroll horizontally with the document window if overflow is on body.
+            // But here clean layout means #chart-area overflow auto.
+            // Sticky behavior inside overflow container:
+            // It sticks to top, but scrolls left/right with content.
+            // So we just need width to be correct.
+            stickyContainer.style.width = totalWidth ? totalWidth + 'px' : '100%';
         }
 
         // Disable old sync if it exists by flag
