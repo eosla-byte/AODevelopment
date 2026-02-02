@@ -2166,15 +2166,7 @@
             if (field === 'start' || field === 'end' || field === 'name' || field === 'progress') renderGantt(gantt.options.view_mode);
         }
 
-        async function updateTaskDate(id, start, end) {
-            await updateField(id, 'start', start.toISOString().split('T')[0]);
-            await updateField(id, 'end', end.toISOString().split('T')[0]);
 
-            // Update Local array
-            const t = tasks.find(x => x.id == id);
-            if (t) { t.start = start; t.end = end; }
-            renderGrid(); // Refresh grid dates
-        }
 
         // --- CRUD ACTIONS ---
         async function addTask() {
@@ -2278,10 +2270,7 @@
         function diffDays(d1, d2) {
             return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
         }
-        function formatDateInput(date) {
-            if (!date) return '';
-            return date.toISOString().split('T')[0];
-        }
+
 
         function changeView(mode) {
             renderGantt(mode);
