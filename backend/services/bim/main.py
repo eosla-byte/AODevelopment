@@ -580,12 +580,9 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                 tasks_json.append({
                     "id": str(act.activity_id) if act.activity_id else str(act.id),
                     "name": act.name,
-                    "start": start_str,
-                    "end": end_str,
-                    "progress": act.pct_complete or 0,
-                    "dependencies": getattr(act, 'predecessors', "") or "",
                     "contractor": getattr(act, 'contractor', "") or "",
-                    "style": getattr(act, 'style', None)
+                    "style": getattr(act, 'style', None),
+                    "comments": getattr(act, 'comments', []) or []
                 })
         
         if not tasks_json:
@@ -762,7 +759,8 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "dependencies": getattr(act, 'predecessors', "") or "",
                 "custom_class": f"version-{act.version_id}", # Hook for styling if needed
                 "contractor": getattr(act, 'contractor', "N/A") or "N/A",
-                "style": getattr(act, 'style', None)
+                "style": getattr(act, 'style', None),
+                "comments": getattr(act, 'comments', []) or []
             })
             
         return tasks_json

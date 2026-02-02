@@ -812,6 +812,26 @@
             } catch (e) { console.error(e); alert("Critico: " + e.message); }
         }
 
+        function updateDynamicCSS() {
+            let style = document.getElementById('dynamic-company-styles');
+            if (!style) {
+                style = document.createElement('style');
+                style.id = 'dynamic-company-styles';
+                document.head.appendChild(style);
+            }
+            let css = '';
+            companies.forEach(c => {
+                if (c.color) {
+                    const safeName = c.name.replace(/\s+/g, '-');
+                    css += `
+                         .company-${safeName} .bar-progress { fill: ${c.color} !important; }
+                         .company-${safeName} .bar { fill: ${c.color}40 !important; stroke: ${c.color} !important; }
+                     `;
+                }
+            });
+            style.innerHTML = css;
+        }
+
         function renderGantt(viewMode = 'Week') {
             console.log("AO DEBUG 4.0: Dual Gantt Render Start", viewMode);
             const container = document.getElementById('gantt-target');
