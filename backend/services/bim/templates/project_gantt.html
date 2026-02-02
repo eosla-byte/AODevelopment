@@ -1259,10 +1259,7 @@
 
         // --- NEW SPLIT PANE HEADER LOGIC ---
         function cloneGanttHeader() {
-            const container = document.getElementById('gantt-target');
-            if (!container) return;
-
-            const sourceSvg = container.querySelector('svg');
+            const sourceSvg = document.getElementById('gantt-target');
             const headerContainer = document.getElementById('timeline-header-container');
 
             if (!sourceSvg || !headerContainer) return;
@@ -1290,6 +1287,9 @@
             // 4. Clone the Group
             const clone = headerGroup.cloneNode(true);
 
+            // ADJUST POSITION: Ensure top alignment
+            clone.setAttribute('transform', 'translate(0, 0)');
+
             // 5. CLEAN THE CLONE (Styling)
             // Text Color
             const texts = clone.querySelectorAll('text');
@@ -1298,7 +1298,7 @@
                 t.style.fill = '#ffffff';
                 t.style.opacity = '1';
                 t.style.fontWeight = '600';
-                t.style.fontSize = '11px';
+                t.style.fontSize = '12px';
             });
 
             // Lines/Ticks
