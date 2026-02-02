@@ -760,7 +760,8 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "custom_class": f"version-{act.version_id}", # Hook for styling if needed
                 "contractor": getattr(act, 'contractor', "N/A") or "N/A",
                 "style": getattr(act, 'style', None),
-                "comments": getattr(act, 'comments', []) or []
+                "comments": getattr(act, 'comments', []) or [],
+                "display_order": getattr(act, 'display_order', 0) or 0
             })
             
         return tasks_json
@@ -776,6 +777,7 @@ class ActivityUpdateRequest(pydantic.BaseModel):
     contractor: Optional[str] = None
     predecessors: Optional[str] = None
     comments: Optional[List[dict]] = None
+    display_order: Optional[int] = None
 
 @app.put("/api/activities/{activity_id}")
 async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = Depends(get_current_user)):
@@ -789,27 +791,24 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
         # In my view_project_gantt, I used "str(act.activity_id) if act.activity_id else str(act.id)".
         # This is ambitious. Let's try to match either.
         
-        # Try finding by PK first (assuming numeric string)
-        act = None
-        if activity_id.isdigit():
-             act = db.query(BimActivity).filter(BimActivity.id == int(activity_id)).first()
-        
-        # If not found or not numeric, try by activity_id string
+        act = db.query(BimActivity).filter(BimActivity.activity_id == activity_id).first()
         if not act:
-             act = db.query(BimActivity).filter(BimActivity.activity_id == activity_id).first()
+            # Try by PK
+            if activity_id.isdigit():
+                 act = db.query(BimActivity).filter(BimActivity.id == int(activity_id)).first()
              
         if not act:
             raise HTTPException(status_code=404, detail="Activity not found")
             
-        if data.name: act.name = data.name
+        if data.name is not None: act.name = data.name
         if data.progress is not None: act.pct_complete = data.progress
-        if data.start:
+        if data.start is not None:
             try: act.planned_start = datetime.datetime.strptime(data.start, "%Y-%m-%d")
             except: pass
-        if data.end:
+        if data.end is not None:
             try: act.planned_finish = datetime.datetime.strptime(data.end, "%Y-%m-%d")
             except: pass
-        if data.style: 
+        if data.style is not None: 
             try: act.style = data.style
             except: pass # Allow raw string?
         
@@ -817,11 +816,13 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
         if data.contractor is not None: act.contractor = data.contractor
         if data.predecessors is not None: act.predecessors = data.predecessors
         if data.comments is not None: act.comments = data.comments
+        if data.display_order is not None: act.display_order = data.display_order
             
         db.commit()
-        return {"status": "success"}
+        return {"status": "ok"}
     except Exception as e:
         db.rollback()
+        print(f"Update error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
