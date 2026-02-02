@@ -2657,29 +2657,33 @@
             try {
                 const s = start.toISOString().split('T')[0];
                 const e = end.toISOString().split('T')[0];
-                await fetch(`/api/projects/${projectId}/activities/${id}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ start_date: s, end_date: e })
-                });
-                showSaved();
-            } catch (err) {
-                console.error(err);
-                alert("Error actualizando fechas");
-                // Revert? Relies on reload for now.
+                try {
+                    const s = start.toISOString().split('T')[0];
+                    const e = end.toISOString().split('T')[0];
+                    await fetch(`/api/activities/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ start: s, end: e })
+                    });
+                    showSaved();
+                    showSaved();
+                } catch (err) {
+                    console.error(err);
+                    alert("Error actualizando fechas");
+                    // Revert? Relies on reload for now.
+                }
             }
-        }
 
         updateField = async function (id, field, value) {
-            showSaving();
-            try {
-                await _originalUpdateField(id, field, value);
-                showSaved();
-            } catch (e) {
-                console.error(e);
-                alert("Error al guardar");
-            }
-        };
+                showSaving();
+                try {
+                    await _originalUpdateField(id, field, value);
+                    showSaved();
+                } catch (e) {
+                    console.error(e);
+                    alert("Error al guardar");
+                }
+            };
 
 
 
