@@ -214,7 +214,11 @@
             startDate: new Date(),
             totalWidth: 2000,
             selectedIds: new Set(),
-            lastSelectedId: null
+            lastSelectedId: null,
+            // Look Ahead State
+            lookAheadStart: new Date(),
+            lookAheadWeeks: 3,
+            showLookAhead: false
         };
 
         // --- INIT ---
@@ -241,9 +245,19 @@
             orderIndex: i
         }));
 
+        // Init Look Ahead defaults (Today)
+        const today = new Date();
+        State.lookAheadStart = new Date(today);
+
+        // Toolbar Injection for Look Ahead
+        injectLookAheadControls();
+
         initTimeEngine();
         HierarchyEngine.recalculate(State.tasks);
         render();
+
+        // Auto-Scroll to Today
+        setTimeout(scrollToToday, 100);
 
         // Global Keys
         document.addEventListener('keydown', handleGlobalKeys);
@@ -253,6 +267,77 @@
             alert("Error loading Gantt: " + e.message);
         }
         });
+
+        // --- LOOK AHEAD CONTROLS ---
+        function injectLookAheadControls() {
+            const toolbar = document.getElementById('toolbar');
+
+            // Separator
+            const sep = document.createElement('div');
+            sep.style.width = '1px'; sep.style.height = '24px'; sep.style.background = '#e5e7eb'; sep.style.margin = '0 10px';
+            toolbar.appendChild(sep);
+
+            // Label
+            const lbl = document.createElement('span');
+            lbl.innerText = "Look Ahead:";
+            lbl.className = "font-semibold text-gray-600 mr-2";
+            toolbar.appendChild(lbl);
+
+            // Date Picker
+            const dateInput = document.createElement('input');
+            dateInput.type = 'date';
+            dateInput.className = "border rounded px-2 py-1 text-sm";
+            dateInput.value = State.lookAheadStart.toISOString().split('T')[0];
+            dateInput.onchange = (e) => {
+                State.lookAheadStart = new Date(e.target.value);
+                State.showLookAhead = true;
+                render();
+            };
+            toolbar.appendChild(dateInput);
+
+            // Weeks Input
+            const weeksInput = document.createElement('input');
+            weeksInput.type = 'number';
+            weeksInput.className = "border rounded px-2 py-1 text-sm w-16 ml-2";
+            weeksInput.value = State.lookAheadWeeks;
+            weeksInput.min = 1;
+            weeksInput.onchange = (e) => {
+                State.lookAheadWeeks = parseInt(e.target.value);
+                State.showLookAhead = true;
+                render();
+            };
+            toolbar.appendChild(weeksInput);
+
+            // Weeks Label
+            const wLabel = document.createElement('span');
+            wLabel.innerText = "semanas";
+            wLabel.className = "text-gray-600 ml-1 text-xs";
+            toolbar.appendChild(wLabel);
+
+            // Toggle Button (Optional, maybe always on?)
+            const btn = document.createElement('button');
+            btn.className = "ml-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-sm";
+            btn.innerText = "Ver";
+            btn.onclick = () => {
+                State.showLookAhead = !State.showLookAhead;
+                render();
+            };
+            toolbar.appendChild(btn);
+        }
+
+        function scrollToToday() {
+            const todayX = timeToX(new Date());
+            const scroll = document.getElementById('master-scroll');
+            const centerOffset = scroll.clientWidth / 2; // Center it
+            // Adjust for sticky headers... assumes sticky headers are approx 600px
+            const stickyW = getTotalStickyWidth();
+
+            // We want Today to be at stickyW + (visible_gantt / 2)
+            // scrollLeft controls the Gantt view offset.
+            // Actually, sticky table means scrollLeft moves the whole table.
+
+            scroll.scrollLeft = todayX - (scroll.clientWidth / 2) + stickyW;
+        }
 
         // --- HIERARCHY ENGINE ---
         const HierarchyEngine = {
@@ -387,6 +472,62 @@
         function render() {
             renderHeader();
             renderBody();
+            renderOverlays(); // Today Line & Look Ahead
+        }
+
+        function renderOverlays() {
+            // New function to draw overlays on top of the bars
+            // We'll reuse dependency-svg or creating a new "overlay-svg" on top?
+            // Let's use 'dependency-svg' as it is already absolutely positioned.
+
+            let svg = document.getElementById('dependency-svg');
+            if (!svg) return; // Should exist by now
+
+            // Clear previous overlays (but keep deps if we had them? We don't have deps yet)
+            // For now, clear all because we redraw fresh
+            svg.innerHTML = '';
+
+            // 1. TODAY LINE
+            const todayX = timeToX(new Date());
+            if (todayX >= 0 && todayX <= State.totalWidth) {
+                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute('x1', todayX); line.setAttribute('y1', 0);
+                line.setAttribute('x2', todayX); line.setAttribute('y2', svg.clientHeight);
+                line.setAttribute('stroke', 'red');
+                line.setAttribute('stroke-width', '2');
+                line.setAttribute('stroke-dasharray', '4');
+                svg.appendChild(line);
+
+                // Label "Today"
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute('x', todayX + 4); text.setAttribute('y', 12);
+                text.textContent = "HOY";
+                text.setAttribute('fill', 'red');
+                text.setAttribute('font-size', '10');
+                text.setAttribute('font-weight', 'bold');
+                svg.appendChild(text);
+            }
+
+            // 2. LOOK AHEAD FRAME
+            if (State.showLookAhead) {
+                const startX = timeToX(State.lookAheadStart);
+                const endDate = new Date(State.lookAheadStart);
+                endDate.setDate(endDate.getDate() + (State.lookAheadWeeks * 7));
+                const endX = timeToX(endDate);
+
+                const w = endX - startX;
+                if (w > 0) {
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute('x', startX);
+                    rect.setAttribute('y', 0);
+                    rect.setAttribute('width', w);
+                    rect.setAttribute('height', svg.clientHeight);
+                    rect.setAttribute('fill', 'rgba(255, 0, 0, 0.05)'); // Very faint red
+                    rect.setAttribute('stroke', 'red');
+                    rect.setAttribute('stroke-width', '2');
+                    svg.appendChild(rect);
+                }
+            }
         }
 
         function renderHeader() {
@@ -576,11 +717,20 @@
                 depSvg.style.position = 'absolute';
                 depSvg.style.top = '60px';
                 depSvg.style.pointerEvents = 'none';
+                depSvg.style.zIndex = '10'; // Ensure overlay is on top of grid but below some tools?
                 masterScroll.appendChild(depSvg);
             }
             depSvg.style.left = getTotalStickyWidth() + 'px';
             depSvg.style.width = State.totalWidth + 'px';
             depSvg.style.height = Math.max(State.tasks.length * 32, 500) + 'px';
+
+            // Look Ahead Range
+            let laStart = null, laEnd = null;
+            if (State.showLookAhead) {
+                laStart = State.lookAheadStart;
+                laEnd = new Date(laStart);
+                laEnd.setDate(laEnd.getDate() + (State.lookAheadWeeks * 7));
+            }
 
             let hiddenLevel = -1;
 
@@ -589,8 +739,20 @@
                 if (hiddenLevel > -1 && task.level <= hiddenLevel) hiddenLevel = -1;
                 if (task.isSummary && task.collapsed && hiddenLevel === -1) hiddenLevel = task.level;
 
+                // LOOK AHEAD HIGHLIGHT LOGIC
+                // Check intersection
+                let isHighlighted = false;
+                if (laStart && task.start && task.end) {
+                    const tStart = new Date(task.start);
+                    const tEnd = new Date(task.end);
+                    if (tStart < laEnd && tEnd > laStart) {
+                        isHighlighted = true;
+                    }
+                }
+
                 const tr = document.createElement('tr');
                 if (State.selectedIds.has(task.id)) tr.style.backgroundColor = 'var(--selection-blue)'; // #eff6ff
+                else if (isHighlighted) tr.style.backgroundColor = '#fff1f2'; // Reddish tint
 
                 tr.onclick = (e) => {
                     const mode = e.ctrlKey ? 'multi' : (e.shiftKey ? 'range' : 'single');
@@ -619,7 +781,11 @@
                     const span = document.createElement('span');
                     let val = task[col.id];
                     if (col.id === 'start' || col.id === 'end') val = val ? val.toString().split('T')[0] : '';
-                    if (col.id === 'progress') val = Math.round(val || 0) + '%';
+                    if (col.id === 'progress') {
+                        let n = parseFloat(val);
+                        if (isNaN(n)) n = 0;
+                        val = Math.round(n) + '%';
+                    }
 
                     span.innerText = val || '';
                     span.style.width = "100%";
@@ -669,19 +835,18 @@
                         const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                         bgRect.setAttribute('x', x); bgRect.setAttribute('y', barY);
                         bgRect.setAttribute('width', Math.max(w, 5)); bgRect.setAttribute('height', barH);
-                        bgRect.setAttribute('fill', '#dbeafe'); // Light Blue
+                        bgRect.setAttribute('fill', isHighlighted ? '#fecaca' : '#dbeafe'); // Red/Blue
                         bgRect.setAttribute('rx', barRadius);
                         g.appendChild(bgRect);
 
                         // 2. Progress (Dark Blue)
                         const pct = parseFloat(task.progress || 0) / 100;
-                        if (pct > 0) {
+                        if (pct > 0 && !isNaN(pct)) {
                             const progRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                            progRect.setAttribute('x', x); progRect.setAttribute('y', barY + 4); // Slightly thinner? No, full height
-                            progRect.setAttribute('y', barY);
+                            progRect.setAttribute('x', x); progRect.setAttribute('y', barY);
                             progRect.setAttribute('width', Math.max(w * pct, 0));
                             progRect.setAttribute('height', barH);
-                            progRect.setAttribute('fill', '#3b82f6'); // Dark Blue
+                            progRect.setAttribute('fill', isHighlighted ? '#dc2626' : '#3b82f6');
                             progRect.setAttribute('rx', barRadius);
                             g.appendChild(progRect);
                         }
@@ -699,12 +864,17 @@
 
         function initTimeEngine() {
             if (State.tasks.length > 0) {
-                let min = new Date(State.tasks[0].start || new Date());
-                State.tasks.forEach(t => {
-                    if (t.start && new Date(t.start) < min) min = new Date(t.start);
-                });
-                min.setDate(min.getDate() - 15);
+                // If tasks exist, maybe center on them?
+                // But USER REQUEST: "siempre al iniciar el proyecto que el proyecto se ubique en el dia de hoy"
+                // So startDate should perhaps be Today - Offset?
+
+                let min = new Date(); // Start around today
+                min.setDate(min.getDate() - 30); // 1 month buffer
                 State.startDate = min;
+
+                // However, we should also respect task bounds if they are way in the past?
+                // Let's stick to the "Scroll to Today" logic instead of changing StartDate too much
+                // But we need startDate to be before Today for Today to be visible.
             } else { State.startDate = new Date(); }
         }
         function calculateTotalWidth() { return 3000; }
@@ -719,8 +889,7 @@
             const startW = col.width;
 
             const onMove = (mv) => {
-                const diff = mv.clientX - startX;
-                col.width = Math.max(30, startW + diff);
+                col.width = Math.max(30, startW + (mv.clientX - startX));
                 render();
             };
 
