@@ -207,14 +207,8 @@
             z-index: 10;
         }
 
-        /* Chart Area */
-        #chart-area {
-            flex: 1;
-            overflow: auto;
-            position: relative;
-            background: #fff;
-            min-width: 300px;
-        }
+        /* Chart Area (Override for Split Pane context) */
+        /* See #right-split-pane definitions below */
 
         #gantt-target {
             /* Let library control size */
@@ -320,25 +314,39 @@
         }
 
         /* --- STICKY HEADER (CLEAN IMPLEMENTATION) --- */
-        #gantt-header-sticky {
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            height: 50px;
-            background: #1e3a8a;
-            /* Dark Blue Background */
-            border-bottom: 1px solid #172554;
+        /* --- SPLIT PANE ARCHITECTURE (NEW) --- */
+        #right-split-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
             overflow: hidden;
-            /* Hide scrollbars, we show content via SVG */
+            position: relative;
+            background: #fff;
+        }
+
+        #timeline-header-container {
+            flex: 0 0 50px;
+            /* Fixed Height matching header */
+            overflow: hidden;
+            /* No scrollbars shown, synced via JS */
+            background: #1e3a8a;
+            /* Dark Blue */
+            border-bottom: 1px solid #172554;
+            z-index: 40;
             width: 100%;
-            display: none;
-            /* Hidden by default until populated */
+        }
+
+        #chart-area {
+            flex: 1;
+            overflow: auto;
+            /* Scrollable Body */
+            position: relative;
+            /* No sticky header inside here anymore */
         }
 
         .gantt-header-svg {
             display: block;
             pointer-events: none;
-            /* Let clicks pass through if needed */
         }
     </style>
 </head>
@@ -555,11 +563,15 @@
         <!-- RESIZER -->
         <div id="resizer"></div>
 
-        <!-- CHART -->
-        <div id="chart-area" class="no-scroll relative">
-            <!-- CLONED STICKY HEADER (Moved Inside) -->
-            <div id="gantt-header-sticky"></div>
-            <svg id="gantt-target"></svg>
+        <!-- RIGHT SPLIT PANE -->
+        <div id="right-split-pane">
+            <!-- 1. FIXED HEADER PANE -->
+            <div id="timeline-header-container"></div>
+
+            <!-- 2. SCROLLABLE BODY PANE -->
+            <div id="chart-area" class="no-scroll">
+                <svg id="gantt-target"></svg>
+            </div>
         </div>
     </div>
 
@@ -588,22 +600,7 @@
         }
 
         /* 2. Right Panel Header (Timeline) */
-        /* --- STICKY HEADER STYLING --- */
-        #gantt-header-sticky text {
-            fill: #ffffff !important;
-            font-weight: 600 !important;
-            font-size: 11px !important;
-        }
 
-        #gantt-header-sticky line,
-        #gantt-header-sticky path {
-            stroke: rgba(255, 255, 255, 0.3) !important;
-        }
-
-        /* Hide original background rects in the clone so our blue background shows */
-        #gantt-header-sticky rect.grid-header {
-            fill: transparent !important;
-        }
 
         /* --- Preserved Styles --- */
         .lookahead-row {
@@ -703,12 +700,19 @@
             const chart = document.getElementById('chart-area');
 
             // Simple Mutual Sync
-            grid.addEventListener('scroll', () => {
-                if (chart.scrollTop !== grid.scrollTop) chart.scrollTop = grid.scrollTop;
-            });
-            chart.addEventListener('scroll', () => {
-                if (grid.scrollTop !== chart.scrollTop) grid.scrollTop = chart.scrollTop;
-            });
+            // 6. Sync Scroll (Unified)
+            syncScrolls();
+
+            // 7. Grid Listeners (Grid -> Chart)
+            // Re-use existing references if available, or get them if not
+            const gridRef = document.getElementById('tasks-grid');
+            const chartRef = document.getElementById('chart-area');
+            if (gridRef && chartRef) {
+                gridRef.addEventListener('scroll', () => {
+                    // Sync Vertical
+                    if (chartRef.scrollTop !== gridRef.scrollTop) chartRef.scrollTop = gridRef.scrollTop;
+                });
+            }
         });
 
         async function loadTasks() {
@@ -1247,26 +1251,23 @@
         // ... (toggleCompanyVisibility is below)
 
 
-        // --- NEW CLONE HEADER LOGIC (Aggressive Clean) ---
+        // --- NEW SPLIT PANE HEADER LOGIC ---
         function cloneGanttHeader() {
             const sourceSvg = document.getElementById('gantt-target');
-            const stickyContainer = document.getElementById('gantt-header-sticky');
+            const headerContainer = document.getElementById('timeline-header-container'); // NEW Container
 
-            if (!sourceSvg || !stickyContainer) return;
+            if (!sourceSvg || !headerContainer) return;
 
             // 1. Get the source header group
-            // Frappe Gantt logic: .grid-header contains the timeline
             const headerGroup = sourceSvg.querySelector('.grid-header');
 
-            // Safety: If no header (not rendered), hide sticky bar to prevent "Solid Blue Bar"
             if (!headerGroup) {
-                stickyContainer.style.display = 'none';
+                headerContainer.innerHTML = '';
                 return;
             }
 
             // 2. Prepare Container
-            stickyContainer.innerHTML = '';
-            stickyContainer.style.display = 'block';
+            headerContainer.innerHTML = '';
 
             // 3. Create fresh SVG Wrapper
             // We match the WIDTH of the source SVG exactly
@@ -1280,16 +1281,15 @@
             // 4. Clone the Group
             const clone = headerGroup.cloneNode(true);
 
-            // 5. CLEAN THE CLONE (Aggressive DOM manipulation)
-            // Remove any existing fill/stroke that matches the light theme
-            // Force ours via attributes AND classes
-
+            // 5. CLEAN THE CLONE (Styling)
             // Text Color
             const texts = clone.querySelectorAll('text');
             texts.forEach(t => {
                 t.setAttribute('fill', '#ffffff');
                 t.style.fill = '#ffffff';
                 t.style.opacity = '1';
+                t.style.fontWeight = '600';
+                t.style.fontSize = '11px';
             });
 
             // Lines/Ticks
@@ -1300,27 +1300,45 @@
                 l.style.stroke = 'rgba(255,255,255,0.3)';
             });
 
-            // Background Rects (if any exist in .grid-header)
-            // If Frappe puts a big white rect behind, we need to make it transparent
+            // Make rects transparent
             const rects = clone.querySelectorAll('rect');
             rects.forEach(r => {
                 r.setAttribute('fill', 'transparent');
                 r.style.fill = 'transparent';
             });
 
-            // Append to Wrapper
+            // Append
             wrapperSvg.appendChild(clone);
+            headerContainer.appendChild(wrapperSvg);
 
-            // Append Wrapper to Container
-            stickyContainer.appendChild(wrapperSvg);
+            // 6. SYNC INITIAL SCROLL
+            const chartArea = document.getElementById('chart-area');
+            if (chartArea) {
+                headerContainer.scrollLeft = chartArea.scrollLeft;
+            }
+        }
 
-            // 6. SYNC WIDTH SCROLL
-            // The sticky container is sticky, so it doesn't scroll horizontally with the document window if overflow is on body.
-            // But here clean layout means #chart-area overflow auto.
-            // Sticky behavior inside overflow container:
-            // It sticks to top, but scrolls left/right with content.
-            // So we just need width to be correct.
-            stickyContainer.style.width = totalWidth ? totalWidth + 'px' : '100%';
+        // --- SCROLL SYNC LOGIC ---
+        function syncScrolls() {
+            const chart = document.getElementById('chart-area');
+
+            // 1. Chart Horizontal -> Header Horizontal
+            // Use named function to avoid duplicates if called multiple times, though here we just replace
+            if (chart) {
+                chart.addEventListener('scroll', handleChartScroll);
+            }
+        }
+
+        function handleChartScroll(e) {
+            const chart = e.target;
+            const header = document.getElementById('timeline-header-container');
+            const grid = document.getElementById('tasks-grid');
+
+            // Sync Horizontal Header
+            if (header) header.scrollLeft = chart.scrollLeft;
+
+            // Sync Vertical Grid
+            if (grid) grid.scrollTop = chart.scrollTop;
         }
 
         // Disable old sync if it exists by flag
