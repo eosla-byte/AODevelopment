@@ -18,10 +18,8 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password_local(plain, hashed):
     if not hashed: return False
-    try:
-        return pwd_context.verify(plain, hashed)
-    except Exception:
-        return False
+    # REMOVED try/except to debug crashes
+    return pwd_context.verify(plain, hashed)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -47,19 +45,33 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
         # Authenticate against Central Accounts
         user = db.query(AccountUser).filter(AccountUser.email == email).first()
         
-        # DEBUG: Print user status to logs
+    # DEBUG: Print user status to logs
         if user:
-            print(f"Login Attempt: {email} | Found User. | Hash Start: {user.hashed_password[:20] if user.hashed_password else 'None'}")
+            print(f"Login Attempt: {email} | Found User. | Hash: {user.hashed_password[:15]}...")
         else:
             print(f"Login Attempt: {email} | User NOT Found.")
 
-        if not user or not verify_password_local(password, user.hashed_password):
-            return templates.TemplateResponse("login.html", {"request": request, "error": "Credenciales inválidas"})
+        if not user:
+             return templates.TemplateResponse("login.html", {"request": request, "error": "Usuario no encontrado (Check DB Connection/Email)"})
+
+        # Verify Password with precise error catch
+        valid_pwd = False
+        try:
+            valid_pwd = verify_password_local(password, user.hashed_password)
+        except Exception as e:
+             import traceback
+             print(f"Pwd Verify Crash: {e}")
+             traceback.print_exc()
+             return templates.TemplateResponse("login.html", {"request": request, "error": f"Error verificando password: {str(e)}"})
+
+        if not valid_pwd:
+             return templates.TemplateResponse("login.html", {"request": request, "error": "Contraseña incorrecta (Hash Mismatch)"})
         
         # Check Service Access
         services_access = user.services_access or {}
         if not services_access.get("AOPlanSystem", False):
-             return templates.TemplateResponse("login.html", {"request": request, "error": "No tienes acceso a PlanSystem. Contacta a tu administrador."})
+             return templates.TemplateResponse("login.html", {"request": request, "error": "Tu usuario existe pero NO tiene acceso a 'AOPlanSystem'."})
+
     
         # Create Token (Mirroring capabilities of Accounts Service)
         access_token = create_access_token(data={
