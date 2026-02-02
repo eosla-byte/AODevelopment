@@ -1259,8 +1259,11 @@
 
         // --- NEW SPLIT PANE HEADER LOGIC ---
         function cloneGanttHeader() {
-            const sourceSvg = document.getElementById('gantt-target');
-            const headerContainer = document.getElementById('timeline-header-container'); // NEW Container
+            const container = document.getElementById('gantt-target');
+            if (!container) return;
+
+            const sourceSvg = container.querySelector('svg');
+            const headerContainer = document.getElementById('timeline-header-container');
 
             if (!sourceSvg || !headerContainer) return;
 
