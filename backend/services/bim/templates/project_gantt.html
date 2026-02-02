@@ -851,7 +851,7 @@
                             if (!co.visible) customClasses.push('hidden-task');
                         }
 
-                        return {
+                        ganttTasks.push({
                             id: t.id,
                             name: t.name,
                             start: formatDateInput(t.start),
@@ -860,7 +860,7 @@
                             dependencies: t.dependencies,
                             custom_class: customClasses.join(' '),
                             comments: t.comments || []
-                        };
+                        });
                     });
 
                     updateDynamicCSS();
