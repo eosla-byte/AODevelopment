@@ -583,7 +583,7 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                     "start": start_str,
                     "end": end_str,
                     "progress": act.pct_complete or 0,
-                    "dependencies": act.predecessors or "",
+                    "dependencies": getattr(act, 'predecessors', "") or "",
                     "contractor": getattr(act, 'contractor', "") or "",
                     "style": getattr(act, 'style', None),
                     "comments": getattr(act, 'comments', []) or []
