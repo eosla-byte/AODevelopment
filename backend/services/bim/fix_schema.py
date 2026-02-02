@@ -9,37 +9,46 @@ def run_migration():
         
         # 1. Add style column
         try:
-            db.execute(text("ALTER TABLE bim_activities ADD COLUMN IF NOT EXISTS style VARCHAR"))
+            db.execute(text("ALTER TABLE bim_activities ADD COLUMN style VARCHAR"))
             print("Added style column")
         except Exception as e:
-            print(f"Style column check: {e}")
+            if "duplicate column" in str(e).lower() or "no such column" in str(e).lower(): 
+                 # SQLite: duplicate column name
+                 print("Style column already exists (or error ignored)")
+            else:
+                 print(f"Style column check: {e}")
             
         # 2. Add contractor column
         try:
-            db.execute(text("ALTER TABLE bim_activities ADD COLUMN IF NOT EXISTS contractor VARCHAR"))
+            db.execute(text("ALTER TABLE bim_activities ADD COLUMN contractor VARCHAR"))
             print("Added contractor column")
         except Exception as e:
-            print(f"Contractor column check: {e}")
+            if "duplicate column" in str(e).lower():
+                 print("Contractor column already exists")
+            else:
+                 print(f"Contractor column check: {e}")
 
         # 3. Add predecessors column
         try:
-            db.execute(text("ALTER TABLE bim_activities ADD COLUMN IF NOT EXISTS predecessors VARCHAR"))
+            db.execute(text("ALTER TABLE bim_activities ADD COLUMN predecessors VARCHAR"))
             print("Added predecessors column")
         except Exception as e:
-            print(f"Predecessors column check: {e}")
+            if "duplicate column" in str(e).lower():
+                 print("Predecessors column already exists")
+            else:
+                 print(f"Predecessors column check: {e}")
             
         # 4. Add comments column
         try:
-            # Check DB type? Assuming Postgres (JSONB) or SQLite (JSON/TEXT)
-            # Using generic JSON or TEXT if not supported?
-            # SQLAlchemy `JSON` maps to JSON in PG.
-            # Raw SQL: "ADD COLUMN ... JSON" might fail on SQLite if not enabled? 
-            # SQLite supports JSON as TEXT usually.
-            # Let's try flexible approach.
-            db.execute(text("ALTER TABLE bim_activities ADD COLUMN IF NOT EXISTS comments JSON"))
+            # SQLite uses TEXT for JSON usually, or just straight JSON if extension enabled.
+            # Safe bet is adding as TEXT or JSON, catching error.
+            db.execute(text("ALTER TABLE bim_activities ADD COLUMN comments JSON"))
             print("Added comments column")
         except Exception as e:
-            print(f"Comments column check: {e}")
+            if "duplicate column" in str(e).lower():
+                 print("Comments column already exists")
+            else:
+                 print(f"Comments column check: {e}")
             
         db.commit()
         print("Schema update complete.")
