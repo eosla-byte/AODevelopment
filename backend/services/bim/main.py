@@ -580,6 +580,10 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                 tasks_json.append({
                     "id": str(act.activity_id) if act.activity_id else str(act.id),
                     "name": act.name,
+                    "start": start_str,
+                    "end": end_str,
+                    "progress": act.pct_complete or 0,
+                    "dependencies": act.predecessors or "",
                     "contractor": getattr(act, 'contractor', "") or "",
                     "style": getattr(act, 'style', None),
                     "comments": getattr(act, 'comments', []) or []
