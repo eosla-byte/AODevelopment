@@ -821,15 +821,28 @@
                 document.head.appendChild(style);
             }
             let css = '';
+
+            // 1. Company Styles (Efficient Class-based)
             companies.forEach(c => {
                 if (c.color) {
                     const safeName = c.name.replace(/\s+/g, '-');
                     css += `
                          .company-${safeName} .bar-progress { fill: ${c.color} !important; }
-                         .company-${safeName} .bar { fill: ${c.color}40 !important; stroke: ${c.color} !important; }
+                         .company-${safeName} .bar { fill: ${c.color}33 !important; stroke: ${c.color} !important; }
                      `;
                 }
             });
+
+            // 2. Manual Overrides (ID-based, for legacy or specific overrides)
+            tasks.forEach(t => {
+                if (t._style && t._style.fill) {
+                    css += `
+                        .gantt .bar-wrapper[data-id="${t.id}"] .bar { fill: ${t._style.fill} !important; opacity: 0.6 !important; }
+                        .gantt .bar-wrapper[data-id="${t.id}"] .bar-progress { fill: ${t._style.fill} !important; }
+                    `;
+                }
+            });
+
             style.innerHTML = css;
         }
 
@@ -1100,36 +1113,7 @@
 
 
 
-        function updateDynamicCSS() {
-            let styleEl = document.getElementById('dynamic-gantt-styles');
-            if (!styleEl) {
-                styleEl = document.createElement('style');
-                styleEl.id = 'dynamic-gantt-styles';
-                document.head.appendChild(styleEl);
-            }
-            let css = '';
-            tasks.forEach(t => {
-                let color = null;
-                // 1. Manual Style
-                if (t._style && t._style.fill) color = t._style.fill;
 
-                // 2. Company Style (Priority)
-                const companyName = (t.contractor || '').trim();
-                const comp = companies.find(c => c.name === companyName);
-                if (comp && comp.color && comp.visible) {
-                    color = comp.color;
-                }
-
-                if (color) {
-                    // Safe Selector using data-id which is reliable in Frappe Gantt
-                    css += `
-            .gantt.bar - wrapper[data - id="${t.id}"] .bar { fill: ${color} !important; opacity: 0.4!important; }
-                        .gantt.bar - wrapper[data - id="${t.id}"] .bar - progress { fill: ${color} !important; opacity: 1!important; }
-        `;
-                }
-            });
-            styleEl.textContent = css;
-        }
 
         // --- TODAY LINE LOGIC ---
         function drawTodayLine() {
@@ -1799,23 +1783,23 @@
                 if (isParent) {
                     const isCollapsed = collapsedTasks.has(task.id);
                     const icon = isCollapsed ? 'fa-caret-right' : 'fa-caret-down';
-                    toggleHtml = `< i class="fas ${icon} toggle-icon" onclick = "toggleCollapse(${index})" ></i > `;
+                    toggleHtml = `<i class="fas ${icon} toggle-icon" onclick="toggleCollapse(${index})"></i>`;
                 } else {
-                    toggleHtml = `< span class="toggle-icon" ></span > `;
+                    toggleHtml = `<span class="toggle-icon"></span>`;
                 }
 
                 // Contractor Cell with Color Pill
                 let contractorHtml = '';
                 const comp = companies.find(c => c.name === companyName);
                 if (comp) {
-                    contractorHtml = `< div class="flex items-center gap-1 overflow-hidden" ><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${comp.color}"></div><span class="truncate min-w-0" title="${task.contractor}">${task.contractor}</span></div > `;
+                    contractorHtml = `<div class="flex items-center gap-1 overflow-hidden" ><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${comp.color}"></div><span class="truncate min-w-0" title="${task.contractor}">${task.contractor}</span></div>`;
                 } else {
-                    contractorHtml = `< input class="cell-input" value = "${task.contractor || ''}" readonly > `;
+                    contractorHtml = `<input class="cell-input" value="${task.contractor || ''}" readonly>`;
                 }
 
 
                 tr.innerHTML = `
-            < td class="text-center text-gray-500 text-xs" > ${index + 1}</td >
+            <td class="text-center text-gray-500 text-xs">${index + 1}</td>
                     
                     <td class="grid-cell" data-field="name" data-id="${task.id}">
                         <div style="display: flex; align-items: center; height:100%">
