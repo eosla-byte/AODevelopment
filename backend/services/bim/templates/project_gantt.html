@@ -218,7 +218,8 @@
             // Look Ahead State
             lookAheadStart: new Date(),
             lookAheadWeeks: 3,
-            showLookAhead: false
+            showLookAhead: false,
+            companyColors: {}
         };
 
         // --- INIT ---
@@ -250,7 +251,7 @@
         State.lookAheadStart = new Date(today);
 
         // Toolbar Injection for Look Ahead
-        injectLookAheadControls();
+        injectToolbarControls();
 
         initTimeEngine();
         HierarchyEngine.recalculate(State.tasks);
@@ -268,22 +269,23 @@
         }
         });
 
-        // --- LOOK AHEAD CONTROLS ---
-        function injectLookAheadControls() {
+        // --- CONTROLS INJECTION ---
+        function injectToolbarControls() {
             const toolbar = document.getElementById('toolbar');
 
-            // Separator
-            const sep = document.createElement('div');
-            sep.style.width = '1px'; sep.style.height = '24px'; sep.style.background = '#e5e7eb'; sep.style.margin = '0 10px';
-            toolbar.appendChild(sep);
+            // --- EXISTING 1: ZOOM ---
+            // (Assumed existing zoom buttons are there or we leave them alone if hardcoded)
 
-            // Label
+            // --- 2. SEPARATOR ---
+            const sep1 = createSeparator();
+            toolbar.appendChild(sep1);
+
+            // --- 3. LOOK AHEAD ---
             const lbl = document.createElement('span');
             lbl.innerText = "Look Ahead:";
             lbl.className = "font-semibold text-gray-600 mr-2";
             toolbar.appendChild(lbl);
 
-            // Date Picker
             const dateInput = document.createElement('input');
             dateInput.type = 'date';
             dateInput.className = "border rounded px-2 py-1 text-sm";
@@ -295,7 +297,6 @@
             };
             toolbar.appendChild(dateInput);
 
-            // Weeks Input
             const weeksInput = document.createElement('input');
             weeksInput.type = 'number';
             weeksInput.className = "border rounded px-2 py-1 text-sm w-16 ml-2";
@@ -308,21 +309,170 @@
             };
             toolbar.appendChild(weeksInput);
 
-            // Weeks Label
             const wLabel = document.createElement('span');
             wLabel.innerText = "semanas";
             wLabel.className = "text-gray-600 ml-1 text-xs";
             toolbar.appendChild(wLabel);
 
-            // Toggle Button (Optional, maybe always on?)
-            const btn = document.createElement('button');
-            btn.className = "ml-2 bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded text-sm";
-            btn.innerText = "Ver";
-            btn.onclick = () => {
-                State.showLookAhead = !State.showLookAhead;
-                render();
-            };
-            toolbar.appendChild(btn);
+            // --- 4. SEPARATOR ---
+            const sep2 = createSeparator();
+            toolbar.appendChild(sep2);
+
+            // --- 5. EMPRESAS (COMPANIES) ---
+            const btnCompanies = document.createElement('button');
+            btnCompanies.className = "bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1 rounded text-sm font-medium flex items-center shadow-sm";
+            btnCompanies.innerHTML = '<i class="fas fa-building mr-2 text-blue-500"></i> Empresas';
+            btnCompanies.onclick = openCompanyModal;
+            toolbar.appendChild(btnCompanies);
+
+            // --- 6. IMPORT (MPP) ---
+            const btnImport = document.createElement('button');
+            btnImport.className = "ml-2 bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1 rounded text-sm font-medium flex items-center shadow-sm";
+            btnImport.innerHTML = '<i class="fas fa-file-import mr-2"></i> Importar .mpp';
+            btnImport.onclick = () => document.getElementById('file-upload').click();
+            toolbar.appendChild(btnImport);
+
+            // Hidden File Input
+            const fileInput = document.createElement('input');
+            fileInput.id = 'file-upload';
+            fileInput.type = 'file';
+            fileInput.accept = '.mpp,.xml';
+            fileInput.style.display = 'none';
+            fileInput.onchange = handleFileUpload;
+            toolbar.appendChild(fileInput);
+        }
+
+        function createSeparator() {
+            const sep = document.createElement('div');
+            sep.style.width = '1px'; sep.style.height = '24px'; sep.style.background = '#e5e7eb'; sep.style.margin = '0 10px';
+            return sep;
+        }
+
+        // --- IMPORT LOGIC ---
+        async function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!confirm(`¿Importar ${file.name}? Esto creará una nueva versión.`)) {
+                e.target.value = ''; // Reset
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const urlParts = window.location.pathname.split('/');
+            const projectId = urlParts[urlParts.length - 1]; // Assume ID is last part
+
+            const btn = e.target.previousElementSibling;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Subiendo...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`/api/projects/${projectId}/schedule`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (res.ok) {
+                    alert('Importación exitosa. Recargando...');
+                    window.location.reload();
+                } else {
+                    const err = await res.json();
+                    alert('Error: ' + (err.detail || 'Error desconocido'));
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Error de conexión');
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                e.target.value = '';
+            }
+        }
+
+        // --- COMPANIES LOGIC ---
+        function openCompanyModal() {
+            const contractors = new Set();
+            State.tasks.forEach(t => {
+                const c = t.contractor;
+                if (c && c.trim() !== '' && c !== 'N/A') contractors.add(c.trim());
+            });
+
+            let overlay = document.getElementById('modal-overlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'modal-overlay';
+                overlay.className = "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50";
+                document.body.appendChild(overlay);
+            }
+            overlay.innerHTML = '';
+
+            const modal = document.createElement('div');
+            modal.className = "bg-white rounded-lg shadow-xl w-96 max-h-[80vh] flex flex-col";
+
+            const header = document.createElement('div');
+            header.className = "px-6 py-4 border-b flex justify-between items-center";
+            header.innerHTML = '<h3 class="text-lg font-bold text-gray-800">Gestión de Empresas</h3><button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>';
+            modal.appendChild(header);
+
+            const body = document.createElement('div');
+            body.className = "p-6 overflow-y-auto flex-1";
+
+            if (contractors.size === 0) {
+                body.innerHTML = '<p class="text-gray-500 italic text-center">No hay empresas asignadas en las tareas.</p>';
+            } else {
+                contractors.forEach(c => {
+                    const row = document.createElement('div');
+                    row.className = "flex items-center justify-between mb-3";
+
+                    const label = document.createElement('span');
+                    label.innerText = c;
+                    label.className = "font-medium text-gray-700 truncate mr-4";
+
+                    const input = document.createElement('input');
+                    input.type = 'color';
+                    input.className = "w-8 h-8 rounded cursor-pointer border-0 p-0";
+                    input.value = State.companyColors[c] || stringToColor(c);
+                    if (!State.companyColors[c]) State.companyColors[c] = input.value; // Save default
+
+                    input.onchange = (e) => {
+                        State.companyColors[c] = e.target.value;
+                        render();
+                    };
+
+                    row.appendChild(label);
+                    row.appendChild(input);
+                    body.appendChild(row);
+                });
+            }
+            modal.appendChild(body);
+
+            const footer = document.createElement('div');
+            footer.className = "px-6 py-4 border-t bg-gray-50 flex justify-end";
+            footer.innerHTML = '<button onclick="closeModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Cerrar</button>';
+            modal.appendChild(footer);
+
+            overlay.appendChild(modal);
+            overlay.style.display = 'flex';
+        }
+
+        window.closeModal = function () {
+            document.getElementById('modal-overlay').style.display = 'none';
+        }
+
+        function stringToColor(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                hash = str.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            let color = '#';
+            for (let i = 0; i < 3; i++) {
+                let value = (hash >> (i * 8)) & 0xFF;
+                color += ('00' + value.toString(16)).substr(-2);
+            }
+            return color;
         }
 
         function scrollToToday() {
@@ -835,7 +985,29 @@
                         const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                         bgRect.setAttribute('x', x); bgRect.setAttribute('y', barY);
                         bgRect.setAttribute('width', Math.max(w, 5)); bgRect.setAttribute('height', barH);
+
+                        // COLOR LOGIC: Check Company Color -> Default Blue
+                        const companyColor = (task.contractor && State.companyColors[task.contractor]) ? State.companyColors[task.contractor] : '#dbeafe';
+                        // If company color is set, use it for background? Or Progress?
+                        // Usually Gantt background is pale, progress is dark.
+                        // Let's make Background = Pale version of Company Color? 
+                        // Or just use Company Color for Progress and standard pale blue for background?
+                        // User Request: "sus colores". Implicitly distinctive.
+
+                        // Revised: 
+                        // Background = light gray/blue standard (or very light version of company color if we want to be fancy)
+                        // Progress = Company Color.
+
+                        // Let's stick to requested "Agrega los botones... por ejemplo el de empresas y sus colores".
+                        // If I change the progress color, it overrides the 'dark blue' for progress.
+                        // Let's update the PROGRESS bar color to be the company color.
+                        // And Background to be a default pale, or matching pale.
+
+                        // Simple: Background #dbeafe (default). 
+                        // Progress uses Company Color if exists, else #3b82f6.
+
                         bgRect.setAttribute('fill', isHighlighted ? '#fecaca' : '#dbeafe'); // Red/Blue
+
                         bgRect.setAttribute('rx', barRadius);
                         g.appendChild(bgRect);
 
@@ -844,10 +1016,11 @@
                         if (pct > 0 && !isNaN(pct)) {
                             const progRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                             progRect.setAttribute('x', x); progRect.setAttribute('y', barY);
+                            const companyFill = (task.contractor && State.companyColors[task.contractor]) ? State.companyColors[task.contractor] : '#3b82f6';
+
                             progRect.setAttribute('width', Math.max(w * pct, 0));
                             progRect.setAttribute('height', barH);
-                            progRect.setAttribute('fill', isHighlighted ? '#dc2626' : '#3b82f6');
-                            progRect.setAttribute('rx', barRadius);
+                            progRect.setAttribute('fill', isHighlighted ? '#dc2626' : companyFill); progRect.setAttribute('rx', barRadius);
                             g.appendChild(progRect);
                         }
                     }
