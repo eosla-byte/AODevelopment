@@ -1042,6 +1042,55 @@
                     `;
                     list.appendChild(item);
                 });
+                // Auto scroll to bottom
+                list.scrollTop = list.scrollHeight;
+            };
+
+            renderList();
+            content.appendChild(list);
+
+            // Footer (Input)
+            const footer = document.createElement('div');
+            footer.className = "mt-4 border-t pt-3 flex gap-2";
+            footer.innerHTML = `
+                <input type="text" id="new-comment-input" class="flex-1 border rounded px-2 py-1 text-sm focus:outline-none focus:border-blue-500" placeholder="Escribir comentario...">
+                <button id="btn-add-comment" class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700">Enviar</button>
+            `;
+
+            const addFn = async () => {
+                const input = footer.querySelector('input');
+                const text = input.value.trim();
+                if (!text) return;
+
+                if (!t.comments) t.comments = [];
+                t.comments.push({
+                    text: text,
+                    date: new Date().toISOString(),
+                    user: "Usuario"
+                });
+
+                // Update UI
+                renderList();
+                input.value = '';
+
+                // Save
+                saveProjectDataLocally();
+                await updateField(t.id, 'comments', t.comments);
+            };
+
+            footer.querySelector('button').onclick = addFn;
+            footer.querySelector('input').onkeydown = (e) => {
+                if (e.key === 'Enter') addFn();
+            };
+
+            content.appendChild(footer);
+
+            overlay.appendChild(content);
+            document.body.appendChild(overlay);
+        } <div class="text-gray-700 whitespace-pre-wrap">${c.text}</div>
+        `;
+                    list.appendChild(item);
+                });
                 list.scrollTop = list.scrollHeight;
             };
             renderList();
@@ -1111,9 +1160,9 @@
                 if (color) {
                     // Safe Selector using data-id which is reliable in Frappe Gantt
                     css += `
-                        .gantt .bar-wrapper[data-id="${t.id}"] .bar { fill: ${color} !important; opacity: 0.4 !important; }
-                        .gantt .bar-wrapper[data-id="${t.id}"] .bar-progress { fill: ${color} !important; opacity: 1 !important; }
-                    `;
+            .gantt.bar - wrapper[data - id="${t.id}"] .bar { fill: ${ color } !important; opacity: 0.4!important; }
+                        .gantt.bar - wrapper[data - id="${t.id}"] .bar - progress { fill: ${ color } !important; opacity: 1!important; }
+        `;
                 }
             });
             styleEl.textContent = css;
@@ -1174,9 +1223,9 @@
         // State
         let companies = []; // { name, color, visible }
         const DEFAULT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-        const STORAGE_KEY = `gantt_companies_${projectId}`;
+        const STORAGE_KEY = `gantt_companies_${ projectId } `;
 
-        const DATA_KEY = `gantt_data_${projectId}`;
+        const DATA_KEY = `gantt_data_${ projectId } `;
 
         // Save Companies AND Assignments/Comments to LocalStorage
         function saveProjectDataLocally() {
@@ -1284,8 +1333,8 @@
                 const div = document.createElement('div');
                 div.className = "flex items-center gap-3 p-3 bg-white border border-gray-100 shadow-sm rounded-lg hover:shadow-md transition-shadow group";
                 div.innerHTML = `
-                    <div class="relative w-8 h-8 rounded-full border border-gray-200 cursor-pointer shadow-inner" 
-                         style="background-color: ${c.color}">
+            < div class="relative w-8 h-8 rounded-full border border-gray-200 cursor-pointer shadow-inner"
+        style = "background-color: ${c.color}" >
                         <input type="color" value="${c.color}" 
                             class="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                             title="Cambiar Color"
@@ -1299,7 +1348,7 @@
                         <input type="checkbox" ${c.visible ? 'checked' : ''} 
                             onchange="toggleCompanyVisibility(${idx})" class="form-checkbox h-4 w-4 text-blue-600 rounded">
                     </label>
-                `;
+        `;
                 container.appendChild(div);
             });
         }
@@ -1411,7 +1460,7 @@
                 companies.forEach(c => {
                     const item = document.createElement('button');
                     item.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 flex items-center gap-2";
-                    item.innerHTML = `<span class="w-2 h-2 rounded-full" style="background:${c.color}"></span> ${c.name}`;
+                    item.innerHTML = `< span class="w-2 h-2 rounded-full" style = "background:${c.color}" ></span > ${ c.name } `;
                     item.onclick = (e) => {
                         e.stopPropagation();
                         assignCompanyToSelection(c.name);
@@ -1435,7 +1484,7 @@
             // --- Feature: ADD COMMENTS ---
             const addCommentBtn = document.createElement('button');
             addCommentBtn.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 text-gray-700 border-t mt-1 flex items-center gap-2";
-            addCommentBtn.innerHTML = `<i class="fas fa-comment"></i> Agregar Comentario`;
+            addCommentBtn.innerHTML = `< i class="fas fa-comment" ></i > Agregar Comentario`;
             addCommentBtn.onclick = (e) => {
                 e.stopPropagation();
                 addCommentToTask(hoveredId);
@@ -1446,7 +1495,7 @@
             // --- Feature: REGISTER DELAY ---
             const delayBtn = document.createElement('button');
             delayBtn.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 border-top mt-1 flex items-center gap-2";
-            delayBtn.innerHTML = `<i class="fas fa-clock"></i> Registrar Atraso`;
+            delayBtn.innerHTML = `< i class="fas fa-clock" ></i > Registrar Atraso`;
             delayBtn.onclick = (e) => {
                 e.stopPropagation();
                 registerDelay(hoveredId);
@@ -1509,7 +1558,7 @@
 
             // 2. Add Comment/Log
             if (!t.comments) t.comments = [];
-            const logEntry = `[ATRASO REGISTRADO] +${days} días. Razón: ${reason || 'N/A'}`;
+            const logEntry = `[ATRASO REGISTRADO]+${ days } días.Razón: ${ reason || 'N/A' } `;
             t.comments.push({
                 text: logEntry,
                 date: new Date().toISOString(),
@@ -1526,7 +1575,7 @@
             await updateTaskDate(id, t.start, newEnd);
 
             // 4. Feedback
-            alert(`Atraso registrado. Nueva fecha fin: ${newEnd.toISOString().split('T')[0]}`);
+            alert(`Atraso registrado.Nueva fecha fin: ${ newEnd.toISOString().split('T')[0] } `);
         }
 
 
@@ -1574,7 +1623,7 @@
                     const yyyy = today.getFullYear();
                     const mm = String(today.getMonth() + 1).padStart(2, '0');
                     const dd = String(today.getDate()).padStart(2, '0');
-                    dateInput.value = `${yyyy}-${mm}-${dd}`;
+                    dateInput.value = `${ yyyy } -${ mm } -${ dd } `;
                     if (typeof updateLookahead === 'function') updateLookahead();
                 }
             } else {
@@ -1679,7 +1728,7 @@
                 // (TaskStart < LHEnd) && (TaskEnd > LHStart)
                 if (tStart < lhEnd && tEnd > lhStart) {
                     // Highlight Row in Grid
-                    const tr = document.querySelector(`tr[data-id="${t.id}"]`);
+                    const tr = document.querySelector(`tr[data - id= "${t.id}"]`);
                     if (tr) {
                         tr.classList.add('lookahead-row');
 
@@ -1770,7 +1819,7 @@
                         // User said "activarle color y resalte".
                         // Let's create a subtle pill or text color in the contractor column
                         // AND maybe a left border on the row?
-                        tr.style.borderLeft = `3px solid ${c.color}`;
+                        tr.style.borderLeft = `3px solid ${ c.color } `;
                     }
                 }
 
@@ -1780,23 +1829,23 @@
                 if (isParent) {
                     const isCollapsed = collapsedTasks.has(task.id);
                     const icon = isCollapsed ? 'fa-caret-right' : 'fa-caret-down';
-                    toggleHtml = `<i class="fas ${icon} toggle-icon" onclick="toggleCollapse(${index})"></i>`;
+                    toggleHtml = `< i class="fas ${icon} toggle-icon" onclick = "toggleCollapse(${index})" ></i > `;
                 } else {
-                    toggleHtml = `<span class="toggle-icon"></span>`;
+                    toggleHtml = `< span class="toggle-icon" ></span > `;
                 }
 
                 // Contractor Cell with Color Pill
                 let contractorHtml = '';
                 const comp = companies.find(c => c.name === companyName);
                 if (comp) {
-                    contractorHtml = `<div class="flex items-center gap-1 overflow-hidden"><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${comp.color}"></div><span class="truncate min-w-0" title="${task.contractor}">${task.contractor}</span></div>`;
+                    contractorHtml = `< div class="flex items-center gap-1 overflow-hidden" ><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${comp.color}"></div><span class="truncate min-w-0" title="${task.contractor}">${task.contractor}</span></div > `;
                 } else {
-                    contractorHtml = `<input class="cell-input" value="${task.contractor || ''}" readonly>`;
+                    contractorHtml = `< input class="cell-input" value = "${task.contractor || ''}" readonly > `;
                 }
 
 
                 tr.innerHTML = `
-                    <td class="text-center text-gray-500 text-xs">${index + 1}</td>
+            < td class="text-center text-gray-500 text-xs" > ${ index + 1 }</td >
                     
                     <td class="grid-cell" data-field="name" data-id="${task.id}">
                         <div style="display: flex; align-items: center; height:100%">
@@ -1825,7 +1874,7 @@
                     <td class="grid-cell text-center" data-field="progress" data-id="${task.id}">
                          <input type="number" class="cell-input text-center" value="${task.progress}" readonly>
                     </td>
-                `;
+        `;
                 tbody.appendChild(tr);
             });
 
@@ -1880,13 +1929,13 @@
         }
 
         function toggleSelectCell(id, field) {
-            const key = `${id}:${field}`;
+            const key = `${ id }:${ field } `;
             if (selectedCells.has(key)) selectedCells.delete(key);
             else selectedCells.add(key);
         }
 
         function selectCell(id, field) {
-            selectedCells.add(`${id}:${field}`);
+            selectedCells.add(`${ id }:${ field } `);
         }
 
         function selectRange(idx1, idx2, field1, field2) {
@@ -1908,7 +1957,7 @@
             for (let i = startRow; i <= endRow; i++) {
                 const t = tasks[i];
                 for (let j = startCol; j <= endCol; j++) {
-                    selectedCells.add(`${t.id}:${cols[j]}`);
+                    selectedCells.add(`${ t.id }:${ cols[j] } `);
                 }
             }
         }
@@ -1919,7 +1968,7 @@
 
             selectedCells.forEach(key => {
                 const [id, field] = key.split(':');
-                const cell = document.querySelector(`.grid-cell[data-id="${id}"][data-field="${field}"]`);
+                const cell = document.querySelector(`.grid - cell[data - id="${id}"][data - field="${field}"]`);
                 if (cell) cell.classList.add('selected');
             });
         }
@@ -2188,7 +2237,7 @@
 
         async function saveTaskStyle(id, styleObj) {
             try {
-                await fetch(`/api/activities/${id}`, {
+                await fetch(`/ api / activities / ${ id } `, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ style: JSON.stringify(styleObj) })
@@ -2209,7 +2258,7 @@
             const payload = {};
             payload[field] = value;
 
-            await fetch(`/api/activities/${id}`, {
+            await fetch(`/ api / activities / ${ id } `, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -2246,15 +2295,15 @@
             // Persist (Create on backend usually, but for now just local update until Save)
             // Ideally we call POST /api/activities
             try {
-                await fetch(`/api/projects/${projectId}/activities`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(newTask)
+                await fetch(`/ api / projects / ${ projectId }/activities`, {
+        method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newTask)
                 });
             } catch (e) { console.error("Error creating task", e); } // Silently fail/continue
 
-            renderGrid();
-            renderGantt(gantt ? gantt.options.view_mode : 'Day');
+        renderGrid();
+        renderGantt(gantt ? gantt.options.view_mode : 'Day');
         }
 
         async function deleteTask() {
