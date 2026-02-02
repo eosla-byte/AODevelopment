@@ -197,67 +197,189 @@
         // --- CONFIG ---
         const Config = {
             columns: [
-                { id: 'id', label: 'ID', width: 40, align: 'center' },
-                { id: 'name', label: 'Tarea', width: 300, align: 'left' },
-                { id: 'start', label: 'Inicio', width: 100, align: 'center' },
-                { id: 'end', label: 'Fin', width: 100, align: 'center' },
-                { id: 'pct', label: '%', width: 60, align: 'center' }
+                { id: 'wbs', label: 'ID', width: 60, align: 'left' }, // Changed ID to WBS
+                { id: 'name', label: 'Tarea', width: 300, align: 'left', editable: true },
+                { id: 'start', label: 'Inicio', width: 100, align: 'center', editable: true },
+                { id: 'end', label: 'Fin', width: 100, align: 'center', editable: true },
+                { id: 'progress', label: '%', width: 60, align: 'center', editable: true } // Mapped "pct" to "progress"
             ],
             rowHeight: 32,
             headerHeight: 60
         };
 
         const State = {
-            tasks: [],
+            tasks: [], // includes level, collapsed, isSummary
             zoom: 'WEEK',
             pxPerMin: 0.01,
             startDate: new Date(),
-            totalWidth: 2000
+            totalWidth: 2000,
+            selectedIds: new Set(),
+            lastSelectedId: null
         };
 
         // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
             const serverTasks = {{ tasks | tojson | safe
         }};
-        State.tasks = serverTasks;
+        // Post-process server tasks
+        State.tasks = serverTasks.map((t, i) => ({
+            ...t,
+            level: t.level || 0,
+            collapsed: false,
+            isSummary: false, // Calculated later
+            childrenIds: [],
+            parentId: null,
+            orderIndex: i
+        }));
+
         initTimeEngine();
+        HierarchyEngine.recalculate(State.tasks);
         render();
+
+        // Global Keys
+        document.addEventListener('keydown', handleGlobalKeys);
         });
 
-        function initTimeEngine() {
-            // Find Min Date
-            if (State.tasks.length > 0) {
-                let min = new Date(State.tasks[0].start || new Date());
-                State.tasks.forEach(t => {
-                    if (t.start && new Date(t.start) < min) min = new Date(t.start);
+        // --- HIERARCHY ENGINE ---
+        const HierarchyEngine = {
+            recalculate(tasks) {
+                // 1. Reset
+                tasks.forEach((t, i) => {
+                    t.isSummary = false;
+                    t.childrenIds = [];
+                    t.parentId = null;
+                    t.wbs = ''; // Re-calc logic if needed, but we trust level for now
+                    t.orderIndex = i;
                 });
-                min.setDate(min.getDate() - 15); // Buffer
-                State.startDate = min;
-            } else {
-                State.startDate = new Date();
+
+                // 2. Build Tree based on linear list
+                // Stack of "active parents" at each level
+                // Level 0 parent at stack[0]...
+                const parentStack = [];
+
+                tasks.forEach(task => {
+                    const level = task.level;
+
+                    // Maintain stack such that stack[L] is the last task seen at Level L
+                    parentStack[level] = task;
+
+                    // Parent is at level - 1
+                    if (level > 0 && parentStack[level - 1]) {
+                        const parent = parentStack[level - 1];
+                        parent.childrenIds.push(task.id);
+                        parent.isSummary = true;
+                        task.parentId = parent.id;
+                    }
+
+                    // Clear deeper levels from stack as they are now closed
+                    for (let l = level + 1; l < parentStack.length; l++) {
+                        parentStack[l] = null;
+                    }
+                });
+            },
+
+            toggleCollapse(taskId) {
+                const task = State.tasks.find(t => t.id === taskId);
+                if (task && task.isSummary) {
+                    task.collapsed = !task.collapsed;
+                    render();
+                }
+            },
+
+            indent() {
+                const toModify = new Set();
+                State.tasks.forEach(t => {
+                    if (State.selectedIds.has(t.id)) {
+                        toModify.add(t);
+                        // Include subtree
+                        const subtree = this.getSubtree(t);
+                        subtree.forEach(child => toModify.add(child));
+                    }
+                });
+
+                // Validate: Can we indent? (Prev sibling must exist)
+                // We'll skip validation for brevity/ux fluidity (Project usually allows it and auto-parents)
+
+                toModify.forEach(t => {
+                    t.level += 1;
+                });
+
+                this.recalculate(State.tasks);
+                render();
+            },
+
+            outdent() {
+                const toModify = new Set();
+                State.tasks.forEach(t => {
+                    if (State.selectedIds.has(t.id)) {
+                        toModify.add(t);
+                        const subtree = this.getSubtree(t);
+                        subtree.forEach(child => toModify.add(child));
+                    }
+                });
+
+                toModify.forEach(t => {
+                    if (t.level > 0) t.level -= 1;
+                });
+
+                this.recalculate(State.tasks);
+                render();
+            },
+
+            getSubtree(parent) {
+                const results = [];
+                const idx = parent.orderIndex;
+                for (let i = idx + 1; i < State.tasks.length; i++) {
+                    const t = State.tasks[i];
+                    if (t.level > parent.level) {
+                        results.push(t);
+                    } else {
+                        break;
+                    }
+                }
+                return results;
+            }
+        };
+
+        // --- INTERACTION ---
+        function handleGlobalKeys(e) {
+            // Indent/Outdent
+            if (e.altKey && e.shiftKey) {
+                if (e.key === 'ArrowRight') {
+                    HierarchyEngine.indent();
+                    e.preventDefault();
+                } else if (e.key === 'ArrowLeft') {
+                    HierarchyEngine.outdent();
+                    e.preventDefault();
+                }
             }
         }
 
-        function render() {
-            renderHeader();
-            renderBody();
-            renderTimelineHeader();
+        function selectRow(task, mode) { // mode: 'single', 'multi', 'range'
+            if (mode === 'single') {
+                State.selectedIds.clear();
+                State.selectedIds.add(task.id);
+            } else if (mode === 'multi') {
+                if (State.selectedIds.has(task.id)) State.selectedIds.delete(task.id);
+                else State.selectedIds.add(task.id);
+            } else {
+                State.selectedIds.add(task.id);
+            }
+            State.lastSelectedId = task.id;
+            render();
         }
 
         // --- RENDERERS ---
         function renderHeader() {
             const tr = document.getElementById('header-row');
-            // Clear existing cols except timeline
             const timelineTh = document.getElementById('timeline-header-cell');
 
-            // Remove old sticky headers (keep timeline)
+            // Clean logic (same as before)
             Array.from(tr.children).forEach(child => {
                 if (child.id !== 'timeline-header-cell') tr.removeChild(child);
             });
 
             let leftOffset = 0;
-
-            // 1. Render Sticky Columns
             Config.columns.forEach(col => {
                 const th = document.createElement('th');
                 th.className = 'sticky-col';
@@ -265,47 +387,50 @@
                 th.style.width = col.width + 'px';
                 th.style.left = leftOffset + 'px';
                 th.style.minWidth = col.width + 'px';
-                th.style.maxWidth = col.width + 'px';
-
-                // Resizer
                 const resizer = document.createElement('div');
                 resizer.className = 'resizer';
                 resizer.onmousedown = (e) => initResize(e, col);
                 th.appendChild(resizer);
-
-                tr.insertBefore(th, timelineTh); // Insert before timeline
+                tr.insertBefore(th, timelineTh);
                 leftOffset += col.width;
             });
 
-            // 2. Set Timeline Width
             State.totalWidth = calculateTotalWidth();
             timelineTh.style.width = State.totalWidth + 'px';
-            timelineTh.style.minWidth = State.totalWidth + 'px'; // Essential for scrolling
-
-            const svg = document.getElementById('timeline-svg');
-            svg.style.width = State.totalWidth + 'px';
-            renderTimelineTicks(svg);
+            timelineTh.style.minWidth = State.totalWidth + 'px';
+            renderTimelineTicks(document.getElementById('timeline-svg'));
         }
 
         function renderTimelineTicks(svg) {
             svg.innerHTML = '';
-            // Mock Ticks based on Zoom
+            const zoom = State.zoom;
             let x = 0;
+            let curr = new Date(State.startDate);
+            let step = 100;
+            // Simplify scaling for ticks
+            if (zoom === 'DAY') step = 50;
+            if (zoom === 'MONTH') step = 200;
+
             while (x < State.totalWidth) {
-                // Month Rect
-                const w = 100; // Mock width per month
                 const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                rect.setAttribute('x', x); rect.setAttribute('y', 0);
-                rect.setAttribute('width', w); rect.setAttribute('height', 30);
+                rect.setAttribute('x', x); rect.setAttribute('y', 30);
+                rect.setAttribute('width', step); rect.setAttribute('height', 30);
                 rect.setAttribute('fill', 'none'); rect.setAttribute('stroke', '#eee');
                 svg.appendChild(rect);
 
                 const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                text.setAttribute('x', x + 5); text.setAttribute('y', 20);
-                text.textContent = "Month";
+                text.setAttribute('x', x + 5); text.setAttribute('y', 50);
+                // Formatting based on zoom
+                text.textContent = curr.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
+                text.setAttribute('font-size', '10'); text.setAttribute('fill', '#666');
                 svg.appendChild(text);
 
-                x += w;
+                // Increment
+                if (zoom === 'DAY') curr.setDate(curr.getDate() + 1);
+                else if (zoom === 'WEEK') curr.setDate(curr.getDate() + 7);
+                else curr.setMonth(curr.getMonth() + 1);
+
+                x += step;
             }
         }
 
@@ -313,51 +438,64 @@
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
 
-            // DEPENDENCY OVERLAY
-            const masterScroll = document.getElementById('master-scroll');
-            let depSvg = document.getElementById('dependency-svg');
-            if (!depSvg) {
-                depSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                depSvg.id = 'dependency-svg';
-                depSvg.style.position = 'absolute';
-                depSvg.style.top = '60px'; // Below header
-                depSvg.style.left = getTotalStickyWidth() + 'px'; // Start after columns
-                depSvg.style.width = State.totalWidth + 'px';
-                depSvg.style.height = (State.tasks.length * 32) + 'px';
-                depSvg.style.pointerEvents = 'none'; // Click through
-                depSvg.style.zIndex = 20; // Above bars? No, lines usually below or above.
-                masterScroll.appendChild(depSvg);
-            }
-            // Update Dependency Overlay Position if columns resize
-            depSvg.style.left = getTotalStickyWidth() + 'px';
+            let hiddenLevel = -1;
 
+            State.tasks.forEach(task => {
+                // Hiding Logic
+                if (hiddenLevel > -1 && task.level > hiddenLevel) return;
+                if (hiddenLevel > -1 && task.level <= hiddenLevel) hiddenLevel = -1;
+                if (task.isSummary && task.collapsed && hiddenLevel === -1) hiddenLevel = task.level;
 
-            State.tasks.forEach((task, i) => {
                 const tr = document.createElement('tr');
-                let leftOffset = 0;
+                if (State.selectedIds.has(task.id)) {
+                    tr.style.backgroundColor = 'var(--selection-blue)';
+                }
 
-                // 1. Sticky Data Cells
+                tr.onclick = (e) => {
+                    const mode = e.ctrlKey ? 'multi' : (e.shiftKey ? 'range' : 'single');
+                    selectRow(task, mode);
+                };
+
+                let leftOffset = 0;
                 Config.columns.forEach(col => {
                     const td = document.createElement('td');
                     td.className = 'sticky-col';
                     td.style.left = leftOffset + 'px';
-                    td.style.textAlign = col.align;
-                    td.style.width = col.width + 'px'; // Strict
+                    td.style.width = col.width + 'px';
                     td.style.minWidth = col.width + 'px';
-                    td.style.maxWidth = col.width + 'px';
 
+                    // INDENTATION
+                    if (col.id === 'name') {
+                        td.style.paddingLeft = (task.level * 20 + 8) + 'px';
+                        td.style.display = 'flex'; td.style.alignItems = 'center';
+                        if (task.isSummary) {
+                            const icon = document.createElement('i');
+                            icon.className = `fas fa-caret-${task.collapsed ? 'right' : 'down'} mr-2 cursor-pointer`;
+                            icon.onclick = (e) => { e.stopPropagation(); HierarchyEngine.toggleCollapse(task.id); };
+                            td.appendChild(icon);
+                        }
+                    }
+
+                    // EDITABLE
+                    const span = document.createElement('span');
                     let val = task[col.id];
                     if (col.id === 'start' || col.id === 'end') val = val ? val.split('T')[0] : '';
-                    td.innerText = val || '';
+                    if (col.id === 'progress') val = Math.round(val || 0) + '%';
 
+                    span.innerText = val || '';
+                    span.style.width = "100%";
+                    if (col.editable) {
+                        span.contentEditable = true;
+                        span.onclick = (e) => e.stopPropagation();
+                    }
+                    td.appendChild(span);
                     tr.appendChild(td);
                     leftOffset += col.width;
                 });
 
-                // 2. Gantt Row Cell
+                // GANTT BAR
                 const ganttTd = document.createElement('td');
                 ganttTd.className = 'gantt-cell';
-
                 const barSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
                 barSvg.style.width = State.totalWidth + 'px';
                 barSvg.style.height = '100%';
@@ -368,58 +506,45 @@
                     const w = timeToX(task.end) - x;
 
                     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-
-                    // Bar
                     const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute('x', x);
-                    rect.setAttribute('y', 6);
+                    rect.setAttribute('x', x); rect.setAttribute('y', 6);
                     rect.setAttribute('width', Math.max(w, 5));
-                    rect.setAttribute('height', 20);
-                    rect.setAttribute('fill', '#3b82f6');
-                    rect.setAttribute('rx', 3);
+                    rect.setAttribute('height', task.isSummary ? 12 : 20); // Skinnier summary
 
-                    // Label
-                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    text.setAttribute('x', x + Math.max(w, 5) + 5);
-                    text.setAttribute('y', 20);
-                    text.textContent = task.name;
-                    text.setAttribute('font-size', '11');
-                    text.setAttribute('fill', '#666');
-
+                    if (task.isSummary) {
+                        rect.setAttribute('fill', '#000'); // Black Summary
+                        // Brackets logic (simple rect for now)
+                        // Add triangle ends?
+                        rect.setAttribute('y', 6);
+                    } else {
+                        rect.setAttribute('fill', '#3b82f6');
+                        rect.setAttribute('rx', 3);
+                    }
                     g.appendChild(rect);
-                    g.appendChild(text);
                     barSvg.appendChild(g);
                 }
-
                 ganttTd.appendChild(barSvg);
                 tr.appendChild(ganttTd);
-
                 tbody.appendChild(tr);
             });
         }
 
-        function getTotalStickyWidth() {
-            return Config.columns.reduce((sum, col) => sum + col.width, 0);
+        function initTimeEngine() {
+            if (State.tasks.length > 0) {
+                let min = new Date(State.tasks[0].start || new Date());
+                State.tasks.forEach(t => {
+                    if (t.start && new Date(t.start) < min) min = new Date(t.start);
+                });
+                min.setDate(min.getDate() - 15);
+                State.startDate = min;
+            } else { State.startDate = new Date(); }
         }
-
-        // --- HELPERS ---
-        function calculateTotalWidth() {
-            // Find max end date
-            return 3000; // Mock
-        }
-
+        function calculateTotalWidth() { return 3000; }
         function timeToX(dateStr) {
             const d = new Date(dateStr);
             const diffMins = (d - State.startDate) / 60000;
             return diffMins * State.pxPerMin;
         }
-
-        function renderTimelineHeader() {
-            // Draw Ticks on #timeline-svg
-            // Use timeToX logic
-        }
-
-        // --- RESIZE LOGIC ---
         function initResize(e, col) {
             e.preventDefault();
             const startX = e.clientX;
@@ -428,7 +553,7 @@
             const onMove = (mv) => {
                 const diff = mv.clientX - startX;
                 col.width = Math.max(30, startW + diff);
-                render(); // Re-render everything to update offsets
+                render();
             };
 
             const onUp = () => {

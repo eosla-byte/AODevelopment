@@ -586,7 +586,9 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                     "dependencies": getattr(act, 'predecessors', "") or "",
                     "contractor": getattr(act, 'contractor', "") or "",
                     "style": getattr(act, 'style', None),
-                    "comments": getattr(act, 'comments', []) or []
+                    "comments": getattr(act, 'comments', []) or [],
+                    "wbs": getattr(act, 'wbs_code', "") or "",
+                    "level": (len(getattr(act, 'wbs_code', "").split('.')) - 1) if getattr(act, 'wbs_code') else 0
                 })
         
         if not tasks_json:
