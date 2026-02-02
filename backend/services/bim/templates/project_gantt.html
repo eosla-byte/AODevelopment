@@ -219,7 +219,10 @@
             lookAheadStart: new Date(),
             lookAheadWeeks: 3,
             showLookAhead: false,
-            companyColors: {}
+            companyColors: {},
+            // Formatting & AutoSave
+            autoSaveTimer: null,
+            dirtyTasks: new Set()
         };
 
         // --- INIT ---
@@ -340,6 +343,177 @@
             fileInput.style.display = 'none';
             fileInput.onchange = handleFileUpload;
             toolbar.appendChild(fileInput);
+
+            // --- 7. SEPARATOR ---
+            toolbar.appendChild(createSeparator());
+
+            // --- 8. FORMAT TOOLS ---
+            injectFormatControls(toolbar);
+
+            // --- 9. AUTO-SAVE STATUS ---
+            const status = document.createElement('span');
+            status.id = 'save-status';
+            status.className = "ml-auto text-xs text-gray-400 font-medium italic";
+            status.innerText = "Sincronizado";
+            toolbar.appendChild(status);
+        }
+
+        function injectFormatControls(toolbar) {
+            // Group for Format
+            const group = document.createElement('div');
+            group.className = "flex items-center space-x-1";
+
+            // Bold
+            const btnBold = createToolBtn('<i class="fas fa-bold"></i>', toggleBold);
+            group.appendChild(btnBold);
+
+            // Fill Color
+            const inputFill = createColorInput('Fill', changeFill, '<i class="fas fa-fill-drip"></i>');
+            group.appendChild(inputFill);
+
+            // Text Color
+            const inputText = createColorInput('Text', changeTextColor, '<i class="fas fa-font"></i>');
+            group.appendChild(inputText);
+
+            // Font Size
+            const selectSize = document.createElement('select');
+            selectSize.className = "border rounded text-xs py-1 px-1 w-12";
+            [12, 13, 14, 16, 18].forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s;
+                opt.text = s;
+                selectSize.appendChild(opt);
+            });
+            selectSize.value = 13; // Default
+            selectSize.onchange = (e) => changeFontSize(e.target.value);
+            group.appendChild(selectSize);
+
+            toolbar.appendChild(group);
+        }
+
+        function createToolBtn(html, onClick) {
+            const btn = document.createElement('button');
+            btn.className = "text-gray-600 hover:bg-gray-100 p-1 rounded w-8 h-8 flex items-center justify-center";
+            btn.innerHTML = html;
+            btn.onclick = onClick;
+            return btn;
+        }
+
+        function createColorInput(title, onChange, iconHtml) {
+            const wrapper = document.createElement('div');
+            wrapper.className = "relative inline-block w-8 h-8";
+
+            const icon = document.createElement('div');
+            icon.className = "absolute inset-0 flex items-center justify-center pointer-events-none text-gray-600";
+            icon.innerHTML = iconHtml;
+
+            const input = document.createElement('input');
+            input.type = 'color';
+            input.className = "opacity-0 w-full h-full cursor-pointer";
+            input.oninput = (e) => onChange(e.target.value);
+
+            wrapper.appendChild(input);
+            wrapper.appendChild(icon);
+            return wrapper;
+        }
+
+        // --- FORMATTING LOGIC ---
+        function applyStyle(key, value) {
+            const selIds = Array.from(State.selectedIds);
+            if (selIds.length === 0) return;
+
+            selIds.forEach(id => {
+                const task = State.tasks.find(t => t.id === id);
+                if (task) {
+                    if (!task.style) task.style = {};
+                    task.style[key] = value;
+                    triggerAutoSave(task.id);
+                }
+            });
+            render();
+        }
+
+        function toggleBold() {
+            // Check first selected to toggle
+            const firstId = Array.from(State.selectedIds)[0];
+            if (!firstId) return;
+            const task = State.tasks.find(t => t.id === firstId);
+            const isBold = task.style && task.style.fontWeight === 'bold';
+            applyStyle('fontWeight', isBold ? 'normal' : 'bold');
+        }
+
+        function changeFill(color) { applyStyle('backgroundColor', color); }
+        function changeTextColor(color) { applyStyle('color', color); }
+        function changeFontSize(size) { applyStyle('fontSize', size + 'px'); }
+
+        // --- AUTO-SAVE LOGIC ---
+        function triggerAutoSave(taskId) {
+            State.dirtyTasks.add(taskId);
+
+            const status = document.getElementById('save-status');
+            if (status) {
+                status.innerText = "Guardando...";
+                status.classList.remove('text-green-500');
+                status.classList.add('text-orange-400');
+            }
+
+            if (State.autoSaveTimer) clearTimeout(State.autoSaveTimer);
+            State.autoSaveTimer = setTimeout(saveDirtyTasks, 1500); // 1.5s debounce
+        }
+
+        async function saveDirtyTasks() {
+            if (State.dirtyTasks.size === 0) return;
+
+            const tasksToSave = Array.from(State.dirtyTasks);
+            State.dirtyTasks.clear(); // Optimistic clear
+
+            console.log("AO Gantt: Auto-Saving", tasksToSave.length, "tasks");
+
+            // We save sequentially or parallel? Parallel is fine.
+            // Ideally backend supports bulk update, but we have /api/activities/{id}
+
+            const promises = tasksToSave.map(async (id) => {
+                const task = State.tasks.find(t => t.id === id);
+                if (!task) return;
+
+                // Construct Payload
+                // Include Style, etc.
+                const payload = {
+                    name: task.name,
+                    start: task.start,
+                    end: task.end,
+                    progress: task.progress, // mapped from pct
+                    contractor: task.contractor,
+                    style: JSON.stringify(task.style || {}), // Backend expects string? Check main.py
+                    // main.py lines 817: try: act.style = data.style
+                    // If backend model is string, we typically use JSON.dumps.
+                    // If backend model is JSON column, better.
+                    // Checking main.py: "style": getattr(act, 'style', None)
+                    // It seems to be generic. Let's send generic JSON object if Pydantic supports it, or string.
+                    // Main.py line 782: style: Optional[str] = None
+                    // It expects STRING. So JSON.stringify is correct.
+                };
+
+                try {
+                    await fetch(`/api/activities/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } catch (e) {
+                    console.error("Failed to save", id, e);
+                    State.dirtyTasks.add(id); // Re-add on failure
+                }
+            });
+
+            await Promise.all(promises);
+
+            const status = document.getElementById('save-status');
+            if (status) {
+                status.innerText = "Guardado";
+                status.classList.remove('text-orange-400');
+                status.classList.add('text-green-500');
+            }
         }
 
         function createSeparator() {
@@ -551,6 +725,7 @@
 
                 toModify.forEach(t => {
                     t.level += 1;
+                    triggerAutoSave(t.id);
                 });
 
                 this.recalculate(State.tasks);
@@ -569,6 +744,7 @@
 
                 toModify.forEach(t => {
                     if (t.level > 0) t.level -= 1;
+                    triggerAutoSave(t.id);
                 });
 
                 this.recalculate(State.tasks);
