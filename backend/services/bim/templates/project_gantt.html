@@ -847,7 +847,8 @@
                     const headerTarget = document.getElementById('gantt-header-target');
                     if (headerTarget) headerTarget.innerHTML = '';
 
-                    const ganttTasks = tasks.map(t => {
+                    const ganttTasks = [];
+                    tasks.forEach(t => {
                         const customClasses = [];
                         // logic to determine color/class...
                         const co = companies.find(c => c.name === t.company);
