@@ -823,7 +823,7 @@
             let css = '';
             companies.forEach(c => {
                 if (c.color) {
-                    const safeName = c.name.replace(/\s+/g, '-');
+                    const safeName = c.name.replace(/+/g, '-');
                     css += `
                          .company-${safeName} .bar-progress { fill: ${c.color} !important; }
                          .company-${safeName} .bar { fill: ${c.color}40 !important; stroke: ${c.color} !important; }
@@ -851,7 +851,7 @@
                     // We inject color as inline style via hook or just use class if possible.
                     // Frappe Gantt doesn't support inline color easily without custom HTML.
                     // We'll rely on updateDynamicCSS() which we call below.
-                    customClasses.push(`company-${co.name.replace(/\s+/g, '-')}`);
+                    customClasses.push(`company-${co.name.replace(/+/g, '-')}`);
                     if (!co.visible) customClasses.push('hidden-task');
                 }
 
@@ -2128,7 +2128,7 @@
 
             try {
                 const text = await navigator.clipboard.readText();
-                const lines = text.split(/\r?\n/);
+                const lines = text.split(/r?\n/);
 
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i];
