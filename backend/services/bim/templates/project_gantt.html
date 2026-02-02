@@ -113,7 +113,7 @@
 
         /* --- Strict Split Layout --- */
         .gantt-table thead th {
-            height: 50px !important;
+            height: 70px !important;
             box-sizing: border-box;
 
             position: sticky;
@@ -666,6 +666,19 @@
         #gantt-header-sticky text {
             fill: #ffffff !important;
             font-weight: 600;
+        }
+
+        /* Force Timeline Header Text Visibility */
+        #gantt-header-target .tick text {
+            fill: #374151 !important;
+            /* Gray-700 */
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        #gantt-header-target .path {
+            opacity: 0.1;
+            /* Subtler Grid Lines in Header */
         }
 
         .grid-cell.selected {
@@ -1407,7 +1420,7 @@
                 companies.forEach(c => {
                     const item = document.createElement('button');
                     item.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 flex items-center gap-2";
-                    item.innerHTML = `< span class="w-2 h-2 rounded-full" style = "background:${c.color}" ></span > ${c.name} `;
+                    item.innerHTML = `<span class="w-2 h-2 rounded-full" style="background:${c.color}"></span> ${c.name}`;
                     item.onclick = (e) => {
                         e.stopPropagation();
                         assignCompanyToSelection(c.name);
@@ -1675,7 +1688,7 @@
                 // (TaskStart < LHEnd) && (TaskEnd > LHStart)
                 if (tStart < lhEnd && tEnd > lhStart) {
                     // Highlight Row in Grid
-                    const tr = document.querySelector(`tr[data - id= "${t.id}"]`);
+                    const tr = document.querySelector(`tr[data-id="${t.id}"]`);
                     if (tr) {
                         tr.classList.add('lookahead-row');
 
