@@ -344,6 +344,12 @@
             /* No sticky header inside here anymore */
         }
 
+        /* Hide Original Header in Scrollable Area to avoid double headers */
+        #chart-area .grid-header {
+            visibility: hidden;
+            opacity: 0;
+        }
+
         .gantt-header-svg {
             display: block;
             pointer-events: none;
@@ -1400,8 +1406,16 @@
         function updateCompanyColor(idx, color) {
             companies[idx].color = color;
             // Re-render to apply color
-            renderGrid();
-            renderGantt(gantt ? gantt.options.view_mode : 'Day');
+            // NEW: Clone Header explicitly after render
+            setTimeout(() => {
+                if (typeof cloneGanttHeader === 'function') {
+                    cloneGanttHeader();
+                }
+            }, 100);
+
+        } catch (ex) {
+            console.error("Gantt Render Error:", ex);
+        }
         }
 
         // --- CONTEXT MENU (Empresas) ---
@@ -2643,49 +2657,8 @@
             alert("Todo el progreso ha sido guardado exitosamente en el servidor.");
         }
 
-        // --- STICKY HEADER (CLONE) ---
-        function cloneGanttHeader() {
-            setTimeout(() => {
-                const srcSvg = document.getElementById('gantt-target');
-                const targetSvg = document.getElementById('sticky-header-svg');
-                const chartDiv = document.getElementById('chart-area');
-                const headerContainer = document.getElementById('gantt-header-sticky');
-
-                if (!srcSvg || !targetSvg || !chartDiv || !headerContainer) return;
-
-                // 1. Find Header in Rendered Gantt
-                const headerGroup = srcSvg.querySelector('.grid-header');
-                if (!headerGroup) return;
-
-                // 2. Clone
-                targetSvg.innerHTML = '';
-                const clone = headerGroup.cloneNode(true);
-                targetSvg.appendChild(clone);
-
-                // 3. Match Widths
-                targetSvg.setAttribute('width', srcSvg.getAttribute('width'));
-                targetSvg.setAttribute('height', '50'); // Force height for header
-
-                // 4. Sync Scroll Events
-                chartDiv.onscroll = () => {
-                    // Sync X of Header
-                    headerContainer.scrollLeft = chartDiv.scrollLeft;
-
-                    // Sync Y of Grid
-                    const gridDiv = document.getElementById('tasks-grid');
-                    if (gridDiv) gridDiv.scrollTop = chartDiv.scrollTop;
-                };
-
-                // Initial Sync
-                headerContainer.scrollLeft = chartDiv.scrollLeft;
-
-                // Bind Grid Scroll
-                const gridDiv = document.getElementById('tasks-grid');
-                if (gridDiv) {
-                    gridDiv.onscroll = () => chartDiv.scrollTop = gridDiv.scrollTop;
-                }
-            }, 200);
-        }
+        // --- LEGACY STICKY REMOVED ---
+        // (Cleaned up to prevent override)
 
         // Wrap updateField to show saving
         const _originalUpdateField = updateField;
