@@ -747,539 +747,539 @@
                     if (chartRef.scrollTop !== gridRef.scrollTop) chartRef.scrollTop = gridRef.scrollTop;
                 });
             }
-        });
 
-        async function loadTasks() {
-            try {
-                // Use server-side data if available (passed via Jinja)
-                if (tasks && tasks.length > 0) {
-                    console.log("Initializing with", tasks.length, "tasks");
-                    tasks = tasks.map(t => {
-                        const parseDate = (d) => {
-                            if (!d) return new Date();
-                            const date = new Date(d);
-                            return isNaN(date.getTime()) ? new Date() : date;
-                        };
-                        t.start = parseDate(t.start);
-                        t.end = parseDate(t.end);
+
+            async function loadTasks() {
+                try {
+                    // Use server-side data if available (passed via Jinja)
+                    if (tasks && tasks.length > 0) {
+                        console.log("Initializing with", tasks.length, "tasks");
+                        tasks = tasks.map(t => {
+                            const parseDate = (d) => {
+                                if (!d) return new Date();
+                                const date = new Date(d);
+                                return isNaN(date.getTime()) ? new Date() : date;
+                            };
+                            t.start = parseDate(t.start);
+                            t.end = parseDate(t.end);
+                            if (t.style && typeof t.style === 'string') {
+                                try { t._style = JSON.parse(t.style); } catch (e) { }
+                            }
+                            return t;
+                        });
+
+                        try {
+                            renderGrid();
+                        } catch (e) {
+                            console.error("Grid Render Failed:", e);
+                            alert("Error renderizando tabla: " + e.message);
+                        }
+
+                        try {
+                            renderGantt();
+                        } catch (e) {
+                            console.error("Gantt Render Failed:", e);
+                            alert("Error renderizando gráfica: " + e.message);
+                        }
+                        return;
+                    } else {
+                        console.warn("No tasks loaded from server template.");
+                    }
+
+                    // Fallback catch-all (usually not needed if Jinja works)
+                    const res = await fetch(`/api/projects/${projectId}/activities`);
+                    if (!res.ok) throw new Error("Error loading");
+                    const data = await res.json();
+                    tasks = data.map(t => {
+                        t.start = new Date(t.start);
+                        t.end = new Date(t.end);
                         if (t.style && typeof t.style === 'string') {
                             try { t._style = JSON.parse(t.style); } catch (e) { }
                         }
                         return t;
                     });
+                    renderGrid();
+                    renderGantt();
+                } catch (e) { console.error(e); alert("Critico: " + e.message); }
+            }
 
-                    try {
-                        renderGrid();
-                    } catch (e) {
-                        console.error("Grid Render Failed:", e);
-                        alert("Error renderizando tabla: " + e.message);
+            function renderGantt(viewMode = 'Week') {
+                const svgElement = document.getElementById('gantt-target');
+                if (!svgElement) return;
+                svgElement.innerHTML = '';
+
+                // Filter Tasks
+                const ganttTasks = [];
+                tasks.forEach(t => {
+                    // Company Filter
+                    const companyName = (t.contractor || '').trim();
+                    if (companyName) {
+                        const c = companies.find(x => x.name === companyName);
+                        if (c && !c.visible) return; // Skip
                     }
 
-                    try {
-                        renderGantt();
-                    } catch (e) {
-                        console.error("Gantt Render Failed:", e);
-                        alert("Error renderizando gráfica: " + e.message);
-                    }
-                    return;
-                } else {
-                    console.warn("No tasks loaded from server template.");
-                }
+                    // Note: Gantt lib usually needs flattening if using native view hierarchy, 
+                    // but here we just map distinct tasks.
+                    // We should ideally support collapse in Gantt too? 
+                    // Current grid handles collapse by just not creating rows? 
+                    // If we filter them here, they won't show.
 
-                // Fallback catch-all (usually not needed if Jinja works)
-                const res = await fetch(`/api/projects/${projectId}/activities`);
-                if (!res.ok) throw new Error("Error loading");
-                const data = await res.json();
-                tasks = data.map(t => {
-                    t.start = new Date(t.start);
-                    t.end = new Date(t.end);
-                    if (t.style && typeof t.style === 'string') {
-                        try { t._style = JSON.parse(t.style); } catch (e) { }
-                    }
-                    return t;
-                });
-                renderGrid();
-                renderGantt();
-            } catch (e) { console.error(e); alert("Critico: " + e.message); }
-        }
+                    /* --- DUAL GANTT RENDERER (v4.0) --- */
+                    let ganttHeaderInstance = null;
+                    let ganttBodyInstance = null;
 
-        function renderGantt(viewMode = 'Week') {
-            const svgElement = document.getElementById('gantt-target');
-            if (!svgElement) return;
-            svgElement.innerHTML = '';
+                    function renderGantt(viewMode) {
+                        console.log("AO DEBUG 4.0: Dual Gantt Render Start", viewMode);
+                        const container = document.getElementById('gantt-target');
+                        if (!container) return;
 
-            // Filter Tasks
-            const ganttTasks = [];
-            tasks.forEach(t => {
-                // Company Filter
-                const companyName = (t.contractor || '').trim();
-                if (companyName) {
-                    const c = companies.find(x => x.name === companyName);
-                    if (c && !c.visible) return; // Skip
-                }
+                        // Clear both
+                        container.innerHTML = '';
+                        const headerTarget = document.getElementById('gantt-header-target');
+                        if (headerTarget) headerTarget.innerHTML = '';
 
-                // Note: Gantt lib usually needs flattening if using native view hierarchy, 
-                // but here we just map distinct tasks.
-                // We should ideally support collapse in Gantt too? 
-                // Current grid handles collapse by just not creating rows? 
-                // If we filter them here, they won't show.
-
-                /* --- DUAL GANTT RENDERER (v4.0) --- */
-                let ganttHeaderInstance = null;
-                let ganttBodyInstance = null;
-
-                function renderGantt(viewMode) {
-                    console.log("AO DEBUG 4.0: Dual Gantt Render Start", viewMode);
-                    const container = document.getElementById('gantt-target');
-                    if (!container) return;
-
-                    // Clear both
-                    container.innerHTML = '';
-                    const headerTarget = document.getElementById('gantt-header-target');
-                    if (headerTarget) headerTarget.innerHTML = '';
-
-                    const ganttTasks = tasks.map(t => {
-                        const customClasses = [];
-                        // logic to determine color/class...
-                        const co = companies.find(c => c.name === t.company);
-                        if (co) {
-                            // We inject color as inline style via hook or just use class if possible.
-                            // Frappe Gantt doesn't support inline color easily without custom HTML.
-                            // We'll rely on updateDynamicCSS() which we call below.
-                            customClasses.push(`company-${co.name.replace(/\s+/g, '-')}`);
-                            if (!co.visible) customClasses.push('hidden-task');
-                        }
-
-                        return {
-                            id: t.id,
-                            name: t.name,
-                            start: formatDateInput(t.start),
-                            end: formatDateInput(t.end),
-                            progress: t.progress,
-                            dependencies: t.dependencies,
-                            custom_class: customClasses.join(' '),
-                            comments: t.comments || []
-                        };
-                    });
-
-                    updateDynamicCSS();
-
-                    try {
-                        if (ganttTasks.length === 0) {
-                            document.getElementById('chart-area').innerHTML = '<div class="text-gray-400 p-10 text-center">No hay tareas para mostrar</div>';
-                            return;
-                        }
-
-                        const commonOptions = {
-                            header_height: 70, // Matched to container
-                            column_width: 30,
-                            step: 24,
-                            view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
-                            bar_height: 20,
-                            bar_corner_radius: 3,
-                            arrow_curve: 5,
-                            padding: 18,
-                            view_mode: viewMode,
-                            date_format: 'YYYY-MM-DD',
-                            language: 'es',
-                            on_date_change: (task, start, end) => updateTaskDate(task.id, start, end),
-                            on_click: (task) => { },
-                            on_view_change: () => {
-                                drawTodayLine();
-                                if (typeof updateLookahead === 'function') updateLookahead();
-                                // Sync wrapper?
+                        const ganttTasks = tasks.map(t => {
+                            const customClasses = [];
+                            // logic to determine color/class...
+                            const co = companies.find(c => c.name === t.company);
+                            if (co) {
+                                // We inject color as inline style via hook or just use class if possible.
+                                // Frappe Gantt doesn't support inline color easily without custom HTML.
+                                // We'll rely on updateDynamicCSS() which we call below.
+                                customClasses.push(`company-${co.name.replace(/\s+/g, '-')}`);
+                                if (!co.visible) customClasses.push('hidden-task');
                             }
-                        };
 
-                        // 1. RENDER HEADER INSTANCE (Top)
-                        if (headerTarget) {
-                            ganttHeaderInstance = new Gantt("#gantt-header-target", ganttTasks, {
-                                ...commonOptions,
-                                // We don't need callbacks here really, but keeping consistency is safer for alignment
-                            });
+                            return {
+                                id: t.id,
+                                name: t.name,
+                                start: formatDateInput(t.start),
+                                end: formatDateInput(t.end),
+                                progress: t.progress,
+                                dependencies: t.dependencies,
+                                custom_class: customClasses.join(' '),
+                                comments: t.comments || []
+                            };
+                        });
 
-                            // Styles to Hide Body in Header
-                            // We can do this via JS or global CSS. JS is safer to target specific instance?
-                            // Frappe Gantt generates SVG content relative to root.
-                            // We'll trust global CSS targeting #gantt-header-target
-                        }
+                        updateDynamicCSS();
 
-                        // 2. RENDER BODY INSTANCE (Bottom)
-                        gantt = new Gantt("#gantt-target", ganttTasks, commonOptions);
-                        ganttBodyInstance = gantt; // Alias
+                        try {
+                            if (ganttTasks.length === 0) {
+                                document.getElementById('chart-area').innerHTML = '<div class="text-gray-400 p-10 text-center">No hay tareas para mostrar</div>';
+                                return;
+                            }
 
-                        // 3. POST-RENDER SYNC & CLEANUP
-                        setTimeout(() => {
-                            try {
-                                drawTodayLine();
-                                if (typeof updateLookahead === 'function') updateLookahead();
-                                if (typeof drawCommentIndicators === 'function') drawCommentIndicators();
-
-                                // Force Scroll Sync Initial
-                                const chartArea = document.getElementById('chart-area');
-                                const headerContainer = document.getElementById('timeline-header-container');
-                                if (chartArea && headerContainer) {
-                                    headerContainer.scrollLeft = chartArea.scrollLeft;
-
-                                    // Bind One-Way Sync (Chart -> Header)
-                                    chartArea.onscroll = function () {
-                                        headerContainer.scrollLeft = chartArea.scrollLeft;
-                                    };
+                            const commonOptions = {
+                                header_height: 70, // Matched to container
+                                column_width: 30,
+                                step: 24,
+                                view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+                                bar_height: 20,
+                                bar_corner_radius: 3,
+                                arrow_curve: 5,
+                                padding: 18,
+                                view_mode: viewMode,
+                                date_format: 'YYYY-MM-DD',
+                                language: 'es',
+                                on_date_change: (task, start, end) => updateTaskDate(task.id, start, end),
+                                on_click: (task) => { },
+                                on_view_change: () => {
+                                    drawTodayLine();
+                                    if (typeof updateLookahead === 'function') updateLookahead();
+                                    // Sync wrapper?
                                 }
-
-                                scrollToToday();
-
-                            } catch (e) { console.error("Post-render error", e); }
-                        }, 300);
-
-                    } catch (e) {
-                        console.error("Gantt Render Error:", e);
-                    }
-                }
-
-                function drawCommentIndicators() {
-                    const svg = document.getElementById('gantt-target');
-                    if (!svg) return;
-
-                    // Remove existing
-                    svg.querySelectorAll('.comment-indicator').forEach(el => el.remove());
-
-                    tasks.forEach(t => {
-                        if (t.comments && t.comments.length > 0) {
-                            const barWrapper = svg.querySelector(`.bar-wrapper[data-id="${t.id}"]`);
-                            if (!barWrapper) return;
-
-                            const barGroup = barWrapper.querySelector('.bar-group');
-                            if (!barGroup) return;
-
-                            const bar = barWrapper.querySelector('.bar');
-                            if (!bar) return;
-
-                            const width = parseFloat(bar.getAttribute('width'));
-                            const y = parseFloat(bar.getAttribute('y'));
-                            const x = parseFloat(bar.getAttribute('x'));
-
-                            // Create Indicator (Red Bubble)
-                            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                            g.classList.add('comment-indicator');
-                            g.style.cursor = 'pointer';
-
-                            // Circle
-                            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                            circle.setAttribute('cx', x + width);
-                            circle.setAttribute('cy', y);
-                            circle.setAttribute('r', 5);
-                            circle.setAttribute('fill', '#ef4444');
-                            circle.setAttribute('stroke', 'white');
-                            circle.setAttribute('stroke-width', '1');
-
-                            g.appendChild(circle);
-
-                            // Interaction
-                            g.onclick = (e) => {
-                                e.stopPropagation();
-                                showTaskComments(t.id);
                             };
 
-                            const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-                            title.textContent = `${t.comments.length} Comentarios`;
-                            g.appendChild(title);
+                            // 1. RENDER HEADER INSTANCE (Top)
+                            if (headerTarget) {
+                                ganttHeaderInstance = new Gantt("#gantt-header-target", ganttTasks, {
+                                    ...commonOptions,
+                                    // We don't need callbacks here really, but keeping consistency is safer for alignment
+                                });
 
-                            barWrapper.appendChild(g);
+                                // Styles to Hide Body in Header
+                                // We can do this via JS or global CSS. JS is safer to target specific instance?
+                                // Frappe Gantt generates SVG content relative to root.
+                                // We'll trust global CSS targeting #gantt-header-target
+                            }
+
+                            // 2. RENDER BODY INSTANCE (Bottom)
+                            gantt = new Gantt("#gantt-target", ganttTasks, commonOptions);
+                            ganttBodyInstance = gantt; // Alias
+
+                            // 3. POST-RENDER SYNC & CLEANUP
+                            setTimeout(() => {
+                                try {
+                                    drawTodayLine();
+                                    if (typeof updateLookahead === 'function') updateLookahead();
+                                    if (typeof drawCommentIndicators === 'function') drawCommentIndicators();
+
+                                    // Force Scroll Sync Initial
+                                    const chartArea = document.getElementById('chart-area');
+                                    const headerContainer = document.getElementById('timeline-header-container');
+                                    if (chartArea && headerContainer) {
+                                        headerContainer.scrollLeft = chartArea.scrollLeft;
+
+                                        // Bind One-Way Sync (Chart -> Header)
+                                        chartArea.onscroll = function () {
+                                            headerContainer.scrollLeft = chartArea.scrollLeft;
+                                        };
+                                    }
+
+                                    scrollToToday();
+
+                                } catch (e) { console.error("Post-render error", e); }
+                            }, 300);
+
+                        } catch (e) {
+                            console.error("Gantt Render Error:", e);
                         }
-                    });
-                }
+                    }
 
-                function showTaskComments(id) {
-                    const t = tasks.find(x => x.id === id);
-                    if (!t) return;
+                    function drawCommentIndicators() {
+                        const svg = document.getElementById('gantt-target');
+                        if (!svg) return;
 
-                    // Remove existing overlay
-                    const existing = document.getElementById('comments-overlay');
-                    if (existing) existing.remove();
+                        // Remove existing
+                        svg.querySelectorAll('.comment-indicator').forEach(el => el.remove());
 
-                    const overlay = document.createElement('div');
-                    overlay.id = 'comments-overlay';
-                    overlay.className = "fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center";
-                    overlay.onclick = (e) => {
-                        if (e.target === overlay) overlay.remove();
-                    };
+                        tasks.forEach(t => {
+                            if (t.comments && t.comments.length > 0) {
+                                const barWrapper = svg.querySelector(`.bar-wrapper[data-id="${t.id}"]`);
+                                if (!barWrapper) return;
 
-                    const content = document.createElement('div');
-                    content.className = "bg-white rounded-lg shadow-xl w-96 p-4 max-h-[80vh] flex flex-col";
+                                const barGroup = barWrapper.querySelector('.bar-group');
+                                if (!barGroup) return;
 
-                    const header = document.createElement('div');
-                    header.className = "flex justify-between items-center border-b pb-2 mb-2";
-                    header.innerHTML = `<h3 class="font-bold text-gray-800 truncate" title="${t.name}">${t.name}</h3><button class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>`;
-                    header.querySelector('button').onclick = () => overlay.remove();
-                    content.appendChild(header);
+                                const bar = barWrapper.querySelector('.bar');
+                                if (!bar) return;
 
-                    const list = document.createElement('div');
-                    list.className = "flex-1 overflow-y-auto space-y-3";
+                                const width = parseFloat(bar.getAttribute('width'));
+                                const y = parseFloat(bar.getAttribute('y'));
+                                const x = parseFloat(bar.getAttribute('x'));
 
-                    const renderList = () => {
-                        list.innerHTML = '';
-                        if (!t.comments || t.comments.length === 0) {
-                            list.innerHTML = '<div class="text-gray-400 text-xs italic text-center p-4">Sin comentarios</div>';
-                            return;
-                        }
-                        t.comments.forEach(c => {
-                            const item = document.createElement('div');
-                            item.className = "bg-gray-50 p-2 rounded text-sm";
-                            let dateStr = "Fecha desconocida";
-                            try { dateStr = new Date(c.date).toLocaleString(); } catch (e) { }
+                                // Create Indicator (Red Bubble)
+                                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                                g.classList.add('comment-indicator');
+                                g.style.cursor = 'pointer';
 
-                            item.innerHTML = `
+                                // Circle
+                                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                                circle.setAttribute('cx', x + width);
+                                circle.setAttribute('cy', y);
+                                circle.setAttribute('r', 5);
+                                circle.setAttribute('fill', '#ef4444');
+                                circle.setAttribute('stroke', 'white');
+                                circle.setAttribute('stroke-width', '1');
+
+                                g.appendChild(circle);
+
+                                // Interaction
+                                g.onclick = (e) => {
+                                    e.stopPropagation();
+                                    showTaskComments(t.id);
+                                };
+
+                                const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+                                title.textContent = `${t.comments.length} Comentarios`;
+                                g.appendChild(title);
+
+                                barWrapper.appendChild(g);
+                            }
+                        });
+                    }
+
+                    function showTaskComments(id) {
+                        const t = tasks.find(x => x.id === id);
+                        if (!t) return;
+
+                        // Remove existing overlay
+                        const existing = document.getElementById('comments-overlay');
+                        if (existing) existing.remove();
+
+                        const overlay = document.createElement('div');
+                        overlay.id = 'comments-overlay';
+                        overlay.className = "fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center";
+                        overlay.onclick = (e) => {
+                            if (e.target === overlay) overlay.remove();
+                        };
+
+                        const content = document.createElement('div');
+                        content.className = "bg-white rounded-lg shadow-xl w-96 p-4 max-h-[80vh] flex flex-col";
+
+                        const header = document.createElement('div');
+                        header.className = "flex justify-between items-center border-b pb-2 mb-2";
+                        header.innerHTML = `<h3 class="font-bold text-gray-800 truncate" title="${t.name}">${t.name}</h3><button class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>`;
+                        header.querySelector('button').onclick = () => overlay.remove();
+                        content.appendChild(header);
+
+                        const list = document.createElement('div');
+                        list.className = "flex-1 overflow-y-auto space-y-3";
+
+                        const renderList = () => {
+                            list.innerHTML = '';
+                            if (!t.comments || t.comments.length === 0) {
+                                list.innerHTML = '<div class="text-gray-400 text-xs italic text-center p-4">Sin comentarios</div>';
+                                return;
+                            }
+                            t.comments.forEach(c => {
+                                const item = document.createElement('div');
+                                item.className = "bg-gray-50 p-2 rounded text-sm";
+                                let dateStr = "Fecha desconocida";
+                                try { dateStr = new Date(c.date).toLocaleString(); } catch (e) { }
+
+                                item.innerHTML = `
                         <div class="text-xs text-blue-600 font-semibold mb-1 flex justify-between">
                             <span>${c.user || 'Usuario'}</span>
                             <span class="text-gray-400 font-normal">${dateStr}</span>
                         </div>
                         <div class="text-gray-700 whitespace-pre-wrap">${c.text}</div>
                     `;
-                            list.appendChild(item);
-                        });
-                        list.scrollTop = list.scrollHeight;
-                    };
-                    renderList();
-                    content.appendChild(list);
-
-                    // Footer
-                    const footer = document.createElement('div');
-                    footer.className = "mt-3 pt-2 border-t flex gap-2";
-                    const input = document.createElement('input');
-                    input.className = "flex-1 border rounded px-2 py-1 text-sm";
-                    input.placeholder = "Escribe un comentario...";
-                    input.onkeydown = (e) => {
-                        if (e.key === 'Enter') btn.click();
-                    };
-
-                    const btn = document.createElement('button');
-                    btn.className = "bg-blue-600 text-white px-3 py-1 rounded text-sm";
-                    btn.innerText = "Enviar";
-                    btn.onclick = async () => {
-                        const txt = input.value.trim();
-                        if (!txt) return;
-
-                        if (!t.comments) t.comments = [];
-                        t.comments.push({
-                            text: txt,
-                            date: new Date().toISOString(),
-                            user: "Usuario"
-                            // In real app, we'd get current user name from context or backend would set it
-                        });
-
-                        await updateField(t.id, 'comments', t.comments);
-
-                        input.value = '';
+                                list.appendChild(item);
+                            });
+                            list.scrollTop = list.scrollHeight;
+                        };
                         renderList();
-                        drawCommentIndicators(); // Refresh bubble
-                    };
+                        content.appendChild(list);
 
-                    footer.appendChild(input);
-                    footer.appendChild(btn);
-                    content.appendChild(footer);
+                        // Footer
+                        const footer = document.createElement('div');
+                        footer.className = "mt-3 pt-2 border-t flex gap-2";
+                        const input = document.createElement('input');
+                        input.className = "flex-1 border rounded px-2 py-1 text-sm";
+                        input.placeholder = "Escribe un comentario...";
+                        input.onkeydown = (e) => {
+                            if (e.key === 'Enter') btn.click();
+                        };
 
-                    overlay.appendChild(content);
-                    document.body.appendChild(overlay);
-                }
+                        const btn = document.createElement('button');
+                        btn.className = "bg-blue-600 text-white px-3 py-1 rounded text-sm";
+                        btn.innerText = "Enviar";
+                        btn.onclick = async () => {
+                            const txt = input.value.trim();
+                            if (!txt) return;
 
+                            if (!t.comments) t.comments = [];
+                            t.comments.push({
+                                text: txt,
+                                date: new Date().toISOString(),
+                                user: "Usuario"
+                                // In real app, we'd get current user name from context or backend would set it
+                            });
 
-                function updateDynamicCSS() {
-                    let styleEl = document.getElementById('dynamic-gantt-styles');
-                    if (!styleEl) {
-                        styleEl = document.createElement('style');
-                        styleEl.id = 'dynamic-gantt-styles';
-                        document.head.appendChild(styleEl);
+                            await updateField(t.id, 'comments', t.comments);
+
+                            input.value = '';
+                            renderList();
+                            drawCommentIndicators(); // Refresh bubble
+                        };
+
+                        footer.appendChild(input);
+                        footer.appendChild(btn);
+                        content.appendChild(footer);
+
+                        overlay.appendChild(content);
+                        document.body.appendChild(overlay);
                     }
-                    let css = '';
-                    tasks.forEach(t => {
-                        let color = null;
-                        // 1. Manual Style
-                        if (t._style && t._style.fill) color = t._style.fill;
 
-                        // 2. Company Style (Priority)
-                        const companyName = (t.contractor || '').trim();
-                        const comp = companies.find(c => c.name === companyName);
-                        if (comp && comp.color && comp.visible) {
-                            color = comp.color;
+
+                    function updateDynamicCSS() {
+                        let styleEl = document.getElementById('dynamic-gantt-styles');
+                        if (!styleEl) {
+                            styleEl = document.createElement('style');
+                            styleEl.id = 'dynamic-gantt-styles';
+                            document.head.appendChild(styleEl);
                         }
+                        let css = '';
+                        tasks.forEach(t => {
+                            let color = null;
+                            // 1. Manual Style
+                            if (t._style && t._style.fill) color = t._style.fill;
 
-                        if (color) {
-                            // Safe Selector using data-id which is reliable in Frappe Gantt
-                            css += `
+                            // 2. Company Style (Priority)
+                            const companyName = (t.contractor || '').trim();
+                            const comp = companies.find(c => c.name === companyName);
+                            if (comp && comp.color && comp.visible) {
+                                color = comp.color;
+                            }
+
+                            if (color) {
+                                // Safe Selector using data-id which is reliable in Frappe Gantt
+                                css += `
                         .gantt .bar-wrapper[data-id="${t.id}"] .bar { fill: ${color} !important; opacity: 0.4 !important; }
                         .gantt .bar-wrapper[data-id="${t.id}"] .bar-progress { fill: ${color} !important; opacity: 1 !important; }
                     `;
-                        }
-                    });
-                    styleEl.textContent = css;
-                }
-
-                // --- TODAY LINE LOGIC ---
-                function drawTodayLine() {
-                    const svg = document.getElementById('gantt-target');
-                    if (!svg || !gantt) return;
-
-                    // Remove existing
-                    const existing = svg.querySelector('.today-line');
-                    if (existing) existing.remove();
-
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-
-                    // Helper to find X. Frappe doesn't expose public API easily, 
-                    // but we can infer from the time scale.
-                    // x = (date - start) / (end - start) * width
-                    // Or rely on tasks?
-                    // HACK: Use the library's internal date mapping if possible
-                    // Re-use logic from bar positioning? 
-                    // Better: Iterate through the rendered .tick elements? No.
-
-                    // Let's use the 'gantt_start' and 'gantt_end' from the gantt object logic
-                    // Frappe 0.6.1 usually sets these on the instance.
-
-                    if (!gantt.gantt_start || !gantt.gantt_end) return;
-
-                    const totalDuration = gantt.gantt_end - gantt.gantt_start;
-                    const progress = (today - gantt.gantt_start) / totalDuration;
-
-                    if (progress < 0 || progress > 1) return; // Today is out of view
-
-                    // Width of the date area
-                    // SVG width usually includes padding?
-                    // The library renders bars in a group.
-                    // Let's assume linear mapping over the SVG width (or the scrollable area width?)
-                    // Actually, Frappe sets SVG width explicitly.
-                    const svgWidth = svg.getAttribute('width');
-                    const svgHeight = svg.getAttribute('height');
-
-                    const x = progress * svgWidth;
-
-                    // Create Line
-                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    line.setAttribute('x1', x);
-                    line.setAttribute('y1', 0);
-                    line.setAttribute('x2', x);
-                    line.setAttribute('y2', svgHeight);
-                    line.classList.add('today-line');
-
-                    svg.appendChild(line);
-                }
-
-                // --- COMPANIES LOGIC ---
-                // State
-                let companies = []; // { name, color, visible }
-                const DEFAULT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-                const STORAGE_KEY = `gantt_companies_${projectId}`;
-
-                const DATA_KEY = `gantt_data_${projectId}`;
-
-                // Save Companies AND Assignments/Comments to LocalStorage
-                function saveProjectDataLocally() {
-                    try {
-                        // 1. Companies Definitions
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(companies));
-
-                        // 2. Task Metadata (Assignments & Comments)
-                        const metadata = {};
-                        tasks.forEach(t => {
-                            if (t.contractor || (t.comments && t.comments.length > 0)) {
-                                metadata[t.id] = {
-                                    contractor: t.contractor,
-                                    comments: t.comments
-                                };
                             }
                         });
-                        localStorage.setItem(DATA_KEY, JSON.stringify(metadata));
-                    } catch (e) { console.error("Save local error", e); }
-                }
+                        styleEl.textContent = css;
+                    }
 
-                // --- OLD SAVE WRAPPER ALIAS ---
-                function saveCompaniesLocally() { saveProjectDataLocally(); } // Alias for backward compat in this file
+                    // --- TODAY LINE LOGIC ---
+                    function drawTodayLine() {
+                        const svg = document.getElementById('gantt-target');
+                        if (!svg || !gantt) return;
 
-                function initCompanies() {
-                    // 0. Load Task Metadata FIRST (Assignments & Comments)
-                    try {
-                        const metaStr = localStorage.getItem(DATA_KEY);
-                        if (metaStr) {
-                            const metadata = JSON.parse(metaStr);
+                        // Remove existing
+                        const existing = svg.querySelector('.today-line');
+                        if (existing) existing.remove();
+
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+
+                        // Helper to find X. Frappe doesn't expose public API easily, 
+                        // but we can infer from the time scale.
+                        // x = (date - start) / (end - start) * width
+                        // Or rely on tasks?
+                        // HACK: Use the library's internal date mapping if possible
+                        // Re-use logic from bar positioning? 
+                        // Better: Iterate through the rendered .tick elements? No.
+
+                        // Let's use the 'gantt_start' and 'gantt_end' from the gantt object logic
+                        // Frappe 0.6.1 usually sets these on the instance.
+
+                        if (!gantt.gantt_start || !gantt.gantt_end) return;
+
+                        const totalDuration = gantt.gantt_end - gantt.gantt_start;
+                        const progress = (today - gantt.gantt_start) / totalDuration;
+
+                        if (progress < 0 || progress > 1) return; // Today is out of view
+
+                        // Width of the date area
+                        // SVG width usually includes padding?
+                        // The library renders bars in a group.
+                        // Let's assume linear mapping over the SVG width (or the scrollable area width?)
+                        // Actually, Frappe sets SVG width explicitly.
+                        const svgWidth = svg.getAttribute('width');
+                        const svgHeight = svg.getAttribute('height');
+
+                        const x = progress * svgWidth;
+
+                        // Create Line
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', x);
+                        line.setAttribute('y1', 0);
+                        line.setAttribute('x2', x);
+                        line.setAttribute('y2', svgHeight);
+                        line.classList.add('today-line');
+
+                        svg.appendChild(line);
+                    }
+
+                    // --- COMPANIES LOGIC ---
+                    // State
+                    let companies = []; // { name, color, visible }
+                    const DEFAULT_COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+                    const STORAGE_KEY = `gantt_companies_${projectId}`;
+
+                    const DATA_KEY = `gantt_data_${projectId}`;
+
+                    // Save Companies AND Assignments/Comments to LocalStorage
+                    function saveProjectDataLocally() {
+                        try {
+                            // 1. Companies Definitions
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(companies));
+
+                            // 2. Task Metadata (Assignments & Comments)
+                            const metadata = {};
                             tasks.forEach(t => {
-                                if (metadata[t.id]) {
-                                    // Restore fields if missing from backend
-                                    if (metadata[t.id].contractor) t.contractor = metadata[t.id].contractor;
-                                    if (metadata[t.id].comments) t.comments = metadata[t.id].comments;
+                                if (t.contractor || (t.comments && t.comments.length > 0)) {
+                                    metadata[t.id] = {
+                                        contractor: t.contractor,
+                                        comments: t.comments
+                                    };
                                 }
                             });
-                        }
-                    } catch (e) { console.error("Load meta error", e); }
-
-                    // 1. Load Companies Definitions
-                    let stored = [];
-                    try {
-                        const s = localStorage.getItem(STORAGE_KEY);
-                        if (s) stored = JSON.parse(s);
-                    } catch (e) { console.error(e); }
-
-                    // 2. Extract unique from tasks (now enriched with local data)
-                    const uniqueTasks = new Set();
-                    tasks.forEach(t => {
-                        if (t.contractor) uniqueTasks.add(t.contractor.trim());
-                    });
-
-                    // 3. Merge
-                    const merged = [];
-                    const seen = new Set();
-
-                    stored.forEach(c => {
-                        merged.push(c);
-                        seen.add(c.name);
-                    });
-
-                    let cIdx = 0;
-                    uniqueTasks.forEach(name => {
-                        if (!seen.has(name)) {
-                            merged.push({
-                                name: name,
-                                color: DEFAULT_COLORS[cIdx % DEFAULT_COLORS.length],
-                                visible: true
-                            });
-                            cIdx++;
-                        }
-                    });
-
-                    companies = merged;
-                    saveProjectDataLocally(); // Sync normalized data
-                    renderCompanyMenu();
-                }
-
-                function toggleCompanyMenu() {
-                    const menu = document.getElementById('company-menu');
-                    const overlay = document.getElementById('company-panel-overlay');
-
-                    if (menu.classList.contains('translate-x-full')) {
-                        // Open
-                        menu.classList.remove('translate-x-full');
-                        overlay.classList.remove('hidden');
-                    } else {
-                        // Close
-                        menu.classList.add('translate-x-full');
-                        overlay.classList.add('hidden');
-                    }
-                }
-
-                function renderCompanyMenu() {
-                    const container = document.getElementById('company-list');
-                    container.innerHTML = '';
-
-                    if (companies.length === 0) {
-                        container.innerHTML = '<div class="text-sm text-gray-400 italic text-center p-10">No hay empresas registradas.<br>Agrega una arriba.</div>';
-                        return;
+                            localStorage.setItem(DATA_KEY, JSON.stringify(metadata));
+                        } catch (e) { console.error("Save local error", e); }
                     }
 
-                    companies.forEach((c, idx) => {
-                        const div = document.createElement('div');
-                        div.className = "flex items-center gap-3 p-3 bg-white border border-gray-100 shadow-sm rounded-lg hover:shadow-md transition-shadow group";
-                        div.innerHTML = `
+                    // --- OLD SAVE WRAPPER ALIAS ---
+                    function saveCompaniesLocally() { saveProjectDataLocally(); } // Alias for backward compat in this file
+
+                    function initCompanies() {
+                        // 0. Load Task Metadata FIRST (Assignments & Comments)
+                        try {
+                            const metaStr = localStorage.getItem(DATA_KEY);
+                            if (metaStr) {
+                                const metadata = JSON.parse(metaStr);
+                                tasks.forEach(t => {
+                                    if (metadata[t.id]) {
+                                        // Restore fields if missing from backend
+                                        if (metadata[t.id].contractor) t.contractor = metadata[t.id].contractor;
+                                        if (metadata[t.id].comments) t.comments = metadata[t.id].comments;
+                                    }
+                                });
+                            }
+                        } catch (e) { console.error("Load meta error", e); }
+
+                        // 1. Load Companies Definitions
+                        let stored = [];
+                        try {
+                            const s = localStorage.getItem(STORAGE_KEY);
+                            if (s) stored = JSON.parse(s);
+                        } catch (e) { console.error(e); }
+
+                        // 2. Extract unique from tasks (now enriched with local data)
+                        const uniqueTasks = new Set();
+                        tasks.forEach(t => {
+                            if (t.contractor) uniqueTasks.add(t.contractor.trim());
+                        });
+
+                        // 3. Merge
+                        const merged = [];
+                        const seen = new Set();
+
+                        stored.forEach(c => {
+                            merged.push(c);
+                            seen.add(c.name);
+                        });
+
+                        let cIdx = 0;
+                        uniqueTasks.forEach(name => {
+                            if (!seen.has(name)) {
+                                merged.push({
+                                    name: name,
+                                    color: DEFAULT_COLORS[cIdx % DEFAULT_COLORS.length],
+                                    visible: true
+                                });
+                                cIdx++;
+                            }
+                        });
+
+                        companies = merged;
+                        saveProjectDataLocally(); // Sync normalized data
+                        renderCompanyMenu();
+                    }
+
+                    function toggleCompanyMenu() {
+                        const menu = document.getElementById('company-menu');
+                        const overlay = document.getElementById('company-panel-overlay');
+
+                        if (menu.classList.contains('translate-x-full')) {
+                            // Open
+                            menu.classList.remove('translate-x-full');
+                            overlay.classList.remove('hidden');
+                        } else {
+                            // Close
+                            menu.classList.add('translate-x-full');
+                            overlay.classList.add('hidden');
+                        }
+                    }
+
+                    function renderCompanyMenu() {
+                        const container = document.getElementById('company-list');
+                        container.innerHTML = '';
+
+                        if (companies.length === 0) {
+                            container.innerHTML = '<div class="text-sm text-gray-400 italic text-center p-10">No hay empresas registradas.<br>Agrega una arriba.</div>';
+                            return;
+                        }
+
+                        companies.forEach((c, idx) => {
+                            const div = document.createElement('div');
+                            div.className = "flex items-center gap-3 p-3 bg-white border border-gray-100 shadow-sm rounded-lg hover:shadow-md transition-shadow group";
+                            div.innerHTML = `
                     <div class="relative w-8 h-8 rounded-full border border-gray-200 cursor-pointer shadow-inner" 
                          style="background-color: ${c.color}">
                         <input type="color" value="${c.color}" 
@@ -1296,469 +1296,469 @@
                             onchange="toggleCompanyVisibility(${idx})" class="form-checkbox h-4 w-4 text-blue-600 rounded">
                     </label>
                 `;
-                        container.appendChild(div);
-                    });
-                }
-
-                // Helper wrappers
-                function updateCompanyColor(idx, color) {
-                    if (companies[idx]) {
-                        companies[idx].color = color;
-                        saveCompaniesLocally();
-                        // Refresh Gantt
-                        renderGrid();
-                        renderGantt(gantt ? gantt.options.view_mode : 'Day');
-                    }
-                }
-
-                // ... (toggleCompanyVisibility is below)
-
-
-                // --- NEW SPLIT PANE HEADER LOGIC ---
-
-
-                // --- STRATEGY 3: MARGIN SHIFT & FULL CLONE ---
-
-
-                function addCompany() {
-                    const input = document.getElementById('new-company-name');
-                    const name = input.value.trim();
-                    if (!name) return;
-
-                    // Check dupes
-                    if (companies.find(c => c.name === name)) return alert('Empresa ya existe');
-
-                    companies.push({
-                        name: name,
-                        color: DEFAULT_COLORS[companies.length % DEFAULT_COLORS.length],
-                        visible: true
-                    });
-                    saveCompaniesLocally();
-
-                    input.value = '';
-                    renderCompanyMenu();
-                }
-
-                function toggleCompanyVisibility(idx) {
-                    companies[idx].visible = !companies[idx].visible;
-                    saveCompaniesLocally();
-                    renderGantt(gantt ? gantt.options.view_mode : 'Day'); // Re-filter
-                }
-
-
-                function updateCompanyColor(idx, color) {
-                    companies[idx].color = color;
-                    // Re-render to apply color
-                    renderGrid();
-                    renderGantt(gantt ? gantt.options.view_mode : 'Day');
-                }
-
-                // --- CONTEXT MENU (Empresas) ---
-                let contextMenuEl = null;
-
-                function setupContextMenu() {
-                    // Create Menu DOM
-                    contextMenuEl = document.createElement('div');
-                    contextMenuEl.id = 'ctx-menu-companies';
-                    contextMenuEl.className = 'fixed bg-white border border-gray-200 shadow-xl rounded-md py-1 z-[100] hidden min-w-[160px]';
-                    document.body.appendChild(contextMenuEl);
-
-                    // Listeners
-                    document.addEventListener('contextmenu', (e) => {
-                        // Check if target is inside Grid row (not header)
-                        const row = e.target.closest('tr');
-                        if (!row || row.closest('thead')) return;
-
-                        e.preventDefault();
-                        showContextMenu(e.clientX, e.clientY, row.dataset.id);
-                    });
-
-                    document.addEventListener('click', () => hideContextMenu());
-                }
-
-                function showContextMenu(x, y, hoveredId) {
-                    // Logic: If selection exists, modify selection. 
-                    // If right-clicked ID is NOT in selection, clear selection and select just that one?
-                    // Windows behavior: If right click outside selection, select that one. If inside, keep selection.
-
-                    if (!selectedTaskIds.has(hoveredId)) {
-                        // Clicked outside selection
-                        selectedTaskIds.clear();
-                        selectedTaskIds.add(hoveredId);
-                        // Also clear cell selection? Yes.
-                        selectedCells.clear();
-                        renderGrid(); // update visuals
-                    }
-
-                    // Build Menu Items
-                    contextMenuEl.innerHTML = '';
-
-                    const title = document.createElement('div');
-                    title.className = "px-3 py-1 text-xs font-bold text-gray-500 border-b mb-1";
-                    title.innerText = "Asignar a Empresa";
-                    contextMenuEl.appendChild(title);
-
-                    if (companies.length === 0) {
-                        const empty = document.createElement('div');
-                        empty.className = "px-3 py-1 text-xs text-gray-400 italic";
-                        empty.innerText = "Crear empresas primero";
-                        contextMenuEl.appendChild(empty);
-                    } else {
-                        companies.forEach(c => {
-                            const item = document.createElement('button');
-                            item.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 flex items-center gap-2";
-                            item.innerHTML = `<span class="w-2 h-2 rounded-full" style="background:${c.color}"></span> ${c.name}`;
-                            item.onclick = (e) => {
-                                e.stopPropagation();
-                                assignCompanyToSelection(c.name);
-                                hideContextMenu();
-                            };
-                            contextMenuEl.appendChild(item);
+                            container.appendChild(div);
                         });
                     }
 
-                    // Unassign Option
-                    const unassign = document.createElement('button');
-                    unassign.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-500 border-t mt-1";
-                    unassign.innerText = "Sin Asignar / Borrar";
-                    unassign.onclick = (e) => {
-                        e.stopPropagation();
-                        assignCompanyToSelection("");
-                        hideContextMenu();
-                    };
-                    contextMenuEl.appendChild(unassign);
+                    // Helper wrappers
+                    function updateCompanyColor(idx, color) {
+                        if (companies[idx]) {
+                            companies[idx].color = color;
+                            saveCompaniesLocally();
+                            // Refresh Gantt
+                            renderGrid();
+                            renderGantt(gantt ? gantt.options.view_mode : 'Day');
+                        }
+                    }
 
-                    // --- Feature: ADD COMMENTS ---
-                    const addCommentBtn = document.createElement('button');
-                    addCommentBtn.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 text-gray-700 border-t mt-1 flex items-center gap-2";
-                    addCommentBtn.innerHTML = `<i class="fas fa-comment"></i> Agregar Comentario`;
-                    addCommentBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        addCommentToTask(hoveredId);
-                        hideContextMenu();
-                    };
-                    contextMenuEl.appendChild(addCommentBtn);
-
-                    // --- Feature: REGISTER DELAY ---
-                    const delayBtn = document.createElement('button');
-                    delayBtn.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 border-top mt-1 flex items-center gap-2";
-                    delayBtn.innerHTML = `<i class="fas fa-clock"></i> Registrar Atraso`;
-                    delayBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        registerDelay(hoveredId);
-                        hideContextMenu();
-                    };
-                    contextMenuEl.appendChild(delayBtn);
-
-                    // Position
-                    contextMenuEl.style.left = x + 'px';
-                    contextMenuEl.style.top = y + 'px';
-                    contextMenuEl.classList.remove('hidden');
-                }
-
-                function hideContextMenu() {
-                    if (contextMenuEl) contextMenuEl.classList.add('hidden');
-                }
-
-                async function addCommentToTask(id) {
-                    const t = tasks.find(x => x.id === id);
-                    if (!t) return;
-
-                    const comment = prompt("Agregar comentario a: " + t.name, "");
-                    if (!comment) return;
-
-                    if (!t.comments) t.comments = [];
-                    t.comments.push({
-                        text: comment,
-                        date: new Date().toISOString(),
-                        user: "Usuario" // Placeholder
-                    });
-
-                    // Save metadata? We reuse updateField or specialized endpoint?
-                    // Sending generic 'meta' object if supported, or assuming backend saves generic fields.
-                    // For now, let's assume we can save 'comments' field.
-                    // Save to Local Metadata (Primary Persistence since backend lacks field)
-                    saveProjectDataLocally();
-
-                    // Attempt Backend Save too (Best Effort)
-                    await updateField(id, 'comments', t.comments);
-
-                    renderGantt(gantt ? gantt.options.view_mode : 'Day');
-                }
-
-                async function registerDelay(id) {
-                    alert("Delay Analysis feature coming in next step!");
-                    // This placeholder acknowledges the user request but defers implementation 
-                    // to keep this edit focused on Comments/Header.
-                }
+                    // ... (toggleCompanyVisibility is below)
 
 
+                    // --- NEW SPLIT PANE HEADER LOGIC ---
 
-                async function assignCompanyToSelection(companyName) {
-                    // MERGE Logic: Row Selection (checkbox/row click) AND Cell Selection (drag/ctrl+click)
-                    const ids = new Set(selectedTaskIds);
-                    selectedCells.forEach(k => {
-                        const [id] = k.split(':');
-                        ids.add(id);
-                    });
 
-                    const finalIds = Array.from(ids);
-                    if (finalIds.length === 0) return alert("Selecciona tareas primero");
+                    // --- STRATEGY 3: MARGIN SHIFT & FULL CLONE ---
 
-                    const updates = [];
-                    finalIds.forEach(id => {
+
+                    function addCompany() {
+                        const input = document.getElementById('new-company-name');
+                        const name = input.value.trim();
+                        if (!name) return;
+
+                        // Check dupes
+                        if (companies.find(c => c.name === name)) return alert('Empresa ya existe');
+
+                        companies.push({
+                            name: name,
+                            color: DEFAULT_COLORS[companies.length % DEFAULT_COLORS.length],
+                            visible: true
+                        });
+                        saveCompaniesLocally();
+
+                        input.value = '';
+                        renderCompanyMenu();
+                    }
+
+                    function toggleCompanyVisibility(idx) {
+                        companies[idx].visible = !companies[idx].visible;
+                        saveCompaniesLocally();
+                        renderGantt(gantt ? gantt.options.view_mode : 'Day'); // Re-filter
+                    }
+
+
+                    function updateCompanyColor(idx, color) {
+                        companies[idx].color = color;
+                        // Re-render to apply color
+                        renderGrid();
+                        renderGantt(gantt ? gantt.options.view_mode : 'Day');
+                    }
+
+                    // --- CONTEXT MENU (Empresas) ---
+                    let contextMenuEl = null;
+
+                    function setupContextMenu() {
+                        // Create Menu DOM
+                        contextMenuEl = document.createElement('div');
+                        contextMenuEl.id = 'ctx-menu-companies';
+                        contextMenuEl.className = 'fixed bg-white border border-gray-200 shadow-xl rounded-md py-1 z-[100] hidden min-w-[160px]';
+                        document.body.appendChild(contextMenuEl);
+
+                        // Listeners
+                        document.addEventListener('contextmenu', (e) => {
+                            // Check if target is inside Grid row (not header)
+                            const row = e.target.closest('tr');
+                            if (!row || row.closest('thead')) return;
+
+                            e.preventDefault();
+                            showContextMenu(e.clientX, e.clientY, row.dataset.id);
+                        });
+
+                        document.addEventListener('click', () => hideContextMenu());
+                    }
+
+                    function showContextMenu(x, y, hoveredId) {
+                        // Logic: If selection exists, modify selection. 
+                        // If right-clicked ID is NOT in selection, clear selection and select just that one?
+                        // Windows behavior: If right click outside selection, select that one. If inside, keep selection.
+
+                        if (!selectedTaskIds.has(hoveredId)) {
+                            // Clicked outside selection
+                            selectedTaskIds.clear();
+                            selectedTaskIds.add(hoveredId);
+                            // Also clear cell selection? Yes.
+                            selectedCells.clear();
+                            renderGrid(); // update visuals
+                        }
+
+                        // Build Menu Items
+                        contextMenuEl.innerHTML = '';
+
+                        const title = document.createElement('div');
+                        title.className = "px-3 py-1 text-xs font-bold text-gray-500 border-b mb-1";
+                        title.innerText = "Asignar a Empresa";
+                        contextMenuEl.appendChild(title);
+
+                        if (companies.length === 0) {
+                            const empty = document.createElement('div');
+                            empty.className = "px-3 py-1 text-xs text-gray-400 italic";
+                            empty.innerText = "Crear empresas primero";
+                            contextMenuEl.appendChild(empty);
+                        } else {
+                            companies.forEach(c => {
+                                const item = document.createElement('button');
+                                item.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 flex items-center gap-2";
+                                item.innerHTML = `<span class="w-2 h-2 rounded-full" style="background:${c.color}"></span> ${c.name}`;
+                                item.onclick = (e) => {
+                                    e.stopPropagation();
+                                    assignCompanyToSelection(c.name);
+                                    hideContextMenu();
+                                };
+                                contextMenuEl.appendChild(item);
+                            });
+                        }
+
+                        // Unassign Option
+                        const unassign = document.createElement('button');
+                        unassign.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 text-gray-500 border-t mt-1";
+                        unassign.innerText = "Sin Asignar / Borrar";
+                        unassign.onclick = (e) => {
+                            e.stopPropagation();
+                            assignCompanyToSelection("");
+                            hideContextMenu();
+                        };
+                        contextMenuEl.appendChild(unassign);
+
+                        // --- Feature: ADD COMMENTS ---
+                        const addCommentBtn = document.createElement('button');
+                        addCommentBtn.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-blue-50 text-gray-700 border-t mt-1 flex items-center gap-2";
+                        addCommentBtn.innerHTML = `<i class="fas fa-comment"></i> Agregar Comentario`;
+                        addCommentBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            addCommentToTask(hoveredId);
+                            hideContextMenu();
+                        };
+                        contextMenuEl.appendChild(addCommentBtn);
+
+                        // --- Feature: REGISTER DELAY ---
+                        const delayBtn = document.createElement('button');
+                        delayBtn.className = "w-full text-left px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 border-top mt-1 flex items-center gap-2";
+                        delayBtn.innerHTML = `<i class="fas fa-clock"></i> Registrar Atraso`;
+                        delayBtn.onclick = (e) => {
+                            e.stopPropagation();
+                            registerDelay(hoveredId);
+                            hideContextMenu();
+                        };
+                        contextMenuEl.appendChild(delayBtn);
+
+                        // Position
+                        contextMenuEl.style.left = x + 'px';
+                        contextMenuEl.style.top = y + 'px';
+                        contextMenuEl.classList.remove('hidden');
+                    }
+
+                    function hideContextMenu() {
+                        if (contextMenuEl) contextMenuEl.classList.add('hidden');
+                    }
+
+                    async function addCommentToTask(id) {
                         const t = tasks.find(x => x.id === id);
-                        if (t) {
-                            t.contractor = companyName;
-                            saveProjectDataLocally(); // Save immediately
-                            updates.push(updateField(id, 'contractor', companyName));
-                        }
-                    });
+                        if (!t) return;
 
-                    await Promise.all(updates);
-                    renderGrid();
-                    renderGantt(gantt.options.view_mode);
-                }
+                        const comment = prompt("Agregar comentario a: " + t.name, "");
+                        if (!comment) return;
 
-                // --- LOOKAHEAD LOGIC ---
-                let lookaheadActive = false;
+                        if (!t.comments) t.comments = [];
+                        t.comments.push({
+                            text: comment,
+                            date: new Date().toISOString(),
+                            user: "Usuario" // Placeholder
+                        });
 
-                function toggleLookahead() {
-                    lookaheadActive = !lookaheadActive;
-                    const btn = document.getElementById('btn-lookahead');
-                    if (lookaheadActive) {
-                        btn.classList.add('bg-red-600', 'text-white');
-                        btn.classList.remove('bg-red-50', 'text-red-600');
+                        // Save metadata? We reuse updateField or specialized endpoint?
+                        // Sending generic 'meta' object if supported, or assuming backend saves generic fields.
+                        // For now, let's assume we can save 'comments' field.
+                        // Save to Local Metadata (Primary Persistence since backend lacks field)
+                        saveProjectDataLocally();
 
-                        // Default date to Today if empty
-                        const dateInput = document.getElementById('lookahead-start');
-                        if (!dateInput.value) {
-                            const today = new Date();
-                            const yyyy = today.getFullYear();
-                            const mm = String(today.getMonth() + 1).padStart(2, '0');
-                            const dd = String(today.getDate()).padStart(2, '0');
-                            dateInput.value = `${yyyy}-${mm}-${dd}`;
-                            if (typeof updateLookahead === 'function') updateLookahead();
-                        }
-                    } else {
-                        btn.classList.remove('bg-red-600', 'text-white');
-                        btn.classList.add('bg-red-50', 'text-red-600');
+                        // Attempt Backend Save too (Best Effort)
+                        await updateField(id, 'comments', t.comments);
+
+                        renderGantt(gantt ? gantt.options.view_mode : 'Day');
                     }
-                    updateLookahead();
-                }
 
-                function updateLookahead() {
-                    if (!lookaheadActive) {
+                    async function registerDelay(id) {
+                        alert("Delay Analysis feature coming in next step!");
+                        // This placeholder acknowledges the user request but defers implementation 
+                        // to keep this edit focused on Comments/Header.
+                    }
+
+
+
+                    async function assignCompanyToSelection(companyName) {
+                        // MERGE Logic: Row Selection (checkbox/row click) AND Cell Selection (drag/ctrl+click)
+                        const ids = new Set(selectedTaskIds);
+                        selectedCells.forEach(k => {
+                            const [id] = k.split(':');
+                            ids.add(id);
+                        });
+
+                        const finalIds = Array.from(ids);
+                        if (finalIds.length === 0) return alert("Selecciona tareas primero");
+
+                        const updates = [];
+                        finalIds.forEach(id => {
+                            const t = tasks.find(x => x.id === id);
+                            if (t) {
+                                t.contractor = companyName;
+                                saveProjectDataLocally(); // Save immediately
+                                updates.push(updateField(id, 'contractor', companyName));
+                            }
+                        });
+
+                        await Promise.all(updates);
+                        renderGrid();
+                        renderGantt(gantt.options.view_mode);
+                    }
+
+                    // --- LOOKAHEAD LOGIC ---
+                    let lookaheadActive = false;
+
+                    function toggleLookahead() {
+                        lookaheadActive = !lookaheadActive;
+                        const btn = document.getElementById('btn-lookahead');
+                        if (lookaheadActive) {
+                            btn.classList.add('bg-red-600', 'text-white');
+                            btn.classList.remove('bg-red-50', 'text-red-600');
+
+                            // Default date to Today if empty
+                            const dateInput = document.getElementById('lookahead-start');
+                            if (!dateInput.value) {
+                                const today = new Date();
+                                const yyyy = today.getFullYear();
+                                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                                const dd = String(today.getDate()).padStart(2, '0');
+                                dateInput.value = `${yyyy}-${mm}-${dd}`;
+                                if (typeof updateLookahead === 'function') updateLookahead();
+                            }
+                        } else {
+                            btn.classList.remove('bg-red-600', 'text-white');
+                            btn.classList.add('bg-red-50', 'text-red-600');
+                        }
+                        updateLookahead();
+                    }
+
+                    function updateLookahead() {
+                        if (!lookaheadActive) {
+                            removeLookaheadOverlay();
+                            clearLookaheadHighlights();
+                            return;
+                        }
+                        drawLookaheadOverlay();
+                        highlightLookaheadTasks();
+                    }
+
+                    function removeLookaheadOverlay() {
+                        const svg = document.getElementById('gantt-target');
+                        if (!svg) return;
+                        const existing = svg.querySelector('.lookahead-overlay');
+                        if (existing) existing.remove();
+                    }
+
+                    function clearLookaheadHighlights() {
+                        document.querySelectorAll('.lookahead-row').forEach(el => el.classList.remove('lookahead-row'));
+                    }
+
+                    function drawLookaheadOverlay() {
+                        const svg = document.getElementById('gantt-target');
+                        if (!svg || !gantt) return;
+
                         removeLookaheadOverlay();
+
+                        const startVal = document.getElementById('lookahead-start').value;
+                        const weeksVal = parseInt(document.getElementById('lookahead-weeks').value) || 4;
+                        if (!startVal) return;
+
+                        const startDate = new Date(startVal);
+                        const endDate = new Date(startDate);
+                        endDate.setDate(startDate.getDate() + (weeksVal * 7));
+
+                        // Coordinates
+                        if (!gantt.gantt_start || !gantt.gantt_end) return;
+
+                        // Map Date to X
+                        const totalDuration = gantt.gantt_end - gantt.gantt_start;
+                        const svgWidth = parseFloat(svg.getAttribute('width'));
+                        const svgHeight = parseFloat(svg.getAttribute('height'));
+
+                        const getX = (date) => {
+                            const diff = date - gantt.gantt_start;
+                            return (diff / totalDuration) * svgWidth;
+                        };
+
+                        const x1 = getX(startDate);
+                        const x2 = getX(endDate);
+                        const width = x2 - x1;
+
+                        if (width <= 0) return;
+
+                        // Draw Rect
+                        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        rect.setAttribute('x', x1);
+                        rect.setAttribute('y', 0);
+                        rect.setAttribute('width', width);
+                        rect.setAttribute('height', svgHeight);
+                        rect.setAttribute('class', 'lookahead-overlay');
+                        rect.setAttribute('fill', 'rgba(239, 68, 68, 0.1)'); // Red 500, 10%
+                        rect.setAttribute('stroke', '#ef4444');
+                        rect.setAttribute('stroke-width', '2');
+                        rect.setAttribute('pointer-events', 'none');
+
+                        // Prepend to avoid covering tooltips/interactions? 
+                        // Append puts it on TOP. Prepend puts it BEHIND bars.
+                        // User requested "frame", suggesting overlay. "Transparent" suggests overlay.
+                        // Let's Append but ensure pointer-events: none.
+                        svg.appendChild(rect);
+                    }
+
+                    function highlightLookaheadTasks() {
                         clearLookaheadHighlights();
-                        return;
-                    }
-                    drawLookaheadOverlay();
-                    highlightLookaheadTasks();
-                }
+                        const startVal = document.getElementById('lookahead-start').value;
+                        const weeksVal = parseInt(document.getElementById('lookahead-weeks').value) || 4;
+                        if (!startVal) return;
 
-                function removeLookaheadOverlay() {
-                    const svg = document.getElementById('gantt-target');
-                    if (!svg) return;
-                    const existing = svg.querySelector('.lookahead-overlay');
-                    if (existing) existing.remove();
-                }
+                        const lhStart = new Date(startVal);
+                        const lhEnd = new Date(lhStart);
+                        lhEnd.setDate(lhStart.getDate() + (weeksVal * 7));
 
-                function clearLookaheadHighlights() {
-                    document.querySelectorAll('.lookahead-row').forEach(el => el.classList.remove('lookahead-row'));
-                }
+                        // Check intersections
+                        tasks.forEach((t, index) => {
+                            // Ignore Summary? Usually Lookahead cares about actionable tasks.
+                            // But let's highlight everything intersecting.
 
-                function drawLookaheadOverlay() {
-                    const svg = document.getElementById('gantt-target');
-                    if (!svg || !gantt) return;
+                            const tStart = new Date(t.start);
+                            const tEnd = new Date(t.end);
 
-                    removeLookaheadOverlay();
+                            // Intersection Logic:
+                            // (TaskStart < LHEnd) && (TaskEnd > LHStart)
+                            if (tStart < lhEnd && tEnd > lhStart) {
+                                // Highlight Row in Grid
+                                const tr = document.querySelector(`tr[data-id="${t.id}"]`);
+                                if (tr) {
+                                    tr.classList.add('lookahead-row');
 
-                    const startVal = document.getElementById('lookahead-start').value;
-                    const weeksVal = parseInt(document.getElementById('lookahead-weeks').value) || 4;
-                    if (!startVal) return;
-
-                    const startDate = new Date(startVal);
-                    const endDate = new Date(startDate);
-                    endDate.setDate(startDate.getDate() + (weeksVal * 7));
-
-                    // Coordinates
-                    if (!gantt.gantt_start || !gantt.gantt_end) return;
-
-                    // Map Date to X
-                    const totalDuration = gantt.gantt_end - gantt.gantt_start;
-                    const svgWidth = parseFloat(svg.getAttribute('width'));
-                    const svgHeight = parseFloat(svg.getAttribute('height'));
-
-                    const getX = (date) => {
-                        const diff = date - gantt.gantt_start;
-                        return (diff / totalDuration) * svgWidth;
-                    };
-
-                    const x1 = getX(startDate);
-                    const x2 = getX(endDate);
-                    const width = x2 - x1;
-
-                    if (width <= 0) return;
-
-                    // Draw Rect
-                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                    rect.setAttribute('x', x1);
-                    rect.setAttribute('y', 0);
-                    rect.setAttribute('width', width);
-                    rect.setAttribute('height', svgHeight);
-                    rect.setAttribute('class', 'lookahead-overlay');
-                    rect.setAttribute('fill', 'rgba(239, 68, 68, 0.1)'); // Red 500, 10%
-                    rect.setAttribute('stroke', '#ef4444');
-                    rect.setAttribute('stroke-width', '2');
-                    rect.setAttribute('pointer-events', 'none');
-
-                    // Prepend to avoid covering tooltips/interactions? 
-                    // Append puts it on TOP. Prepend puts it BEHIND bars.
-                    // User requested "frame", suggesting overlay. "Transparent" suggests overlay.
-                    // Let's Append but ensure pointer-events: none.
-                    svg.appendChild(rect);
-                }
-
-                function highlightLookaheadTasks() {
-                    clearLookaheadHighlights();
-                    const startVal = document.getElementById('lookahead-start').value;
-                    const weeksVal = parseInt(document.getElementById('lookahead-weeks').value) || 4;
-                    if (!startVal) return;
-
-                    const lhStart = new Date(startVal);
-                    const lhEnd = new Date(lhStart);
-                    lhEnd.setDate(lhStart.getDate() + (weeksVal * 7));
-
-                    // Check intersections
-                    tasks.forEach((t, index) => {
-                        // Ignore Summary? Usually Lookahead cares about actionable tasks.
-                        // But let's highlight everything intersecting.
-
-                        const tStart = new Date(t.start);
-                        const tEnd = new Date(t.end);
-
-                        // Intersection Logic:
-                        // (TaskStart < LHEnd) && (TaskEnd > LHStart)
-                        if (tStart < lhEnd && tEnd > lhStart) {
-                            // Highlight Row in Grid
-                            const tr = document.querySelector(`tr[data-id="${t.id}"]`);
-                            if (tr) {
-                                tr.classList.add('lookahead-row');
-
-                                // Optional: Compute status (Starting, Ending, In Process)
-                                // Could add tooltip or specific color class
+                                    // Optional: Compute status (Starting, Ending, In Process)
+                                    // Could add tooltip or specific color class
+                                }
                             }
-                        }
-                    });
-                }
-
-                // Hook into Gantt View Change
-                const originalViewChange = gantt ? gantt.options.on_view_change : null;
-                // Logic handled in renderGantt setup... wait.
-                // We need to re-hook whenever we re-create Gantt.
-
-                // --- GRID RENDERING (Optimized for Interaction) ---
-                // State for collapsed parents
-                let collapsedTasks = new Set();
-
-                function toggleCollapse(index) {
-                    const parent = tasks[index];
-                    if (!parent) return;
-
-                    if (collapsedTasks.has(parent.id)) {
-                        collapsedTasks.delete(parent.id);
-                    } else {
-                        collapsedTasks.add(parent.id);
+                        });
                     }
-                    renderGrid();
-                    // Optional: Filter tasks passed to Gantt chart to match grid visibility
-                    // For now, let's just update grid. Chart might show all or we need to filter there too.
-                    renderGantt();
-                }
 
-                function renderGrid() {
-                    const tbody = document.getElementById('grid-body');
-                    tbody.innerHTML = '';
+                    // Hook into Gantt View Change
+                    const originalViewChange = gantt ? gantt.options.on_view_change : null;
+                    // Logic handled in renderGantt setup... wait.
+                    // We need to re-hook whenever we re-create Gantt.
 
-                    const isSummary = (index) => {
-                        if (index >= tasks.length - 1) return false;
-                        const c = (tasks[index]._style && tasks[index]._style.indent) || 0;
-                        const n = (tasks[index + 1]._style && tasks[index + 1]._style.indent) || 0;
-                        return n > c;
-                    };
+                    // --- GRID RENDERING (Optimized for Interaction) ---
+                    // State for collapsed parents
+                    let collapsedTasks = new Set();
 
-                    // COLLAPSE LOGIC + FILTERING
-                    let visible = true;
-                    let collapsedLevel = -1;
+                    function toggleCollapse(index) {
+                        const parent = tasks[index];
+                        if (!parent) return;
 
-                    tasks.forEach((task, index) => {
-                        // 1. Company Filter
-                        const companyName = (task.contractor || '').trim();
-                        if (companyName) {
-                            const c = companies.find(x => x.name === companyName);
-                            // If company exists and is NOT visible, skip
-                            if (c && !c.visible) return;
+                        if (collapsedTasks.has(parent.id)) {
+                            collapsedTasks.delete(parent.id);
+                        } else {
+                            collapsedTasks.add(parent.id);
                         }
-                        // If task has company but we haven't created it yet? Show by default.
+                        renderGrid();
+                        // Optional: Filter tasks passed to Gantt chart to match grid visibility
+                        // For now, let's just update grid. Chart might show all or we need to filter there too.
+                        renderGantt();
+                    }
 
-                        // 2. Indentation Logic (existing)
-                        let indent = (task._style && task._style.indent) ? task._style.indent : 0;
-                        if (collapsedLevel !== -1) {
-                            if (indent > collapsedLevel) return;
-                            else collapsedLevel = -1;
-                        }
-                        const isParent = isSummary(index);
-                        if (isParent && collapsedTasks.has(task.id)) {
-                            if (collapsedLevel === -1) collapsedLevel = indent;
-                        }
+                    function renderGrid() {
+                        const tbody = document.getElementById('grid-body');
+                        tbody.innerHTML = '';
 
-                        // 3. Render Row
-                        const tr = document.createElement('tr');
-                        tr.dataset.id = task.id;
-                        tr.dataset.index = index;
+                        const isSummary = (index) => {
+                            if (index >= tasks.length - 1) return false;
+                            const c = (tasks[index]._style && tasks[index]._style.indent) || 0;
+                            const n = (tasks[index + 1]._style && tasks[index + 1]._style.indent) || 0;
+                            return n > c;
+                        };
 
-                        // Style Logic
-                        if (isParent) {
-                            tr.style.fontWeight = 'bold';
-                            tr.classList.add('summary-task');
-                        }
-                        if (task._style) applyRowStyle(tr, task._style);
+                        // COLLAPSE LOGIC + FILTERING
+                        let visible = true;
+                        let collapsedLevel = -1;
 
-                        // --- COMPANY COLOR HIGHLIGHT (Grid) ---
-                        if (companyName) {
-                            const c = companies.find(x => x.name === companyName);
-                            if (c && c.visible && c.color) {
-                                // Apply left border or background tint?
-                                // User said "activarle color y resalte".
-                                // Let's create a subtle pill or text color in the contractor column
-                                // AND maybe a left border on the row?
-                                tr.style.borderLeft = `3px solid ${c.color}`;
+                        tasks.forEach((task, index) => {
+                            // 1. Company Filter
+                            const companyName = (task.contractor || '').trim();
+                            if (companyName) {
+                                const c = companies.find(x => x.name === companyName);
+                                // If company exists and is NOT visible, skip
+                                if (c && !c.visible) return;
                             }
-                        }
+                            // If task has company but we haven't created it yet? Show by default.
 
-                        tr.style.height = '38px';
+                            // 2. Indentation Logic (existing)
+                            let indent = (task._style && task._style.indent) ? task._style.indent : 0;
+                            if (collapsedLevel !== -1) {
+                                if (indent > collapsedLevel) return;
+                                else collapsedLevel = -1;
+                            }
+                            const isParent = isSummary(index);
+                            if (isParent && collapsedTasks.has(task.id)) {
+                                if (collapsedLevel === -1) collapsedLevel = indent;
+                            }
 
-                        let toggleHtml = '';
-                        if (isParent) {
-                            const isCollapsed = collapsedTasks.has(task.id);
-                            const icon = isCollapsed ? 'fa-caret-right' : 'fa-caret-down';
-                            toggleHtml = `<i class="fas ${icon} toggle-icon" onclick="toggleCollapse(${index})"></i>`;
-                        } else {
-                            toggleHtml = `<span class="toggle-icon"></span>`;
-                        }
+                            // 3. Render Row
+                            const tr = document.createElement('tr');
+                            tr.dataset.id = task.id;
+                            tr.dataset.index = index;
 
-                        // Contractor Cell with Color Pill
-                        let contractorHtml = '';
-                        const comp = companies.find(c => c.name === companyName);
-                        if (comp) {
-                            contractorHtml = `<div class="flex items-center gap-1 overflow-hidden"><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${comp.color}"></div><span class="truncate min-w-0" title="${task.contractor}">${task.contractor}</span></div>`;
-                        } else {
-                            contractorHtml = `<input class="cell-input" value="${task.contractor || ''}" readonly>`;
-                        }
+                            // Style Logic
+                            if (isParent) {
+                                tr.style.fontWeight = 'bold';
+                                tr.classList.add('summary-task');
+                            }
+                            if (task._style) applyRowStyle(tr, task._style);
+
+                            // --- COMPANY COLOR HIGHLIGHT (Grid) ---
+                            if (companyName) {
+                                const c = companies.find(x => x.name === companyName);
+                                if (c && c.visible && c.color) {
+                                    // Apply left border or background tint?
+                                    // User said "activarle color y resalte".
+                                    // Let's create a subtle pill or text color in the contractor column
+                                    // AND maybe a left border on the row?
+                                    tr.style.borderLeft = `3px solid ${c.color}`;
+                                }
+                            }
+
+                            tr.style.height = '38px';
+
+                            let toggleHtml = '';
+                            if (isParent) {
+                                const isCollapsed = collapsedTasks.has(task.id);
+                                const icon = isCollapsed ? 'fa-caret-right' : 'fa-caret-down';
+                                toggleHtml = `<i class="fas ${icon} toggle-icon" onclick="toggleCollapse(${index})"></i>`;
+                            } else {
+                                toggleHtml = `<span class="toggle-icon"></span>`;
+                            }
+
+                            // Contractor Cell with Color Pill
+                            let contractorHtml = '';
+                            const comp = companies.find(c => c.name === companyName);
+                            if (comp) {
+                                contractorHtml = `<div class="flex items-center gap-1 overflow-hidden"><div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${comp.color}"></div><span class="truncate min-w-0" title="${task.contractor}">${task.contractor}</span></div>`;
+                            } else {
+                                contractorHtml = `<input class="cell-input" value="${task.contractor || ''}" readonly>`;
+                            }
 
 
-                        tr.innerHTML = `
+                            tr.innerHTML = `
                     <td class="text-center text-gray-500 text-xs">${index + 1}</td>
                     
                     <td class="grid-cell" data-field="name" data-id="${task.id}">
@@ -1789,827 +1789,828 @@
                          <input type="number" class="cell-input text-center" value="${task.progress}" readonly>
                     </td>
                 `;
-                        tbody.appendChild(tr);
-                    });
+                            tbody.appendChild(tr);
+                        });
 
-                    renderSelection();
-                    if (lookaheadActive) highlightLookaheadTasks(); // Re-apply lookahead
-                }
-
-                // --- INTERACTION HANDLERS ---
-
-                function handleGridMouseDown(e) {
-                    // Find Cell
-                    const cell = e.target.closest('.grid-cell');
-                    if (!cell) return;
-
-                    // If currently editing another cell, commit it first? 
-                    // Blur event usually handles commit, but click might happen before blur finishes?
-                    // Let blur handle logic.
-
-                    const id = cell.dataset.id;
-                    const field = cell.dataset.field;
-                    const index = parseInt(cell.closest('tr').dataset.index);
-
-                    if (isEditing) {
-                        // If we click inside the SAME cell while editing, do nothing (allow text selection)
-                        if (cell.classList.contains('editing')) {
-                            return; // Let native behavior happen
-                        }
-                        // Else, stop editing previous
-                        finishEditing(); // Helper to clear editing state
+                        renderSelection();
+                        if (lookaheadActive) highlightLookaheadTasks(); // Re-apply lookahead
                     }
 
-                    // Selection Logic
-                    if (e.ctrlKey) {
-                        toggleSelectCell(id, field);
-                    } else if (e.shiftKey && lastSelectedCell) {
-                        selectRange(lastSelectedCell.index, index, lastSelectedCell.field, field);
-                    } else {
-                        // Single Select
+                    // --- INTERACTION HANDLERS ---
+
+                    function handleGridMouseDown(e) {
+                        // Find Cell
+                        const cell = e.target.closest('.grid-cell');
+                        if (!cell) return;
+
+                        // If currently editing another cell, commit it first? 
+                        // Blur event usually handles commit, but click might happen before blur finishes?
+                        // Let blur handle logic.
+
+                        const id = cell.dataset.id;
+                        const field = cell.dataset.field;
+                        const index = parseInt(cell.closest('tr').dataset.index);
+
+                        if (isEditing) {
+                            // If we click inside the SAME cell while editing, do nothing (allow text selection)
+                            if (cell.classList.contains('editing')) {
+                                return; // Let native behavior happen
+                            }
+                            // Else, stop editing previous
+                            finishEditing(); // Helper to clear editing state
+                        }
+
+                        // Selection Logic
+                        if (e.ctrlKey) {
+                            toggleSelectCell(id, field);
+                        } else if (e.shiftKey && lastSelectedCell) {
+                            selectRange(lastSelectedCell.index, index, lastSelectedCell.field, field);
+                        } else {
+                            // Single Select
+                            selectedCells.clear();
+                            selectCell(id, field);
+                        }
+
+                        lastSelectedCell = { id, field, index };
+                        renderSelection();
+                    }
+
+                    function handleGridDoubleClick(e) {
+                        const cell = e.target.closest('.grid-cell');
+                        if (!cell) return;
+
+                        startEditing(cell);
+                    }
+
+                    function toggleSelectCell(id, field) {
+                        const key = `${id}:${field}`;
+                        if (selectedCells.has(key)) selectedCells.delete(key);
+                        else selectedCells.add(key);
+                    }
+
+                    function selectCell(id, field) {
+                        selectedCells.add(`${id}:${field}`);
+                    }
+
+                    function selectRange(idx1, idx2, field1, field2) {
+                        // Simplification: Select rectangular block
+                        // Need to know column order
+                        const cols = ['name', 'contractor', 'start', 'end', 'progress'];
+                        const c1 = cols.indexOf(field1);
+                        const c2 = cols.indexOf(field2);
+
+                        if (c1 === -1 || c2 === -1) return;
+
+                        const startRow = Math.min(idx1, idx2);
+                        const endRow = Math.max(idx1, idx2);
+                        const startCol = Math.min(c1, c2);
+                        const endCol = Math.max(c1, c2);
+
                         selectedCells.clear();
-                        selectCell(id, field);
-                    }
 
-                    lastSelectedCell = { id, field, index };
-                    renderSelection();
-                }
-
-                function handleGridDoubleClick(e) {
-                    const cell = e.target.closest('.grid-cell');
-                    if (!cell) return;
-
-                    startEditing(cell);
-                }
-
-                function toggleSelectCell(id, field) {
-                    const key = `${id}:${field}`;
-                    if (selectedCells.has(key)) selectedCells.delete(key);
-                    else selectedCells.add(key);
-                }
-
-                function selectCell(id, field) {
-                    selectedCells.add(`${id}:${field}`);
-                }
-
-                function selectRange(idx1, idx2, field1, field2) {
-                    // Simplification: Select rectangular block
-                    // Need to know column order
-                    const cols = ['name', 'contractor', 'start', 'end', 'progress'];
-                    const c1 = cols.indexOf(field1);
-                    const c2 = cols.indexOf(field2);
-
-                    if (c1 === -1 || c2 === -1) return;
-
-                    const startRow = Math.min(idx1, idx2);
-                    const endRow = Math.max(idx1, idx2);
-                    const startCol = Math.min(c1, c2);
-                    const endCol = Math.max(c1, c2);
-
-                    selectedCells.clear();
-
-                    for (let i = startRow; i <= endRow; i++) {
-                        const t = tasks[i];
-                        for (let j = startCol; j <= endCol; j++) {
-                            selectedCells.add(`${t.id}:${cols[j]}`);
-                        }
-                    }
-                }
-
-                function renderSelection() {
-                    // Clear all visual
-                    document.querySelectorAll('.grid-cell.selected').forEach(el => el.classList.remove('selected'));
-
-                    selectedCells.forEach(key => {
-                        const [id, field] = key.split(':');
-                        const cell = document.querySelector(`.grid-cell[data-id="${id}"][data-field="${field}"]`);
-                        if (cell) cell.classList.add('selected');
-                    });
-                }
-
-                // --- EDITING LOGIC ---
-                let currentEditCell = null;
-
-                function startEditing(cell) {
-                    if (isEditing) finishEditing();
-
-                    isEditing = true;
-                    currentEditCell = cell;
-                    cell.classList.add('editing');
-
-                    const input = cell.querySelector('input');
-                    if (input) {
-                        input.readOnly = false;
-                        input.focus();
-                        // input.select(); // Optional: select all text
-
-                        // Bind blur to save
-                        input.onblur = () => {
-                            // Commit changes
-                            const id = cell.dataset.id;
-                            const field = cell.dataset.field;
-                            updateField(id, field, input.value); // Existing server update fn
-                            finishEditing();
-                        };
-
-                        // Bind Enter to save
-                        input.onkeydown = (e) => {
-                            if (e.key === 'Enter') {
-                                input.blur();
+                        for (let i = startRow; i <= endRow; i++) {
+                            const t = tasks[i];
+                            for (let j = startCol; j <= endCol; j++) {
+                                selectedCells.add(`${t.id}:${cols[j]}`);
                             }
                         }
                     }
-                }
 
-                function finishEditing() {
-                    if (!currentEditCell) return;
-                    const input = currentEditCell.querySelector('input');
-                    if (input) input.readOnly = true;
-                    currentEditCell.classList.remove('editing');
+                    function renderSelection() {
+                        // Clear all visual
+                        document.querySelectorAll('.grid-cell.selected').forEach(el => el.classList.remove('selected'));
 
-                    // Cleanup events
-                    if (input) {
-                        input.onblur = null;
-                        input.onkeydown = null;
+                        selectedCells.forEach(key => {
+                            const [id, field] = key.split(':');
+                            const cell = document.querySelector(`.grid-cell[data-id="${id}"][data-field="${field}"]`);
+                            if (cell) cell.classList.add('selected');
+                        });
                     }
 
-                    isEditing = false;
-                    currentEditCell = null;
-                }
+                    // --- EDITING LOGIC ---
+                    let currentEditCell = null;
 
-                // --- CLIPBOARD ---
-                async function handleGlobalKeydown(e) {
-                    if (isEditing) return; // Allow normal keys in edit mode
+                    function startEditing(cell) {
+                        if (isEditing) finishEditing();
 
-                    if (e.ctrlKey && e.key === 'c') {
-                        e.preventDefault();
-                        copySelection();
-                    } else if (e.ctrlKey && e.key === 'v') {
-                        e.preventDefault();
-                        pasteSelection();
-                    } else if (e.key === 'Delete' || e.key === 'Backspace') {
-                        deleteSelection();
-                    }
-                }
+                        isEditing = true;
+                        currentEditCell = cell;
+                        cell.classList.add('editing');
 
-                function copySelection() {
-                    if (selectedCells.size === 0) return;
+                        const input = cell.querySelector('input');
+                        if (input) {
+                            input.readOnly = false;
+                            input.focus();
+                            // input.select(); // Optional: select all text
 
-                    // We need to order the data to make a nice table string
-                    // Group by Row Index
-                    const rows = {}; // index -> { colIndex -> value }
-                    const cols = ['name', 'contractor', 'start', 'end', 'progress'];
+                            // Bind blur to save
+                            input.onblur = () => {
+                                // Commit changes
+                                const id = cell.dataset.id;
+                                const field = cell.dataset.field;
+                                updateField(id, field, input.value); // Existing server update fn
+                                finishEditing();
+                            };
 
-                    selectedCells.forEach(key => {
-                        const [id, field] = key.split(':');
-                        const task = tasks.find(t => t.id === id);
-                        if (!task) return;
-                        const idx = tasks.indexOf(task);
-                        const colIdx = cols.indexOf(field);
-
-                        if (!rows[idx]) rows[idx] = {};
-
-                        let val = task[field];
-                        if (field === 'start' || field === 'end') val = formatDateInput(val);
-                        rows[idx][colIdx] = val;
-                    });
-
-                    // Convert to string
-                    const sortedRowIndices = Object.keys(rows).sort((a, b) => a - b);
-                    if (sortedRowIndices.length === 0) return;
-
-                    // Normalize columns (smallest col index in selection)
-                    // Actually, usually clipboard is just the rect.
-                    // Let's just output lines.
-
-                    let text = "";
-                    sortedRowIndices.forEach((rIdx, i) => {
-                        const rowData = rows[rIdx];
-                        const sortedCols = Object.keys(rowData).sort((a, b) => a - b);
-                        const line = sortedCols.map(c => rowData[c]).join('\t');
-                        text += line + (i < sortedRowIndices.length - 1 ? '\n' : '');
-                    });
-
-                    navigator.clipboard.writeText(text).then(() => {
-                        // Visual feedback?
-                        console.log("Copied to clipboard");
-                    });
-                }
-
-                async function pasteSelection() {
-                    if (selectedCells.size === 0) return;
-
-                    // Paste starting at the "Anchor" (first selected cell)
-                    // Or if range selected, maybe restrict? 
-                    // Standard Excel: If 1 cell selected, paste expands. If range selected, paste repeats or fits.
-                    // Let's implement: Paste expands from TOP-LEFT of selection.
-
-                    // Find Top-Left
-                    const cols = ['name', 'contractor', 'start', 'end', 'progress'];
-                    let minRow = Infinity;
-                    let minCol = Infinity;
-
-                    selectedCells.forEach(key => {
-                        const [id, field] = key.split(':');
-                        const t = tasks.find(x => x.id === id);
-                        const r = tasks.indexOf(t);
-                        const c = cols.indexOf(field);
-                        if (r < minRow) minRow = r;
-                        if (c < minCol) minCol = c;
-                    });
-
-                    if (minRow === Infinity) return;
-
-                    try {
-                        const text = await navigator.clipboard.readText();
-                        const lines = text.split(/\r?\n/);
-
-                        for (let i = 0; i < lines.length; i++) {
-                            const line = lines[i];
-                            if (!line) continue;
-                            const vals = line.split('\t');
-
-                            const targetRowIdx = minRow + i;
-                            if (targetRowIdx >= tasks.length) break; // Out of bounds
-
-                            const task = tasks[targetRowIdx];
-
-                            for (let j = 0; j < vals.length; j++) {
-                                const targetColIdx = minCol + j;
-                                if (targetColIdx >= cols.length) break;
-
-                                const field = cols[targetColIdx];
-                                const val = vals[j];
-
-                                // Update Data
-                                updateField(task.id, field, val); // Server update
-                                // Local update usually handled in updateField but we might want batch update?
-                                // updateField re-renders Gantt/Grid. If we do 50 pastes, 50 re-renders is bad.
-                                // We should suppress re-render until end.
-
-                                // Optimize: Manually update local cache, then Render ONCE
+                            // Bind Enter to save
+                            input.onkeydown = (e) => {
+                                if (e.key === 'Enter') {
+                                    input.blur();
+                                }
                             }
                         }
-
-                        // Force Reload after bulk
-                        setTimeout(() => {
-                            renderGrid();
-                            renderGantt(gantt ? gantt.options.view_mode : 'Day');
-                        }, 500);
-
-                    } catch (e) {
-                        console.error("Paste failed", e);
                     }
-                }
 
-                function deleteSelection() {
-                    if (!confirm("¿Borrar contenido de celdas seleccionadas?")) return;
+                    function finishEditing() {
+                        if (!currentEditCell) return;
+                        const input = currentEditCell.querySelector('input');
+                        if (input) input.readOnly = true;
+                        currentEditCell.classList.remove('editing');
 
-                    selectedCells.forEach(key => {
-                        const [id, field] = key.split(':');
-                        updateField(id, field, ""); // Clear value
-                    });
-                }
+                        // Cleanup events
+                        if (input) {
+                            input.onblur = null;
+                            input.onkeydown = null;
+                        }
 
-                // --- EXISTING FNS (Modified to prevent conflict) ---
-                // updateField needs to NOT call full render if we are just blurring?
-                // Actually full render is fine for valid data consistency.
-
-                // ... Load, ApplyStyle, AddTask ... need to ensure they don't break selection state
-                // Re-rendering grid clears selection DOM, so renderGrid calls renderSelection() at end.
-
-                // Also update renderGantt to call drawTodayLine()
-
-                // --- STYLING LOGIC ---
-                function applyRowStyle(tr, style) {
-                    if (!style) return;
-                    // Font Styles
-                    if (style.fontWeight) tr.style.fontWeight = style.fontWeight;
-                    if (style.fontStyle) tr.style.fontStyle = style.fontStyle;
-                    if (style.textDecoration) tr.style.textDecoration = style.textDecoration;
-                    if (style.fontFamily) tr.style.fontFamily = style.fontFamily;
-                    if (style.fontSize) tr.style.fontSize = style.fontSize;
-
-                    // Colors
-                    if (style.color) {
-                        tr.style.color = style.color;
-                        // Also force inputs to inherit
-                        const inputs = tr.querySelectorAll('input');
-                        inputs.forEach(i => i.style.color = style.color);
+                        isEditing = false;
+                        currentEditCell = null;
                     }
-                    if (style.fill) {
-                        // Background for the row
-                        tr.style.backgroundColor = style.fill + '20'; // Add transparency? Or solid?
-                        // User likely wants highlight. Let's use it as bg.
-                        // But wait, selection uses bg.
-                        // Let's set it, but allow selection to override or blend.
-                        // tr.style.backgroundColor = style.fill; 
+
+                    // --- CLIPBOARD ---
+                    async function handleGlobalKeydown(e) {
+                        if (isEditing) return; // Allow normal keys in edit mode
+
+                        if (e.ctrlKey && e.key === 'c') {
+                            e.preventDefault();
+                            copySelection();
+                        } else if (e.ctrlKey && e.key === 'v') {
+                            e.preventDefault();
+                            pasteSelection();
+                        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                            deleteSelection();
+                        }
                     }
-                }
 
-                async function applyStyle(key, value) {
-                    // Resolve IDs from Row Selection OR Grid Selection
-                    const idsToUpdate = new Set(selectedTaskIds);
+                    function copySelection() {
+                        if (selectedCells.size === 0) return;
 
-                    selectedCells.forEach(k => {
-                        const [id, field] = k.split(':');
-                        idsToUpdate.add(id);
-                    });
+                        // We need to order the data to make a nice table string
+                        // Group by Row Index
+                        const rows = {}; // index -> { colIndex -> value }
+                        const cols = ['name', 'contractor', 'start', 'end', 'progress'];
 
-                    if (idsToUpdate.size === 0) return alert("Selecciona una tarea o celdas primero.");
+                        selectedCells.forEach(key => {
+                            const [id, field] = key.split(':');
+                            const task = tasks.find(t => t.id === id);
+                            if (!task) return;
+                            const idx = tasks.indexOf(task);
+                            const colIdx = cols.indexOf(field);
 
-                    const updates = [];
+                            if (!rows[idx]) rows[idx] = {};
 
-                    idsToUpdate.forEach(id => {
+                            let val = task[field];
+                            if (field === 'start' || field === 'end') val = formatDateInput(val);
+                            rows[idx][colIdx] = val;
+                        });
+
+                        // Convert to string
+                        const sortedRowIndices = Object.keys(rows).sort((a, b) => a - b);
+                        if (sortedRowIndices.length === 0) return;
+
+                        // Normalize columns (smallest col index in selection)
+                        // Actually, usually clipboard is just the rect.
+                        // Let's just output lines.
+
+                        let text = "";
+                        sortedRowIndices.forEach((rIdx, i) => {
+                            const rowData = rows[rIdx];
+                            const sortedCols = Object.keys(rowData).sort((a, b) => a - b);
+                            const line = sortedCols.map(c => rowData[c]).join('\t');
+                            text += line + (i < sortedRowIndices.length - 1 ? '\n' : '');
+                        });
+
+                        navigator.clipboard.writeText(text).then(() => {
+                            // Visual feedback?
+                            console.log("Copied to clipboard");
+                        });
+                    }
+
+                    async function pasteSelection() {
+                        if (selectedCells.size === 0) return;
+
+                        // Paste starting at the "Anchor" (first selected cell)
+                        // Or if range selected, maybe restrict? 
+                        // Standard Excel: If 1 cell selected, paste expands. If range selected, paste repeats or fits.
+                        // Let's implement: Paste expands from TOP-LEFT of selection.
+
+                        // Find Top-Left
+                        const cols = ['name', 'contractor', 'start', 'end', 'progress'];
+                        let minRow = Infinity;
+                        let minCol = Infinity;
+
+                        selectedCells.forEach(key => {
+                            const [id, field] = key.split(':');
+                            const t = tasks.find(x => x.id === id);
+                            const r = tasks.indexOf(t);
+                            const c = cols.indexOf(field);
+                            if (r < minRow) minRow = r;
+                            if (c < minCol) minCol = c;
+                        });
+
+                        if (minRow === Infinity) return;
+
+                        try {
+                            const text = await navigator.clipboard.readText();
+                            const lines = text.split(/\r?\n/);
+
+                            for (let i = 0; i < lines.length; i++) {
+                                const line = lines[i];
+                                if (!line) continue;
+                                const vals = line.split('\t');
+
+                                const targetRowIdx = minRow + i;
+                                if (targetRowIdx >= tasks.length) break; // Out of bounds
+
+                                const task = tasks[targetRowIdx];
+
+                                for (let j = 0; j < vals.length; j++) {
+                                    const targetColIdx = minCol + j;
+                                    if (targetColIdx >= cols.length) break;
+
+                                    const field = cols[targetColIdx];
+                                    const val = vals[j];
+
+                                    // Update Data
+                                    updateField(task.id, field, val); // Server update
+                                    // Local update usually handled in updateField but we might want batch update?
+                                    // updateField re-renders Gantt/Grid. If we do 50 pastes, 50 re-renders is bad.
+                                    // We should suppress re-render until end.
+
+                                    // Optimize: Manually update local cache, then Render ONCE
+                                }
+                            }
+
+                            // Force Reload after bulk
+                            setTimeout(() => {
+                                renderGrid();
+                                renderGantt(gantt ? gantt.options.view_mode : 'Day');
+                            }, 500);
+
+                        } catch (e) {
+                            console.error("Paste failed", e);
+                        }
+                    }
+
+                    function deleteSelection() {
+                        if (!confirm("¿Borrar contenido de celdas seleccionadas?")) return;
+
+                        selectedCells.forEach(key => {
+                            const [id, field] = key.split(':');
+                            updateField(id, field, ""); // Clear value
+                        });
+                    }
+
+                    // --- EXISTING FNS (Modified to prevent conflict) ---
+                    // updateField needs to NOT call full render if we are just blurring?
+                    // Actually full render is fine for valid data consistency.
+
+                    // ... Load, ApplyStyle, AddTask ... need to ensure they don't break selection state
+                    // Re-rendering grid clears selection DOM, so renderGrid calls renderSelection() at end.
+
+                    // Also update renderGantt to call drawTodayLine()
+
+                    // --- STYLING LOGIC ---
+                    function applyRowStyle(tr, style) {
+                        if (!style) return;
+                        // Font Styles
+                        if (style.fontWeight) tr.style.fontWeight = style.fontWeight;
+                        if (style.fontStyle) tr.style.fontStyle = style.fontStyle;
+                        if (style.textDecoration) tr.style.textDecoration = style.textDecoration;
+                        if (style.fontFamily) tr.style.fontFamily = style.fontFamily;
+                        if (style.fontSize) tr.style.fontSize = style.fontSize;
+
+                        // Colors
+                        if (style.color) {
+                            tr.style.color = style.color;
+                            // Also force inputs to inherit
+                            const inputs = tr.querySelectorAll('input');
+                            inputs.forEach(i => i.style.color = style.color);
+                        }
+                        if (style.fill) {
+                            // Background for the row
+                            tr.style.backgroundColor = style.fill + '20'; // Add transparency? Or solid?
+                            // User likely wants highlight. Let's use it as bg.
+                            // But wait, selection uses bg.
+                            // Let's set it, but allow selection to override or blend.
+                            // tr.style.backgroundColor = style.fill; 
+                        }
+                    }
+
+                    async function applyStyle(key, value) {
+                        // Resolve IDs from Row Selection OR Grid Selection
+                        const idsToUpdate = new Set(selectedTaskIds);
+
+                        selectedCells.forEach(k => {
+                            const [id, field] = k.split(':');
+                            idsToUpdate.add(id);
+                        });
+
+                        if (idsToUpdate.size === 0) return alert("Selecciona una tarea o celdas primero.");
+
+                        const updates = [];
+
+                        idsToUpdate.forEach(id => {
+                            const task = tasks.find(t => t.id === id);
+                            if (!task) return;
+
+                            if (!task._style) task._style = {};
+                            task._style[key] = value;
+
+                            // Optimistically update
+                            updates.push(saveTaskStyle(id, task._style));
+                        });
+
+                        await Promise.all(updates);
+                        renderGrid();
+                        renderGantt(gantt ? gantt.options.view_mode : 'Day');
+                    }
+
+                    async function toggleStyle(key) {
+                        // Resolve IDs
+                        const idsToUpdate = new Set(selectedTaskIds);
+                        selectedCells.forEach(k => { const [id] = k.split(':'); idsToUpdate.add(id); });
+
+                        if (idsToUpdate.size === 0) return;
+
+                        const id = Array.from(idsToUpdate)[0]; // Toggle based on first
+                        const task = tasks.find(t => t.id === id);
+                        const current = task._style ? task._style[key] : false;
+                        applyStyle(key, !current);
+                    }
+
+                    async function saveTaskStyle(id, styleObj) {
+                        try {
+                            await fetch(`/api/activities/${id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ style: JSON.stringify(styleObj) })
+                            });
+                        } catch (e) { console.error(e); }
+                    }
+
+                    // --- DATA EDITING ---
+                    async function updateField(id, field, value) {
                         const task = tasks.find(t => t.id === id);
                         if (!task) return;
 
-                        if (!task._style) task._style = {};
-                        task._style[key] = value;
+                        // Local update
+                        if (field === 'start' || field === 'end') value = value; // logic handled in date change
+                        else task[field] = value;
 
-                        // Optimistically update
-                        updates.push(saveTaskStyle(id, task._style));
-                    });
+                        // Server Update
+                        const payload = {};
+                        payload[field] = value;
 
-                    await Promise.all(updates);
-                    renderGrid();
-                    renderGantt(gantt ? gantt.options.view_mode : 'Day');
-                }
-
-                async function toggleStyle(key) {
-                    // Resolve IDs
-                    const idsToUpdate = new Set(selectedTaskIds);
-                    selectedCells.forEach(k => { const [id] = k.split(':'); idsToUpdate.add(id); });
-
-                    if (idsToUpdate.size === 0) return;
-
-                    const id = Array.from(idsToUpdate)[0]; // Toggle based on first
-                    const task = tasks.find(t => t.id === id);
-                    const current = task._style ? task._style[key] : false;
-                    applyStyle(key, !current);
-                }
-
-                async function saveTaskStyle(id, styleObj) {
-                    try {
                         await fetch(`/api/activities/${id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ style: JSON.stringify(styleObj) })
+                            body: JSON.stringify(payload)
                         });
-                    } catch (e) { console.error(e); }
-                }
 
-                // --- DATA EDITING ---
-                async function updateField(id, field, value) {
-                    const task = tasks.find(t => t.id === id);
-                    if (!task) return;
-
-                    // Local update
-                    if (field === 'start' || field === 'end') value = value; // logic handled in date change
-                    else task[field] = value;
-
-                    // Server Update
-                    const payload = {};
-                    payload[field] = value;
-
-                    await fetch(`/api/activities/${id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (field === 'start' || field === 'end' || field === 'name' || field === 'progress') renderGantt(gantt.options.view_mode);
-                }
-
-                async function updateTaskDate(id, start, end) {
-                    await updateField(id, 'start', start.toISOString().split('T')[0]);
-                    await updateField(id, 'end', end.toISOString().split('T')[0]);
-
-                    // Update Local array
-                    const t = tasks.find(x => x.id == id);
-                    if (t) { t.start = start; t.end = end; }
-                    renderGrid(); // Refresh grid dates
-                }
-
-                // --- CRUD ACTIONS ---
-                async function addTask() {
-                    const newId = "new-" + Date.now(); // Temp ID
-                    const newTask = {
-                        id: newId,
-                        name: "Nueva Tarea",
-                        start: new Date(),
-                        end: new Date(Date.now() + 86400000), // +1 day
-                        progress: 0,
-                        dependencies: "",
-                        contractor: "",
-                        _style: { indent: 0 }
-                    };
-
-                    // Insert after selection or at end
-                    if (selectedTaskIds.size > 0) {
-                        const lastSelectedId = Array.from(selectedTaskIds).pop();
-                        const idx = tasks.findIndex(t => t.id === lastSelectedId);
-                        tasks.splice(idx + 1, 0, newTask);
-                    } else {
-                        tasks.push(newTask);
+                        if (field === 'start' || field === 'end' || field === 'name' || field === 'progress') renderGantt(gantt.options.view_mode);
                     }
 
-                    // Persist (Create on backend usually, but for now just local update until Save)
-                    // Ideally we call POST /api/activities
-                    try {
-                        await fetch(`/api/projects/${projectId}/activities`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(newTask)
-                        });
-                    } catch (e) { console.error("Error creating task", e); } // Silently fail/continue
+                    async function updateTaskDate(id, start, end) {
+                        await updateField(id, 'start', start.toISOString().split('T')[0]);
+                        await updateField(id, 'end', end.toISOString().split('T')[0]);
 
-                    renderGrid();
-                    renderGantt(gantt ? gantt.options.view_mode : 'Day');
-                }
+                        // Update Local array
+                        const t = tasks.find(x => x.id == id);
+                        if (t) { t.start = start; t.end = end; }
+                        renderGrid(); // Refresh grid dates
+                    }
 
-                async function deleteTask() {
-                    if (selectedTaskIds.size === 0) return alert("Selecciona tareas para eliminar");
-                    if (!confirm("¿Eliminar tareas seleccionadas?")) return;
+                    // --- CRUD ACTIONS ---
+                    async function addTask() {
+                        const newId = "new-" + Date.now(); // Temp ID
+                        const newTask = {
+                            id: newId,
+                            name: "Nueva Tarea",
+                            start: new Date(),
+                            end: new Date(Date.now() + 86400000), // +1 day
+                            progress: 0,
+                            dependencies: "",
+                            contractor: "",
+                            _style: { indent: 0 }
+                        };
 
-                    const ids = Array.from(selectedTaskIds);
+                        // Insert after selection or at end
+                        if (selectedTaskIds.size > 0) {
+                            const lastSelectedId = Array.from(selectedTaskIds).pop();
+                            const idx = tasks.findIndex(t => t.id === lastSelectedId);
+                            tasks.splice(idx + 1, 0, newTask);
+                        } else {
+                            tasks.push(newTask);
+                        }
 
-                    // Remove from backend
-                    for (const id of ids) {
-                        if (!id.startsWith("new-")) { // Only delete if persisted
-                            await fetch(`/api/activities/${id}`, { method: 'DELETE' });
+                        // Persist (Create on backend usually, but for now just local update until Save)
+                        // Ideally we call POST /api/activities
+                        try {
+                            await fetch(`/api/projects/${projectId}/activities`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(newTask)
+                            });
+                        } catch (e) { console.error("Error creating task", e); } // Silently fail/continue
+
+                        renderGrid();
+                        renderGantt(gantt ? gantt.options.view_mode : 'Day');
+                    }
+
+                    async function deleteTask() {
+                        if (selectedTaskIds.size === 0) return alert("Selecciona tareas para eliminar");
+                        if (!confirm("¿Eliminar tareas seleccionadas?")) return;
+
+                        const ids = Array.from(selectedTaskIds);
+
+                        // Remove from backend
+                        for (const id of ids) {
+                            if (!id.startsWith("new-")) { // Only delete if persisted
+                                await fetch(`/api/activities/${id}`, { method: 'DELETE' });
+                            }
+                        }
+
+                        tasks = tasks.filter(t => !selectedTaskIds.has(t.id));
+                        selectedTaskIds.clear();
+                        renderGrid();
+                        renderGantt(gantt ? gantt.options.view_mode : 'Day');
+                    }
+
+                    async function moveTask(direction) {
+                        if (selectedTaskIds.size !== 1) return; // Only move single row for now
+                        const id = Array.from(selectedTaskIds)[0];
+                        const idx = tasks.findIndex(t => t.id === id);
+
+                        if (direction === -1 && idx > 0) {
+                            // Swap with prev
+                            [tasks[idx], tasks[idx - 1]] = [tasks[idx - 1], tasks[idx]];
+                        } else if (direction === 1 && idx < tasks.length - 1) {
+                            // Swap with next
+                            [tasks[idx], tasks[idx + 1]] = [tasks[idx + 1], tasks[idx]];
+                        }
+                        renderGrid();
+                        renderGantt(gantt ? gantt.options.view_mode : 'Day');
+                    }
+
+                    // --- SELECTION LOGIC ---
+                    function selectTask(id, e) {
+                        if (!clickedIdIsTask(id)) return;
+
+                        if (e.ctrlKey || e.metaKey) {
+                            if (selectedTaskIds.has(id)) selectedTaskIds.delete(id);
+                            else selectedTaskIds.add(id);
+                        } else if (e.shiftKey) {
+                            // Range selection (simple implementation)
+                            // TODO: Find index range
+                            selectedTaskIds.add(id);
+                        } else {
+                            selectedTaskIds.clear();
+                            selectedTaskIds.add(id);
+                        }
+                        renderGrid(); // Re-render to show highlight
+                    }
+                    function clickedIdIsTask(id) { return tasks.some(t => t.id === id); }
+
+                    function handleKeySelection(e) {
+                        if (e.key === 'Escape') {
+                            selectedTaskIds.clear();
+                            renderGrid();
                         }
                     }
 
-                    tasks = tasks.filter(t => !selectedTaskIds.has(t.id));
-                    selectedTaskIds.clear();
-                    renderGrid();
-                    renderGantt(gantt ? gantt.options.view_mode : 'Day');
-                }
-
-                async function moveTask(direction) {
-                    if (selectedTaskIds.size !== 1) return; // Only move single row for now
-                    const id = Array.from(selectedTaskIds)[0];
-                    const idx = tasks.findIndex(t => t.id === id);
-
-                    if (direction === -1 && idx > 0) {
-                        // Swap with prev
-                        [tasks[idx], tasks[idx - 1]] = [tasks[idx - 1], tasks[idx]];
-                    } else if (direction === 1 && idx < tasks.length - 1) {
-                        // Swap with next
-                        [tasks[idx], tasks[idx + 1]] = [tasks[idx + 1], tasks[idx]];
+                    // --- UTILS ---
+                    function diffDays(d1, d2) {
+                        return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
                     }
-                    renderGrid();
-                    renderGantt(gantt ? gantt.options.view_mode : 'Day');
-                }
-
-                // --- SELECTION LOGIC ---
-                function selectTask(id, e) {
-                    if (!clickedIdIsTask(id)) return;
-
-                    if (e.ctrlKey || e.metaKey) {
-                        if (selectedTaskIds.has(id)) selectedTaskIds.delete(id);
-                        else selectedTaskIds.add(id);
-                    } else if (e.shiftKey) {
-                        // Range selection (simple implementation)
-                        // TODO: Find index range
-                        selectedTaskIds.add(id);
-                    } else {
-                        selectedTaskIds.clear();
-                        selectedTaskIds.add(id);
+                    function formatDateInput(date) {
+                        if (!date) return '';
+                        return date.toISOString().split('T')[0];
                     }
-                    renderGrid(); // Re-render to show highlight
-                }
-                function clickedIdIsTask(id) { return tasks.some(t => t.id === id); }
 
-                function handleKeySelection(e) {
-                    if (e.key === 'Escape') {
-                        selectedTaskIds.clear();
-                        renderGrid();
+                    function changeView(mode) {
+                        renderGantt(mode);
                     }
-                }
 
-                // --- UTILS ---
-                function diffDays(d1, d2) {
-                    return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
-                }
-                function formatDateInput(date) {
-                    if (!date) return '';
-                    return date.toISOString().split('T')[0];
-                }
-
-                function changeView(mode) {
-                    renderGantt(mode);
-                }
-
-                function syncScrolls() {
-                    const gridDiv = document.getElementById('tasks-grid');
-                    const chartDiv = document.getElementById('chart-area');
-                    if (gridDiv && chartDiv) {
-                        gridDiv.scrollTop = chartDiv.scrollTop;
+                    function syncScrolls() {
+                        const gridDiv = document.getElementById('tasks-grid');
+                        const chartDiv = document.getElementById('chart-area');
+                        if (gridDiv && chartDiv) {
+                            gridDiv.scrollTop = chartDiv.scrollTop;
+                        }
                     }
-                }
 
-                // --- ACTIONS ---
-                // --- ACTIONS ---
-                async function indentTask(direction) {
-                    // 1. Identify Unique Selected IDs
-                    const allSelectedIds = new Set(selectedTaskIds);
-                    selectedCells.forEach(k => { const [id] = k.split(':'); allSelectedIds.add(id); });
+                    // --- ACTIONS ---
+                    // --- ACTIONS ---
+                    async function indentTask(direction) {
+                        // 1. Identify Unique Selected IDs
+                        const allSelectedIds = new Set(selectedTaskIds);
+                        selectedCells.forEach(k => { const [id] = k.split(':'); allSelectedIds.add(id); });
 
-                    if (allSelectedIds.size === 0) return;
+                        if (allSelectedIds.size === 0) return;
 
-                    // 2. Sort tasks by index to process top-down
-                    const sortedIndices = [];
-                    tasks.forEach((t, i) => {
-                        if (allSelectedIds.has(t.id)) sortedIndices.push(i);
-                    });
-                    sortedIndices.sort((a, b) => a - b);
+                        // 2. Sort tasks by index to process top-down
+                        const sortedIndices = [];
+                        tasks.forEach((t, i) => {
+                            if (allSelectedIds.has(t.id)) sortedIndices.push(i);
+                        });
+                        sortedIndices.sort((a, b) => a - b);
 
-                    // 3. Identify "Root Selections" (exclude descendants of other selected tasks)
-                    // This prevents double-shifting if user selects Parent + Child
-                    const rootIndices = [];
-                    sortedIndices.forEach(idx => {
-                        // Check if any ancestor is also selected
-                        let isDescendantOfSelected = false;
-                        const currentIndent = (tasks[idx]._style && tasks[idx]._style.indent) || 0;
+                        // 3. Identify "Root Selections" (exclude descendants of other selected tasks)
+                        // This prevents double-shifting if user selects Parent + Child
+                        const rootIndices = [];
+                        sortedIndices.forEach(idx => {
+                            // Check if any ancestor is also selected
+                            let isDescendantOfSelected = false;
+                            const currentIndent = (tasks[idx]._style && tasks[idx]._style.indent) || 0;
 
-                        // Walk backwards to find parents
-                        for (let i = idx - 1; i >= 0; i--) {
-                            const t = tasks[i];
-                            const tIndent = (t._style && t._style.indent) || 0;
-                            if (tIndent < currentIndent) {
-                                // Found a parent/ancestor
-                                if (allSelectedIds.has(t.id)) {
+                            // Walk backwards to find parents
+                            for (let i = idx - 1; i >= 0; i--) {
+                                const t = tasks[i];
+                                const tIndent = (t._style && t._style.indent) || 0;
+                                if (tIndent < currentIndent) {
+                                    // Found a parent/ancestor
+                                    if (allSelectedIds.has(t.id)) {
+                                        isDescendantOfSelected = true;
+                                        break;
+                                    }
+                                    // Continue checking ancestors of this parent?
+                                    // Actually, strict hierarchy means we just need to know if we are in the subtree of a selected task.
+                                    // Simplified check: If we are inside the "scope" of a previous selected task.
+                                    // Scope = contiguous block until indent <= parentIndent.
+                                }
+                            }
+
+                            // Optimization: Simple "Scope" check using the sorted list
+                            // If `idx` is a descendant of the *last added root*, ignore it?
+                            // Not necessarily. We could have: Sel(A), Sel(B is sibling of A). Both are roots.
+                            // We could have: Sel(A), Sel(Child of A). Child is not root.
+
+                            // Let's use getParent() helper approach
+                            let parentIdx = getParentIndex(idx);
+                            while (parentIdx !== -1) {
+                                if (allSelectedIds.has(tasks[parentIdx].id)) {
                                     isDescendantOfSelected = true;
                                     break;
                                 }
-                                // Continue checking ancestors of this parent?
-                                // Actually, strict hierarchy means we just need to know if we are in the subtree of a selected task.
-                                // Simplified check: If we are inside the "scope" of a previous selected task.
-                                // Scope = contiguous block until indent <= parentIndent.
+                                parentIdx = getParentIndex(parentIdx);
                             }
-                        }
 
-                        // Optimization: Simple "Scope" check using the sorted list
-                        // If `idx` is a descendant of the *last added root*, ignore it?
-                        // Not necessarily. We could have: Sel(A), Sel(B is sibling of A). Both are roots.
-                        // We could have: Sel(A), Sel(Child of A). Child is not root.
-
-                        // Let's use getParent() helper approach
-                        let parentIdx = getParentIndex(idx);
-                        while (parentIdx !== -1) {
-                            if (allSelectedIds.has(tasks[parentIdx].id)) {
-                                isDescendantOfSelected = true;
-                                break;
+                            if (!isDescendantOfSelected) {
+                                rootIndices.push(idx);
                             }
-                            parentIdx = getParentIndex(parentIdx);
-                        }
-
-                        if (!isDescendantOfSelected) {
-                            rootIndices.push(idx);
-                        }
-                    });
-
-                    // 4. Apply changes to Roots and their Subtrees
-                    const updates = [];
-                    const processedIds = new Set(); // Avoid double processing
-
-                    for (const rootIdx of rootIndices) {
-                        const root = tasks[rootIdx];
-                        if (processedIds.has(root.id)) continue;
-
-                        if (!root._style) root._style = { indent: 0 };
-                        const currentLevel = root._style.indent || 0;
-
-                        // VALIDATION: Can we indent?
-                        if (direction > 0) {
-                            // Rule: Cannot indent if no predecessor (index 0)
-                            if (rootIdx === 0) continue;
-
-                            // Rule: Cannot exceed Predecessor.indent + 1
-                            const prev = tasks[rootIdx - 1];
-                            const prevIndent = (prev._style && prev._style.indent) || 0;
-                            if (currentLevel + 1 > prevIndent + 1) {
-                                // Block illogical indent (Project allows max +1 deeper than prev)
-                                continue;
-                            }
-                        }
-
-                        // VALIDATION: Can we outdent?
-                        if (direction < 0) {
-                            if (currentLevel === 0) continue; // Cannot go negative
-                        }
-
-                        // Apply Delta
-                        const delta = direction; // +1 or -1
-
-                        // Collect tree (Root + Descendants)
-                        const subtreeIndices = [rootIdx];
-                        const rootBaseIndent = currentLevel;
-
-                        // Find descendants: contiguous tasks with indent > rootBaseIndent
-                        for (let i = rootIdx + 1; i < tasks.length; i++) {
-                            const t = tasks[i];
-                            const tIndent = (t._style && t._style.indent) || 0;
-                            if (tIndent > rootBaseIndent) {
-                                subtreeIndices.push(i);
-                            } else {
-                                break; // End of subtree
-                            }
-                        }
-
-                        // Apply updates
-                        for (const idx of subtreeIndices) {
-                            const t = tasks[idx];
-                            if (!t._style) t._style = { indent: 0 };
-
-                            let newLevel = (t._style.indent || 0) + delta;
-                            if (newLevel < 0) newLevel = 0;
-                            t._style.indent = newLevel;
-
-                            if (!processedIds.has(t.id)) {
-                                updates.push(saveTaskStyle(t.id, t._style));
-                                processedIds.add(t.id);
-                            }
-                        }
-                    }
-
-                    if (updates.length > 0) {
-                        await Promise.all(updates);
-                        renderGrid();
-                    }
-                }
-
-                function getParentIndex(childIdx) {
-                    if (childIdx <= 0) return -1;
-                    const childIndent = (tasks[childIdx]._style && tasks[childIdx]._style.indent) || 0;
-
-                    for (let i = childIdx - 1; i >= 0; i--) {
-                        const t = tasks[i];
-                        const tIndent = (t._style && t._style.indent) || 0;
-                        if (tIndent < childIndent) {
-                            return i;
-                        }
-                    }
-                    return -1;
-                }
-
-                async function addLink() {
-                    // Link selected tasks sequentially
-                    const selected = Array.from(new Set([...selectedTaskIds, ...Array.from(selectedCells).map(k => k.split(':')[0])]));
-                    if (selected.length < 2) return alert("Selecciona al menos 2 tareas para vincular");
-
-                    for (let i = 1; i < selected.length; i++) {
-                        const predecessorId = selected[i - 1];
-                        const successorId = selected[i];
-                        const successor = tasks.find(t => t.id === successorId);
-
-                        // Add dependency
-                        let deps = successor.dependencies ? successor.dependencies.split(',') : [];
-                        if (!deps.includes(predecessorId)) {
-                            deps.push(predecessorId);
-                            successor.dependencies = deps.join(',');
-                            await updateField(successorId, 'predecessors', successor.dependencies);
-                        }
-                    }
-                    renderGantt(gantt.options.view_mode);
-                }
-
-                async function removeLink() {
-                    const selected = Array.from(new Set([...selectedTaskIds, ...Array.from(selectedCells).map(k => k.split(':')[0])]));
-                    if (selected.length === 0) return alert("Selecciona tareas para desvincular");
-
-                    for (const id of selected) {
-                        const t = tasks.find(x => x.id === id);
-                        if (t && t.dependencies) {
-                            t.dependencies = "";
-                            await updateField(id, 'predecessors', "");
-                        }
-                    }
-                    renderGantt(gantt.options.view_mode);
-                }
-
-
-
-                // --- RESIZER ---
-                function setupResizer() {
-                    const resizer = document.getElementById('resizer');
-                    const leftPane = document.getElementById('tasks-grid');
-                    let x = 0;
-                    let w = 0;
-
-                    const mouseDownHandler = function (e) {
-                        x = e.clientX;
-                        const rect = leftPane.getBoundingClientRect();
-                        w = rect.width;
-                        document.addEventListener('mousemove', mouseMoveHandler);
-                        document.addEventListener('mouseup', mouseUpHandler);
-                        resizer.classList.add('resizing');
-                    };
-
-                    const mouseMoveHandler = function (e) {
-                        const dx = e.clientX - x;
-                        leftPane.style.width = `${w + dx}px`;
-                        document.documentElement.style.setProperty('--grid-width', `${w + dx}px`);
-                        resizer.style.left = `${w + dx}px`;
-                    };
-
-                    const mouseUpHandler = function () {
-                        document.removeEventListener('mousemove', mouseMoveHandler);
-                        document.removeEventListener('mouseup', mouseUpHandler);
-                        resizer.classList.remove('resizing');
-                    };
-
-                    resizer.addEventListener('mousedown', mouseDownHandler);
-                }
-
-                async function uploadSchedule(e) {
-                    const file = e.target.files[0];
-                    if (!file) return;
-
-                    const formData = new FormData();
-                    formData.append('file', file);
-
-                    // Show loading by changing button text temporarily
-                    const btn = document.querySelector('button[onclick*="file-upload"]');
-                    const originalContent = btn ? btn.innerHTML : '';
-                    if (btn) {
-                        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
-                        btn.disabled = true;
-                    }
-
-                    try {
-                        const res = await fetch(`/api/projects/${projectId}/schedule`, {
-                            method: 'POST',
-                            body: formData
                         });
 
-                        const data = await res.json();
+                        // 4. Apply changes to Roots and their Subtrees
+                        const updates = [];
+                        const processedIds = new Set(); // Avoid double processing
 
-                        if (!res.ok) {
-                            throw new Error(data.detail || "Error al subir");
+                        for (const rootIdx of rootIndices) {
+                            const root = tasks[rootIdx];
+                            if (processedIds.has(root.id)) continue;
+
+                            if (!root._style) root._style = { indent: 0 };
+                            const currentLevel = root._style.indent || 0;
+
+                            // VALIDATION: Can we indent?
+                            if (direction > 0) {
+                                // Rule: Cannot indent if no predecessor (index 0)
+                                if (rootIdx === 0) continue;
+
+                                // Rule: Cannot exceed Predecessor.indent + 1
+                                const prev = tasks[rootIdx - 1];
+                                const prevIndent = (prev._style && prev._style.indent) || 0;
+                                if (currentLevel + 1 > prevIndent + 1) {
+                                    // Block illogical indent (Project allows max +1 deeper than prev)
+                                    continue;
+                                }
+                            }
+
+                            // VALIDATION: Can we outdent?
+                            if (direction < 0) {
+                                if (currentLevel === 0) continue; // Cannot go negative
+                            }
+
+                            // Apply Delta
+                            const delta = direction; // +1 or -1
+
+                            // Collect tree (Root + Descendants)
+                            const subtreeIndices = [rootIdx];
+                            const rootBaseIndent = currentLevel;
+
+                            // Find descendants: contiguous tasks with indent > rootBaseIndent
+                            for (let i = rootIdx + 1; i < tasks.length; i++) {
+                                const t = tasks[i];
+                                const tIndent = (t._style && t._style.indent) || 0;
+                                if (tIndent > rootBaseIndent) {
+                                    subtreeIndices.push(i);
+                                } else {
+                                    break; // End of subtree
+                                }
+                            }
+
+                            // Apply updates
+                            for (const idx of subtreeIndices) {
+                                const t = tasks[idx];
+                                if (!t._style) t._style = { indent: 0 };
+
+                                let newLevel = (t._style.indent || 0) + delta;
+                                if (newLevel < 0) newLevel = 0;
+                                t._style.indent = newLevel;
+
+                                if (!processedIds.has(t.id)) {
+                                    updates.push(saveTaskStyle(t.id, t._style));
+                                    processedIds.add(t.id);
+                                }
+                            }
                         }
 
-                        alert("Importación exitosa. La página se recargará.");
-                        location.reload();
-                    } catch (err) {
-                        console.error(err);
-                        alert("Aviso: " + err.message);
-                    } finally {
+                        if (updates.length > 0) {
+                            await Promise.all(updates);
+                            renderGrid();
+                        }
+                    }
+
+                    function getParentIndex(childIdx) {
+                        if (childIdx <= 0) return -1;
+                        const childIndent = (tasks[childIdx]._style && tasks[childIdx]._style.indent) || 0;
+
+                        for (let i = childIdx - 1; i >= 0; i--) {
+                            const t = tasks[i];
+                            const tIndent = (t._style && t._style.indent) || 0;
+                            if (tIndent < childIndent) {
+                                return i;
+                            }
+                        }
+                        return -1;
+                    }
+
+                    async function addLink() {
+                        // Link selected tasks sequentially
+                        const selected = Array.from(new Set([...selectedTaskIds, ...Array.from(selectedCells).map(k => k.split(':')[0])]));
+                        if (selected.length < 2) return alert("Selecciona al menos 2 tareas para vincular");
+
+                        for (let i = 1; i < selected.length; i++) {
+                            const predecessorId = selected[i - 1];
+                            const successorId = selected[i];
+                            const successor = tasks.find(t => t.id === successorId);
+
+                            // Add dependency
+                            let deps = successor.dependencies ? successor.dependencies.split(',') : [];
+                            if (!deps.includes(predecessorId)) {
+                                deps.push(predecessorId);
+                                successor.dependencies = deps.join(',');
+                                await updateField(successorId, 'predecessors', successor.dependencies);
+                            }
+                        }
+                        renderGantt(gantt.options.view_mode);
+                    }
+
+                    async function removeLink() {
+                        const selected = Array.from(new Set([...selectedTaskIds, ...Array.from(selectedCells).map(k => k.split(':')[0])]));
+                        if (selected.length === 0) return alert("Selecciona tareas para desvincular");
+
+                        for (const id of selected) {
+                            const t = tasks.find(x => x.id === id);
+                            if (t && t.dependencies) {
+                                t.dependencies = "";
+                                await updateField(id, 'predecessors', "");
+                            }
+                        }
+                        renderGantt(gantt.options.view_mode);
+                    }
+
+
+
+                    // --- RESIZER ---
+                    function setupResizer() {
+                        const resizer = document.getElementById('resizer');
+                        const leftPane = document.getElementById('tasks-grid');
+                        let x = 0;
+                        let w = 0;
+
+                        const mouseDownHandler = function (e) {
+                            x = e.clientX;
+                            const rect = leftPane.getBoundingClientRect();
+                            w = rect.width;
+                            document.addEventListener('mousemove', mouseMoveHandler);
+                            document.addEventListener('mouseup', mouseUpHandler);
+                            resizer.classList.add('resizing');
+                        };
+
+                        const mouseMoveHandler = function (e) {
+                            const dx = e.clientX - x;
+                            leftPane.style.width = `${w + dx}px`;
+                            document.documentElement.style.setProperty('--grid-width', `${w + dx}px`);
+                            resizer.style.left = `${w + dx}px`;
+                        };
+
+                        const mouseUpHandler = function () {
+                            document.removeEventListener('mousemove', mouseMoveHandler);
+                            document.removeEventListener('mouseup', mouseUpHandler);
+                            resizer.classList.remove('resizing');
+                        };
+
+                        resizer.addEventListener('mousedown', mouseDownHandler);
+                    }
+
+                    async function uploadSchedule(e) {
+                        const file = e.target.files[0];
+                        if (!file) return;
+
+                        const formData = new FormData();
+                        formData.append('file', file);
+
+                        // Show loading by changing button text temporarily
+                        const btn = document.querySelector('button[onclick*="file-upload"]');
+                        const originalContent = btn ? btn.innerHTML : '';
                         if (btn) {
-                            btn.innerHTML = originalContent;
-                            btn.disabled = false;
+                            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Procesando...';
+                            btn.disabled = true;
                         }
-                        // Reset input
-                        e.target.value = '';
+
+                        try {
+                            const res = await fetch(`/api/projects/${projectId}/schedule`, {
+                                method: 'POST',
+                                body: formData
+                            });
+
+                            const data = await res.json();
+
+                            if (!res.ok) {
+                                throw new Error(data.detail || "Error al subir");
+                            }
+
+                            alert("Importación exitosa. La página se recargará.");
+                            location.reload();
+                        } catch (err) {
+                            console.error(err);
+                            alert("Aviso: " + err.message);
+                        } finally {
+                            if (btn) {
+                                btn.innerHTML = originalContent;
+                                btn.disabled = false;
+                            }
+                            // Reset input
+                            e.target.value = '';
+                        }
                     }
-                }
 
-                // --- SAVE SYSTEM ---
-                function showSaving() {
-                    const el = document.getElementById('save-status');
-                    if (el) {
-                        el.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-500"></i> GUARDANDO...';
-                        el.classList.remove('hidden');
+                    // --- SAVE SYSTEM ---
+                    function showSaving() {
+                        const el = document.getElementById('save-status');
+                        if (el) {
+                            el.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-500"></i> GUARDANDO...';
+                            el.classList.remove('hidden');
+                        }
                     }
-                }
 
-                function showSaved() {
-                    const el = document.getElementById('save-status');
-                    if (el) {
-                        el.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> GUARDADO';
-                        el.classList.remove('hidden');
-                        setTimeout(() => el.classList.add('hidden'), 3000);
+                    function showSaved() {
+                        const el = document.getElementById('save-status');
+                        if (el) {
+                            el.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> GUARDADO';
+                            el.classList.remove('hidden');
+                            setTimeout(() => el.classList.add('hidden'), 3000);
+                        }
                     }
-                }
 
-                async function forceSaveAll() {
-                    showSaving();
-                    // Just a visual confirmation since we save atomically
-                    await new Promise(r => setTimeout(r, 800));
-                    showSaved();
-                    alert("Todo el progreso ha sido guardado exitosamente en el servidor.");
-                }
-
-                // --- LEGACY STICKY REMOVED ---
-                // (Cleaned up to prevent override)
-
-                // Wrap updateField to show saving
-                const _originalUpdateField = updateField;
-                updateField = async function (id, field, value) {
-                    showSaving();
-                    try {
-                        await _originalUpdateField(id, field, value);
+                    async function forceSaveAll() {
+                        showSaving();
+                        // Just a visual confirmation since we save atomically
+                        await new Promise(r => setTimeout(r, 800));
                         showSaved();
-                    } catch (e) {
-                        console.error(e);
-                        alert("Error al guardar");
+                        alert("Todo el progreso ha sido guardado exitosamente en el servidor.");
                     }
-                };
+
+                    // --- LEGACY STICKY REMOVED ---
+                    // (Cleaned up to prevent override)
+
+                    // Wrap updateField to show saving
+                    const _originalUpdateField = updateField;
+                    updateField = async function (id, field, value) {
+                        showSaving();
+                        try {
+                            await _originalUpdateField(id, field, value);
+                            showSaved();
+                        } catch (e) {
+                            console.error(e);
+                            alert("Error al guardar");
+                        }
+                    };
 
 
-            }}); // Close DOMContentLoaded (Force Balance)
+                }}
+        })); // Close DOMContentLoaded (Final Balance)
     </script>
 
     <!-- COMPANIES SIDE PANEL (Moved to Root) -->
