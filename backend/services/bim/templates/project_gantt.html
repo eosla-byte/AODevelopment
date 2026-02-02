@@ -606,26 +606,14 @@
         }
 
         /* 2. Right Panel Header (Timeline) */
-        /* HIDDEN ORIGINAL HEADER to prevent duplication */
-        #chart-area .grid-header {
-            visibility: hidden !important;
-            opacity: 0 !important;
-            pointer-events: none;
-        }
-
-        /* STICKY HEADER CONTAINER */
+        /* Will be re-implemented dynamically */
         #timeline-header-container {
-            background-color: #1e3a8a !important;
-            /* Force Blue Background */
+            height: 50px;
+            background-color: #1e3a8a;
+            /* Base Blue */
             border-bottom: 1px solid #172554;
             overflow: hidden;
-            /* Hide overflow */
-        }
-
-        /* TEXT VISIBILITY IN CLONE */
-        .gantt-header-svg text {
-            fill: #ffffff !important;
-            font-weight: 600 !important;
+            position: relative;
         }
 
 
@@ -877,10 +865,10 @@
                         // Optional: Sync selection
                     },
                     on_view_change: () => {
-                        syncScrolls();
+                        // syncScrolls(); // REMOVED
                         drawTodayLine();
                         if (typeof updateLookahead === 'function') updateLookahead();
-                        cloneGanttHeader();
+                        initStickyGanttHeader(); // NEW CALL
                     }
                 });
 
@@ -889,7 +877,7 @@
                         drawTodayLine();
                         if (typeof updateLookahead === 'function') updateLookahead();
                         if (typeof drawCommentIndicators === 'function') drawCommentIndicators();
-                        cloneGanttHeader();
+                        initStickyGanttHeader(); // NEW CALL
                         scrollToToday(); // Fix: Force scroll to today on init
                     } catch (e) { console.error("Post-render error", e); }
                 }, 300); // Increased timeout to ensure DOM is ready
@@ -1279,108 +1267,109 @@
 
 
         // --- NEW SPLIT PANE HEADER LOGIC ---
-        function cloneGanttHeader() {
-            console.log("AO DEBUG VERSION: 2026-02-02 11:50 - STARTING CLONE");
+        // --- NEW ROBUST STICKY HEADER LOGIC ---
+        function initStickyGanttHeader() {
             try {
-                const sourceSvg = document.getElementById('gantt-target');
-                const headerContainer = document.getElementById('timeline-header-container');
+                const container = document.getElementById('gantt-target'); // The SVG
+                const stickyContainer = document.getElementById('timeline-header-container'); // The Top Bar
 
-                if (!sourceSvg || !headerContainer) {
-                    console.warn("CloneGanttHeader: Missing SVG or Container");
-                    return;
-                }
+                if (!container || !stickyContainer) return;
 
-                // 1. Get the source header group
-                // Try standard class first, then fallback to first group or specific attributes
-                let headerGroup = sourceSvg.querySelector('.grid-header');
+                console.log("InitSticky: Starting search for header...");
+                stickyContainer.innerHTML = ''; // Clean start
 
-                // FALLBACK: Frappe Gantt sometimes changes class names. 
-                // The header usually contains the date texts.
-                if (!headerGroup) {
-                    console.warn("CloneGanttHeader: .grid-header not found. Trying fallback.");
-                    const allGroups = sourceSvg.querySelectorAll('g');
-                    // Heuristic: Find group containing text elements with date-like length or positions
-                    for (let g of allGroups) {
-                        if (g.querySelector('text') && g.querySelector('line')) {
-                            // Likely the header? 
-                            // Usually header is one of the first groups.
-                            headerGroup = g;
-                            break;
+                // SEARCH STRATEGY: 
+                // The header group usually contains text elements for dates/months.
+                // We will look for the first group that has TEXT elements appearing at the TOP (y < 50).
+
+                const allGroups = container.querySelectorAll('g');
+                let targetGroup = null;
+
+                for (let g of allGroups) {
+                    // Check if group has text children
+                    const text = g.querySelector('text');
+                    if (text) {
+                        // Check Y position of text
+                        // SVG y attribute can be string "10" or "20px"
+                        const yVal = parseFloat(text.getAttribute('y') || text.getAttribute('dy') || '0');
+
+                        // Header is usually at top (y=10 to y=40 typically)
+                        if (yVal >= 0 && yVal < 60) {
+                            // Double check: Does it have lines? (Ticks)
+                            if (g.querySelector('line') || g.querySelector('path')) {
+                                targetGroup = g;
+                                console.log("InitSticky: Found Candidate Group", g, "Text Y:", yVal);
+                                break; // Assume first one is correct
+                            }
                         }
                     }
                 }
 
-                if (!headerGroup) {
-                    console.error("CloneGanttHeader: Could not find header group!");
-                    headerContainer.innerHTML = '';
+                if (!targetGroup) {
+                    console.warn("InitSticky: Could not auto-detect header group.");
                     return;
                 }
 
-                // 2. Prepare Container
-                headerContainer.innerHTML = '';
+                // HIDE ORIGINAL
+                targetGroup.style.display = 'none'; // Hard hide
 
-                // 3. Create fresh SVG Wrapper
-                const totalWidth = sourceSvg.getAttribute('width') || '1000'; // Fallback width
-                const wrapperSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                // CLONE
+                const clone = targetGroup.cloneNode(true);
+                clone.style.display = 'block'; // Ensure visibility in clone
+                clone.removeAttribute('display'); // Clear any inline hidden
 
-                wrapperSvg.setAttribute('width', totalWidth);
-                wrapperSvg.setAttribute('height', '50');
-                wrapperSvg.classList.add('gantt-header-svg');
-                // Force display properties
-                wrapperSvg.style.display = 'block';
-                wrapperSvg.style.overflow = 'hidden';
+                // CREATE WRAPPER SVG
+                const svgWidth = container.getAttribute('width') || '2000';
+                const wrapper = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                wrapper.setAttribute('width', svgWidth);
+                wrapper.setAttribute('height', '50');
+                wrapper.style.display = 'block';
 
-                // 4. Clone the Group
-                const clone = headerGroup.cloneNode(true);
-
-                // ADJUST POSITION: Force top-left alignment
-                // We clear any existing transform and set our own
-                clone.removeAttribute('transform');
+                // STYLE CLONE
+                // Force Reset Transform to ensure 0,0 alignment
                 clone.setAttribute('transform', 'translate(0, 0)');
 
-                // 5. CLEAN THE CLONE (Styling)
-                // Text Color
+                // Styling: White Text
                 const texts = clone.querySelectorAll('text');
                 texts.forEach(t => {
                     t.setAttribute('fill', '#ffffff');
                     t.style.fill = '#ffffff';
-                    t.style.opacity = '1';
-                    t.style.fontWeight = '600';
+                    t.style.fontWeight = 'bold';
                     t.style.fontSize = '12px';
-                    // Ensure visibility
-                    t.style.display = 'block';
-                    t.style.visibility = 'visible';
                 });
 
-                // Lines/Ticks
+                // Styling: Ticks
                 const lines = clone.querySelectorAll('line, path');
                 lines.forEach(l => {
-                    l.setAttribute('stroke', 'rgba(255,255,255,0.3)');
-                    l.style.stroke = 'rgba(255,255,255,0.3)';
-                    l.style.opacity = '1';
+                    l.setAttribute('stroke', 'rgba(255, 255, 255, 0.4)');
+                    l.style.stroke = 'rgba(255, 255, 255, 0.4)';
                 });
 
-                // Make rects transparent (backgrounds)
+                // Styling: Remove background rects
                 const rects = clone.querySelectorAll('rect');
                 rects.forEach(r => {
-                    r.setAttribute('fill', 'transparent');
                     r.style.fill = 'transparent';
-                    r.style.stroke = 'none';
+                    r.setAttribute('fill', 'transparent');
                 });
 
-                // Append
-                wrapperSvg.appendChild(clone);
-                headerContainer.appendChild(wrapperSvg);
+                wrapper.appendChild(clone);
+                stickyContainer.appendChild(wrapper);
 
-                console.log("CloneGanttHeader: Success");
-
-                // 6. SYNC INITIAL SCROLL
+                // SYNC SCROLL
                 const chartArea = document.getElementById('chart-area');
                 if (chartArea) {
-                    headerContainer.scrollLeft = chartArea.scrollLeft;
+                    stickyContainer.scrollLeft = chartArea.scrollLeft;
+                    // Ensure bind
+                    chartArea.removeEventListener('scroll', handleChartScroll); // Clear old
+                    chartArea.addEventListener('scroll', () => {
+                        stickyContainer.scrollLeft = chartArea.scrollLeft;
+                    });
                 }
-            } catch (e) {
-                console.error("CloneGanttHeader Crash:", e);
+
+                console.log("InitSticky: Header Cloned & Pushed");
+
+            } catch (ex) {
+                console.error("InitSticky Error:", ex);
             }
         }
 
