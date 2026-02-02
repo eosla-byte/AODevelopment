@@ -2611,6 +2611,24 @@
             }
         }
 
+        async function updateField(id, field, value) {
+            const t = tasks.find(x => x.id === id);
+            if (!t) return;
+            // Local & API Update
+            if (field === 'comments') t.comments = value;
+            else if (field !== 'start' && field !== 'end') t[field] = value;
+
+            const payload = {};
+            payload[field] = value;
+            try {
+                await fetch(`/api/activities/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) { console.error(e); }
+        }
+
         async function forceSaveAll() {
             showSaving();
             // Just a visual confirmation since we save atomically
