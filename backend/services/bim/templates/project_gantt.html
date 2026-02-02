@@ -219,8 +219,17 @@
 
         // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
-            const serverTasks = {{ tasks | tojson | safe
-        }};
+            console.log("AO Gantt: Starting...");
+            try {
+                const serverTasks = {{ tasks | tojson | safe
+            }};
+        console.log("AO Gantt: Tasks loaded:", serverTasks ? serverTasks.length : 0);
+
+        if (!serverTasks || !Array.isArray(serverTasks)) {
+            console.error("AO Gantt: Invalid tasks data", serverTasks);
+            return;
+        }
+
         // Post-process server tasks
         State.tasks = serverTasks.map((t, i) => ({
             ...t,
@@ -238,6 +247,11 @@
 
         // Global Keys
         document.addEventListener('keydown', handleGlobalKeys);
+        console.log("AO Gantt: Render complete");
+            } catch (e) {
+            console.error("AO Gantt: Crash during init", e);
+            alert("Error loading Gantt: " + e.message);
+        }
         });
 
         // --- HIERARCHY ENGINE ---
