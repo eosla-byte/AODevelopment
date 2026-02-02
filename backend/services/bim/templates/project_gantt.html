@@ -388,6 +388,19 @@
             selectSize.onchange = (e) => changeFontSize(e.target.value);
             group.appendChild(selectSize);
 
+            // Indentation
+            const sepIndent = createSeparator();
+            sepIndent.style.height = '16px'; // smaller sep inside group
+            group.appendChild(sepIndent);
+
+            const btnOutdent = createToolBtn('<i class="fas fa-outdent"></i>', () => HierarchyEngine.outdent());
+            btnOutdent.title = "Outdent (Alt+Shift+Left)";
+            group.appendChild(btnOutdent);
+
+            const btnIndent = createToolBtn('<i class="fas fa-indent"></i>', () => HierarchyEngine.indent());
+            btnIndent.title = "Indent (Alt+Shift+Right)";
+            group.appendChild(btnIndent);
+
             toolbar.appendChild(group);
         }
 
@@ -663,7 +676,7 @@
             scroll.scrollLeft = todayX - (scroll.clientWidth / 2) + stickyW;
         }
 
-        // --- HIERARCHY ENGINE ---
+        // --- HIERARCHY ENGINE (Project-Like) ---
         const HierarchyEngine = {
             recalculate(tasks) {
                 // 1. Reset
@@ -671,30 +684,24 @@
                     t.isSummary = false;
                     t.childrenIds = [];
                     t.parentId = null;
-                    t.wbs = ''; // Re-calc logic if needed, but we trust level for now
+                    t.wbs = '';
                     t.orderIndex = i;
                 });
 
-                // 2. Build Tree based on linear list
-                // Stack of "active parents" at each level
-                // Level 0 parent at stack[0]...
+                // 2. Build Tree
                 const parentStack = [];
 
                 tasks.forEach(task => {
                     const level = task.level;
-
-                    // Maintain stack such that stack[L] is the last task seen at Level L
                     parentStack[level] = task;
 
-                    // Parent is at level - 1
                     if (level > 0 && parentStack[level - 1]) {
                         const parent = parentStack[level - 1];
                         parent.childrenIds.push(task.id);
                         parent.isSummary = true;
                         task.parentId = parent.id;
                     }
-
-                    // Clear deeper levels from stack as they are now closed
+                    // Clear deep stack
                     for (let l = level + 1; l < parentStack.length; l++) {
                         parentStack[l] = null;
                     }
@@ -709,46 +716,101 @@
                 }
             },
 
-            indent() {
-                const toModify = new Set();
-                State.tasks.forEach(t => {
-                    if (State.selectedIds.has(t.id)) {
-                        toModify.add(t);
-                        // Include subtree
-                        const subtree = this.getSubtree(t);
-                        subtree.forEach(child => toModify.add(child));
+            // --- CORE SELECTION LOGIC ---
+            getSelectionSegments() {
+                // 1. Normalize Selection: Get all selected Tasks
+                let selectedTasks = State.tasks.filter(t => State.selectedIds.has(t.id));
+                if (selectedTasks.length === 0) return [];
+
+                // 2. Expand Subtrees (If parent selected, include all children recursively)
+                const fullSelectionSet = new Set();
+
+                selectedTasks.forEach(task => {
+                    fullSelectionSet.add(task);
+                    // Include subtree
+                    const subtree = this.getSubtree(task);
+                    subtree.forEach(child => fullSelectionSet.add(child));
+                });
+
+                // Convert back to Array and Sort by Order
+                const finalSelection = Array.from(fullSelectionSet).sort((a, b) => a.orderIndex - b.orderIndex);
+
+                // 3. Group into Contiguous Segments
+                const segments = [];
+                let currentSegment = [];
+
+                finalSelection.forEach((task, i) => {
+                    if (currentSegment.length === 0) {
+                        currentSegment.push(task);
+                    } else {
+                        const prev = currentSegment[currentSegment.length - 1];
+                        if (task.orderIndex === prev.orderIndex + 1) {
+                            currentSegment.push(task);
+                        } else {
+                            segments.push(currentSegment);
+                            currentSegment = [task];
+                        }
                     }
                 });
+                if (currentSegment.length > 0) segments.push(currentSegment);
 
-                // Validate: Can we indent? (Prev sibling must exist)
-                // We'll skip validation for brevity/ux fluidity (Project usually allows it and auto-parents)
+                return segments;
+            },
 
-                toModify.forEach(t => {
-                    t.level += 1;
-                    triggerAutoSave(t.id);
+            indent() {
+                const segments = this.getSelectionSegments();
+                let changed = false;
+
+                // Process segments from Bottom to Top to avoid validation issues? 
+                // Actually top-down is fine for indent check.
+
+                segments.forEach(segment => {
+                    const topTask = segment[0];
+                    if (topTask.orderIndex === 0) return; // Cannot indent first task
+
+                    const prevTask = State.tasks[topTask.orderIndex - 1];
+                    const newLevel = topTask.level + 1;
+
+                    // Validation: Can process if prevTask exists.
+                    // Project allows indent as long as prev task exists.
+                    // It becomes child of prevTask. 
+
+                    // Apply to ALL in segment
+                    segment.forEach(t => {
+                        t.level += 1;
+                        triggerAutoSave(t.id);
+                    });
+                    changed = true;
                 });
 
-                this.recalculate(State.tasks);
-                render();
+                if (changed) {
+                    this.recalculate(State.tasks);
+                    render();
+                }
             },
 
             outdent() {
-                const toModify = new Set();
-                State.tasks.forEach(t => {
-                    if (State.selectedIds.has(t.id)) {
-                        toModify.add(t);
-                        const subtree = this.getSubtree(t);
-                        subtree.forEach(child => toModify.add(child));
-                    }
+                const segments = this.getSelectionSegments();
+                let changed = false;
+
+                segments.forEach(segment => {
+                    // Validation: Level > 0
+                    const topTask = segment[0];
+                    if (topTask.level <= 0) return; // Cannot outdent root
+
+                    segment.forEach(t => {
+                        if (t.level > 0) {
+                            t.level -= 1;
+                            triggerAutoSave(t.id);
+                        }
+                    });
+                    changed = true;
                 });
 
-                toModify.forEach(t => {
-                    if (t.level > 0) t.level -= 1;
-                    triggerAutoSave(t.id);
-                });
-
-                this.recalculate(State.tasks);
-                render();
+                if (changed) {
+                    this.recalculate(State.tasks);
+                    render();
+                }
             },
 
             getSubtree(parent) {
@@ -756,6 +818,7 @@
                 const idx = parent.orderIndex;
                 for (let i = idx + 1; i < State.tasks.length; i++) {
                     const t = State.tasks[i];
+                    // Stop if we hit a task with level <= parent.level
                     if (t.level > parent.level) {
                         results.push(t);
                     } else {
