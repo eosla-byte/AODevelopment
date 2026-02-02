@@ -557,6 +557,7 @@
                         <th style="width: 80px;">Duración</th>
                         <th style="width: 90px;">Inicio</th>
                         <th style="width: 90px;">Fin</th>
+                        <th style="width: 80px;">Pred.</th>
                         <th style="width: 60px;">%</th>
                     </tr>
                 </thead>
@@ -887,6 +888,14 @@
                     date_format: 'YYYY-MM-DD',
                     language: 'es',
                     on_date_change: (task, start, end) => updateTaskDate(task.id, start, end),
+                    on_progress_change: (task, progress) => {
+                        const t = tasks.find(x => x.id === task.id);
+                        if (t) {
+                            t.progress = progress;
+                            saveProjectDataLocally();
+                            updateField(task.id, 'progress', progress);
+                        }
+                    },
                     on_click: (task) => { },
                     on_view_change: () => {
                         drawTodayLine();
@@ -1871,6 +1880,10 @@
                         <input type="date" class="cell-input" value="${formatDateInput(task.end)}" readonly>
                     </td>
                     
+                    <td class="grid-cell" data-field="predecessors" data-id="${task.id}">
+                        <input type="text" class="cell-input" value="${task.dependencies || ''}" readonly title="Use IDs separadas por coma">
+                    </td>
+
                     <td class="grid-cell text-center" data-field="progress" data-id="${task.id}">
                          <input type="number" class="cell-input text-center" value="${task.progress}" readonly>
                     </td>
@@ -2664,6 +2677,14 @@
             if (!t) return;
             // Local & API Update
             if (field === 'comments') t.comments = value;
+            else if (field === 'predecessors') {
+                t[field] = value;
+                // Sync with Frappe Gantt property 'dependencies'
+                t.dependencies = value;
+                // Maybe trigger re-render of Gantt if dependencies changed?
+                // renderGantt(gantt.options.view_mode); // Expensive?
+                // Actually dependencies affect layout, so yes, we should re-render or at least update lines.
+            }
             else if (field !== 'start' && field !== 'end') t[field] = value;
 
             const payload = {};
@@ -2674,6 +2695,15 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+
+                // If dependencies changed, we might want to refresh Gantt to show arrows
+                if (field === 'predecessors') {
+                    // Update the internal list used by Frappe Gantt which is `ganttTasks` or simple re-init
+                    // renderGantt handles reconstruction of `ganttTasks` from `tasks`.
+                    // So calling renderGantt() is the correct way.
+                    renderGantt(gantt.options.view_mode);
+                }
+
             } catch (e) { console.error(e); }
         }
 
