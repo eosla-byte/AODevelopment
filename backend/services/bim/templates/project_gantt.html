@@ -750,6 +750,14 @@
         }); // End DOMContentLoaded
 
 
+        // Helper for Date Formatting
+        function formatDateInput(date) {
+            if (!date) return '';
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return '';
+            return d.toISOString().split('T')[0];
+        }
+
         async function loadTasks() {
             try {
                 // Use server-side data if available (passed via Jinja)
