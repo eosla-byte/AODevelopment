@@ -319,19 +319,26 @@
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
+        /* --- STICKY HEADER (CLEAN IMPLEMENTATION) --- */
         #gantt-header-sticky {
-            /* Positioned absolutely within the relative container, strictly at top */
-            position: absolute;
+            position: sticky;
             top: 0;
-            right: 0;
-            left: auto;
-            /* Width controlled by JS or layout? */
-            /* Use flex logic or calc if possible. For now, absolute right aligned matches chart area usually */
-            z-index: 40;
-            background: rgba(255, 255, 255, 0.85);
-            /* Liquid glass fallback */
+            z-index: 50;
+            height: 50px;
+            background: #1e3a8a;
+            /* Dark Blue Background */
+            border-bottom: 1px solid #172554;
             overflow: hidden;
-            /* Hide scrollbar, sync via JS */
+            /* Hide scrollbars, we show content via SVG */
+            width: 100%;
+            display: none;
+            /* Hidden by default until populated */
+        }
+
+        .gantt-header-svg {
+            display: block;
+            pointer-events: none;
+            /* Let clicks pass through if needed */
         }
     </style>
 </head>
@@ -581,43 +588,21 @@
         }
 
         /* 2. Right Panel Header (Timeline) */
-        #gantt-header-sticky {
-            position: sticky;
-            top: 0;
-            z-index: 45;
-            height: 50px;
-            background: #1e3a8a !important;
-            /* Dark Blue Background */
-            border-bottom: 1px solid #172554;
-            overflow: hidden;
-            /* Clip extra content */
-            pointer-events: none;
-            margin-bottom: -50px;
-            /* Overlap the original SVG header */
-            display: block;
-        }
-
-        /* 3. SVG Visibility Fixes */
-        #gantt-header-sticky svg {
-            background-color: transparent !important;
-        }
-
-        #gantt-header-sticky .grid-header {
-            fill: transparent !important;
-            /* Hide original background rects */
-        }
-
+        /* --- STICKY HEADER STYLING --- */
         #gantt-header-sticky text {
             fill: #ffffff !important;
-            /* Force Text White */
             font-weight: 600 !important;
-            opacity: 1 !important;
+            font-size: 11px !important;
         }
 
         #gantt-header-sticky line,
         #gantt-header-sticky path {
-            stroke: rgba(255, 255, 255, 0.2) !important;
-            /* Make ticks visible */
+            stroke: rgba(255, 255, 255, 0.3) !important;
+        }
+
+        /* Hide original background rects in the clone so our blue background shows */
+        #gantt-header-sticky rect.grid-header {
+            fill: transparent !important;
         }
 
         /* --- Preserved Styles --- */
@@ -1262,60 +1247,79 @@
         // ... (toggleCompanyVisibility is below)
 
 
-        // --- UPDATED CLONE HEADER LOGIC ---
+        // --- NEW CLONE HEADER LOGIC (Aggressive Clean) ---
         function cloneGanttHeader() {
             const sourceSvg = document.getElementById('gantt-target');
-            const targetContainer = document.getElementById('gantt-header-sticky');
-            if (!sourceSvg || !targetContainer) return;
+            const stickyContainer = document.getElementById('gantt-header-sticky');
 
-            // 1. Find the header group in Frappe Gantt
+            if (!sourceSvg || !stickyContainer) return;
+
+            // 1. Get the source header group
+            // Frappe Gantt logic: .grid-header contains the timeline
             const headerGroup = sourceSvg.querySelector('.grid-header');
+
+            // Safety: If no header (not rendered), hide sticky bar to prevent "Solid Blue Bar"
             if (!headerGroup) {
-                // Fallback: If header not found (e.g. not rendered yet), hide the sticky container
-                // so the original header (underneath) can be seen, avoiding the "Blue Bar of Death".
-                targetContainer.style.display = 'none';
-                // Optional: Retry once if data seems loaded?
+                stickyContainer.style.display = 'none';
                 return;
             }
 
-            // Ensure visible if previously hidden
-            targetContainer.style.display = 'block';
+            // 2. Prepare Container
+            stickyContainer.innerHTML = '';
+            stickyContainer.style.display = 'block';
 
-            // 2. Clone it
-            const clone = headerGroup.cloneNode(true);
-
-            // 3. Create a wrapper SVG
-            const width = sourceSvg.getAttribute('width');
-
-            // Sync Width to allow Horizontal Scroll
-            targetContainer.style.width = width ? width + 'px' : '100%';
-
+            // 3. Create fresh SVG Wrapper
+            // We match the WIDTH of the source SVG exactly
+            const totalWidth = sourceSvg.getAttribute('width');
             const wrapperSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-            if (width) wrapperSvg.setAttribute('width', width);
-            wrapperSvg.setAttribute('height', '50'); // Fixed header height
+
+            if (totalWidth) wrapperSvg.setAttribute('width', totalWidth);
+            wrapperSvg.setAttribute('height', '50'); // Explicit height
             wrapperSvg.classList.add('gantt-header-svg');
 
-            // Append clone
-            wrapperSvg.appendChild(clone);
+            // 4. Clone the Group
+            const clone = headerGroup.cloneNode(true);
 
-            // Clear and Append to sticky container
-            targetContainer.innerHTML = '';
-            targetContainer.appendChild(wrapperSvg);
+            // 5. CLEAN THE CLONE (Aggressive DOM manipulation)
+            // Remove any existing fill/stroke that matches the light theme
+            // Force ours via attributes AND classes
 
-            // Ensure Text Visibility explicitly via JS as fallback
-            // We target both text elements and the grid-header groups to ensure styles stick
-            wrapperSvg.querySelectorAll('text').forEach(t => {
-                t.style.fill = '#ffffff';
+            // Text Color
+            const texts = clone.querySelectorAll('text');
+            texts.forEach(t => {
                 t.setAttribute('fill', '#ffffff');
-                t.style.fontWeight = '600';
+                t.style.fill = '#ffffff';
+                t.style.opacity = '1';
             });
 
-            // Force tick lines to be visible if they were using opacity
-            wrapperSvg.querySelectorAll('line, path').forEach(p => {
-                p.style.stroke = 'rgba(255,255,255,0.3)';
-            });
+            // Lines/Ticks
+            const lines = clone.querySelectorAll('line, path');
+            lines.forEach(l => {
+                l.setAttribute('stroke', 'rgba(255,255,255,0.3)');
+                l.style.stroke = 'rgba(255,255,255,0.3)');
+        });
 
-            // No need for Scroll Sync listeners - Native flow handles it!
+        // Background Rects (if any exist in .grid-header)
+        // If Frappe puts a big white rect behind, we need to make it transparent
+        const rects = clone.querySelectorAll('rect');
+        rects.forEach(r => {
+            r.setAttribute('fill', 'transparent');
+            r.style.fill = 'transparent';
+        });
+
+        // Append to Wrapper
+        wrapperSvg.appendChild(clone);
+
+        // Append Wrapper to Container
+        stickyContainer.appendChild(wrapperSvg);
+
+        // 6. SYNC WIDTH SCROLL
+        // The sticky container is sticky, so it doesn't scroll horizontally with the document window if overflow is on body.
+        // But here clean layout means #chart-area overflow auto.
+        // Sticky behavior inside overflow container:
+        // It sticks to top, but scrolls left/right with content.
+        // So we just need width to be correct.
+        stickyContainer.style.width = totalWidth ? totalWidth + 'px' : '100%';
         }
 
         // Disable old sync if it exists by flag
