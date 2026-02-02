@@ -2582,6 +2582,34 @@
 
         // Wrap updateField to show saving
         const _originalUpdateField = updateField;
+
+        async function updateTaskDate(id, start, end) {
+            // Update local state first for responsiveness
+            const t = tasks.find(x => x.id === id);
+            if (t) {
+                t.start = new Date(start);
+                t.end = new Date(end);
+            }
+
+            // Call API
+            // We need to update both start and end
+            showSaving();
+            try {
+                const s = start.toISOString().split('T')[0];
+                const e = end.toISOString().split('T')[0];
+                await fetch(`/api/projects/${projectId}/activities/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ start_date: s, end_date: e })
+                });
+                showSaved();
+            } catch (err) {
+                console.error(err);
+                alert("Error actualizando fechas");
+                // Revert? Relies on reload for now.
+            }
+        }
+
         updateField = async function (id, field, value) {
             showSaving();
             try {
