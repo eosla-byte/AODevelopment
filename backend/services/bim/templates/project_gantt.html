@@ -694,6 +694,9 @@
             });
         }
 
+
+        function getTotalStickyWidth() { return Config.columns.reduce((sum, col) => sum + col.width, 0); }
+
         function initTimeEngine() {
             if (State.tasks.length > 0) {
                 let min = new Date(State.tasks[0].start || new Date());
