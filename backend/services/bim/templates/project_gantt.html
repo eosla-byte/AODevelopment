@@ -1472,9 +1472,42 @@
         }
 
         async function registerDelay(id) {
-            alert("Delay Analysis feature coming in next step!");
-            // This placeholder acknowledges the user request but defers implementation 
-            // to keep this edit focused on Comments/Header.
+            const t = tasks.find(x => x.id === id);
+            if (!t) return;
+
+            const daysStr = prompt("¿Cuántos días de atraso?", "1");
+            if (!daysStr) return;
+            const days = parseInt(daysStr);
+            if (isNaN(days) || days <= 0) return alert("Número inválido");
+
+            const reason = prompt("Razón del atraso:", "Operativo");
+
+            // 1. Update End Date
+            // Ensure we work with Date objects
+            const oldEnd = new Date(t.end);
+            const newEnd = new Date(oldEnd);
+            newEnd.setDate(newEnd.getDate() + days);
+
+            // 2. Add Comment/Log
+            if (!t.comments) t.comments = [];
+            const logEntry = `[ATRASO REGISTRADO] +${days} días. Razón: ${reason || 'N/A'}`;
+            t.comments.push({
+                text: logEntry,
+                date: new Date().toISOString(),
+                user: "Usuario"
+            });
+
+            // 3. Apply Updates
+            // Save Comment Local & Backend
+            saveProjectDataLocally();
+            await updateField(id, 'comments', t.comments);
+
+            // Save Date Change (API + Grid)
+            // This will also trigger renderGrid()
+            await updateTaskDate(id, t.start, newEnd);
+
+            // 4. Feedback
+            alert(`Atraso registrado. Nueva fecha fin: ${newEnd.toISOString().split('T')[0]}`);
         }
 
 
