@@ -606,6 +606,27 @@
         }
 
         /* 2. Right Panel Header (Timeline) */
+        /* HIDDEN ORIGINAL HEADER to prevent duplication */
+        #chart-area .grid-header {
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none;
+        }
+
+        /* STICKY HEADER CONTAINER */
+        #timeline-header-container {
+            background-color: #1e3a8a !important;
+            /* Force Blue Background */
+            border-bottom: 1px solid #172554;
+            overflow: hidden;
+            /* Hide overflow */
+        }
+
+        /* TEXT VISIBILITY IN CLONE */
+        .gantt-header-svg text {
+            fill: #ffffff !important;
+            font-weight: 600 !important;
+        }
 
 
         /* --- Preserved Styles --- */
