@@ -10,22 +10,24 @@
 
     <style>
         :root {
-            /* MS Project Palette */
-            --header-bg: #f3f4f6;
-            --header-text: #1f2937;
-            --border-color: #d1d5db;
-            --grid-line: #e5e7eb;
-            --row-hover: #f3f4f6;
-            --selection-blue: rgba(59, 130, 246, 0.1);
-            --primary-blue: #2563eb;
-
             --row-height: 32px;
             --header-height: 60px;
+            --col-id-width: 40px;
+            --col-name-width: 300px;
+            --col-start-width: 100px;
+            --col-end-width: 100px;
+            --col-dur-width: 80px;
+            --col-pct-width: 60px;
+
+            --sticky-left-total: calc(40px + 300px + 100px + 100px + 80px + 60px);
+            /* Adjust based on visible cols */
+
+            --grid-border: 1px solid #e5e7eb;
+            --bg-header: #f9fafb;
         }
 
         * {
             box-sizing: border-box;
-            /* CRITICAL FIX for double scroll */
         }
 
         body,
@@ -34,674 +36,415 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* Strict App Shell */
-            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             font-size: 13px;
         }
 
-        /* --- APP SHELL --- */
-        #app-container {
+        #app {
             display: flex;
             flex-direction: column;
-            width: 100vw;
             height: 100vh;
-            /* Fallback */
-            height: 100dvh;
-            /* Dynamic Viewport Height */
-            overflow: hidden;
         }
 
         #toolbar {
             height: 48px;
-            background: #ffffff;
-            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            border-bottom: var(--grid-border);
             display: flex;
             align-items: center;
             padding: 0 16px;
-            gap: 12px;
-            flex-shrink: 0;
-            z-index: 20;
-        }
-
-        /* --- MAIN WORKSPACE --- */
-        #workspace {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            position: relative;
-        }
-
-        /* --- UNIFIED HEADER (Fixed) --- */
-        #unified-header {
-            display: flex;
-            height: var(--header-height);
-            border-bottom: 1px solid var(--border-color);
-            background: var(--header-bg);
-            flex-shrink: 0;
-        }
-
-        #grid-header-container {
-            width: 400px;
-            /* Initial Width */
-            border-right: 1px solid var(--border-color);
-            overflow: hidden;
-            /* No scroll here */
-            position: relative;
-        }
-
-        #gantt-header-container {
-            flex: 1;
-            overflow: hidden;
-            /* Syncs with Body Scroll X */
-            position: relative;
-        }
-
-        /* --- UNIFIED BODY (Global Scroll Y) --- */
-        #unified-body {
-            flex: 1;
-            display: flex;
-            overflow-y: auto;
-            /* The ONE scrollbar */
-            overflow-x: hidden;
-            position: relative;
-        }
-
-        #grid-body-container {
-            width: 400px;
-            /* Matches header */
-            border-right: 1px solid var(--border-color);
-            flex-shrink: 0;
-            position: relative;
-            background: white;
-        }
-
-        #gantt-body-container {
-            flex: 1;
-            overflow-x: auto;
-            /* Horizontal Scroll Only */
-            position: relative;
-            background: white;
-        }
-
-        /* --- COMPONENTS --- */
-        .resizer {
-            width: 5px;
-            cursor: col-resize;
-            background: transparent;
-            position: absolute;
-            right: 0;
-            top: 0;
-            bottom: 0;
+            gap: 8px;
             z-index: 100;
+            background: white;
         }
 
-        .resizer:hover {
-            background: var(--primary-blue);
+        /* --- THE MASTER SCROLL CONTAINER --- */
+        #master-scroll {
+            flex: 1;
+            overflow: auto;
+            /* The ONLY scrollbar */
+            position: relative;
+            background: white;
         }
 
-        table {
-            border-collapse: collapse;
-            width: 100%;
+        /* --- THE GIANT GRID --- */
+        #main-table {
+            border-collapse: separate;
+            /* Required for sticky */
+            border-spacing: 0;
             table-layout: fixed;
+            width: max-content;
+            /* Allows horizontal growth */
         }
 
-        th,
+        /* Headers */
+        thead th {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            height: var(--header-height);
+            background: var(--bg-header);
+            border-bottom: var(--grid-border);
+            border-right: var(--grid-border);
+            vertical-align: middle;
+            /* Center vertically specifically for Timeline */
+        }
+
+        /* Fixed Columns (Left) */
+        .sticky-col {
+            position: sticky;
+            z-index: 30;
+            background: white;
+            /* Cover Gantt bars sliding under */
+            left: 0;
+            /* JS updates this for subsequent cols */
+        }
+
+        /* Corner Headers (Top-Left) - The "Pivot" */
+        thead th.sticky-col {
+            z-index: 50;
+            /* Above everything */
+            background: #f3f4f6;
+        }
+
+        /* Cells */
         td {
             height: var(--row-height);
+            border-bottom: var(--grid-border);
+            border-right: var(--grid-border);
             padding: 0 8px;
-            border-bottom: 1px solid var(--grid-line);
-            border-right: 1px solid var(--grid-line);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
 
-        th {
-            background: var(--header-bg);
-            font-weight: 600;
-            text-align: left;
+        /* Timeline Header Cell */
+        #timeline-header-cell {
+            padding: 0;
+            margin: 0;
+            background: white;
+        }
+
+        /* Resizers */
+        .resizer {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            cursor: col-resize;
+            z-index: 60;
+        }
+
+        .resizer:hover {
+            background: #3b82f6;
+        }
+
+        /* Row Highlights */
+        tr:hover td {
+            background-color: #f3f9ff;
+        }
+
+        /* Gantt Cell */
+        .gantt-cell {
+            padding: 0;
+            margin: 0;
+            vertical-align: top;
             position: relative;
         }
     </style>
 </head>
 
 <body>
-
-    <div id="app-container">
-        <!-- TOP TOOLBAR -->
+    <div id="app">
+        <!-- TOOLBAR -->
         <div id="toolbar">
-            <h1 class="font-bold text-lg mr-4">{{ project.name }}</h1>
-
-            <div class="h-6 w-px bg-gray-300 mx-2"></div>
-
-            <button class="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Outdent"><i
-                    class="fas fa-outdent"></i></button>
-            <button class="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Indent"><i
-                    class="fas fa-indent"></i></button>
-
-            <div class="h-6 w-px bg-gray-300 mx-2"></div>
-
-            <button class="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Link"><i
-                    class="fas fa-link"></i></button>
-            <button class="p-1.5 hover:bg-gray-100 rounded text-gray-700" title="Unlink"><i
-                    class="fas fa-unlink"></i></button>
-
-            <div class="flex-1"></div>
-
-            <!-- Zoom Controls -->
-            <div class="flex items-center gap-1 border rounded px-1">
-                <button class="p-1 hover:bg-gray-100 rounded text-xs" onclick="AO.Gantt.zoomOut()"><i
-                        class="fas fa-minus"></i></button>
-                <span id="zoom-level-label" class="text-xs font-mono w-16 text-center">WEEK</span>
-                <button class="p-1 hover:bg-gray-100 rounded text-xs" onclick="AO.Gantt.zoomIn()"><i
-                        class="fas fa-plus"></i></button>
-            </div>
+            <h1 class="font-bold mr-4">{{ project.name }}</h1>
+            <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomOut()"><i
+                    class="fas fa-minus"></i></button>
+            <span id="zoom-label" class="w-16 text-center font-mono text-xs">WEEK</span>
+            <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomIn()"><i
+                    class="fas fa-plus"></i></button>
         </div>
 
-        <!-- MAIN WORKSPACE -->
-        <div id="workspace">
-            <!-- GLOBAL HEADER ROW -->
-            <div id="unified-header">
-                <!-- Grid Header -->
-                <div id="grid-header-container">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th style="width: 40px; text-align: center;">ID</th>
-                                <th style="width: 24px;">i</th> <!-- Indicators -->
-                                <th style="width: 200px;">Task Name</th>
-                                <th style="width: 80px;">Start</th>
-                                <th style="width: 80px;">Finish</th>
-                                <th style="width: 60px;">Dur</th>
-                                <th style="width: 60px;">%</th>
-                            </tr>
-                        </thead>
-                    </table>
-                    <div class="resizer" id="split-pane-resizer"></div>
-                </div>
+        <!-- MASTER SCROLL -->
+        <div id="master-scroll">
+            <table id="main-table">
+                <thead>
+                    <tr id="header-row">
+                        <!-- LEFT COLUMNS (JS Generated) -->
+                        <!-- RIGHT TIMELINE (Single Giant TH) -->
+                        <th id="timeline-header-cell">
+                            <svg id="timeline-svg" height="60" width="100%"></svg>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                    <!-- ROWS (JS Generated) -->
+                </tbody>
+            </table>
 
-                <!-- Gantt Timeline Header -->
-                <div id="gantt-header-container">
-                    <!-- SVG Timeline Rendered Here -->
-                    <svg id="timeline-svg" style="width: 100%; height: 100%; display:block;"></svg>
-                </div>
-            </div>
-
-            <!-- GLOBAL BODY ROW (Vertical Scroll Container) -->
-            <div id="unified-body">
-                <!-- Grid Body -->
-                <div id="grid-body-container">
-                    <table id="grid-table">
-                        <tbody id="grid-tbody">
-                            <!-- Virtual Rows Here -->
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Gantt Body -->
-                <div id="gantt-body-container">
-                    <!-- SVG Canvas -->
-                    <svg id="gantt-svg" style="width: 2000px; height: 1px; display:block;">
-                        <defs>
-                            <pattern id="gridPattern" width="100" height="100" patternUnits="userSpaceOnUse">
-                                <path d="M 100 0 L 0 0 0 100" fill="none" stroke="gray" stroke-width="0.5" />
-                            </pattern>
-                        </defs>
-                        <!-- Layers -->
-                        <g id="layer-grid"></g>
-                        <g id="layer-dependencies"></g>
-                        <g id="layer-bars"></g>
-                        <g id="layer-highlights"></g>
-                    </svg>
-                </div>
-            </div>
+            <!-- GANTT OVERLAY (Absolute, for Bars) -->
+            <!-- We render bars inside the last TD of each row or a separate overlay? 
+                 Better: Render bars in an SVG inside the last TD of *each row*? No, too many SVGs.
+                 Better: One Giant SVG overlaying the right side? 
+                 Solution: The last column is the "Gantt Column". 
+            -->
         </div>
     </div>
 
-    <!-- MODULES: AO.Gantt Engine -->
     <script type="module">
-        // --- NAMESPACE ---
-        window.AO = window.AO || {};
+        // --- CONFIG ---
+        const Config = {
+            columns: [
+                { id: 'id', label: 'ID', width: 40, align: 'center' },
+                { id: 'name', label: 'Tarea', width: 300, align: 'left' },
+                { id: 'start', label: 'Inicio', width: 100, align: 'center' },
+                { id: 'end', label: 'Fin', width: 100, align: 'center' },
+                { id: 'pct', label: '%', width: 60, align: 'center' }
+            ],
+            rowHeight: 32,
+            headerHeight: 60
+        };
 
-        // --- STATE ---
         const State = {
             tasks: [],
-            taskMap: new Map(),
-            displayOrder: [], // Array of IDs
-
-            view: {
-                zoomLevel: 'WEEK', // YEAR, QUARTER, MONTH, WEEK, DAY
-                pxPerMinute: 0.1,  // Dynamic scale
-                rowHeight: 32,
-                headerHeight: 60,
-
-                // Dimensions
-                gridWidth: 400,
-                totalGanttWidth: 2000,
-            },
-
-            ui: {
-                scrollTop: 0,
-                scrollLeft: 0, // Gantt Only
-            }
+            zoom: 'WEEK',
+            pxPerMin: 0.01,
+            startDate: new Date(),
+            totalWidth: 2000
         };
 
-        // --- INITIALIZATION ---
-        document.addEventListener('DOMContentLoaded', async () => {
-            console.log("AO Gantt Engine: Starting...");
-
-            // 1. Setup Resizer
-            setupSplitPane();
-
-            // 2. Setup Scroll Sync
-            setupScrollSync();
-
-            // 3. Load Data
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
             const serverTasks = {{ tasks | tojson | safe
         }};
-        loadData(serverTasks);
-
-        // 4. Initial Render
+        State.tasks = serverTasks;
+        initTimeEngine();
         render();
-    });
+        });
 
-        // --- CORE LAYOUT FUNCTIONS ---
-
-        function setupSplitPane() {
-            const resizer = document.getElementById('split-pane-resizer');
-            const gridHeader = document.getElementById('grid-header-container');
-            const gridBody = document.getElementById('grid-body-container');
-            const unifiedHeader = document.getElementById('unified-header');
-
-            let isResizing = false;
-
-            resizer.addEventListener('mousedown', (e) => {
-                isResizing = true;
-                document.body.style.cursor = 'col-resize';
-                e.preventDefault();
-            });
-
-            document.addEventListener('mousemove', (e) => {
-                if (!isResizing) return;
-                // Calculate new width relative to app container
-                const newWidth = e.clientX;
-                if (newWidth > 100 && newWidth < (window.innerWidth - 100)) {
-                    State.view.gridWidth = newWidth;
-                    gridHeader.style.width = newWidth + 'px';
-                    gridBody.style.width = newWidth + 'px';
-                }
-            });
-
-            document.addEventListener('mouseup', () => {
-                isResizing = false;
-                document.body.style.cursor = 'default';
-            });
-        }
-
-        function setupScrollSync() {
-            const unifiedBody = document.getElementById('unified-body');
-            const ganttBody = document.getElementById('gantt-body-container');
-            const ganttHeader = document.getElementById('gantt-header-container');
-
-            // 1. Vertical Scroll (Native on #unified-body)
-            // No sync needed! It moves both grid-body and gantt-body containers naturally.
-
-            // 2. Horizontal Scroll (Gantt Body -> Gantt Header)
-            ganttBody.addEventListener('scroll', (e) => {
-                const left = ganttBody.scrollLeft;
-                ganttHeader.scrollLeft = left; // Sync Header
-                State.ui.scrollLeft = left;
-
-                // Trigger Virtual Column Render if needed
-                // renderTimelineLabels();
-            });
-        }
-
-        // --- TIME ENGINE (Coordinate System) ---
-        const TimeEngine = {
-            // Configuration
-            baseDate: new Date(), // Will be set to project start
-
-            init(tasks) {
-                // Find Min/Max
-                if (!tasks.length) return;
-                let min = new Date(tasks[0].start || new Date());
-                let max = new Date(tasks[0].end || new Date());
-
-                tasks.forEach(t => {
-                    if (t.start) { const d = new Date(t.start); if (d < min) min = d; }
-                    if (t.end) { const d = new Date(t.end); if (d > max) max = d; }
+        function initTimeEngine() {
+            // Find Min Date
+            if (State.tasks.length > 0) {
+                let min = new Date(State.tasks[0].start || new Date());
+                State.tasks.forEach(t => {
+                    if (t.start && new Date(t.start) < min) min = new Date(t.start);
                 });
-
-                // Add Buffer (1 month before, 1 month after)
-                min.setDate(min.getDate() - 30);
-                max.setDate(max.getDate() + 30);
-
-                this.baseDate = min;
-                State.view.startDate = min;
-                State.view.endDate = max;
-
-                // Calculate Total Width
-                const minutes = (max - min) / 1000 / 60;
-                State.view.totalGanttWidth = minutes * State.view.pxPerMinute;
-
-                // Update Container
-                document.getElementById('gantt-svg').style.width = State.view.totalGanttWidth + 'px';
-                document.getElementById('timeline-svg').style.width = State.view.totalGanttWidth + 'px';
-            },
-
-            timeToX(date) {
-                if (!date) return 0;
-                const validDate = typeof date === 'string' ? new Date(date) : date;
-                const diffMinutes = (validDate - this.baseDate) / 1000 / 60;
-                return diffMinutes * State.view.pxPerMinute;
-            },
-
-            xToTime(x) {
-                const minutes = x / State.view.pxPerMinute;
-                return new Date(this.baseDate.getTime() + minutes * 60 * 1000);
+                min.setDate(min.getDate() - 15); // Buffer
+                State.startDate = min;
+            } else {
+                State.startDate = new Date();
             }
-        };
-
-        // --- TIMELINE RENDERER (SVG) ---
-        const TimelineRenderer = {
-            render() {
-                const svg = document.getElementById('timeline-svg');
-                svg.innerHTML = ''; // Clear
-
-                const zoom = State.view.zoomLevel;
-                const start = State.view.startDate;
-                const end = State.view.endDate;
-
-                // Generate Ticks based on Zoom Level
-                // Logic for "WEEK" Zoom: 
-                // Top Row: Months
-                // Bottom Row: Weeks
-
-                // 1. Bottom Row (Minor Ticks - Weeks/Days)
-                let curr = new Date(start);
-                // Snap to Monday
-                const day = curr.getDay();
-                const diff = curr.getDate() - day + (day == 0 ? -6 : 1);
-                curr.setDate(diff);
-
-                while (curr < end) {
-                    const x = TimeEngine.timeToX(curr);
-                    const next = new Date(curr);
-                    next.setDate(next.getDate() + 7); // +1 Week
-                    const w = TimeEngine.timeToX(next) - x;
-
-                    // Group
-                    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-
-                    // Rectangle
-                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute("x", x);
-                    rect.setAttribute("y", 30); // Bottom Half
-                    rect.setAttribute("width", w);
-                    rect.setAttribute("height", 30);
-                    rect.setAttribute("fill", "white");
-                    rect.setAttribute("stroke", "#e5e7eb");
-
-                    // Label
-                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    text.setAttribute("x", x + w / 2);
-                    text.setAttribute("y", 50);
-                    text.setAttribute("text-anchor", "middle");
-                    text.setAttribute("font-size", "11");
-                    text.setAttribute("fill", "#6b7280");
-                    text.textContent = `Sem ${getWeekNumber(curr)}`;
-
-                    g.appendChild(rect);
-                    g.appendChild(text);
-                    svg.appendChild(g);
-
-                    curr = next;
-                }
-
-                // 2. Top Row (Major Ticks - Months)
-                curr = new Date(start);
-                curr.setDate(1); // Snap to 1st
-
-                while (curr < end) {
-                    const x = TimeEngine.timeToX(curr);
-                    const next = new Date(curr);
-                    next.setMonth(next.getMonth() + 1);
-                    const w = TimeEngine.timeToX(next) - x;
-
-                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    rect.setAttribute("x", x);
-                    rect.setAttribute("y", 0);
-                    rect.setAttribute("width", w);
-                    rect.setAttribute("height", 30);
-                    rect.setAttribute("fill", "#f9fafb");
-                    rect.setAttribute("stroke", "#e5e7eb");
-
-                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    text.setAttribute("x", x + 5); // Left align
-                    text.setAttribute("y", 20);
-                    text.setAttribute("font-weight", "bold");
-                    text.setAttribute("font-size", "12");
-                    text.setAttribute("fill", "#374151");
-                    text.textContent = curr.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-
-                    svg.appendChild(rect);
-                    svg.appendChild(text);
-
-                    curr = next;
-                }
-            }
-        };
-
-        function getWeekNumber(d) {
-            d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-            var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-            var weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-            return weekNo;
-        }
-
-        // --- MAIN RENDER LOOP ---
-
-        function loadData(rawTasks) {
-            // Hydrate State
-            State.tasks = rawTasks;
-            State.taskMap = new Map(rawTasks.map(t => [t.id, t]));
-            State.displayOrder = rawTasks.map(t => t.id);
-
-            console.log(`Loaded ${State.tasks.length} tasks.`);
-
-            // Init Time Engine
-            TimeEngine.init(State.tasks);
         }
 
         function render() {
-            // 1. Render Grid
-            renderGridRows();
-
-            // 2. Render Timeline Header
-            TimelineRenderer.render();
-
-            // 3. Render Gantt Bars
-            renderGanttBars();
+            renderHeader();
+            renderBody();
+            renderTimelineHeader();
         }
 
-        // --- RENDERERS (Placeholder for Phase 2) ---
+        // --- RENDERERS ---
+        function renderHeader() {
+            const tr = document.getElementById('header-row');
+            // Clear existing cols except timeline
+            const timelineTh = document.getElementById('timeline-header-cell');
 
-        function renderGridRows() {
-            const tbody = document.getElementById('grid-tbody');
+            // Remove old sticky headers (keep timeline)
+            Array.from(tr.children).forEach(child => {
+                if (child.id !== 'timeline-header-cell') tr.removeChild(child);
+            });
+
+            let leftOffset = 0;
+
+            // 1. Render Sticky Columns
+            Config.columns.forEach(col => {
+                const th = document.createElement('th');
+                th.className = 'sticky-col';
+                th.innerText = col.label;
+                th.style.width = col.width + 'px';
+                th.style.left = leftOffset + 'px';
+                th.style.minWidth = col.width + 'px';
+                th.style.maxWidth = col.width + 'px';
+
+                // Resizer
+                const resizer = document.createElement('div');
+                resizer.className = 'resizer';
+                resizer.onmousedown = (e) => initResize(e, col);
+                th.appendChild(resizer);
+
+                tr.insertBefore(th, timelineTh); // Insert before timeline
+                leftOffset += col.width;
+            });
+
+            // 2. Set Timeline Width
+            State.totalWidth = calculateTotalWidth();
+            timelineTh.style.width = State.totalWidth + 'px';
+            timelineTh.style.minWidth = State.totalWidth + 'px'; // Essential for scrolling
+
+            const svg = document.getElementById('timeline-svg');
+            svg.style.width = State.totalWidth + 'px';
+            renderTimelineTicks(svg);
+        }
+
+        function renderTimelineTicks(svg) {
+            svg.innerHTML = '';
+            // Mock Ticks based on Zoom
+            let x = 0;
+            while (x < State.totalWidth) {
+                // Month Rect
+                const w = 100; // Mock width per month
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                rect.setAttribute('x', x); rect.setAttribute('y', 0);
+                rect.setAttribute('width', w); rect.setAttribute('height', 30);
+                rect.setAttribute('fill', 'none'); rect.setAttribute('stroke', '#eee');
+                svg.appendChild(rect);
+
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.setAttribute('x', x + 5); text.setAttribute('y', 20);
+                text.textContent = "Month";
+                svg.appendChild(text);
+
+                x += w;
+            }
+        }
+
+        function renderBody() {
+            const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
 
-            State.tasks.forEach(task => {
-                const tr = document.createElement('tr');
-                tr.id = `row-${task.id}`;
-
-                // Check for valid dates
-                const s = task.start ? task.start.split('T')[0] : '';
-                const e = task.end ? task.end.split('T')[0] : '';
-
-                tr.innerHTML = `
-                <td style="text-align:center;">${task.id}</td>
-                <td style="text-align:center;"><i class="fas fa-circle text-[8px] text-green-500"></i></td>
-                <td>${task.name}</td>
-                <td>${s}</td>
-                <td>${e}</td>
-                <td style="text-align:center;">${task.duration || '-'} d</td>
-                <td style="text-align:center;">${task.progress || 0}%</td>
-            `;
-                tbody.appendChild(tr);
-            });
-
-            // Adjust Canvas Height
-            const totalHeight = State.tasks.length * State.view.rowHeight;
-            document.getElementById('gantt-svg').style.height = totalHeight + 'px';
-
-            // Draw Grid Lines on Gantt for row alignment
-            drawGanttRows(totalHeight);
-        }
-
-        function drawGanttRows(totalHeight) {
-            const layer = document.getElementById('layer-grid');
-            layer.innerHTML = '';
-
-            // Horizontal Lines
-            for (let y = 0; y <= totalHeight; y += State.view.rowHeight) {
-                const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                line.setAttribute("x1", 0);
-                line.setAttribute("y1", y);
-                line.setAttribute("x2", "100%");
-                line.setAttribute("y2", y);
-                line.setAttribute("stroke", "#e5e7eb");
-                line.setAttribute("stroke-width", "1");
-                layer.appendChild(line);
+            // DEPENDENCY OVERLAY
+            const masterScroll = document.getElementById('master-scroll');
+            let depSvg = document.getElementById('dependency-svg');
+            if (!depSvg) {
+                depSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                depSvg.id = 'dependency-svg';
+                depSvg.style.position = 'absolute';
+                depSvg.style.top = '60px'; // Below header
+                depSvg.style.left = getTotalStickyWidth() + 'px'; // Start after columns
+                depSvg.style.width = State.totalWidth + 'px';
+                depSvg.style.height = (State.tasks.length * 32) + 'px';
+                depSvg.style.pointerEvents = 'none'; // Click through
+                depSvg.style.zIndex = 20; // Above bars? No, lines usually below or above.
+                masterScroll.appendChild(depSvg);
             }
+            // Update Dependency Overlay Position if columns resize
+            depSvg.style.left = getTotalStickyWidth() + 'px';
 
-            // Today Line
-            const nowX = TimeEngine.timeToX(new Date());
-            const today = document.createElementNS("http://www.w3.org/2000/svg", "line");
-            today.setAttribute("x1", nowX);
-            today.setAttribute("y1", 0);
-            today.setAttribute("x2", nowX);
-            today.setAttribute("y2", totalHeight);
-            today.setAttribute("stroke", "red");
-            today.setAttribute("stroke-dasharray", "4");
-            layer.appendChild(today);
-        }
-
-        function renderGanttBars() {
-            const layer = document.getElementById('layer-bars');
-            layer.innerHTML = '';
 
             State.tasks.forEach((task, i) => {
-                if (!task.start || !task.end) return;
+                const tr = document.createElement('tr');
+                let leftOffset = 0;
 
-                const startX = TimeEngine.timeToX(task.start);
-                const endX = TimeEngine.timeToX(task.end);
-                const width = Math.max(2, endX - startX);
+                // 1. Sticky Data Cells
+                Config.columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.className = 'sticky-col';
+                    td.style.left = leftOffset + 'px';
+                    td.style.textAlign = col.align;
+                    td.style.width = col.width + 'px'; // Strict
+                    td.style.minWidth = col.width + 'px';
+                    td.style.maxWidth = col.width + 'px';
 
-                const y = i * State.view.rowHeight + 6; // Center in 32px row
-                const height = 20;
+                    let val = task[col.id];
+                    if (col.id === 'start' || col.id === 'end') val = val ? val.split('T')[0] : '';
+                    td.innerText = val || '';
 
-                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                    tr.appendChild(td);
+                    leftOffset += col.width;
+                });
 
-                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                rect.setAttribute("x", startX);
-                rect.setAttribute("y", y);
-                rect.setAttribute("width", width);
-                rect.setAttribute("height", height);
-                rect.setAttribute("fill", "#3b82f6");
-                rect.setAttribute("rx", "3");
-                rect.setAttribute("cursor", "pointer");
-                // Hover Title
-                const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
-                title.textContent = `${task.name}\n${task.start} - ${task.end}`;
-                rect.appendChild(title);
+                // 2. Gantt Row Cell
+                const ganttTd = document.createElement('td');
+                ganttTd.className = 'gantt-cell';
 
-                // Hover Effects
-                rect.onmouseenter = () => highlightRow(task.id, true);
-                rect.onmouseleave = () => highlightRow(task.id, false);
+                const barSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                barSvg.style.width = State.totalWidth + 'px';
+                barSvg.style.height = '100%';
+                barSvg.style.display = 'block';
 
-                g.appendChild(rect);
+                if (task.start && task.end) {
+                    const x = timeToX(task.start);
+                    const w = timeToX(task.end) - x;
 
-                // Label right of bar
-                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                text.setAttribute("x", startX + width + 5);
-                text.setAttribute("y", y + 14);
-                text.setAttribute("fill", "#4b5563");
-                text.setAttribute("font-size", "11");
-                text.textContent = task.name;
-                g.appendChild(text);
+                    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
 
-                layer.appendChild(g);
-            });
-        }
+                    // Bar
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute('x', x);
+                    rect.setAttribute('y', 6);
+                    rect.setAttribute('width', Math.max(w, 5));
+                    rect.setAttribute('height', 20);
+                    rect.setAttribute('fill', '#3b82f6');
+                    rect.setAttribute('rx', 3);
 
-        function highlightRow(taskId, active) {
-            // Highlight Grid Row
-            const tr = document.getElementById(`row-${taskId}`);
-            if (tr) {
-                tr.style.background = active ? 'var(--row-hover)' : 'transparent';
-            }
-            // Highlight Gantt Bar (Optional, can add stroke)
-        }
+                    // Label
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute('x', x + Math.max(w, 5) + 5);
+                    text.setAttribute('y', 20);
+                    text.textContent = task.name;
+                    text.setAttribute('font-size', '11');
+                    text.setAttribute('fill', '#666');
 
-        // --- LOOKAHEAD ---
-        function applyLookahead(weeks) {
-            const start = new Date();
-            const end = new Date();
-            end.setDate(end.getDate() + (weeks * 7));
-
-            State.tasks.forEach(task => {
-                const tr = document.getElementById(`row-${task.id}`);
-                if (!tr) return;
-
-                const tStart = new Date(task.start);
-                const tEnd = new Date(task.end);
-
-                if (tStart < end && tEnd > start) {
-                    tr.style.borderLeft = "4px solid red";
-                    tr.style.backgroundColor = "#fef2f2";
-                } else {
-                    tr.style.borderLeft = "1px solid var(--grid-line)";
-                    tr.style.backgroundColor = "transparent";
+                    g.appendChild(rect);
+                    g.appendChild(text);
+                    barSvg.appendChild(g);
                 }
+
+                ganttTd.appendChild(barSvg);
+                tr.appendChild(ganttTd);
+
+                tbody.appendChild(tr);
             });
         }
 
-        // --- INTERACTIONS ---
-
-        function setZoom(level) {
-            State.view.zoomLevel = level;
-            const label = document.getElementById('zoom-level-label');
-            if (label) label.innerText = level;
-
-            // Scale Factor (Pixels per minute)
-            switch (level) {
-                case 'MONTH': State.view.pxPerMinute = 0.002; break; // Very zoomed out
-                case 'WEEK': State.view.pxPerMinute = 0.01; break;  // Standard
-                case 'DAY': State.view.pxPerMinute = 0.05; break;  // Detailed
-            }
-
-            // Re-calcs
-            TimeEngine.init(State.tasks);
-            render();
+        function getTotalStickyWidth() {
+            return Config.columns.reduce((sum, col) => sum + col.width, 0);
         }
 
-        // Export for Debugging
-        window.AO.Gantt = {
-            zoomIn: () => {
-                const levels = ['MONTH', 'WEEK', 'DAY'];
-                const idx = levels.indexOf(State.view.zoomLevel);
-                if (idx < levels.length - 1) setZoom(levels[idx + 1]);
-            },
-            zoomOut: () => {
-                const levels = ['MONTH', 'WEEK', 'DAY'];
-                const idx = levels.indexOf(State.view.zoomLevel);
-                if (idx > 0) setZoom(levels[idx - 1]);
-            },
-            State,
-            setZoom // Expose for testing
+        // --- HELPERS ---
+        function calculateTotalWidth() {
+            // Find max end date
+            return 3000; // Mock
+        }
+
+        function timeToX(dateStr) {
+            const d = new Date(dateStr);
+            const diffMins = (d - State.startDate) / 60000;
+            return diffMins * State.pxPerMin;
+        }
+
+        function renderTimelineHeader() {
+            // Draw Ticks on #timeline-svg
+            // Use timeToX logic
+        }
+
+        // --- RESIZE LOGIC ---
+        function initResize(e, col) {
+            e.preventDefault();
+            const startX = e.clientX;
+            const startW = col.width;
+
+            const onMove = (mv) => {
+                const diff = mv.clientX - startX;
+                col.width = Math.max(30, startW + diff);
+                render(); // Re-render everything to update offsets
+            };
+
+            const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        }
+
+        window.AO = {
+            Gantt: {
+                zoomIn: () => { State.pxPerMin *= 1.2; render(); },
+                zoomOut: () => { State.pxPerMin *= 0.8; render(); }
+            }
         };
     </script>
 </body>
