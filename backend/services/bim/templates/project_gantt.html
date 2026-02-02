@@ -152,6 +152,39 @@
             vertical-align: top;
             position: relative;
         }
+
+        /* Grid Selection Styles */
+        .selected-cell {
+            background-color: rgba(59, 130, 246, 0.1) !important;
+            border: 1px solid #3b82f6 !important;
+        }
+
+        .fill-handle {
+            width: 8px;
+            height: 8px;
+            background-color: #3b82f6;
+            position: absolute;
+            bottom: -4px;
+            right: -4px;
+            cursor: crosshair;
+            z-index: 10;
+        }
+
+        .selection-border-top {
+            border-top: 2px solid #3b82f6 !important;
+        }
+
+        .selection-border-bottom {
+            border-bottom: 2px solid #3b82f6 !important;
+        }
+
+        .selection-border-left {
+            border-left: 2px solid #3b82f6 !important;
+        }
+
+        .selection-border-right {
+            border-right: 2px solid #3b82f6 !important;
+        }
     </style>
 </head>
 
@@ -223,7 +256,14 @@
             companyColors: {},
             // Formatting & AutoSave
             autoSaveTimer: null,
-            dirtyTasks: new Set()
+            dirtyTasks: new Set(),
+            // Grid Interaction
+            selectedCells: new Set(), // "taskId:colId"
+            activeCell: null, // {taskId, colId}
+            anchorCell: null, // {taskId, colId}
+            isDragging: false,
+            isFilling: false,
+            fillSourceRange: null // {startRow, endRow, tasks: []}
         };
 
         // --- INIT ---
@@ -433,27 +473,270 @@
 
         // --- FORMATTING LOGIC ---
         function applyStyle(key, value) {
-            const selIds = Array.from(State.selectedIds);
-            if (selIds.length === 0) return;
+            // New Cell-Based Logic
+            if (State.selectedCells.size === 0) return;
 
-            selIds.forEach(id => {
-                const task = State.tasks.find(t => t.id === id);
+            State.selectedCells.forEach(cellKey => {
+                const [taskId, colId] = cellKey.split(':');
+                const task = State.tasks.find(t => t.id === taskId);
                 if (task) {
-                    if (!task.style) task.style = {};
-                    task.style[key] = value;
+                    if (!task.cellStyles) task.cellStyles = {};
+                    if (!task.cellStyles[colId]) task.cellStyles[colId] = {};
+
+                    task.cellStyles[colId][key] = value;
                     triggerAutoSave(task.id);
                 }
             });
             render();
         }
 
+        // --- GRID INTERACTION CONTROLLER ---
+        const GridController = {
+            handleMouseDown(e, task, colId) {
+                if (e.button !== 0) return; // Only Left Click
+
+                // If clicking fill handle (logic handled separately or check target class)
+                if (e.target.classList.contains('fill-handle')) {
+                    this.startFill(e);
+                    return;
+                }
+
+                State.isDragging = true;
+                State.isFilling = false;
+
+                const cellKey = `${task.id}:${colId}`;
+
+                if (e.ctrlKey) {
+                    // Add/Remove
+                    if (State.selectedCells.has(cellKey)) {
+                        State.selectedCells.delete(cellKey);
+                    } else {
+                        State.selectedCells.add(cellKey);
+                        State.activeCell = { taskId: task.id, colId };
+                    }
+                    State.anchorCell = { taskId: task.id, colId };
+                } else if (e.shiftKey && State.activeCell) {
+                    // Range Select
+                    this.selectRange(State.activeCell, { taskId: task.id, colId });
+                } else {
+                    // Single Select
+                    State.selectedCells.clear();
+                    State.selectedCells.add(cellKey);
+                    State.activeCell = { taskId: task.id, colId };
+                    State.anchorCell = { taskId: task.id, colId };
+                }
+
+                render(); // Update Visuals
+            },
+
+            handleMouseEnter(e, task, colId) {
+                if (State.isDragging && !State.isFilling) {
+                    // Update Range Selection from Anchor to Current
+                    this.selectRange(State.anchorCell, { taskId: task.id, colId });
+                    render();
+                }
+                if (State.isFilling) {
+                    // Update Target Range
+                    const src = State.fillSourceRange;
+                    if (!src) return;
+
+                    // Determine Target Range based on Mouse Position vs Source
+                    // We only support Vertical Fill for now
+                    const targetTask = State.tasks.find(t => t.id === task.id);
+                    if (!targetTask) return;
+
+                    let startRow = src.startRow;
+                    let endRow = src.endRow;
+
+                    if (targetTask.orderIndex > src.endRow) {
+                        // Dragging Down
+                        endRow = targetTask.orderIndex;
+                    } else if (targetTask.orderIndex < src.startRow) {
+                        // Dragging Up (Optional? for now focus on Down)
+                        startRow = targetTask.orderIndex;
+                    }
+
+                    State.fillTargetRange = { startRow, endRow };
+
+                    // Visual Feedback: Select Target Cells temporarily?
+                    // Or add specific class 'fill-target'?
+                    // For now, let's just select them to show scope
+                    // But "Selection" usually implies source. 
+                    // Excel keeps source selected and adds border to target.
+                    // We'll stick to simple selection expansion for now to save complexity.
+                    this.selectRange(
+                        { taskId: State.tasks[startRow].id, colId: State.activeCell.colId }, // Approx
+                        { taskId: State.tasks[endRow].id, colId: State.activeCell.colId }
+                    );
+                    render();
+                }
+            },
+
+            handleMouseUp() {
+                if (State.isFilling) {
+                    this.executeFill();
+                }
+                State.isDragging = false;
+                State.isFilling = false;
+                State.fillSourceRange = null;
+                State.fillTargetRange = null;
+            },
+
+            selectRange(start, end) {
+                State.selectedCells.clear();
+
+                const startTask = State.tasks.find(t => t.id === start.taskId);
+                const endTask = State.tasks.find(t => t.id === end.taskId);
+                if (!startTask || !endTask) return;
+
+                const startIdx = Math.min(startTask.orderIndex, endTask.orderIndex);
+                const endIdx = Math.max(startTask.orderIndex, endTask.orderIndex);
+
+                const cols = Config.columns.map(c => c.id);
+                const c1 = cols.indexOf(start.colId);
+                const c2 = cols.indexOf(end.colId);
+                const startCol = Math.min(c1, c2);
+                const endCol = Math.max(c1, c2);
+
+                for (let r = startIdx; r <= endIdx; r++) {
+                    const t = State.tasks[r];
+                    if (!t) continue;
+                    for (let c = startCol; c <= endCol; c++) {
+                        State.selectedCells.add(`${t.id}:${cols[c]}`);
+                    }
+                }
+            },
+
+            startFill(e) {
+                State.isFilling = true;
+                State.isDragging = true;
+                e.stopPropagation();
+
+                // Calculate Source Range from Selection
+                const indices = [];
+                State.selectedCells.forEach(k => {
+                    const [tid] = k.split(':');
+                    const t = State.tasks.find(x => x.id === tid);
+                    if (t) indices.push(t.orderIndex);
+                });
+
+                if (indices.length === 0) return;
+
+                const minRow = Math.min(...indices);
+                const maxRow = Math.max(...indices);
+
+                State.fillSourceRange = {
+                    startRow: minRow,
+                    endRow: maxRow
+                };
+                // Initial Target is Source
+                State.fillTargetRange = { ...State.fillSourceRange };
+            },
+
+            executeFill() {
+                if (!State.fillSourceRange || !State.fillTargetRange) return;
+
+                const src = State.fillSourceRange; // {startRow, endRow, ...}
+                const tgt = State.fillTargetRange; // {startRow, endRow, ...}
+
+                // For each selected column
+                const sCells = Array.from(State.selectedCells);
+                if (sCells.length === 0) return;
+
+                // Group by Col
+                const cols = new Set(sCells.map(k => k.split(':')[1]));
+
+                cols.forEach(colId => {
+                    // Get Source Values
+                    const sourceValues = [];
+                    for (let r = src.startRow; r <= src.endRow; r++) {
+                        const tHash = State.tasks[r];
+                        if (tHash) sourceValues.push(tHash[colId]);
+                    }
+
+                    // Detect Pattern
+                    // Simple logic: if all numbers, check increment. If mixed or text, repeat sequence.
+                    let isNumeric = sourceValues.every(v => !isNaN(parseFloat(v)) && isFinite(v));
+                    let increment = 0;
+
+                    if (isNumeric && sourceValues.length > 1) {
+                        const n1 = parseFloat(sourceValues[0]);
+                        const n2 = parseFloat(sourceValues[1]);
+                        increment = n2 - n1;
+                        // Verify consistency? Assume linear for now.
+                    }
+
+                    // Fill Target
+                    let srcIdx = 0;
+                    let lastVal = parseFloat(sourceValues[sourceValues.length - 1]);
+
+                    for (let r = tgt.startRow; r <= tgt.endRow; r++) {
+                        const targetTask = State.tasks[r];
+                        if (!targetTask) continue;
+
+                        let newVal;
+
+                        if (isNumeric && sourceValues.length > 1) {
+                            // Continue Pattern
+                            lastVal += increment;
+                            newVal = lastVal;
+                            // Format back to string if needed?
+                            // If duration, suffix 'días'? Duration logic handles raw numbers usually?
+                            // 'duration' column logic: "5 días".
+                            if (colId === 'duration') {
+                                // Duration special handling?
+                                // stored as '5 días'?
+                                // Let's check getter... val = diffDays + ' días'.
+                                // So sourceValues are strings "5 días".
+                                // isNumeric will be false.
+                            }
+                        } else {
+                            // Repeat Sequence
+                            newVal = sourceValues[srcIdx % sourceValues.length];
+                            srcIdx++;
+                        }
+
+                        // Apply
+                        // Special Handling for Duration/Dates
+                        if (colId === 'duration') {
+                            // parse "5 días" -> 5
+                            const days = parseInt(newVal) || 0;
+                            if (targetTask.start && days > 0) {
+                                const d = new Date(targetTask.start);
+                                d.setDate(d.getDate() + days);
+                                targetTask.end = d.toISOString().split('T')[0];
+                            }
+                        } else if (colId === 'start') {
+                            // Date logic? For now strict copy.
+                            targetTask.start = newVal;
+                            // Update Duration?
+                        } else {
+                            targetTask[colId] = newVal;
+                        }
+                        triggerAutoSave(targetTask.id);
+                    }
+                });
+
+                HierarchyEngine.recalculate(State.tasks);
+                render();
+            }
+        };
+
+        document.addEventListener('mouseup', () => GridController.handleMouseUp());
+
+        // --- OLD FORMATTING LOGIC (MIGRATED ABOVE) ---
+        // keeping helpers
         function toggleBold() {
-            // Check first selected to toggle
-            const firstId = Array.from(State.selectedIds)[0];
-            if (!firstId) return;
-            const task = State.tasks.find(t => t.id === firstId);
-            const isBold = task.style && task.style.fontWeight === 'bold';
-            applyStyle('fontWeight', isBold ? 'normal' : 'bold');
+            // check cell styles? 
+            // Just toggle active cell's style
+            if (State.selectedCells.size > 0) {
+                // Check if first is bold
+                const firstKey = Array.from(State.selectedCells)[0];
+                const [tid, cid] = firstKey.split(':');
+                const task = State.tasks.find(t => t.id === tid);
+                const isBold = task.cellStyles && task.cellStyles[cid] && task.cellStyles[cid].fontWeight === 'bold';
+                applyStyle('fontWeight', isBold ? 'normal' : 'bold');
+            }
         }
 
         function changeFill(color) { applyStyle('backgroundColor', color); }
@@ -506,6 +789,7 @@
                     // It seems to be generic. Let's send generic JSON object if Pydantic supports it, or string.
                     // Main.py line 782: style: Optional[str] = None
                     // It expects STRING. So JSON.stringify is correct.
+                    cell_styles: JSON.stringify(task.cellStyles || {}) // New: Cell-specific styles
                 };
 
                 try {
@@ -1194,21 +1478,35 @@
                 }
 
                 const tr = document.createElement('tr');
-                if (State.selectedIds.has(task.id)) tr.style.backgroundColor = 'var(--selection-blue)'; // #eff6ff
-                else if (isHighlighted) tr.style.backgroundColor = '#fff1f2'; // Reddish tint
-
-                tr.onclick = (e) => {
-                    const mode = e.ctrlKey ? 'multi' : (e.shiftKey ? 'range' : 'single');
-                    selectRow(task, mode);
-                };
+                // Row selection deprecated in favor of cell selection?
+                // Or keep row selection visual if "Selecting Row Header"? 
+                // For now transparency
 
                 let leftOffset = 0;
                 Config.columns.forEach(col => {
                     const td = document.createElement('td');
-                    td.className = 'sticky-col';
+                    td.className = 'sticky-col select-none'; // select-none to prevent text selection while dragging
                     td.style.left = leftOffset + 'px';
                     td.style.width = col.width + 'px';
                     td.style.minWidth = col.width + 'px';
+                    // td.style.position = 'absolute'; // Sticky needs absolute inside sticky container? 
+                    // No, implementation earlier used sticky-col class which has position:sticky.
+                    // But if I use absolute here, it breaks sticky.
+                    // sticky-col class handles left/position.
+
+                    const cellKey = `${task.id}:${col.id}`;
+                    const isSelected = State.selectedCells.has(cellKey);
+
+                    if (isSelected) {
+                        td.classList.add('selected-cell');
+                        // Add Borders? 
+                        // Logic for borders requires checking neighbors (efficiently).
+                        // Or just simple border for now. CSS handles simple border.
+                    }
+
+                    // Attach Events
+                    td.onmousedown = (e) => GridController.handleMouseDown(e, task, col.id);
+                    td.onmouseenter = (e) => GridController.handleMouseEnter(e, task, col.id);
 
                     if (col.id === 'name') {
                         td.style.paddingLeft = (task.level * 20 + 8) + 'px';
@@ -1221,7 +1519,6 @@
                         }
                     }
 
-
                     const span = document.createElement('span');
                     let val = task[col.id];
                     if (col.id === 'start' || col.id === 'end') val = val ? val.toString().split('T')[0] : '';
@@ -1231,7 +1528,6 @@
                         val = Math.round(n) + '%';
                     }
                     if (col.id === 'duration') {
-                        // Calculate Duration
                         if (task.start && task.end) {
                             const d1 = new Date(task.start);
                             const d2 = new Date(task.end);
@@ -1245,47 +1541,70 @@
 
                     span.innerText = val || '';
                     span.style.width = "100%";
+
+                    // APPLY CELL STYLES
+                    if (task.cellStyles && task.cellStyles[col.id]) {
+                        const s = task.cellStyles[col.id];
+                        if (s.fontWeight) span.style.fontWeight = s.fontWeight;
+                        if (s.color) span.style.color = s.color;
+                        if (s.backgroundColor) td.style.backgroundColor = s.backgroundColor; // BG on TD
+                        if (s.fontSize) span.style.fontSize = s.fontSize;
+                    }
+
                     if (col.editable) {
                         span.contentEditable = true;
+
+                        // Prevent row selection when clicking to edit
+                        span.onmousedown = (e) => { e.stopPropagation(); }; // Allow text selection
+
                         span.onblur = (e) => {
                             let newVal = e.target.innerText;
-
-                            if (col.id === 'duration') {
-                                // Logic to update End Date
-                                const days = parseInt(newVal) || 0;
-                                if (task.start && days > 0) {
-                                    const d = new Date(task.start);
-                                    d.setDate(d.getDate() + days); // Add days
-                                    task.end = d.toISOString().split('T')[0];
-                                    triggerAutoSave(task.id);
-                                    HierarchyEngine.recalculate(State.tasks);
-                                    render();
-                                }
-                            } else if (col.id === 'start') {
-                                task.start = newVal;
-                                // If duration exists, maintain duration? Or maintain End and update Duration?
-                                // User: "si yo cambio alguna de las fechas se actualizara DURACION"
-                                // So Start/End updates -> Duration re-renders automatically (calc on fly).
-                                // We just save the date.
-                                triggerAutoSave(task.id);
-                                HierarchyEngine.recalculate(State.tasks);
-                                render();
-                            } else if (col.id === 'end') {
-                                task.end = newVal;
-                                triggerAutoSave(task.id);
-                                HierarchyEngine.recalculate(State.tasks);
-                                render();
-                            } else {
-                                task[col.id] = newVal;
-                                triggerAutoSave(task.id);
-                            }
+                            // ... (Save Logic) ...
+                            // Copied from previous logic, condensed for brevity?
+                            // No, must replicate logic or use shared handler.
+                            updateTaskValue(task, col.id, newVal);
                         };
-                        span.onclick = (e) => e.stopPropagation();
                     }
                     td.appendChild(span);
+
+                    // FILL HANDLE (If Active Cell)
+                    if (State.activeCell && State.activeCell.taskId === task.id && State.activeCell.colId === col.id) {
+                        const handle = document.createElement('div');
+                        handle.className = 'fill-handle';
+                        td.appendChild(handle);
+                    }
+
                     tr.appendChild(td);
                     leftOffset += col.width;
                 });
+
+                // --- Helper for updating task ---
+                function updateTaskValue(task, colId, newVal) {
+                    if (colId === 'duration') {
+                        const days = parseInt(newVal) || 0;
+                        if (task.start && days > 0) {
+                            const d = new Date(task.start);
+                            d.setDate(d.getDate() + days);
+                            task.end = d.toISOString().split('T')[0];
+                            triggerAutoSave(task.id);
+                            HierarchyEngine.recalculate(State.tasks);
+                            render();
+                        }
+                    } else if (colId === 'start') {
+                        task.start = newVal;
+                        triggerAutoSave(task.id);
+                        HierarchyEngine.recalculate(State.tasks);
+                        render();
+                    } else if (colId === 'end') {
+                        task.end = newVal;
+                        triggerAutoSave(task.id);
+                        HierarchyEngine.recalculate(State.tasks);
+                        render();
+                    } else {
+                        task[colId] = newVal;
+                        triggerAutoSave(task.id);
+                    }
+                }
 
                 const ganttTd = document.createElement('td');
                 ganttTd.className = 'gantt-cell';
