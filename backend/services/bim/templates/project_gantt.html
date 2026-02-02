@@ -591,7 +591,7 @@
             /* Align to top of grid container */
             z-index: 50;
 
-            height: 50px !important;
+            height: 70px !important;
             vertical-align: middle;
             background: #1e3a8a !important;
             /* Force Dark Blue */
@@ -608,7 +608,7 @@
         /* 2. Right Panel Header (Timeline) */
         /* Will be re-implemented dynamically */
         #timeline-header-container {
-            height: 50px;
+            height: 70px;
             background-color: #1e3a8a;
             /* Base Blue */
             border-bottom: 1px solid #172554;
@@ -1318,9 +1318,9 @@
 
                 // 2. HIDE ORIGINAL HEADER (The "Shift")
                 // Instead of display:none on nodes, we just shift the SVG up.
-                // The Header is 50px high.
-                container.style.marginTop = '-50px';
-                console.log("AO DEBUG 3.0: Original SVG Shifted -50px");
+                // The Header is 70px high.
+                container.style.marginTop = '-70px';
+                console.log("AO DEBUG 3.0: Original SVG Shifted -70px");
 
                 // 3. SYNC SCROLL
                 const chartArea = document.getElementById('chart-area');
