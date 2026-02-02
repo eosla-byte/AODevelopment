@@ -1280,71 +1280,106 @@
 
         // --- NEW SPLIT PANE HEADER LOGIC ---
         function cloneGanttHeader() {
-            const sourceSvg = document.getElementById('gantt-target');
-            const headerContainer = document.getElementById('timeline-header-container');
+            try {
+                const sourceSvg = document.getElementById('gantt-target');
+                const headerContainer = document.getElementById('timeline-header-container');
 
-            if (!sourceSvg || !headerContainer) return;
+                if (!sourceSvg || !headerContainer) {
+                    console.warn("CloneGanttHeader: Missing SVG or Container");
+                    return;
+                }
 
-            // 1. Get the source header group
-            const headerGroup = sourceSvg.querySelector('.grid-header');
+                // 1. Get the source header group
+                // Try standard class first, then fallback to first group or specific attributes
+                let headerGroup = sourceSvg.querySelector('.grid-header');
 
-            if (!headerGroup) {
+                // FALLBACK: Frappe Gantt sometimes changes class names. 
+                // The header usually contains the date texts.
+                if (!headerGroup) {
+                    console.warn("CloneGanttHeader: .grid-header not found. Trying fallback.");
+                    const allGroups = sourceSvg.querySelectorAll('g');
+                    // Heuristic: Find group containing text elements with date-like length or positions
+                    for (let g of allGroups) {
+                        if (g.querySelector('text') && g.querySelector('line')) {
+                            // Likely the header? 
+                            // Usually header is one of the first groups.
+                            headerGroup = g;
+                            break;
+                        }
+                    }
+                }
+
+                if (!headerGroup) {
+                    console.error("CloneGanttHeader: Could not find header group!");
+                    headerContainer.innerHTML = '';
+                    return;
+                }
+
+                // 2. Prepare Container
                 headerContainer.innerHTML = '';
-                return;
-            }
 
-            // 2. Prepare Container
-            headerContainer.innerHTML = '';
+                // 3. Create fresh SVG Wrapper
+                const totalWidth = sourceSvg.getAttribute('width') || '1000'; // Fallback width
+                const wrapperSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 
-            // 3. Create fresh SVG Wrapper
-            // We match the WIDTH of the source SVG exactly
-            const totalWidth = sourceSvg.getAttribute('width');
-            const wrapperSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                wrapperSvg.setAttribute('width', totalWidth);
+                wrapperSvg.setAttribute('height', '50');
+                wrapperSvg.classList.add('gantt-header-svg');
+                // Force display properties
+                wrapperSvg.style.display = 'block';
+                wrapperSvg.style.overflow = 'hidden';
 
-            if (totalWidth) wrapperSvg.setAttribute('width', totalWidth);
-            wrapperSvg.setAttribute('height', '50'); // Explicit height
-            wrapperSvg.classList.add('gantt-header-svg');
+                // 4. Clone the Group
+                const clone = headerGroup.cloneNode(true);
 
-            // 4. Clone the Group
-            const clone = headerGroup.cloneNode(true);
+                // ADJUST POSITION: Force top-left alignment
+                // We clear any existing transform and set our own
+                clone.removeAttribute('transform');
+                clone.setAttribute('transform', 'translate(0, 0)');
 
-            // ADJUST POSITION: Ensure top alignment
-            clone.setAttribute('transform', 'translate(0, 0)');
+                // 5. CLEAN THE CLONE (Styling)
+                // Text Color
+                const texts = clone.querySelectorAll('text');
+                texts.forEach(t => {
+                    t.setAttribute('fill', '#ffffff');
+                    t.style.fill = '#ffffff';
+                    t.style.opacity = '1';
+                    t.style.fontWeight = '600';
+                    t.style.fontSize = '12px';
+                    // Ensure visibility
+                    t.style.display = 'block';
+                    t.style.visibility = 'visible';
+                });
 
-            // 5. CLEAN THE CLONE (Styling)
-            // Text Color
-            const texts = clone.querySelectorAll('text');
-            texts.forEach(t => {
-                t.setAttribute('fill', '#ffffff');
-                t.style.fill = '#ffffff';
-                t.style.opacity = '1';
-                t.style.fontWeight = '600';
-                t.style.fontSize = '12px';
-            });
+                // Lines/Ticks
+                const lines = clone.querySelectorAll('line, path');
+                lines.forEach(l => {
+                    l.setAttribute('stroke', 'rgba(255,255,255,0.3)');
+                    l.style.stroke = 'rgba(255,255,255,0.3)';
+                    l.style.opacity = '1';
+                });
 
-            // Lines/Ticks
-            // Lines/Ticks
-            const lines = clone.querySelectorAll('line, path');
-            lines.forEach(l => {
-                l.setAttribute('stroke', 'rgba(255,255,255,0.3)');
-                l.style.stroke = 'rgba(255,255,255,0.3)';
-            });
+                // Make rects transparent (backgrounds)
+                const rects = clone.querySelectorAll('rect');
+                rects.forEach(r => {
+                    r.setAttribute('fill', 'transparent');
+                    r.style.fill = 'transparent';
+                    r.style.stroke = 'none';
+                });
 
-            // Make rects transparent
-            const rects = clone.querySelectorAll('rect');
-            rects.forEach(r => {
-                r.setAttribute('fill', 'transparent');
-                r.style.fill = 'transparent';
-            });
+                // Append
+                wrapperSvg.appendChild(clone);
+                headerContainer.appendChild(wrapperSvg);
 
-            // Append
-            wrapperSvg.appendChild(clone);
-            headerContainer.appendChild(wrapperSvg);
+                console.log("CloneGanttHeader: Success");
 
-            // 6. SYNC INITIAL SCROLL
-            const chartArea = document.getElementById('chart-area');
-            if (chartArea) {
-                headerContainer.scrollLeft = chartArea.scrollLeft;
+                // 6. SYNC INITIAL SCROLL
+                const chartArea = document.getElementById('chart-area');
+                if (chartArea) {
+                    headerContainer.scrollLeft = chartArea.scrollLeft;
+                }
+            } catch (e) {
+                console.error("CloneGanttHeader Crash:", e);
             }
         }
 
