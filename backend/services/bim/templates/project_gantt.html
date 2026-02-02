@@ -384,6 +384,11 @@
         }
 
         // --- RENDERERS ---
+        function render() {
+            renderHeader();
+            renderBody();
+        }
+
         function renderHeader() {
             const tr = document.getElementById('header-row');
             const timelineTh = document.getElementById('timeline-header-cell');
