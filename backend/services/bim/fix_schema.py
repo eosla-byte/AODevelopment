@@ -50,6 +50,16 @@ def run_migration():
             else:
                  print(f"Comments column check: {e}")
             
+        # 5. Add display_order column
+        try:
+            db.execute(text("ALTER TABLE bim_activities ADD COLUMN display_order INTEGER DEFAULT 0"))
+            print("Added display_order column")
+        except Exception as e:
+            if "duplicate column" in str(e).lower():
+                 print("Display_order column already exists")
+            else:
+                 print(f"Display_order column check: {e}")
+            
         db.commit()
         print("Schema update complete.")
     except Exception as e:

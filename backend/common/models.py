@@ -371,6 +371,7 @@ class BimActivity(Base):
     # Advanced Gantt Fields
     contractor = Column(String) # Empresa Encargada
     predecessors = Column(String) # JSON or String "1,2,3"
+    display_order = Column(Integer, default=0) # For manual row reordering
     style = Column(String) # JSON: {"font": "Calibri", "fontSize": 11, "bold": true, "fill": "#ffff00", "color": "#ff0000"}
     comments = Column(JSON, default=[]) # Log of delays/notes
     # Force Rebuild Check 2
