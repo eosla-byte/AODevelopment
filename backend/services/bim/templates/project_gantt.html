@@ -257,6 +257,13 @@
 
 <body>
     <div id="app">
+        <script>
+            window.onerror = function (msg, url, line, col, error) {
+                alert("JS ERROR: " + msg + "\nLine: " + line + "\nCol: " + col);
+                console.error("Global Error:", error);
+            };
+        </script>
+
         <!-- TOOLBAR -->
         <div id="toolbar">
             <h1 class="font-bold mr-4">{{ project.name }}</h1>
@@ -360,7 +367,8 @@
         document.addEventListener('DOMContentLoaded', () => {
             console.log("AO Gantt: Starting...");
             try {
-                const serverTasks = {{ tasks | tojson | safe }};
+                const serverTasks = {{ tasks | tojson | safe
+            }};
         console.log("AO Gantt: Tasks loaded:", serverTasks ? serverTasks.length : 0);
 
         if (!serverTasks || !Array.isArray(serverTasks)) {
