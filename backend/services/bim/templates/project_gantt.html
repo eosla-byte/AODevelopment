@@ -499,22 +499,6 @@
             btnCompanies.onclick = openCompanyModal;
             toolbar.appendChild(btnCompanies);
 
-            // --- 6. IMPORT (MPP) ---
-            const btnImport = document.createElement('button');
-            btnImport.className = "ml-2 bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1 rounded text-sm font-medium flex items-center shadow-sm";
-            btnImport.innerHTML = '<i class="fas fa-file-import mr-2"></i> Importar .mpp';
-            btnImport.onclick = () => document.getElementById('file-upload').click();
-            toolbar.appendChild(btnImport);
-
-            // Hidden File Input
-            const fileInput = document.createElement('input');
-            fileInput.id = 'file-upload';
-            fileInput.type = 'file';
-            fileInput.accept = '.mpp,.xml';
-            fileInput.style.display = 'none';
-            fileInput.onchange = handleFileUpload;
-            toolbar.appendChild(fileInput);
-
             // --- 7. SEPARATOR ---
             toolbar.appendChild(createSeparator());
 
@@ -1109,6 +1093,9 @@
                 if (res.ok) {
                     alert('Importación exitosa. Recargando...');
                     window.location.reload();
+                } else if (res.status === 401) {
+                    alert('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+                    window.location.href = '/auth/login?next=' + encodeURIComponent(window.location.pathname);
                 } else {
                     const err = await res.json();
                     alert('Error: ' + (err.detail || 'Error desconocido'));
