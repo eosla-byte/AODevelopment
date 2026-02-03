@@ -985,11 +985,21 @@
                 styleObj.collapsed = task.collapsed;
                 styleObj.index = task.orderIndex; // Persist Sort Order
 
+                // SANITIZATION
+                let cleanProgress = parseFloat(task.progress);
+                if (isNaN(cleanProgress)) cleanProgress = 0;
+
+                let cleanStart = task.start;
+                if (cleanStart && cleanStart.includes('T')) cleanStart = cleanStart.split('T')[0];
+
+                let cleanEnd = task.end;
+                if (cleanEnd && cleanEnd.includes('T')) cleanEnd = cleanEnd.split('T')[0];
+
                 const payload = {
                     name: task.name,
-                    start: task.start,
-                    end: task.end,
-                    progress: task.progress, // mapped from pct
+                    start: cleanStart,
+                    end: cleanEnd,
+                    progress: cleanProgress,
                     contractor: task.contractor,
                     style: JSON.stringify(styleObj),
                     cell_styles: JSON.stringify(task.cellStyles || {}),
