@@ -373,12 +373,21 @@ def ensure_jvm_started():
     # DEDUPLICATE CLASSPATH
     classpath = list(set(classpath))
     
-    cp_args = "-Djava.class.path=" + os.pathsep.join(classpath)
-    print(f"DEBUG: JVM Final Classpath Args: {cp_args}")
+    # cp_args = "-Djava.class.path=" + os.pathsep.join(classpath)
+    # print(f"DEBUG: JVM Final Classpath Args: {cp_args}")
 
     try:
         # Check if startJVM accepts arguments list or just args
-        jpype.startJVM(jvm_path, cp_args, convertStrings=False)
+        # Use explicit classpath kwarg for robust handling
+        print(f"DEBUG: Starting JPype JVM with {len(classpath)} items in classpath")
+        jpype.startJVM(jvm_path, classpath=classpath, convertStrings=False)
+        
+        # Verify Classpath at Runtime
+        import jpype.imports
+        from java.lang import System
+        runtime_cp = System.getProperty("java.class.path")
+        print(f"DEBUG: Runtime JVM Classpath: {runtime_cp}")
+        
         return jvm_path
     except Exception as e:
         if "JVM is already started" in str(e):
@@ -390,6 +399,7 @@ def parse_mpp(content: bytes) -> dict:
     Parses .mpp file using MPXJ.
     """
     import jpype
+    import jpype.imports # CRITICAL for 'from net.sf...'
     import mpxj 
     import tempfile
     import os
