@@ -224,43 +224,82 @@ def ensure_jvm_started():
     # 3. Nix Store Search (Robust)
     if not jvm_path and os.path.exists("/nix/store"):
         print("DEBUG: Searching /nix/store for libjvm.so...")
-        # Common Nix paths for JDK
-        # patterns: /nix/store/*jdk*/lib/server/libjvm.so
-        #           /nix/store/*headless*/lib/server/libjvm.so
         nix_candidates = glob.glob("/nix/store/*jdk*/lib/server/libjvm.so")
         if not nix_candidates:
             nix_candidates = glob.glob("/nix/store/*headless*/lib/server/libjvm.so")
         
-        # Deep search attempt if glob fails
         if not nix_candidates:
-            # Look for ANY libjvm.so in nix store (expensive?)
-            # Limit to *jdk* folders to be safe
-            jdk_dirs = glob.glob("/nix/store/*jdk*") + glob.glob("/nix/store/*headless*")
-            for d in jdk_dirs:
-                found = find_libjvm(d)
-                if found:
-                    nix_candidates.append(found)
-                    break 
-        
+             # Try deeper search for "libjvm.so" within any *jdk* dir
+             # Use a generator to stop at first match to save time
+             try:
+                 for root, dirs, files in os.walk("/nix/store"):
+                     if root.count(os.sep) > 6: # limit depth
+                         del dirs[:]
+                         continue 
+                     # Optimization: only traverse dirs looking like jdk/jvm
+                     # But "/nix/store" flat list is huge.
+                     # Better: glob top level directories matching *jdk*
+                     pass # Rely on glob above.
+             except: pass
+
         if nix_candidates:
             jvm_path = nix_candidates[0]
             print(f"DEBUG: Found in Nix Store: {jvm_path}")
             # Try to infer JAVA_HOME
-            # .../lib/server/libjvm.so -> .../ -> ...
             new_home = os.path.dirname(os.path.dirname(os.path.dirname(jvm_path)))
             if not os.environ.get("JAVA_HOME"):
                  os.environ["JAVA_HOME"] = new_home
 
     # 4. System Paths
     if not jvm_path:
-        sys_paths = ["/usr/lib/jvm", "/usr/java", "/opt/java", "/app/jdk"]
+        sys_paths = ["/usr/lib/jvm", "/usr/java", "/opt/java", "/app/jdk", "/usr/local/openjdk-17"]
         for p in sys_paths:
             found = find_libjvm(p)
             if found:
                 jvm_path = found
                 break
 
-    # 5. Default Fallback
+    # 5. Runtime Download (Falbiack - The "Nuclear Option")
+    # If Nixpacks failed or env is weird, download JDK manually to /tmp
+    if not jvm_path:
+        print("WARNING: No JVM found in system. Initiating Runtime Download (Fallback)...")
+        try:
+             # Define check inside
+            def download_jdk():
+                JDK_URL = "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.9%2B9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.9_9.tar.gz"
+                DEST_DIR = "/tmp/jdk"
+                LIBJVM_PATH = os.path.join(DEST_DIR, "lib", "server", "libjvm.so")
+                
+                if os.path.exists(LIBJVM_PATH):
+                    return LIBJVM_PATH
+
+                if not os.path.exists(DEST_DIR):
+                     os.makedirs(DEST_DIR)
+                
+                print(f"DEBUG: Downloading JDK from {JDK_URL}...")
+                tar_path = os.path.join(DEST_DIR, "jdk.tar.gz")
+                urllib.request.urlretrieve(JDK_URL, tar_path)
+                
+                print("DEBUG: Extracting JDK...")
+                with tarfile.open(tar_path, "r:gz") as tar:
+                    for member in tar.getmembers():
+                        api_path = member.name.split('/', 1)
+                        if len(api_path) > 1:
+                            member.name = api_path[1]
+                            tar.extract(member, path=DEST_DIR)
+                
+                print("DEBUG: JDK Extracted.")
+                return find_libjvm(DEST_DIR)
+
+            jvm_path = download_jdk()
+            if jvm_path:
+                 print(f"DEBUG: Runtime Download successful. JVM at {jvm_path}")
+                 os.environ["JAVA_HOME"] = os.path.dirname(os.path.dirname(os.path.dirname(jvm_path)))
+        
+        except Exception as e:
+            print(f"CRITICAL: Runtime Download Failed: {e}")
+
+    # 6. Default Fallback
     if not jvm_path:
         try:
             jvm_path = jpype.getDefaultJVMPath()

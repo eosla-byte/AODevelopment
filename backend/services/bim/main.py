@@ -954,6 +954,9 @@ def debug_jvm():
     """Checks JVM status and Environment"""
     import os
     import shutil
+    import glob
+    
+    error_msg = None
     try:
         import jpype
         from schedule_parser import ensure_jvm_started
@@ -961,20 +964,27 @@ def debug_jvm():
         # Try to ensure it's started if not
         try:
             ensure_jvm_started()
-        except: pass
+        except Exception as e:
+            error_msg = str(e)
 
         jvm_started = jpype.isJVMStarted()
         java_home = os.environ.get("JAVA_HOME")
         path_java = shutil.which("java")
         
+        # Debug NIX
+        nix_jdks = glob.glob("/nix/store/*jdk*")[:5]
+        
         return {
             "jvm_started": jvm_started,
             "java_home": java_home,
             "java_binary": path_java,
-            "details": "JVM managed by ensure_jvm_started"
+            "details": "JVM managed by ensure_jvm_started",
+            "last_error": error_msg,
+            "path_env": os.environ.get("PATH"),
+            "nix_sample": nix_jdks
         }
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": str(e), "trace": "Outer Debug Level"}
 
 @app.get("/api/projects/{project_id}/activities")
 async def get_project_activities(project_id: str, versions: str = "", user = Depends(get_current_user)):
