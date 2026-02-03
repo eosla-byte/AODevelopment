@@ -107,7 +107,74 @@
             background: #f3f4f6;
         }
 
-        /* Cells */
+        /* CONTEXT MENU */
+        #context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            min-width: 150px;
+            border-radius: 4px;
+        }
+
+        #context-menu .item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #333;
+        }
+
+        #context-menu .item:hover {
+            background-color: #f0f0f0;
+        }
+
+        #context-menu .separator {
+            border-top: 1px solid #eee;
+            margin: 4px 0;
+        }
+
+        /* COMMENTS MODAL */
+        .comment-bubble {
+            background: #f3f4f6;
+            border-radius: 12px;
+            padding: 10px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            position: relative;
+        }
+
+        .comment-bubble.me {
+            background: #dbeafe;
+            /* Blue tint */
+            margin-left: 20px;
+        }
+
+        .comment-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .comment-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 8px;
+            object-fit: cover;
+        }
+
+        .attachment-preview {
+            display: inline-block;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        /* SCROLL BARS */
         td {
             height: var(--row-height);
             border-bottom: var(--grid-border);
@@ -290,7 +357,8 @@
             isSummary: false, // Calculated later
             childrenIds: [],
             parentId: null,
-            orderIndex: i
+            orderIndex: i,
+            comments: t.comments ? JSON.parse(t.comments) : [] // Parse comments from string
         }));
 
         // Init Look Ahead defaults (Today)
@@ -330,7 +398,12 @@
             // --- 3. LOOK AHEAD ---
             const lbl = document.createElement('span');
             lbl.innerText = "Look Ahead:";
-            lbl.className = "font-semibold text-gray-600 mr-2";
+            lbl.className = "font-semibold text-gray-600 mr-2 cursor-pointer select-none border-b border-transparent hover:border-gray-400";
+            lbl.title = "Click to Toggle visibility";
+            lbl.onclick = () => {
+                State.showLookAhead = !State.showLookAhead;
+                render();
+            };
             toolbar.appendChild(lbl);
 
             const dateInput = document.createElement('input');
@@ -339,7 +412,7 @@
             dateInput.value = State.lookAheadStart.toISOString().split('T')[0];
             dateInput.onchange = (e) => {
                 State.lookAheadStart = new Date(e.target.value);
-                State.showLookAhead = true;
+                // State.showLookAhead = true; // Don't auto-force if user toggled off? Or yes? User asked for toggle.
                 render();
             };
             toolbar.appendChild(dateInput);
@@ -808,7 +881,8 @@
                     // It seems to be generic. Let's send generic JSON object if Pydantic supports it, or string.
                     // Main.py line 782: style: Optional[str] = None
                     // It expects STRING. So JSON.stringify is correct.
-                    cell_styles: JSON.stringify(task.cellStyles || {}) // New: Cell-specific styles
+                    cell_styles: JSON.stringify(task.cellStyles || {}), // New: Cell-specific styles
+                    comments: JSON.stringify(task.comments || []) // New: Comments
                 };
 
                 try {
@@ -1316,24 +1390,7 @@
             const task = State.tasks.find(t => t.id === taskId);
 
             if (task) {
-                // Reuse updateTaskValue logic?
-                if (colId === 'duration') {
-                    const days = parseInt(val) || 0;
-                    if (task.start && days > 0) {
-                        const d = new Date(task.start);
-                        d.setDate(d.getDate() + days);
-                        task.end = d.toISOString().split('T')[0];
-                        triggerAutoSave(task.id);
-                        HierarchyEngine.recalculate(State.tasks);
-                    }
-                } else if (colId === 'start' || colId === 'end') {
-                    task[colId] = val;
-                    triggerAutoSave(task.id);
-                    HierarchyEngine.recalculate(State.tasks);
-                } else {
-                    task[colId] = val;
-                    triggerAutoSave(task.id);
-                }
+                updateTaskValue(task, colId, val);
             }
         }
 
@@ -1349,6 +1406,34 @@
             }
             State.lastSelectedId = task.id;
             render();
+        }
+
+        // --- Helper for updating task ---
+        function updateTaskValue(task, colId, newVal) {
+            if (colId === 'duration') {
+                const days = parseInt(newVal) || 0;
+                if (task.start && days > 0) {
+                    const d = new Date(task.start);
+                    d.setDate(d.getDate() + days);
+                    task.end = d.toISOString().split('T')[0];
+                    triggerAutoSave(task.id);
+                    HierarchyEngine.recalculate(State.tasks);
+                    render();
+                }
+            } else if (colId === 'start') {
+                task.start = newVal;
+                triggerAutoSave(task.id);
+                HierarchyEngine.recalculate(State.tasks);
+                render();
+            } else if (colId === 'end') {
+                task.end = newVal;
+                triggerAutoSave(task.id);
+                HierarchyEngine.recalculate(State.tasks);
+                render();
+            } else {
+                task[colId] = newVal;
+                triggerAutoSave(task.id);
+            }
         }
 
         // --- RENDERERS ---
@@ -1633,6 +1718,8 @@
                 }
 
                 const tr = document.createElement('tr');
+                tr.setAttribute('data-row-index', task.orderIndex); // For context menu
+
                 // Row selection deprecated in favor of cell selection?
                 // Or keep row selection visual if "Selecting Row Header"? 
                 // For now transparency
@@ -1754,34 +1841,6 @@
                     leftOffset += col.width;
                 });
 
-                // --- Helper for updating task ---
-                function updateTaskValue(task, colId, newVal) {
-                    if (colId === 'duration') {
-                        const days = parseInt(newVal) || 0;
-                        if (task.start && days > 0) {
-                            const d = new Date(task.start);
-                            d.setDate(d.getDate() + days);
-                            task.end = d.toISOString().split('T')[0];
-                            triggerAutoSave(task.id);
-                            HierarchyEngine.recalculate(State.tasks);
-                            render();
-                        }
-                    } else if (colId === 'start') {
-                        task.start = newVal;
-                        triggerAutoSave(task.id);
-                        HierarchyEngine.recalculate(State.tasks);
-                        render();
-                    } else if (colId === 'end') {
-                        task.end = newVal;
-                        triggerAutoSave(task.id);
-                        HierarchyEngine.recalculate(State.tasks);
-                        render();
-                    } else {
-                        task[colId] = newVal;
-                        triggerAutoSave(task.id);
-                    }
-                }
-
                 const ganttTd = document.createElement('td');
                 ganttTd.className = 'gantt-cell';
                 const barSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1794,6 +1853,8 @@
                     const w = timeToX(task.end) - x;
 
                     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                    g.classList.add('gantt-bar-group'); // Add class for context menu
+                    g.setAttribute('data-id', task.id); // Add data-id for context menu
 
                     let barH = 20;
                     let barY = 6;
@@ -1830,11 +1891,6 @@
                         // Revised: 
                         // Background = light gray/blue standard (or very light version of company color if we want to be fancy)
                         // Progress = Company Color.
-
-                        // Let's stick to requested "Agrega los botones... por ejemplo el de empresas y sus colores".
-                        // If I change the progress color, it overrides the 'dark blue' for progress.
-                        // Let's update the PROGRESS bar color to be the company color.
-                        // And Background to be a default pale, or matching pale.
 
                         // Simple: Background #dbeafe (default). 
                         // Progress uses Company Color if exists, else #3b82f6.
@@ -1894,20 +1950,288 @@
             const startX = e.clientX;
             const startW = col.width;
 
-            const onMove = (mv) => {
-                col.width = Math.max(30, startW + (mv.clientX - startX));
-                render();
-            };
+            function onMove(me) {
+                const diff = me.clientX - startX;
+                col.width = Math.max(20, startW + diff);
+                render(); // Re-render headers & rows
+            }
 
-            const onUp = () => {
+            function onUp() {
                 document.removeEventListener('mousemove', onMove);
                 document.removeEventListener('mouseup', onUp);
-            };
+            }
 
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
         }
 
+        // --- CONTEXT MENU LOGIC ---
+        let contextMenuTarget = null; // { task, type: 'row'|'bar' }
+
+        document.addEventListener('contextmenu', (e) => {
+            // Check if inside Grid Row or Gantt Bar
+            const row = e.target.closest('tr');
+            const bar = e.target.closest('.gantt-bar-group');
+
+            if (!row && !bar) {
+                hideContextMenu();
+                return;
+            }
+
+            e.preventDefault();
+
+            let task = null;
+            if (row) {
+                const idx = row.getAttribute('data-row-index');
+                if (idx) task = State.tasks[parseInt(idx)];
+            } else if (bar) {
+                const id = bar.getAttribute('data-id');
+                task = State.tasks.find(t => t.id === id);
+            }
+
+            if (task) {
+                contextMenuTarget = task;
+                showContextMenu(e.clientX, e.clientY);
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('#context-menu')) return;
+            hideContextMenu();
+        });
+
+        function showContextMenu(x, y) {
+            let menu = document.getElementById('context-menu');
+            if (!menu) {
+                menu = document.createElement('div');
+                menu.id = 'context-menu';
+                document.body.appendChild(menu);
+            }
+
+            menu.innerHTML = `
+                <div class="item" onclick="triggerAssignCompany()"><i class="fas fa-building mr-2"></i> Asignar Empresa</div>
+                <div class="item" onclick="triggerAddComment()"><i class="fas fa-comment mr-2"></i> Agregar Comentario</div>
+                <div class="separator"></div>
+                <div class="item" onclick="State.activeCell={taskId:contextMenuTarget.id, colId:'duration'}; enterEditMode(); hideContextMenu();"><i class="fas fa-edit mr-2"></i> Editar Duración</div>
+            `;
+
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+            menu.style.display = 'block';
+        }
+
+        function hideContextMenu() {
+            const menu = document.getElementById('context-menu');
+            if (menu) menu.style.display = 'none';
+        }
+
+        // --- ACTIONS ---
+        function triggerAssignCompany() {
+            hideContextMenu();
+            if (!contextMenuTarget) return;
+            // Use existing openCompanyModal but pre-select? 
+            // Or just open generic? User said "click derecho... aparezca la opcion asignar empresa"
+            // Currently openCompanyModal manages 'Active Companies' globally usually? 
+            // Or does it assign to task? 
+            // Looking at code... openCompanyModal seems to manage a global list of companies.
+            // But we probably want to assign the 'contractor' field of the task.
+
+            // Quick Fix: Open prompt or specific modal for Task Contractor
+            const companies = Object.keys(State.companyColors);
+            // Simple Prompt for now, or reuse modal if adaptable.
+            // We can update the 'contractor' field.
+
+            // Let's reuse the Company Modal but maybe highlight that we are assigning to THIS task?
+            // Actually, the main Company Modal (from toolbar) manages "Available Companies".
+            // Assigning to a task usually means setting task.contractor = "LOBOS".
+
+            // Let's create a mini selector or use prompt
+            // const comp = prompt("Asignar Empresa (existente o nueva):", contextMenuTarget.contractor || "");
+            // if(comp !== null) {
+            //    updateTaskValue(contextMenuTarget, 'contractor', comp);
+            // }
+
+            // Better: Show a small dialog with buttons of existing companies
+            openTaskCompanyPicker(contextMenuTarget);
+        }
+
+        function openTaskCompanyPicker(task) {
+            const existing = Object.keys(State.companyColors);
+            const dialog = document.createElement('dialog');
+            dialog.className = "bg-white p-4 rounded shadow-lg border border-gray-200";
+            dialog.style.position = "fixed";
+            dialog.style.top = "50%";
+            dialog.style.left = "50%";
+            dialog.style.transform = "translate(-50%, -50%)";
+
+            let html = `<h3 class="font-bold mb-2">Asignar Empresa</h3><div class="flex flex-col gap-2">`;
+            existing.forEach(c => {
+                html += `<button class="p-2 border rounded hover:bg-gray-100 text-left" onclick="selectComp('${c}')">
+                             <span class="w-3 h-3 inline-block rounded-full px-2" style="background:${State.companyColors[c]}"></span> ${c}
+                          </button>`;
+            });
+            html += `<button class="p-2 border rounded hover:bg-gray-100 text-left text-blue-600" onclick="const n=prompt('Nueva Empresa'); if(n) selectComp(n);">+ Nueva</button>`;
+            html += `</div><button class="mt-4 text-xs text-gray-500" onclick="this.closest('dialog').remove()">Cancelar</button>`;
+
+            dialog.innerHTML = html;
+            document.body.appendChild(dialog);
+            dialog.showModal();
+
+            window.selectComp = (c) => {
+                updateTaskValue(task, 'contractor', c);
+                // Ensure color exists
+                if (!State.companyColors[c]) {
+                    // Assign random color
+                    State.companyColors[c] = '#' + Math.floor(Math.random() * 16777215).toString(16);
+                }
+                dialog.close();
+                dialog.remove();
+            }
+        }
+
+        function triggerAddComment() {
+            hideContextMenu();
+            if (!contextMenuTarget) return;
+            openCommentsModal(contextMenuTarget);
+        }
+
+        // --- COMMENTS MODAL ---
+        function openCommentsModal(task) {
+            let modal = document.getElementById('comments-modal');
+            if (modal) modal.remove();
+
+            modal = document.createElement('div');
+            modal.id = 'comments-modal';
+            modal.className = "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000]";
+
+            const comments = task.comments || [];
+
+            modal.innerHTML = `
+                 <div class="bg-white w-[500px] h-[600px] rounded-lg shadow-xl flex flex-col">
+                     <div class="flex justify-between items-center p-4 border-b">
+                         <h3 class="font-bold text-lg">Comentarios: ${task.name}</h3>
+                         <button onclick="document.getElementById('comments-modal').remove()" class="text-gray-500 hover:text-black">&times;</button>
+                     </div>
+                     <div class="flex-1 overflow-y-auto p-4" id="comments-list">
+                         ${renderCommentsList(comments)}
+                     </div>
+                     <div class="p-4 border-t bg-gray-50">
+                         <textarea id="comment-input" class="w-full border rounded p-2 text-sm mb-2" rows="3" placeholder="Escribe un comentario..."></textarea>
+                         <div class="flex justify-between items-center">
+                             <input type="file" id="comment-file" class="text-xs" accept=".pdf,.png,.jpg,.jpeg">
+                             <button onclick="submitComment('${task.id}')" class="bg-blue-600 text-white px-4 py-1 rounded text-sm">Enviar</button>
+                         </div>
+                     </div>
+                 </div>
+             `;
+            document.body.appendChild(modal);
+
+            // Scroll to bottom
+            const list = document.getElementById('comments-list');
+            list.scrollTop = list.scrollHeight;
+        }
+
+        function renderCommentsList(comments) {
+            if (!comments || comments.length === 0) return '<div class="text-gray-400 text-center mt-10">No hay comentarios aún.</div>';
+
+            return comments.map(c => `
+                <div class="comment-bubble ${c.userId === '{{ user.id }}' ? 'me' : ''}">
+                    <div class="comment-header">
+                        <img src="${c.userAvatar || 'https://ui-avatars.com/api/?name=' + (c.userName || 'User')}" class="comment-avatar">
+                        <div>
+                            <span class="font-bold text-xs">${c.userName || 'Usuario'}</span>
+                            <span class="text-xs text-gray-500 ml-2">${new Date(c.timestamp).toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-800">${c.text}</div>
+                    ${c.attachments && c.attachments.length > 0 ? `
+                        <div class="mt-2">
+                             ${c.attachments.map(a => `
+                                 <div class="attachment-preview" onclick="openAttachment('${a.url}')" ondblclick="window.open('${a.url}', '_blank')">
+                                     <i class="fas fa-paperclip text-gray-500"></i> <span class="text-xs">${a.name}</span>
+                                 </div>
+                             `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        window.submitComment = async (taskId) => {
+            const input = document.getElementById('comment-input');
+            const fileInput = document.getElementById('comment-file');
+            const text = input.value.trim();
+            const file = fileInput.files[0];
+
+            if (!text && !file) return;
+
+            const task = State.tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            if (!task.comments) task.comments = [];
+
+            // Upload File first if exists (mock upload for now or real if endpoint exists)
+            // We have /api/projects/{id}/schedule, but not general upload.
+            // Requirement said "adjuntar pdf, png". I should assume we store as DataURI or implement upload.
+            // Using DataURI is easiest for "Visual" requirement without heavy backend change, but bad for performance.
+            // Better: use a mock URL or just store name if waiting for backend implementation.
+            // Actually, I can use the same file input to read as DataURL to show preview immediately.
+
+            let attachments = [];
+            if (file) {
+                // Read as DataURL for demo persistence in JSON
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    attachments.push({
+                        name: file.name,
+                        type: file.type,
+                        url: e.target.result // Storing base64 in JSON (Heavy but self-contained)
+                    });
+                    finishSubmit();
+                };
+                reader.readAsDataURL(file);
+            } else {
+                finishSubmit();
+            }
+
+            function finishSubmit() {
+                const newComment = {
+                    id: Date.now().toString(),
+                    userId: '{{ user.id }}' || 'guest', // Jinja inject
+                    userName: '{{ user_name }}' || 'Invitado',
+                    userAvatar: null, // UI Avatars fallback
+                    text: text,
+                    timestamp: new Date().toISOString(),
+                    attachments: attachments
+                };
+
+                task.comments.push(newComment);
+                triggerAutoSave(task.id);
+
+                // Refresh Modal
+                const list = document.getElementById('comments-list');
+                list.innerHTML = renderCommentsList(task.comments);
+                list.scrollTop = list.scrollHeight;
+                input.value = '';
+                fileInput.value = '';
+            }
+        };
+
+        window.openAttachment = (url) => {
+            // Preview Modal
+            let p = document.createElement('div');
+            p.className = "fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[2100]";
+            p.onclick = () => p.remove();
+
+            if (url.startsWith('data:image')) {
+                p.innerHTML = `<img src="${url}" class="max-w-[90%] max-h-[90%] rounded shadow-lg">`;
+            } else {
+                p.innerHTML = `<div class="bg-white p-8 rounded">Is PDF/Doc. <a href="${url}" target="_blank" class="text-blue-600 underline">Click to Open</a></div>`;
+            }
+            document.body.appendChild(p);
+        };
+
+        // --- RENDER HEADER UPDATE ---
         window.AO = {
             Gantt: {
                 zoomIn: () => { State.pxPerMin *= 1.2; render(); },

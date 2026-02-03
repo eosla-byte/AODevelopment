@@ -368,6 +368,14 @@ class BimActivity(Base):
     duration = Column(Float)
     pct_complete = Column(Float, default=0.0)
     
+    # Visuals & Meta
+    style = Column(String) # JSON or String for simple style? Main.py treats as string.
+    contractor = Column(String)
+    predecessors = Column(String)
+    
+    # Social Comments: [{id, userId, text, timestamp, attachments:[]}]
+    comments = Column(JSON, default=[])
+    
     # Hierarchy
     parent_wbs = Column(String)
     
