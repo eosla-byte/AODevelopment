@@ -361,6 +361,13 @@
             comments: (typeof t.comments === 'string' ? JSON.parse(t.comments) : (t.comments || []))
         }));
 
+        // Init Company Colors
+        State.tasks.forEach(t => {
+            if (t.contractor && !State.companyColors[t.contractor]) {
+                State.companyColors[t.contractor] = '#' + Math.floor(Math.random() * 16777215).toString(16);
+            }
+        });
+
         // Init Look Ahead defaults (Today)
         const today = new Date();
         State.lookAheadStart = new Date(today);
@@ -2232,12 +2239,36 @@
         };
 
         // --- RENDER HEADER UPDATE ---
+        // --- GLOBAL EXPORTS ---
+        window.triggerAssignCompany = triggerAssignCompany;
+        window.triggerAddComment = triggerAddComment;
+        window.enterEditMode = enterEditMode;
+        window.hideContextMenu = hideContextMenu;
+
         window.AO = {
             Gantt: {
-                zoomIn: () => { State.pxPerMin *= 1.2; render(); },
-                zoomOut: () => { State.pxPerMin *= 0.8; render(); }
+                zoomIn: () => {
+                    if (State.zoom === 'MONTH') State.zoom = 'WEEK';
+                    else if (State.zoom === 'WEEK') State.zoom = 'DAY';
+                    const lbl = document.getElementById('zoom-label');
+                    if (lbl) lbl.innerText = State.zoom;
+                    render();
+                },
+                zoomOut: () => {
+                    if (State.zoom === 'DAY') State.zoom = 'WEEK';
+                    else if (State.zoom === 'WEEK') State.zoom = 'MONTH';
+                    const lbl = document.getElementById('zoom-label');
+                    if (lbl) lbl.innerText = State.zoom;
+                    render();
+                }
             }
         };
+
+        // Double Click to Edit
+        document.addEventListener('dblclick', (e) => {
+            if (!e.target.closest('#main-table')) return;
+            enterEditMode();
+        });
 
         function getRandomColor() {
             const letters = '0123456789ABCDEF';
