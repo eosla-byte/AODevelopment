@@ -329,6 +329,7 @@ class BimProject(Base):
     name = Column(String, nullable=False)
     description = Column(Text)
     status = Column(String, default="Active")
+    settings = Column(JSON, default={}) # Project settings (e.g. valid companies, colors)
     created_at = Column(DateTime, default=func.now())
     
     organization = relationship("BimOrganization", back_populates="projects")
@@ -373,6 +374,7 @@ class BimActivity(Base):
     predecessors = Column(String) # JSON or String "1,2,3"
     display_order = Column(Integer, default=0) # For manual row reordering
     style = Column(String) # JSON: {"font": "Calibri", "fontSize": 11, "bold": true, "fill": "#ffff00", "color": "#ff0000"}
+    cell_styles = Column(JSON, default={}) # New: {"colId": {"backgroundColor": "red"}}
     comments = Column(JSON, default=[]) # Log of delays/notes
     # Force Rebuild Check 2
     

@@ -321,6 +321,7 @@
             lookAheadWeeks: 3,
             showLookAhead: false,
             companyColors: {},
+            projectSettings: {},
             // Formatting & AutoSave
             autoSaveTimer: null,
             dirtyTasks: new Set(),
@@ -350,6 +351,12 @@
         }
 
         // Post-process server tasks
+        const projectSettings = {{ project.settings | tojson | safe }} || {};
+        State.projectSettings = projectSettings;
+        if (projectSettings.companyColors) {
+            State.companyColors = projectSettings.companyColors;
+        }
+
         State.tasks = serverTasks.map((t, i) => {
             const parsedStyle = (typeof t.style === 'string' ? JSON.parse(t.style) : (t.style || {}));
             return {
@@ -369,6 +376,7 @@
         State.tasks.forEach(t => {
             if (t.contractor && !State.companyColors[t.contractor]) {
                 State.companyColors[t.contractor] = '#' + Math.floor(Math.random() * 16777215).toString(16);
+                saveProjectSettings(); // Save new discovered colors
             }
         });
 
@@ -825,6 +833,29 @@
             }
         };
 
+        // --- DOUBLE CLICK TO EDIT ---
+        document.getElementById('main-table').addEventListener('dblclick', (e) => {
+            // Find cell
+            const td = e.target.closest('td');
+            if (!td) return;
+
+            // Extract task/col
+            const tr = td.parentElement;
+            const taskId = tr.getAttribute('data-task-id');
+
+            // Col Index?
+            const children = Array.from(tr.children);
+            const colIndex = children.indexOf(td);
+
+            if (taskId && colIndex >= 0) {
+                const col = Config.columns[colIndex];
+                if (col && col.editable) {
+                    State.activeCell = { taskId, colId: col.id };
+                    enterEditMode();
+                }
+            }
+        });
+
         document.addEventListener('mouseup', () => GridController.handleMouseUp());
 
         // --- OLD FORMATTING LOGIC (MIGRATED ABOVE) ---
@@ -859,6 +890,25 @@
 
             if (State.autoSaveTimer) clearTimeout(State.autoSaveTimer);
             State.autoSaveTimer = setTimeout(saveDirtyTasks, 1500); // 1.5s debounce
+        }
+
+        async function saveProjectSettings() {
+            const payload = {
+                settings: {
+                    companyColors: State.companyColors
+                }
+            };
+
+            try {
+                const res = await fetch(`/api/projects/{{ project.id }}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (!res.ok) console.error("Failed to save settings");
+            } catch (e) {
+                console.error("Error saving settings", e);
+            }
         }
 
         async function saveDirtyTasks() {
@@ -904,7 +954,7 @@
                     if (!res.ok) {
                         const errText = await res.text();
                         console.error("Save Failed for", id, res.status, errText);
-                        alert(`Error guardando tarea: ${res.status} - ${errText}`);
+                        // alert(`Error guardando tarea: ${res.status} - ${errText}`); // Suppress alert for smooth UX
                         State.dirtyTasks.add(id); // Re-add
                     }
                 } catch (e) {
@@ -922,7 +972,7 @@
                     status.classList.remove('text-orange-400');
                     status.classList.add('text-green-500');
                 } else {
-                    status.innerText = "Error - Reintentando...";
+                    status.innerText = "Reintentando...";
                     status.classList.add('text-red-500');
                 }
             }
@@ -1051,6 +1101,7 @@
                     colorInput.value = State.companyColors[c];
                     colorInput.onchange = (e) => {
                         State.companyColors[c] = e.target.value;
+                        saveProjectSettings(); // Save change
                         render(); // Re-render Gantt to update bars
                     };
 

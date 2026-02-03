@@ -97,10 +97,18 @@ def ensure_schema_updates():
                      
                      if "comments" not in columns:
                          print("Adding 'comments' column...")
-                         # Use generic JSON, PG/SQLite compatible syntax (mostly)
-                         # Explicitly casting for PG if needed, but 'JSON' usually maps fine in Alchemy
-                         # Pure SQL:
                          conn.execute(text("ALTER TABLE bim_activities ADD COLUMN comments JSON DEFAULT '[]'"))
+
+                     if "cell_styles" not in columns:
+                         print("Adding 'cell_styles' column...")
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN cell_styles JSON DEFAULT '{}'"))
+
+                     # Check BimProjects for 'settings'
+                     if insp.has_table("bim_projects"):
+                         proj_cols = [c['name'] for c in insp.get_columns("bim_projects")]
+                         if "settings" not in proj_cols:
+                             print("Adding 'settings' column to bim_projects...")
+                             conn.execute(text("ALTER TABLE bim_projects ADD COLUMN settings JSON DEFAULT '{}'"))
 
                      trans.commit()
                      print("Schema Check Completed.")
@@ -147,7 +155,11 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "dependencies": act.predecessors or "",
                 "custom_class": f"version-{act.version_id}", # Hook for styling if needed
                 "contractor": act.contractor or "N/A",
-                "style": style_val
+                "style": style_val,
+                "cell_styles": getattr(act, 'cell_styles', {}) or {},
+                "comments": getattr(act, 'comments', []) or [],
+                "wbs": getattr(act, 'wbs_code', "") or "",
+                "level": (len(getattr(act, 'wbs_code', "").split('.')) - 1) if getattr(act, 'wbs_code') else 0
             })
             
         return tasks_json
@@ -662,6 +674,7 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                     "dependencies": getattr(act, 'predecessors', "") or "",
                     "contractor": getattr(act, 'contractor', "") or "",
                     "style": getattr(act, 'style', None),
+                    "cell_styles": getattr(act, 'cell_styles', {}),
                     "comments": getattr(act, 'comments', []) or [],
                     "wbs": getattr(act, 'wbs_code', "") or "",
                     "level": (len(getattr(act, 'wbs_code', "").split('.')) - 1) if getattr(act, 'wbs_code') else 0
@@ -848,6 +861,7 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "custom_class": f"version-{act.version_id}", # Hook for styling if needed
                 "contractor": getattr(act, 'contractor', "N/A") or "N/A",
                 "style": getattr(act, 'style', None),
+                "cell_styles": getattr(act, 'cell_styles', {}) or {},
                 "comments": getattr(act, 'comments', []) or [],
                 "display_order": getattr(act, 'display_order', 0) or 0
             })
@@ -866,6 +880,10 @@ class ActivityUpdateRequest(pydantic.BaseModel):
     predecessors: Optional[str] = None
     comments: Optional[List[dict]] = None
     display_order: Optional[int] = None
+    cell_styles: Optional[str] = None # JSON string or Dict
+    
+class ProjectSettingsRequest(pydantic.BaseModel):
+    settings: dict
 
 @app.put("/api/activities/{activity_id}")
 async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = Depends(get_current_user)):
@@ -905,12 +923,50 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
         if data.predecessors is not None: act.predecessors = data.predecessors
         if data.comments is not None: act.comments = data.comments
         if data.display_order is not None: act.display_order = data.display_order
+        if data.cell_styles is not None:
+             try:
+                 # Accept string or dict
+                 if isinstance(data.cell_styles, str):
+                      import json
+                      act.cell_styles = json.loads(data.cell_styles)
+                 else:
+                      act.cell_styles = data.cell_styles
+             except:
+                 pass
             
         db.commit()
         return {"status": "ok"}
     except Exception as e:
         db.rollback()
         print(f"Update error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.patch("/api/projects/{project_id}")
+async def update_project_settings(project_id: str, data: ProjectSettingsRequest, user = Depends(get_current_user)):
+    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    db = SessionExt()
+    try:
+        project = db.query(BimProject).filter(BimProject.id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+            
+        # Update Settings
+        # Merge or Replace? Let's Merge.
+        current_settings = project.settings or {}
+        current_settings.update(data.settings)
+        project.settings = current_settings
+        
+        # Force update flag if needed (SQLAlchemy JSON tracking)
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(project, "settings")
+        
+        db.commit()
+        return {"status": "ok", "settings": project.settings}
+    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
