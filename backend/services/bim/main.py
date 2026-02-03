@@ -99,6 +99,11 @@ def ensure_schema_updates():
                          print("Adding 'comments' column...")
                          conn.execute(text("ALTER TABLE bim_activities ADD COLUMN comments JSON DEFAULT '[]'"))
 
+                     if "display_order" not in columns:
+                         print("Adding 'display_order' column...")
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN display_order INTEGER DEFAULT 0"))
+
+
                      if "cell_styles" not in columns:
                          print("Adding 'cell_styles' column...")
                          conn.execute(text("ALTER TABLE bim_activities ADD COLUMN cell_styles JSON DEFAULT '{}'"))
@@ -652,7 +657,7 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
         
         tasks_json = []
         if latest_version:
-            activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).order_by(BimActivity.display_order.asc(), BimActivity.id.asc()).all()
+            activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).order_by(text("display_order ASC"), text("id ASC")).all()
             for act in activities:
                 # Format for Frappe Gantt
                 # {id: "Task 1", name: "Redesign website", start: "2016-12-28", end: "2016-12-31", progress: 20, dependencies: "Task 2, Task 3"}
@@ -873,7 +878,8 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
             else:
                 return []
 
-        activities = db.query(BimActivity).filter(BimActivity.version_id.in_(version_ids)).all()
+        # Fix: Use text() sort to avoid AttributeError on stale models
+        activities = db.query(BimActivity).filter(BimActivity.version_id.in_(version_ids)).order_by(text("display_order ASC"), text("id ASC")).all()
         
         tasks_json = []
         for act in activities:
