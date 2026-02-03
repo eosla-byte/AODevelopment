@@ -897,7 +897,6 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
         count = 0
         for act in schedule_data['activities']:
             try:
-            try:
                 # Primary Attempt: Include all fields
                 new_act = BimActivity(
                     version_id=new_version.id,
