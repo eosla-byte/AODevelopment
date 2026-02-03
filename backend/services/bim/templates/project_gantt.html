@@ -360,8 +360,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             console.log("AO Gantt: Starting...");
             try {
-                const serverTasks = {{ tasks | tojson | safe
-            }};
+                const serverTasks = {{ tasks | tojson | safe }};
         console.log("AO Gantt: Tasks loaded:", serverTasks ? serverTasks.length : 0);
 
         if (!serverTasks || !Array.isArray(serverTasks)) {
