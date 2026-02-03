@@ -259,11 +259,18 @@
     <div id="app">
         <!-- TOOLBAR -->
         <div id="toolbar">
-            <h1 class="font-bold mr-4">{{ project.name }}</h1>
-            <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomOut()"><i
-                    class="fas fa-minus"></i></button>
-            <span id="zoom-label" class="w-16 text-center font-mono text-xs">WEEK</span>
-            <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomIn()"><i
+            <div class="flex items-center space-x-2">
+                <button onclick="openImportModal()"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm flex items-center shadow-sm transition">
+                    <i class="fas fa-file-import mr-2"></i> Importar .mpp
+                </button>
+                <button onclick="forceSaveAll()"
+                    class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm flex items-center shadow-sm transition font-bold"
+                    id="btn-save-all">
+                    <i class="fas fa-save mr-2"></i> Guardar Todo
+                </button>
+                <div id="save-status" class="text-xs text-gray-500 font-medium w-24 text-right">Sincronizado</div>
+            </div> <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomIn()"><i
                     class="fas fa-plus"></i></button>
         </div>
 
@@ -946,7 +953,9 @@
                 };
 
                 try {
-                    const res = await fetch(`/api/activities/${id}`, {
+                    // FIX: Use server_id (Unique DB ID) if available, else id
+                    const targetId = task.server_id ? task.server_id : id;
+                    const res = await fetch(`/api/activities/${targetId}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -983,6 +992,29 @@
             const sep = document.createElement('div');
             sep.style.width = '1px'; sep.style.height = '24px'; sep.style.background = '#e5e7eb'; sep.style.margin = '0 10px';
             return sep;
+        }
+        }
+
+        async function forceSaveAll() {
+            const btn = document.getElementById('btn-save-all');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Guardando...';
+            btn.disabled = true;
+
+            // 1. Mark ALL tasks as dirty
+            State.tasks.forEach(t => State.dirtyTasks.add(t.id));
+
+            // 2. Save Settings
+            await saveProjectSettings();
+
+            // 3. Save Tasks
+            await saveDirtyTasks();
+
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                alert("Guardado completo.");
+            }, 500);
         }
 
         // --- IMPORT LOGIC ---

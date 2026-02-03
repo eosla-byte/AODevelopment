@@ -667,6 +667,7 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                 
                 tasks_json.append({
                     "id": str(act.activity_id) if act.activity_id else str(act.id),
+                    "server_id": str(act.id), # UNIQUE DB ID
                     "name": act.name,
                     "start": start_str,
                     "end": end_str,
@@ -859,8 +860,9 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
              # For now keep simple.
              
              tasks_json.append({
-                "id": str(act.id), # Fix: Use Primary Key to ensure we update THIS version's task
-                "activity_id": act.activity_id, # Keep ref
+                "id": str(act.activity_id) if act.activity_id else str(act.id), # Keep for Gantt Dependencies (P6 ID)
+                "server_id": str(act.id), # UNIQUE DB ID for Updates
+                "activity_id": act.activity_id, 
                 "name": name_display,
                 "start": start_str,
                 "end": end_str,
