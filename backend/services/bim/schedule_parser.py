@@ -403,23 +403,59 @@ def parse_mpp(content: bytes) -> dict:
     import mpxj 
     import tempfile
     import os
+    import zipfile # Added for JAR inspection
 
-    # Ensure JVM
+    # Ensure JVM and get classpath used
     ensure_jvm_started()
-
-
-    # 2. Import Java Classes via JPype
+    
+    # DEBUG: Inspect MPXJ Jar content to confirm package structure
     try:
-        from org.mpxj.reader import UniversalProjectReader
-        # from java.io import File # Not strictly needed with MPXJ string path support?
-    except ImportError:
-         print("Failed to import org.mpxj packages. Check JPype/MPXJ version.")
-         # Fallback or error?
-         # If using ancient mpxj, it might be net.sf.mpxj
-         try:
-             from net.sf.mpxj.reader import UniversalProjectReader
-         except:
-             raise ImportError("Could not find UniversalProjectReader in org.mpxj or net.sf.mpxj")
+        import mpxj
+        import zipfile
+        mpxj_dir = os.path.dirname(mpxj.__file__)
+        # Find the main mpxj.jar
+        jar_path = None
+        for root, dirs, files in os.walk(mpxj_dir):
+            for f in files:
+                if f.lower() == "mpxj.jar":
+                    jar_path = os.path.join(root, f)
+                    break
+            if jar_path: break
+            
+        if jar_path:
+             print(f"DEBUG: Inspecting {jar_path} content...")
+             with zipfile.ZipFile(jar_path, 'r') as jar:
+                 # Check for known classes
+                 names = jar.namelist()
+                 reader_class = "net/sf/mpxj/reader/UniversalProjectReader.class"
+                 org_reader = "org/mpxj/reader/UniversalProjectReader.class"
+                 
+                 if reader_class in names:
+                     print(f"DEBUG: Found {reader_class} in JAR.")
+                 elif org_reader in names:
+                     print(f"DEBUG: Found {org_reader} in JAR. Package is ORG!")
+                 else:
+                     print("DEBUG: UniversalProjectReader NOT found in expected paths. Dumping first 10 classes:")
+                     for n in names[:10]: print(f"  - {n}")
+    except Exception as e:
+        print(f"DEBUG: JAR Inspection failed: {e}")
+
+    # 2. Import Java Classes via JPype (JClass is more robust than implicit imports)
+    UniversalProjectReader = None
+    
+    # Try net.sf.mpxj (Classic)
+    try:
+        print("DEBUG: Attempting JClass('net.sf.mpxj.reader.UniversalProjectReader')")
+        UniversalProjectReader = jpype.JClass("net.sf.mpxj.reader.UniversalProjectReader")
+    except Exception as e1:
+        print(f"DEBUG: Failed net.sf: {e1}")
+        # Try org.mpxj (Modern?)
+        try:
+             print("DEBUG: Attempting JClass('org.mpxj.reader.UniversalProjectReader')")
+             UniversalProjectReader = jpype.JClass("org.mpxj.reader.UniversalProjectReader")
+        except Exception as e2:
+             print(f"DEBUG: Failed org.mpxj: {e2}")
+             raise ImportError(f"Could not load UniversalProjectReader. Check JAR structure. Errors: {e1}, {e2}")
 
     
     # 3. Write bytes to temp file (MPXJ handles files best)
@@ -430,7 +466,7 @@ def parse_mpp(content: bytes) -> dict:
             tmp_path = tmp.name
         
         # 4. Read Project
-        from net.sf.mpxj.reader import UniversalProjectReader
+        # from net.sf.mpxj.reader import UniversalProjectReader # This line is now redundant
         reader = UniversalProjectReader()
         print(f"DEBUG: MPXJ Reading file {tmp_path} size={os.path.getsize(tmp_path)}")
         try:
