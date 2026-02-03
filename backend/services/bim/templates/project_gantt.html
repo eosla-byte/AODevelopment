@@ -615,8 +615,30 @@
 
         // --- GRID INTERACTION CONTROLLER ---
         const GridController = {
+            lastClickTime: 0,
+            lastClickId: null,
+
             handleMouseDown(e, task, colId) {
                 if (e.button !== 0) return; // Only Left Click
+
+                // MANUAL DOUBLE CLICK DETECTION (Because Render wipes DOM)
+                const now = Date.now();
+                const cellKey = `${task.id}:${colId}`;
+                if (cellKey === this.lastClickId && (now - this.lastClickTime < 300)) {
+                    // Detected Double Click!
+                    const col = Config.columns.find(c => c.id === colId);
+                    if (col && col.editable) {
+                        e.preventDefault();
+                        e.stopPropagation(); // Stop DblClick
+                        State.activeCell = { taskId: task.id, colId: colId };
+                        enterEditMode();
+                        this.lastClickId = null; // Reset
+                        return;
+                    }
+                }
+                this.lastClickId = cellKey;
+                this.lastClickTime = now;
+
 
                 // If in Edit Mode, clicking outside commits.
                 // If clicking inside editor, don't interfere.
@@ -643,7 +665,10 @@
                 // Update Mode
                 State.interactionMode = 'SELECTING';
 
-                const cellKey = `${task.id}:${colId}`;
+                State.interactionMode = 'SELECTING';
+
+                // cellKey already defined above
+
 
                 if (e.ctrlKey) {
                     // Add/Remove
@@ -1949,16 +1974,9 @@
                     // Attach Events
                     td.onmousedown = (e) => GridController.handleMouseDown(e, task, col.id);
                     td.onmouseenter = (e) => GridController.handleMouseEnter(e, task, col.id);
-                    // Double Click on TD (Safer)
-                    td.ondblclick = (e) => {
-                        console.log("DBLCLICK on TD", task.id, col.id);
-                        if (col.editable) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            State.activeCell = { taskId: task.id, colId: col.id };
-                            enterEditMode();
-                        }
-                    };
+
+                    // Double Click logic moved to handleMouseDown
+
 
                     if (col.id === 'name') {
                         td.style.paddingLeft = (task.level * 20 + 8) + 'px';
