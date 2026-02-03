@@ -313,8 +313,43 @@ def ensure_jvm_started():
         raise ValueError("CRITICAL: libjvm.so not found. Please install a JDK (e.g. jdk17 in nixpacks).")
 
     print(f"DEBUG: Starting JVM with {jvm_path}")
+    
+    # CALCULATE CLASSPATH
+    # We must include MPXJ jars.
+    classpath = []
+    
+    # 1. Automatic MPXJ detection
     try:
-        jpype.startJVM(jvm_path, classpath=jpype.getClassPath())
+        import mpxj
+        # New versions of python-mpxj might have a helper?
+        # If not, we look in the package directory.
+        mpxj_dir = os.path.dirname(mpxj.__file__)
+        jars = glob.glob(os.path.join(mpxj_dir, "*.jar"))
+        if jars:
+            print(f"DEBUG: Found MPXJ jars in {mpxj_dir}: {len(jars)} jars")
+            classpath.extend(jars)
+            
+        # Also check 'lib' subdir often used
+        lib_jars = glob.glob(os.path.join(mpxj_dir, "lib", "*.jar"))
+        if lib_jars:
+            classpath.extend(lib_jars)
+            
+    except Exception as e:
+        print(f"WARNING: Could not auto-detect MPXJ jars: {e}")
+
+    # 2. Add current directory
+    classpath.append(".")
+    
+    # 3. System Classpath
+    if os.environ.get("CLASSPATH"):
+        classpath.append(os.environ.get("CLASSPATH"))
+
+    cp_args = "-Djava.class.path=" + os.pathsep.join(classpath)
+    print(f"DEBUG: JVM Classpath Args: {cp_args}")
+
+    try:
+        # Check if startJVM accepts arguments list or just args
+        jpype.startJVM(jvm_path, cp_args, convertStrings=False)
         return jvm_path
     except Exception as e:
         if "JVM is already started" in str(e):
