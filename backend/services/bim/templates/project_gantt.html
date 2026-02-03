@@ -1358,6 +1358,60 @@
                         parentStack[l] = null;
                     }
                 });
+
+                // 3. Rollup Calculations (Bottom-Up)
+                // We need to process from deep levels up or use recursion.
+                // Since we have childrenIds, recursion is easy.
+                const topLevel = tasks.filter(t => !t.parentId);
+                topLevel.forEach(t => this.rollup(t));
+            },
+
+            rollup(task) {
+                if (!task.childrenIds || task.childrenIds.length === 0) return;
+
+                const children = task.childrenIds.map(id => State.tasks.find(t => t.id === id)).filter(Boolean);
+
+                // Recurse first
+                children.forEach(c => this.rollup(c));
+
+                // Calculate Stats
+                let minStart = null;
+                let maxEnd = null;
+                let totalProgress = 0;
+                let validProgressCount = 0;
+
+                children.forEach(c => {
+                    if (c.start) {
+                        const s = new Date(c.start);
+                        if (!minStart || s < minStart) minStart = s;
+                        // For summary end: usually max of ends.
+                        // If c.end is missing, maybe assume c.start?
+                    }
+                    if (c.end) {
+                        if (!maxEnd || e > maxEnd) maxEnd = e;
+                    }
+
+                    let p = parseFloat(c.progress);
+                    if (isNaN(p)) p = 0;
+                    totalProgress += p;
+                    validProgressCount++;
+                });
+
+                if (minStart) task.start = minStart.toISOString().split('T')[0];
+                if (maxEnd) task.end = maxEnd.toISOString().split('T')[0];
+                if (validProgressCount > 0) {
+                    task.progress = Math.round(totalProgress / validProgressCount);
+                } else {
+                    task.progress = 0;
+                }
+
+                // Duration matches date range? Or sum of durations?
+                // Visual Gantt usually implies duration = End - Start.
+                // Project usually does End - Start.
+                // We don't explicitely set 'duration' field here because the getter calculates it?
+                // Let's check getter in renderBody: 
+                // if (col.id === 'duration') ... const diffDays = ...
+                // So updating start/end is sufficient for duration column.
             },
 
             toggleCollapse(taskId) {
@@ -1409,6 +1463,21 @@
                 return segments;
             },
 
+            // Helper for subtree
+            getSubtree(parent) {
+                let list = [];
+                if (parent.childrenIds) {
+                    parent.childrenIds.forEach(cid => {
+                        const c = State.tasks.find(x => x.id === cid);
+                        if (c) {
+                            list.push(c);
+                            list = list.concat(this.getSubtree(c));
+                        }
+                    });
+                }
+                return list;
+            },
+
             indent() {
                 const rows = this.getSelectedRows();
                 if (rows.length === 0) return;
@@ -1449,29 +1518,7 @@
             getSelectedRows() {
                 const ids = new Set();
                 State.selectedCells.forEach(k => ids.add(k.split(':')[0]));
-                return State.tasks.filter(t => ids.has(t.id));
-            },
-
-            getSelectedRows() {
-                const ids = new Set();
-                State.selectedCells.forEach(k => ids.add(k.split(':')[0]));
-                return State.tasks.filter(t => ids.has(t.id));
-            },
-
-            // --- RECALCULATE HIERARCHY ---         
-            getSubtree(parent) {
-                const results = [];
-                const idx = parent.orderIndex;
-                for (let i = idx + 1; i < State.tasks.length; i++) {
-                    const t = State.tasks[i];
-                    // Stop if we hit a task with level <= parent.level
-                    if (t.level > parent.level) {
-                        results.push(t);
-                    } else {
-                        break;
-                    }
-                }
-                return results;
+                return Array.from(ids).map(id => State.tasks.find(t => t.id === id)).filter(Boolean);
             }
         };
 
