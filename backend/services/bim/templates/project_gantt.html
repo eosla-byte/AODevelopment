@@ -350,16 +350,20 @@
         }
 
         // Post-process server tasks
-        State.tasks = serverTasks.map((t, i) => ({
-            ...t,
-            level: t.level || 0,
-            collapsed: false,
-            isSummary: false, // Calculated later
-            childrenIds: [],
-            parentId: null,
-            orderIndex: i,
-            comments: (typeof t.comments === 'string' ? JSON.parse(t.comments) : (t.comments || []))
-        }));
+        State.tasks = serverTasks.map((t, i) => {
+            const parsedStyle = (typeof t.style === 'string' ? JSON.parse(t.style) : (t.style || {}));
+            return {
+                ...t,
+                style: parsedStyle, // Keep as object
+                level: parsedStyle.level !== undefined ? parsedStyle.level : (t.level || 0),
+                collapsed: parsedStyle.collapsed !== undefined ? parsedStyle.collapsed : false,
+                isSummary: false, // Calculated later
+                childrenIds: [],
+                parentId: null,
+                orderIndex: i, // Prefer t.display_order if available?
+                comments: (typeof t.comments === 'string' ? JSON.parse(t.comments) : (t.comments || []))
+            }
+        });
 
         // Init Company Colors
         State.tasks.forEach(t => {
@@ -873,23 +877,21 @@
                 if (!task) return;
 
                 // Construct Payload
-                // Include Style, etc.
+                const styleObj = task.style || {};
+                styleObj.level = task.level;
+                styleObj.collapsed = task.collapsed;
+                styleObj.index = task.orderIndex; // Persist Sort Order
+
                 const payload = {
                     name: task.name,
                     start: task.start,
                     end: task.end,
                     progress: task.progress, // mapped from pct
                     contractor: task.contractor,
-                    style: JSON.stringify(task.style || {}), // Backend expects string? Check main.py
-                    // main.py lines 817: try: act.style = data.style
-                    // If backend model is string, we typically use JSON.dumps.
-                    // If backend model is JSON column, better.
-                    // Checking main.py: "style": getattr(act, 'style', None)
-                    // It seems to be generic. Let's send generic JSON object if Pydantic supports it, or string.
-                    // Main.py line 782: style: Optional[str] = None
-                    // It expects STRING. So JSON.stringify is correct.
-                    cell_styles: JSON.stringify(task.cellStyles || {}), // New: Cell-specific styles
-                    comments: JSON.stringify(task.comments || []) // New: Comments
+                    style: JSON.stringify(styleObj),
+                    cell_styles: JSON.stringify(task.cellStyles || {}),
+                    comments: task.comments || [],
+                    display_order: task.orderIndex
                 };
 
                 try {
@@ -1804,7 +1806,12 @@
                         const input = document.createElement('input');
                         input.id = 'active-editor';
                         input.type = 'text'; // or date/number based on col type
-                        input.value = val || '';
+                        // Fix: Don't use || '' because 0 is falsy but valid
+                        input.value = (val !== null && val !== undefined) ? val : '';
+                        if (col.id === 'duration') {
+                            // Strip ' días' if present for editing
+                            input.value = input.value.toString().replace(' días', '').replace(' días', '');
+                        }
                         input.className = "w-full h-full border-0 outline-none p-0 bg-white text-black";
                         input.style.boxShadow = "inset 0 0 0 2px #3b82f6";
 
@@ -2085,7 +2092,22 @@
             dialog.showModal();
 
             window.selectComp = (c) => {
-                updateTaskValue(task, 'contractor', c);
+                // Determine targets: If selection exists and context target is part of it, use selection.
+                // Otherwise use single target.
+                let targets = [task];
+                const uniqueTaskIds = new Set();
+
+                if (State.selectedCells.size > 0) {
+                    State.selectedCells.forEach(k => uniqueTaskIds.add(k.split(':')[0]));
+                }
+
+                if (uniqueTaskIds.has(task.id)) {
+                    // Apply to entire selection
+                    targets = Array.from(uniqueTaskIds).map(id => State.tasks.find(t => t.id === id)).filter(Boolean);
+                }
+
+                targets.forEach(t => updateTaskValue(t, 'contractor', c));
+
                 // Ensure color exists
                 if (!State.companyColors[c]) {
                     // Assign random color
