@@ -1065,7 +1065,8 @@
         }
 
         // --- IMPORT LOGIC V2 (Cache Buster) ---
-        async function handleFileUploadV2(e) {
+        // Expose explicitly to window to avoid Scope/ReferenceErrors
+        window.handleFileUploadV2 = async function (e) {
             // DEBUG ALERT TO CONFIRM EXECUTION
             // alert("DEBUG: Inicio de Importación V2");
 
