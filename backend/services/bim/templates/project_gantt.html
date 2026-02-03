@@ -263,7 +263,10 @@
             anchorCell: null, // {taskId, colId}
             isDragging: false,
             isFilling: false,
-            fillSourceRange: null // {startRow, endRow, tasks: []}
+            fillSourceRange: null, // {startRow, endRow, tasks: []}
+            // Navigation & Editing
+            interactionMode: 'NAVIGATION', // 'NAVIGATION', 'SELECTING', 'EDITING'
+            editingValue: ''
         };
 
         // --- INIT ---
@@ -495,6 +498,16 @@
             handleMouseDown(e, task, colId) {
                 if (e.button !== 0) return; // Only Left Click
 
+                // If in Edit Mode, clicking outside commits.
+                // If clicking inside editor, don't interfere.
+                if (State.interactionMode === 'EDITING') {
+                    if (e.target.id === 'active-editor') return; // Clicking inside input
+                    // Clicking outside -> Commit
+                    commitEdit();
+                    State.interactionMode = 'NAVIGATION';
+                    // Continue to select new cell
+                }
+
                 // If clicking fill handle (logic handled separately or check target class)
                 if (e.target.classList.contains('fill-handle')) {
                     this.startFill(e);
@@ -503,6 +516,12 @@
 
                 State.isDragging = true;
                 State.isFilling = false;
+
+                // Prevent Default Text Selection
+                // e.preventDefault(); // CAUTION: Might block Focus? No, we use user-select: none.
+
+                // Update Mode
+                State.interactionMode = 'SELECTING';
 
                 const cellKey = `${task.id}:${colId}`;
 
@@ -1096,61 +1115,55 @@
             },
 
             indent() {
-                const segments = this.getSelectionSegments();
+                const rows = this.getSelectedRows();
+                if (rows.length === 0) return;
+
+                rows.sort((a, b) => a.orderIndex - b.orderIndex);
+
                 let changed = false;
+                const first = rows[0];
+                const prev = State.tasks[first.orderIndex - 1];
+                if (!prev) return;
 
-                // Process segments from Bottom to Top to avoid validation issues? 
-                // Actually top-down is fine for indent check.
-
-                segments.forEach(segment => {
-                    const topTask = segment[0];
-                    if (topTask.orderIndex === 0) return; // Cannot indent first task
-
-                    const prevTask = State.tasks[topTask.orderIndex - 1];
-                    const newLevel = topTask.level + 1;
-
-                    // Validation: Can process if prevTask exists.
-                    // Project allows indent as long as prev task exists.
-                    // It becomes child of prevTask. 
-
-                    // Apply to ALL in segment
-                    segment.forEach(t => {
-                        t.level += 1;
-                        triggerAutoSave(t.id);
-                    });
+                rows.forEach(t => {
+                    t.level = (t.level || 0) + 1;
                     changed = true;
                 });
 
                 if (changed) {
                     this.recalculate(State.tasks);
+                    State.tasks.forEach(t => { if (rows.includes(t)) triggerAutoSave(t.id); });
                     render();
                 }
             },
 
             outdent() {
-                const segments = this.getSelectionSegments();
-                let changed = false;
+                const rows = this.getSelectedRows();
+                if (rows.length === 0) return;
 
-                segments.forEach(segment => {
-                    // Validation: Level > 0
-                    const topTask = segment[0];
-                    if (topTask.level <= 0) return; // Cannot outdent root
-
-                    segment.forEach(t => {
-                        if (t.level > 0) {
-                            t.level -= 1;
-                            triggerAutoSave(t.id);
-                        }
-                    });
-                    changed = true;
+                rows.forEach(t => {
+                    if (t.level > 0) {
+                        t.level--;
+                        triggerAutoSave(t.id);
+                    }
                 });
-
-                if (changed) {
-                    this.recalculate(State.tasks);
-                    render();
-                }
+                this.recalculate(State.tasks);
+                render();
             },
 
+            getSelectedRows() {
+                const ids = new Set();
+                State.selectedCells.forEach(k => ids.add(k.split(':')[0]));
+                return State.tasks.filter(t => ids.has(t.id));
+            },
+
+            getSelectedRows() {
+                const ids = new Set();
+                State.selectedCells.forEach(k => ids.add(k.split(':')[0]));
+                return State.tasks.filter(t => ids.has(t.id));
+            },
+
+            // --- RECALCULATE HIERARCHY ---         
             getSubtree(parent) {
                 const results = [];
                 const idx = parent.orderIndex;
@@ -1167,16 +1180,159 @@
             }
         };
 
-        // --- INTERACTION ---
+
+        // --- GLOBAL KEYS & NAVIGATION ---
         function handleGlobalKeys(e) {
-            // Indent/Outdent
-            if (e.altKey && e.shiftKey) {
-                if (e.key === 'ArrowRight') {
-                    HierarchyEngine.indent();
+            if (State.interactionMode === 'EDITING') {
+                if (e.key === 'Enter') {
+                    // Commit & Exit
+                    commitEdit();
+                    State.interactionMode = 'NAVIGATION';
+                    render();
+                } else if (e.key === 'Escape') {
+                    // Cancel & Exit
+                    State.interactionMode = 'NAVIGATION';
+                    render();
+                } else if (e.key === 'Tab') {
                     e.preventDefault();
-                } else if (e.key === 'ArrowLeft') {
-                    HierarchyEngine.outdent();
+                    commitEdit();
+                    moveSelection(0, e.shiftKey ? -1 : 1);
+                    State.interactionMode = 'NAVIGATION';
+                    render();
+                }
+                return; // Let input handle other keys
+            }
+
+            // NAVIGATION MODE
+            if (State.interactionMode === 'NAVIGATION' || State.interactionMode === 'SELECTING') {
+                if (e.key.startsWith('Arrow')) {
                     e.preventDefault();
+                    let dr = 0, dc = 0;
+                    if (e.key === 'ArrowUp') dr = -1;
+                    if (e.key === 'ArrowDown') dr = 1;
+                    if (e.key === 'ArrowLeft') dc = -1;
+                    if (e.key === 'ArrowRight') dc = 1;
+
+                    if (e.shiftKey) {
+                        // Expand selection (Anchor stays)
+                        if (State.activeCell) {
+                            const tasks = State.tasks; // assuming flat list matching orderIndex
+                            // Find current End
+                            // This is complex because we need to know current "End".
+                            // Simplify: just move "End" logic?
+                            // Excel Shift+Arrow moves the "Floating" end of selection.
+                            // We need to track `selectionEnd`.
+                            // For now, let's keep simple arrow navigaton. Shift logic can be added if needed seriously.
+                            // Basic Navigation:
+                            moveSelection(dr, dc);
+                        }
+                    } else {
+                        // Move Active Cell
+                        moveSelection(dr, dc);
+                    }
+                } else if (e.key === 'Enter' || e.key === 'F2') {
+                    e.preventDefault();
+                    enterEditMode();
+                } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                    // Clear content
+                    if (State.selectedCells.size > 0) {
+                        State.selectedCells.forEach(k => {
+                            const [tid, cid] = k.split(':');
+                            const t = State.tasks.find(tk => tk.id === tid);
+                            if (t && Config.columns.find(c => c.id === cid).editable) {
+                                t[cid] = '';
+                                triggerAutoSave(t.id);
+                            }
+                        });
+                        render();
+                    }
+                } else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    // Select All?
+                }
+
+                // Indent ShortCuts
+                if (e.altKey && e.shiftKey) {
+                    if (e.key === 'ArrowRight') HierarchyEngine.indent();
+                    if (e.key === 'ArrowLeft') HierarchyEngine.outdent();
+                }
+            }
+        }
+
+        function moveSelection(dr, dc) {
+            if (!State.activeCell) return;
+            const { taskId, colId } = State.activeCell;
+            const task = State.tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            const rIdx = task.orderIndex + dr;
+            const cols = Config.columns.map(c => c.id);
+            const cIdx = cols.indexOf(colId) + dc;
+
+            if (rIdx >= 0 && rIdx < State.tasks.length && cIdx >= 0 && cIdx < cols.length) {
+                const nextTask = State.tasks[rIdx];
+                const nextCol = cols[cIdx];
+
+                // If Shift?? For now just moving active cell clears selection
+                if (!State.isDragging) { // IsDragging check irrelevant here
+                    State.selectedCells.clear();
+                    State.selectedCells.add(`${nextTask.id}:${nextCol}`);
+                    State.activeCell = { taskId: nextTask.id, colId: nextCol };
+                    State.anchorCell = { taskId: nextTask.id, colId: nextCol };
+                    render();
+
+                    // Scroll into view logic ...
+                }
+            }
+        }
+
+        function enterEditMode() {
+            if (!State.activeCell) return;
+            const { taskId, colId } = State.activeCell;
+
+            // Check if editable
+            const col = Config.columns.find(c => c.id === colId);
+            if (!col || !col.editable) return;
+
+            State.interactionMode = 'EDITING';
+            render();
+
+            // Focus Input
+            setTimeout(() => {
+                const input = document.getElementById('active-editor');
+                if (input) {
+                    input.focus();
+                    input.select(); // Select all text like Excel
+                }
+            }, 10);
+        }
+
+        function commitEdit() {
+            const input = document.getElementById('active-editor');
+            if (!input || !State.activeCell) return;
+
+            const val = input.value;
+            const { taskId, colId } = State.activeCell;
+            const task = State.tasks.find(t => t.id === taskId);
+
+            if (task) {
+                // Reuse updateTaskValue logic?
+                if (colId === 'duration') {
+                    const days = parseInt(val) || 0;
+                    if (task.start && days > 0) {
+                        const d = new Date(task.start);
+                        d.setDate(d.getDate() + days);
+                        task.end = d.toISOString().split('T')[0];
+                        triggerAutoSave(task.id);
+                        HierarchyEngine.recalculate(State.tasks);
+                    }
+                } else if (colId === 'start' || colId === 'end') {
+                    task[colId] = val;
+                    triggerAutoSave(task.id);
+                    HierarchyEngine.recalculate(State.tasks);
+                } else {
+                    task[colId] = val;
+                    triggerAutoSave(task.id);
                 }
             }
         }
@@ -1303,15 +1459,14 @@
 
             if (zoom === 'DAY') { tickW = 40; bottomTierUnit = 'd'; topTierUnit = 'm'; }
             else if (zoom === 'WEEK') { tickW = 60; bottomTierUnit = 'w'; topTierUnit = 'm'; }
-            else if (zoom === 'MONTH') { tickW = 100; bottomTierUnit = 'm'; topTierUnit = 'y'; }
+            else { // MONTH
+                tickW = 100; bottomTierUnit = 'm'; topTierUnit = 'y';
+                // Adjust pxPerMin for month view
+                // 100px / (30 days * 1440 min/day) = 100 / 43200 = 0.0023148 px/min
+                // This is a rough estimate. For month view, it's better to calculate based on actual month width.
+            }
 
-            State.pxPerMin = tickW / (bottomTierUnit === 'd' ? 1440 : (bottomTierUnit === 'w' ? 10080 : 43200));
-
-            // We need to re-render renderHeader to apply pxPerMin changes immediately if we set it here?
-            // Better: use State.pxPerMin to derive tickW, not vice versa.
-            // Let's invert: 
-            // tickW = duration * pxPerMin
-
+            // State.pxPerMin = tickW / (bottomTierUnit === 'd' ? 1440 : (bottomTierUnit === 'w' ? 10080 : 43200));
             // REFINED APPROACH: Use current pxPerMin to determine tick placement
             // Just draw ticks starting from startDate
 
@@ -1519,7 +1674,18 @@
                         }
                     }
 
-                    const span = document.createElement('span');
+                    // RENDER CELL CONTENT
+                    // Mode Check: Is this cell in EDITING mode?
+                    const isEditing = State.interactionMode === 'EDITING' &&
+                        State.activeCell &&
+                        State.activeCell.taskId === task.id &&
+                        State.activeCell.colId === col.id;
+
+                    const div = document.createElement('div');
+                    div.style.width = "100%";
+                    div.style.height = "100%";
+                    div.style.userSelect = "none"; // Disable text selection for drag
+
                     let val = task[col.id];
                     if (col.id === 'start' || col.id === 'end') val = val ? val.toString().split('T')[0] : '';
                     if (col.id === 'progress') {
@@ -1539,33 +1705,43 @@
                         }
                     }
 
-                    span.innerText = val || '';
-                    span.style.width = "100%";
+                    if (isEditing) {
+                        // Render Input
+                        const input = document.createElement('input');
+                        input.id = 'active-editor';
+                        input.type = 'text'; // or date/number based on col type
+                        input.value = val || '';
+                        input.className = "w-full h-full border-0 outline-none p-0 bg-white text-black";
+                        input.style.boxShadow = "inset 0 0 0 2px #3b82f6";
+
+                        // Stop propagation for editing keys/clicks
+                        input.onkeydown = (e) => e.stopPropagation();
+                        input.onmousedown = (e) => e.stopPropagation();
+
+                        div.appendChild(input);
+                    } else {
+                        // Render Text
+                        div.innerText = val || '';
+                        // Double Click to Edit
+                        div.ondblclick = (e) => {
+                            if (col.editable) {
+                                enterEditMode();
+                            }
+                        };
+                    }
 
                     // APPLY CELL STYLES
                     if (task.cellStyles && task.cellStyles[col.id]) {
                         const s = task.cellStyles[col.id];
-                        if (s.fontWeight) span.style.fontWeight = s.fontWeight;
-                        if (s.color) span.style.color = s.color;
-                        if (s.backgroundColor) td.style.backgroundColor = s.backgroundColor; // BG on TD
-                        if (s.fontSize) span.style.fontSize = s.fontSize;
+                        if (s.fontWeight) div.style.fontWeight = s.fontWeight;
+                        if (s.color) div.style.color = s.color;
+                        if (s.backgroundColor) td.style.backgroundColor = s.backgroundColor;
+                        if (s.fontSize) div.style.fontSize = s.fontSize;
                     }
 
-                    if (col.editable) {
-                        span.contentEditable = true;
+                    td.appendChild(div);
 
-                        // Prevent row selection when clicking to edit
-                        span.onmousedown = (e) => { e.stopPropagation(); }; // Allow text selection
-
-                        span.onblur = (e) => {
-                            let newVal = e.target.innerText;
-                            // ... (Save Logic) ...
-                            // Copied from previous logic, condensed for brevity?
-                            // No, must replicate logic or use shared handler.
-                            updateTaskValue(task, col.id, newVal);
-                        };
-                    }
-                    td.appendChild(span);
+                    /* OLD EDIT LOGIC REMOVED (contentEditable) */
 
                     // FILL HANDLE (If Active Cell)
                     if (State.activeCell && State.activeCell.taskId === task.id && State.activeCell.colId === col.id) {
