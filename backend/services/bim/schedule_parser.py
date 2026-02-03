@@ -318,22 +318,26 @@ def ensure_jvm_started():
     # We must include MPXJ jars.
     classpath = []
     
-    # 1. Automatic MPXJ detection
+    # 1. Automatic MPXJ detection (Recursive)
     try:
         import mpxj
-        # New versions of python-mpxj might have a helper?
-        # If not, we look in the package directory.
         mpxj_dir = os.path.dirname(mpxj.__file__)
-        jars = glob.glob(os.path.join(mpxj_dir, "*.jar"))
-        if jars:
-            print(f"DEBUG: Found MPXJ jars in {mpxj_dir}: {len(jars)} jars")
-            classpath.extend(jars)
-            
-        # Also check 'lib' subdir often used
-        lib_jars = glob.glob(os.path.join(mpxj_dir, "lib", "*.jar"))
-        if lib_jars:
-            classpath.extend(lib_jars)
-            
+        print(f"DEBUG: Hunting for JARs in {mpxj_dir}")
+        
+        found_jars = []
+        # Walk recursively to find jars in lib/, etc.
+        for root, dirs, files in os.walk(mpxj_dir):
+            for file in files:
+                if file.endswith(".jar"):
+                    full_path = os.path.join(root, file)
+                    found_jars.append(full_path)
+        
+        if found_jars:
+            print(f"DEBUG: Found {len(found_jars)} MPXJ jars: {[os.path.basename(j) for j in found_jars]}")
+            classpath.extend(found_jars)
+        else:
+             print("WARNING: No JARs found in mpxj package directory recursively.")
+
     except Exception as e:
         print(f"WARNING: Could not auto-detect MPXJ jars: {e}")
 
