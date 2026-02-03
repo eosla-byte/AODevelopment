@@ -1065,10 +1065,17 @@
 
         // --- IMPORT LOGIC V2 (Cache Buster) ---
         async function handleFileUploadV2(e) {
+            // DEBUG ALERT TO CONFIRM EXECUTION
+            // alert("DEBUG: Inicio de Importación V2");
+
             const debugEl = document.getElementById('save-status');
-            if (debugEl) debugEl.innerHTML = '<span class="text-blue-600">Iniciando Import...</span>';
+            if (debugEl) debugEl.innerHTML = '<span class="text-blue-600">Iniciando...</span>';
 
             console.log("AO Gantt: Import V2 Triggered");
+
+            // Scope variables for finally block
+            let btn = null;
+            let originalText = 'Importar';
 
             try {
                 // Validate Event
@@ -1100,14 +1107,14 @@
                 const projectId = urlParts[urlParts.length - 1];
 
                 // Button UI Update
-                let btn = e.target.previousElementSibling;
+                btn = e.target.previousElementSibling;
                 // Fallback search
                 if (!btn || btn.tagName !== 'BUTTON') {
                     btn = document.querySelector('button[onclick*="file-upload"]');
                 }
 
-                const originalText = btn ? btn.innerHTML : 'Importar';
                 if (btn) {
+                    originalText = btn.innerHTML;
                     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                     btn.disabled = true;
                 }
