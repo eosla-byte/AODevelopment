@@ -351,7 +351,8 @@
         }
 
         // Post-process server tasks
-        const projectSettings = {{ project.settings | tojson | safe }} || {};
+        // Defensive check: project.settings might be undefined if migration failed or object not reloaded
+        const projectSettings = {{ project.settings | default ({}) | tojson | safe }} || {};
         State.projectSettings = projectSettings;
         if (projectSettings.companyColors) {
             State.companyColors = projectSettings.companyColors;

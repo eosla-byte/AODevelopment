@@ -699,6 +699,14 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
         # Helper: Ensure user has 'id' for template
         if user and isinstance(user, dict) and "id" not in user and "sub" in user:
             user["id"] = user["sub"]
+            
+        # DEBUG OBJECT STATE
+        print(f"DEBUG: Project Object: {project}")
+        try:
+             print(f"DEBUG: Project Settings Attr Exists: {hasattr(project, 'settings')}")
+             print(f"DEBUG: Project Settings Value: {getattr(project, 'settings', 'ATTR_MISSING')}")
+        except Exception as e:
+             print(f"DEBUG: Error inspecting project settings: {e}")
 
         return templates.TemplateResponse("project_gantt.html", {
             "request": request,
