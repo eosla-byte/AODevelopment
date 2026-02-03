@@ -11,6 +11,7 @@ import uuid
 import datetime
 import pydantic
 from typing import Optional, List
+from sqlalchemy import text, inspect
 
 # Path Setup to allow importing 'backend.common'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -59,7 +60,57 @@ if not os.path.exists(static_dir):
     os.makedirs(static_dir)
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+@app.on_event("startup")
+def ensure_schema_updates():
+    print(">>> Startup: Checking BIM Schema...")
+    try:
+        # Use SessionExt to get engine
+        db = SessionExt()
+        engine = db.get_bind()
+        insp = inspect(engine)
+        
+        if insp.has_table("bim_activities"):
+             columns = [c['name'] for c in insp.get_columns("bim_activities")]
+             print(f"Current Columns: {columns}")
+             
+             with engine.connect() as conn:
+                 trans = conn.begin()
+                 try:
+                     if "style" not in columns:
+                         print("Adding 'style' column...")
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN style VARCHAR"))
+                     
+                     if "contractor" not in columns:
+                         print("Adding 'contractor' column...")
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN contractor VARCHAR"))
+                         
+                     if "predecessors" not in columns:
+                         print("Adding 'predecessors' column...")
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN predecessors VARCHAR"))
+                         
+                     if "parent_wbs" not in columns:
+                         print("Adding 'parent_wbs' column...")
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN parent_wbs VARCHAR"))
+                     
+                     if "comments" not in columns:
+                         print("Adding 'comments' column...")
+                         # Use generic JSON, PG/SQLite compatible syntax (mostly)
+                         # Explicitly casting for PG if needed, but 'JSON' usually maps fine in Alchemy
+                         # Pure SQL:
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN comments JSON DEFAULT '[]'"))
+
+                     trans.commit()
+                     print("Schema Check Completed.")
+                 except Exception as e:
+                     trans.rollback()
+                     print(f"Schema Update Error: {e}")
+    except Exception as e:
+        print(f"Startup Migration Failed: {e}")
+    finally:
+        if 'db' in locals(): db.close()
 
 # --- ENDPOINTS ---
 
