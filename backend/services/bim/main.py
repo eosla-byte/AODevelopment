@@ -683,13 +683,18 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
         if all_versions:
              print(f"DEBUG: Latest Version {all_versions[0].id} ({all_versions[0].version_name})")
 
+        # Helper: Ensure user has 'id' for template
+        if user and isinstance(user, dict) and "id" not in user and "sub" in user:
+            user["id"] = user["sub"]
+
         return templates.TemplateResponse("project_gantt.html", {
             "request": request,
             "project": project,
             "tasks": tasks_json,
             "tasks_json": tasks_str,
             "version": latest_version,
-            "all_versions": all_versions
+            "all_versions": all_versions,
+            "user": user
         })
     finally:
         db.close()
