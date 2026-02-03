@@ -961,20 +961,43 @@ async def update_project_settings(project_id: str, data: ProjectSettingsRequest,
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
             
-        # Update Settings
-        # Merge or Replace? Let's Merge.
-        current_settings = project.settings or {}
-        current_settings.update(data.settings)
-        project.settings = current_settings
-        
-        # Force update flag if needed (SQLAlchemy JSON tracking)
-        from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(project, "settings")
+        # Robust Update: Handle SQLAlchemy Attribute Mismatch
+        if not hasattr(project, 'settings'):
+             # Fallback: Raw SQL Update if ORM model is stale
+             from sqlalchemy import text
+             import json
+             # First fetch existing
+             res = db.execute(text("SELECT settings FROM bim_projects WHERE id = :pid"), {"pid": project_id}).fetchone()
+             curr = res[0] if res and res[0] else {}
+             if isinstance(curr, str): curr = json.loads(curr)
+             
+             curr.update(data.settings)
+             
+             db.execute(
+                 text("UPDATE bim_projects SET settings = :sett WHERE id = :pid"), 
+                 {"sett": json.dumps(curr), "pid": project_id}
+             )
+        else:
+            # Standard ORM Update
+            current_settings = project.settings or {}
+            # Ensure it's a dict (sometimes returns string if not casted)
+            if isinstance(current_settings, str): 
+                import json
+                current_settings = json.loads(current_settings)
+                
+            current_settings.update(data.settings)
+            project.settings = current_settings
+            
+            # Force update flag
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(project, "settings")
         
         db.commit()
-        return {"status": "ok", "settings": project.settings}
+        return {"status": "ok"}
     except Exception as e:
         db.rollback()
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
