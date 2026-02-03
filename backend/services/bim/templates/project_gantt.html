@@ -1064,31 +1064,55 @@
         }
 
         // --- IMPORT LOGIC ---
+        // --- IMPORT LOGIC ---
         async function handleFileUpload(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            if (!confirm(`¿Importar ${file.name}? Esto creará una nueva versión.`)) {
-                e.target.value = ''; // Reset
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const urlParts = window.location.pathname.split('/');
-            const projectId = urlParts[urlParts.length - 1]; // Assume ID is last part
-
-            const btn = e.target.previousElementSibling;
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Subiendo...';
-            btn.disabled = true;
+            // DEBUG: Trace execution
+            // alert("DEBUG: handleFileUpload triggered"); 
 
             try {
+                if (!e || !e.target || !e.target.files) {
+                    alert("DEBUG ERROR: Event or target missing. e=" + e);
+                    return;
+                }
+
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (!confirm(`¿Importar ${file.name}? Esto creará una nueva versión.`)) {
+                    e.target.value = ''; // Reset
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const urlParts = window.location.pathname.split('/');
+                const projectId = urlParts[urlParts.length - 1]; // Assume ID is last part
+
+                // Defensive button finding
+                let btn = e.target.previousElementSibling;
+                // Verify it's actually the button
+                if (!btn || btn.tagName !== 'BUTTON') {
+                    // Try finding my ID explicitly if sibling search fails?
+                    // But for now just don't crash
+                    console.warn("Could not find button sibling");
+                    btn = { innerHTML: '', disabled: false }; // Mock
+                }
+
+                const originalText = btn.innerHTML;
+                if (btn.tagName === 'BUTTON') {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Subiendo...';
+                    btn.disabled = true;
+                }
+
+                // alert("DEBUG: Sending request to /api/projects/" + projectId + "/schedule");
+
                 const res = await fetch(`/api/projects/${projectId}/schedule`, {
                     method: 'POST',
                     body: formData
                 });
+
+                // alert("DEBUG: Response status: " + res.status);
 
                 if (res.ok) {
                     alert('Importación exitosa. Recargando...');
@@ -1098,15 +1122,22 @@
                     window.location.href = '/auth/login?next=' + encodeURIComponent(window.location.pathname);
                 } else {
                     const err = await res.json();
-                    alert('Error: ' + (err.detail || 'Error desconocido'));
+                    alert('Error en servidor: ' + (err.detail || 'Error desconocido'));
                 }
             } catch (err) {
                 console.error(err);
-                alert('Error de conexión');
+                alert('Error Crítico Frontend: ' + err.message);
             } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-                e.target.value = '';
+                if (e && e.target) e.target.value = '';
+                // Restore button if real
+                const btn = e.target.previousElementSibling;
+                if (btn && btn.tagName === 'BUTTON') {
+                    // We need to restore original text but we didn't save it in outer scope easily
+                    // Actually we did.
+                    // But let's just restore hardcoded fallback to be safe or originalText if valid
+                    btn.innerHTML = '<i class="fas fa-file-import mr-2"></i> Importar .mpp';
+                    btn.disabled = false;
+                }
             }
         }
 
