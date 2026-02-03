@@ -897,6 +897,8 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
         count = 0
         for act in schedule_data['activities']:
             try:
+            try:
+                # Primary Attempt: Include all fields
                 new_act = BimActivity(
                     version_id=new_version.id,
                     activity_id=act.get("activity_id"),
@@ -909,11 +911,36 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
                     style=json.dumps(act.get("style")) if isinstance(act.get("style"), dict) else act.get("style"),
                     cell_styles=json.dumps(act.get("cell_styles")) if isinstance(act.get("cell_styles"), dict) else act.get("cell_styles")
                 )
+            except TypeError as te:
+                if "cell_styles" in str(te):
+                    # FALLBACK: Schema Mismatch Detection
+                    # Log once to avoid spamming
+                    if count == 0:
+                        print(f"WARN: Schema Mismatch! 'cell_styles' rejected by BimActivity.")
+                        try:
+                            valid_cols = BimActivity.__table__.columns.keys()
+                            print(f"DEBUG: BimActivity Columns on Server: {valid_cols}")
+                        except:
+                            print("DEBUG: Could not inspect BimActivity columns.")
+
+                    # Retry without cell_styles
+                    new_act = BimActivity(
+                        version_id=new_version.id,
+                        activity_id=act.get("activity_id"),
+                        name=act.get("name"),
+                        planned_start=act.get("start"),
+                        planned_finish=act.get("finish"),
+                        pct_complete=act.get("pct_complete", 0.0),
+                        contractor=act.get("contractor"),
+                        predecessors=act.get("predecessors"),
+                        style=json.dumps(act.get("style")) if isinstance(act.get("style"), dict) else act.get("style")
+                        # OMIT cell_styles
+                    )
+                else:
+                    raise te # Re-raise other TypeErrors
+
             except Exception as e:
                 # Catch detailed error for this row but continue?
-                # Better to fail loud if critical?
-                # Let's log and skip only if minor. But DB errors should trigger rollback.
-                # If constructor fails, it's code issue.
                 print(f"Row Error: {e}")
                 continue 
                 
