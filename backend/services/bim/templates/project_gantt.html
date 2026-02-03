@@ -257,12 +257,7 @@
 
 <body>
     <div id="app">
-        <script>
-            window.onerror = function (msg, url, line, col, error) {
-                alert("JS ERROR: " + msg + "\nLine: " + line + "\nCol: " + col);
-                console.error("Global Error:", error);
-            };
-        </script>
+
 
         <!-- TOOLBAR -->
         <div id="toolbar">
@@ -1012,7 +1007,7 @@
             sep.style.width = '1px'; sep.style.height = '24px'; sep.style.background = '#e5e7eb'; sep.style.margin = '0 10px';
             return sep;
         }
-        }
+
 
         async function forceSaveAll() {
             const btn = document.getElementById('btn-save-all');
