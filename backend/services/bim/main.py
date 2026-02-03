@@ -657,7 +657,21 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
         
         tasks_json = []
         if latest_version:
-            activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).order_by(text("display_order ASC"), text("id ASC")).all()
+            try:
+                 activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).order_by(text("display_order ASC"), text("id ASC")).all()
+            except Exception as e:
+                 err_str = str(e)
+                 if "UndefinedColumn" in err_str or "display_order" in err_str:
+                     print("DEBUG: Runtime Migration - Adding 'display_order' column...")
+                     db.rollback()
+                     with db.get_bind().connect() as conn:
+                         trans = conn.begin()
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN display_order INTEGER DEFAULT 0"))
+                         trans.commit()
+                     # Retry
+                     activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).order_by(text("display_order ASC"), text("id ASC")).all()
+                 else:
+                     raise e
             for act in activities:
                 # Format for Frappe Gantt
                 # {id: "Task 1", name: "Redesign website", start: "2016-12-28", end: "2016-12-31", progress: 20, dependencies: "Task 2, Task 3"}
@@ -879,7 +893,21 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 return []
 
         # Fix: Use text() sort to avoid AttributeError on stale models
-        activities = db.query(BimActivity).filter(BimActivity.version_id.in_(version_ids)).order_by(text("display_order ASC"), text("id ASC")).all()
+        try:
+             activities = db.query(BimActivity).filter(BimActivity.version_id.in_(version_ids)).order_by(text("display_order ASC"), text("id ASC")).all()
+        except Exception as e:
+             err_str = str(e)
+             if "UndefinedColumn" in err_str or "display_order" in err_str:
+                 print("DEBUG: Runtime Migration (API) - Adding 'display_order' column...")
+                 db.rollback()
+                 with db.get_bind().connect() as conn:
+                     trans = conn.begin()
+                     conn.execute(text("ALTER TABLE bim_activities ADD COLUMN display_order INTEGER DEFAULT 0"))
+                     trans.commit()
+                 # Retry
+                 activities = db.query(BimActivity).filter(BimActivity.version_id.in_(version_ids)).order_by(text("display_order ASC"), text("id ASC")).all()
+             else:
+                 raise e
         
         tasks_json = []
         for act in activities:
