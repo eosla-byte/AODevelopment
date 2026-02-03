@@ -766,6 +766,61 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
     finally:
         db.close()
 
+
+@app.get("/projects/{project_id}/tasks-board", response_class=HTMLResponse)
+async def view_project_tasks_board(project_id: str, request: Request, user = Depends(get_current_user)):
+    if not user: return RedirectResponse("/auth/login")
+    
+    db = SessionExt()
+    try:
+        project = db.query(BimProject).filter(BimProject.id == project_id).first()
+        if not project:
+             # Fallback 404
+             return HTMLResponse("<h1>Project Not Found</h1>", status_code=404)
+
+        # Reuse existing logic to get latest version tasks
+        latest_version = db.query(BimScheduleVersion).filter(
+            BimScheduleVersion.project_id == project_id
+        ).order_by(BimScheduleVersion.imported_at.desc()).first()
+        
+        tasks_json = []
+        if latest_version:
+            try:
+                activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).order_by(text("display_order ASC"), text("id ASC")).all()
+            except Exception as e:
+                # Fallback if self-healing hasn't run (unlikely but safe)
+                activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).all()
+            
+            for act in activities:
+                 start_str = act.planned_start.strftime("%Y-%m-%d") if act.planned_start else ""
+                 end_str = act.planned_finish.strftime("%Y-%m-%d") if act.planned_finish else ""
+                 
+                 tasks_json.append({
+                    "id": str(act.activity_id) if act.activity_id else str(act.id),
+                    "server_id": str(act.id),
+                    "name": act.name,
+                    "start": start_str,
+                    "end": end_str,
+                    "progress": act.pct_complete or 0,
+                    "contractor": getattr(act, 'contractor', "") or "Sin Asignar",
+                    "comments": getattr(act, 'comments', []) or [],
+                    "wbs": getattr(act, 'wbs_code', "") or "",
+                    "display_order": getattr(act, 'display_order', 0),
+                    "duration": act.duration or 0
+                 })
+
+        import json
+        tasks_str = json.dumps(tasks_json)
+
+        return templates.TemplateResponse("project_tasks.html", {
+            "request": request,
+            "project": project,
+            "tasks_json": tasks_str,
+            "user": user
+        })
+    finally:
+        db.close()
+
 @app.post("/api/projects/{project_id}/schedule")
 async def upload_schedule(project_id: str, file: UploadFile = File(...), user = Depends(get_current_user)):
     if not user: return RedirectResponse("/auth/login")

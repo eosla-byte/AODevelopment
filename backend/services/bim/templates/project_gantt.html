@@ -285,6 +285,10 @@
                     <i class="fas fa-save mr-2"></i> Guardar Todo
                 </button>
                 <div id="save-status" class="text-xs text-gray-500 font-medium w-24 text-right">Sincronizado</div>
+                <button onclick="openTaskBoard()"
+                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm flex items-center shadow-sm transition font-bold ml-2">
+                    <i class="fas fa-columns mr-2"></i> TASK
+                </button>
             </div>
         </div>
 
@@ -1198,6 +1202,25 @@
         window.closeModal = function () {
             document.getElementById('modal-overlay').style.display = 'none';
         }
+
+        window.openTaskBoard = function () {
+            // 1. Force Save to ensure backend has latest edits
+            forceSaveAll();
+
+            // 2. Get Params
+            const start = State.lookAheadStart || new Date();
+            const weeks = State.lookAheadWeeks || 3;
+
+            const yyyy = start.getFullYear();
+            const mm = String(start.getMonth() + 1).padStart(2, '0');
+            const dd = String(start.getDate()).padStart(2, '0');
+            const dateStr = `${yyyy}-${mm}-${dd}`;
+
+            // 3. Open
+            const url = `/projects/{{ project.id }}/tasks-board?start=${dateStr}&weeks=${weeks}`;
+            window.open(url, '_blank');
+        }
+
 
         function stringToColor(str) {
             let hash = 0;
