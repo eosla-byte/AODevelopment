@@ -602,7 +602,32 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
     
     # 1. Fetch Project & Latest Version
     db = SessionExt()
+    
+    # EMERGENCY MIGRATION CHECK
     try:
+         from sqlalchemy import text, inspect
+         engine = db.get_bind()
+         insp = inspect(engine)
+         if insp.has_table("bim_activities"):
+             curr_cols = [c['name'] for c in insp.get_columns("bim_activities")]
+             with engine.connect() as conn:
+                 trans = conn.begin()
+                 if "style" not in curr_cols:
+                     conn.execute(text("ALTER TABLE bim_activities ADD COLUMN style VARCHAR"))
+                 if "contractor" not in curr_cols:
+                     conn.execute(text("ALTER TABLE bim_activities ADD COLUMN contractor VARCHAR"))
+                 if "predecessors" not in curr_cols:
+                     conn.execute(text("ALTER TABLE bim_activities ADD COLUMN predecessors VARCHAR"))
+                 if "parent_wbs" not in curr_cols:
+                     conn.execute(text("ALTER TABLE bim_activities ADD COLUMN parent_wbs VARCHAR"))
+                 if "comments" not in curr_cols:
+                     conn.execute(text("ALTER TABLE bim_activities ADD COLUMN comments JSON DEFAULT '[]'"))
+                 trans.commit()
+    except Exception as e:
+        print(f"Runtime Patch Error: {e}")
+
+    try:
+
         project = db.query(BimProject).filter(BimProject.id == project_id).first()
         
         if not project:
