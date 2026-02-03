@@ -872,7 +872,12 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
             finally:
                 core_db.close()
         
-        # 4. Save Version
+        print(f"DEBUG: Parsed {len(schedule_data.get('activities', []))} activities.")
+        
+        if not schedule_data.get('activities'):
+            raise HTTPException(status_code=400, detail="El archivo no contiene actividades o no pudo ser leído correctamente.")
+
+        # 3. Create Version
         new_version = BimScheduleVersion(
             id=str(uuid.uuid4()),
             project_id=project_id,
@@ -890,49 +895,67 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
 
         # 4. Save Activities
         count = 0
-        if schedule_data.get('activities'):
-            for act in schedule_data['activities']:
-                try:
-                    new_act = BimActivity(
-                        version_id=new_version.id,
-                        activity_id=act.get("activity_id"),
-                        name=act.get("name"),
-                        planned_start=act.get("start"),
-                        planned_finish=act.get("finish"),
-                        pct_complete=act.get("pct_complete", 0.0),
-                        contractor=act.get("contractor"),
-                        predecessors=act.get("predecessors"),
-                        style=json.dumps(act.get("style")) if isinstance(act.get("style"), dict) else act.get("style"),
-                        cell_styles=json.dumps(act.get("cell_styles")) if isinstance(act.get("cell_styles"), dict) else act.get("cell_styles")
-                    )
-                except TypeError:
-                    # Fallback for outdated Deployment Code (Model mismatch)
-                    # Exclude ALL new fields (contractor, predecessors, style)
-                    new_act = BimActivity(
-                        version_id=new_version.id,
-                        activity_id=act.get("activity_id"),
-                        name=act.get("name"),
-                        planned_start=act.get("start"),
-                        planned_finish=act.get("finish"),
-                        pct_complete=act.get("pct_complete", 0.0)
-                    )
-                db.add(new_act)
-                count += 1
+        for act in schedule_data['activities']:
+            try:
+                new_act = BimActivity(
+                    version_id=new_version.id,
+                    activity_id=act.get("activity_id"),
+                    name=act.get("name"),
+                    planned_start=act.get("start"),
+                    planned_finish=act.get("finish"),
+                    pct_complete=act.get("pct_complete", 0.0),
+                    contractor=act.get("contractor"),
+                    predecessors=act.get("predecessors"),
+                    style=json.dumps(act.get("style")) if isinstance(act.get("style"), dict) else act.get("style"),
+                    cell_styles=json.dumps(act.get("cell_styles")) if isinstance(act.get("cell_styles"), dict) else act.get("cell_styles")
+                )
+            except Exception as e:
+                # Catch detailed error for this row but continue?
+                # Better to fail loud if critical?
+                # Let's log and skip only if minor. But DB errors should trigger rollback.
+                # If constructor fails, it's code issue.
+                print(f"Row Error: {e}")
+                continue 
+                
+            db.add(new_act)
+            count += 1
             
-            db.commit()
+        db.commit()
         
         print(f"DEBUG: Saved {count} activities for version {new_version.id}")
         
         return {"status": "ok", "message": f"Schedule imported successfully. {count} activities."}
         
+    except HTTPException as he:
+        db.rollback()
+        raise he
     except Exception as e:
         db.rollback()
         import traceback
         traceback.print_exc()
         # Return 500 to trigger frontend error handling
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Server Error: {str(e)}")
     finally:
         db.close()
+
+@app.get("/api/debug/jvm")
+def debug_jvm():
+    """Checks JVM status and Environment"""
+    import os
+    import shutil
+    try:
+        import jpype
+        jvm_started = jpype.isJVMStarted()
+        java_home = os.environ.get("JAVA_HOME")
+        path_java = shutil.which("java")
+        return {
+            "jvm_started": jvm_started,
+            "java_home": java_home,
+            "java_binary": path_java,
+            "jpype_path": jpype.getDefaultJVMPath() if not jvm_started else "JVM Running"
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/api/projects/{project_id}/activities")
 async def get_project_activities(project_id: str, versions: str = "", user = Depends(get_current_user)):
