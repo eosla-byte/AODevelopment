@@ -356,28 +356,48 @@ def parse_mpp(content: bytes) -> dict:
             tmp_path = tmp.name
         
         # 4. Read Project
+        from net.sf.mpxj.reader import UniversalProjectReader
         reader = UniversalProjectReader()
-        project = reader.read(tmp_path)
-        
+        print(f"DEBUG: MPXJ Reading file {tmp_path} size={os.path.getsize(tmp_path)}")
+        try:
+            project = reader.read(tmp_path)
+        except Exception as read_err:
+             print(f"CRITICAL: MPXJ Reader crashed: {read_err}")
+             raise read_err
+
         # 5. Extract Tasks
         tasks = []
         # getTasks() returns a java.util.List<Task>
         # Iterate over java list
-        for task in project.getTasks():
+        # Java List to generic list
+        raw_tasks = project.getTasks()
+        print(f"DEBUG: MPXJ found {raw_tasks.size()} raw tasks.")
+
+        # Limit debug output
+        debug_count = 0
+        
+        for task in raw_tasks:
             # Skip root/null tasks if any (often ID 0 is Project Summary)
             if not task: continue
             
             # Extract basics
-            
             t_id = task.getUniqueID() # Integer
             t_name = task.getName()
+            
+            # Only debug first 5
+            if debug_count < 5:
+                print(f"DEBUG TASK: ID={t_id} Name={t_name} Outl={task.getOutlineLevel()}")
+                debug_count += 1
+
             t_start = task.getStart()
             t_finish = task.getFinish()
             t_pct = task.getPercentageComplete() 
             t_outline = task.getOutlineLevel() # Integer
             
             # Skip tasks without ID?
-            if not t_id: continue 
+            if not t_id: 
+                 # Maybe it's a null task
+                 continue 
             
             # --- Field Conversion ---
             # ID
@@ -392,11 +412,23 @@ def parse_mpp(content: bytes) -> dict:
                  # Raw is like: 2024-01-26T14:00
                  try:
                      s_str = str(t_start)
+                     if ' Mon ' in s_str or ' Tue ' in s_str: 
+                          # Java Date toString() is crazy sometimes?
+                          # Actually MPXJ returns java.util.Date usually converted to str by jpype
+                          # But let's trust string conversion or use specific accessors
+                          pass
+                     
                      if 'T' in s_str:
                          start_val = datetime.datetime.fromisoformat(s_str)
                      else:
                          # Fallback if just YYYY-MM-DD
-                         start_val = datetime.datetime.strptime(s_str, "%Y-%m-%d")
+                         # sanitize
+                         s_str = s_str.split(' ')[0] 
+                         try:
+                            start_val = datetime.datetime.strptime(s_str, "%Y-%m-%d")
+                         except:
+                            # Try other format?
+                            pass
                  except: 
                      pass
 
@@ -407,7 +439,10 @@ def parse_mpp(content: bytes) -> dict:
                      if 'T' in f_str:
                          finish_val = datetime.datetime.fromisoformat(f_str)
                      else:
-                         finish_val = datetime.datetime.strptime(f_str, "%Y-%m-%d")
+                         f_str = f_str.split(' ')[0]
+                         try:
+                             finish_val = datetime.datetime.strptime(f_str, "%Y-%m-%d")
+                         except: pass
                  except: pass
 
             # Percent
