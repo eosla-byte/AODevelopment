@@ -262,7 +262,7 @@
         <!-- TOOLBAR -->
         <div id="toolbar">
             <h1 class="font-bold mr-4">{{ project.name }}</h1>
-            <span class="text-xs text-gray-300 hidden">DEPLOY_FIX_FINAL</span>
+            <span class="text-xs text-green-500 font-bold">DEPLOY_FIX_FINAL_V2</span>
 
             <!-- Zoom Controls -->
             <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomOut()">
@@ -286,7 +286,7 @@
                         <i class="fas fa-file-import mr-2"></i> Importar .mpp
                     </button>
                     <input type="file" id="file-upload" class="hidden" accept=".mpp,.xml"
-                        onchange="handleFileUpload(event)">
+                        onchange="handleFileUploadV2(event)">
                     <button onclick="saveAll()" id="btn-save-all"
                         class="bg-green-600 text-white px-3 py-1 rounded shadow text-sm flex items-center hover:bg-green-700">
                         <i class="fas fa-save mr-2"></i> Guardar Todo
