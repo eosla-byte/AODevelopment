@@ -346,6 +346,8 @@
             lookAheadWeeks: 3,
             showLookAhead: false,
             companyColors: {},
+            hiddenContractors: new Set(),
+
             projectSettings: {},
             // Formatting & AutoSave
             autoSaveTimer: null,
@@ -1131,6 +1133,33 @@
             modal.appendChild(addIdx);
             // --------------------------------
 
+            // --- NEW: Global Visibility Controls ---
+            const controls = document.createElement('div');
+            controls.className = "px-6 py-2 bg-gray-100 border-b flex space-x-3 text-xs";
+
+            const btnAll = document.createElement('button');
+            btnAll.className = "text-blue-600 hover:text-blue-800 font-medium";
+            btnAll.innerText = "Seleccionar Todo";
+            btnAll.onclick = () => {
+                State.hiddenContractors.clear();
+                openCompanyModal(); // Re-render modal
+                render(); // Re-render Gantt
+            };
+
+            const btnNone = document.createElement('button');
+            btnNone.className = "text-blue-600 hover:text-blue-800 font-medium";
+            btnNone.innerText = "Deseleccionar Todo";
+            btnNone.onclick = () => {
+                contractors.forEach(c => State.hiddenContractors.add(c));
+                openCompanyModal();
+                render();
+            };
+
+            controls.appendChild(btnAll);
+            controls.appendChild(btnNone);
+            modal.appendChild(controls);
+            // ---------------------------------------
+
             const body = document.createElement('div');
             body.className = "p-6 overflow-y-auto flex-1";
 
@@ -1143,6 +1172,20 @@
 
                     const left = document.createElement('div');
                     left.className = "flex items-center";
+
+                    // VISIBILITY CHECKBOX
+                    const check = document.createElement('input');
+                    check.type = 'checkbox';
+                    check.className = "mr-3 w-4 h-4 text-blue-600 rounded";
+                    check.checked = !State.hiddenContractors.has(c);
+                    check.onchange = (e) => {
+                        if (e.target.checked) {
+                            State.hiddenContractors.delete(c);
+                        } else {
+                            State.hiddenContractors.add(c);
+                        }
+                        render();
+                    };
 
                     const colorInput = document.createElement('input');
                     colorInput.type = 'color';
@@ -1181,6 +1224,7 @@
                         // Optional: Highlight success?
                     };
 
+                    left.appendChild(check); // Add checkbox
                     left.appendChild(colorInput);
                     left.appendChild(name);
                     left.appendChild(btnAssign);
@@ -1844,6 +1888,10 @@
             let hiddenLevel = -1;
 
             State.tasks.forEach(task => {
+                // FILTER: Contractor Visibility
+                if (task.contractor && State.hiddenContractors.has(task.contractor.trim())) return;
+
+
                 if (hiddenLevel > -1 && task.level > hiddenLevel) return;
                 if (hiddenLevel > -1 && task.level <= hiddenLevel) hiddenLevel = -1;
                 if (task.isSummary && task.collapsed && hiddenLevel === -1) hiddenLevel = task.level;
