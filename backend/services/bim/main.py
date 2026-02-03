@@ -103,7 +103,6 @@ def ensure_schema_updates():
                          print("Adding 'cell_styles' column...")
                          conn.execute(text("ALTER TABLE bim_activities ADD COLUMN cell_styles JSON DEFAULT '{}'"))
 
-                     # Check BimProjects for 'settings'
                      if insp.has_table("bim_projects"):
                          proj_cols = [c['name'] for c in insp.get_columns("bim_projects")]
                          if "settings" not in proj_cols:
