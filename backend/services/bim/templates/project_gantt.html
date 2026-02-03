@@ -895,14 +895,21 @@
                 };
 
                 try {
-                    await fetch(`/api/activities/${id}`, {
+                    const res = await fetch(`/api/activities/${id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
+
+                    if (!res.ok) {
+                        const errText = await res.text();
+                        console.error("Save Failed for", id, res.status, errText);
+                        alert(`Error guardando tarea: ${res.status} - ${errText}`);
+                        State.dirtyTasks.add(id); // Re-add
+                    }
                 } catch (e) {
-                    console.error("Failed to save", id, e);
-                    State.dirtyTasks.add(id); // Re-add on failure
+                    console.error("Network Error saving", id, e);
+                    State.dirtyTasks.add(id);
                 }
             });
 
@@ -910,9 +917,14 @@
 
             const status = document.getElementById('save-status');
             if (status) {
-                status.innerText = "Guardado";
-                status.classList.remove('text-orange-400');
-                status.classList.add('text-green-500');
+                if (State.dirtyTasks.size === 0) {
+                    status.innerText = "Guardado";
+                    status.classList.remove('text-orange-400');
+                    status.classList.add('text-green-500');
+                } else {
+                    status.innerText = "Error - Reintentando...";
+                    status.classList.add('text-red-500');
+                }
             }
         }
 
@@ -1768,6 +1780,16 @@
                     // Attach Events
                     td.onmousedown = (e) => GridController.handleMouseDown(e, task, col.id);
                     td.onmouseenter = (e) => GridController.handleMouseEnter(e, task, col.id);
+                    // Double Click on TD (Safer)
+                    td.ondblclick = (e) => {
+                        console.log("DBLCLICK on TD", task.id, col.id);
+                        if (col.editable) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            State.activeCell = { taskId: task.id, colId: col.id };
+                            enterEditMode();
+                        }
+                    };
 
                     if (col.id === 'name') {
                         td.style.paddingLeft = (task.level * 20 + 8) + 'px';
@@ -1841,132 +1863,124 @@
                             icon.title = `${task.comments.length} comentarios`;
                             div.appendChild(icon);
                         }
-                        // Double Click to Edit
-                        div.ondblclick = (e) => {
-                            if (col.editable) {
-                                // Force Active Cell Update
-                                State.activeCell = { taskId: task.id, colId: col.id };
-                                enterEditMode();
-                            }
-                        };
                     }
+                }
 
                     // APPLY CELL STYLES
                     if (task.cellStyles && task.cellStyles[col.id]) {
-                        const s = task.cellStyles[col.id];
-                        if (s.fontWeight) div.style.fontWeight = s.fontWeight;
-                        if (s.color) div.style.color = s.color;
-                        if (s.backgroundColor) td.style.backgroundColor = s.backgroundColor;
-                        if (s.fontSize) div.style.fontSize = s.fontSize;
-                    }
-
-                    td.appendChild(div);
-
-                    /* OLD EDIT LOGIC REMOVED (contentEditable) */
-
-                    // FILL HANDLE (If Active Cell)
-                    if (State.activeCell && State.activeCell.taskId === task.id && State.activeCell.colId === col.id) {
-                        const handle = document.createElement('div');
-                        handle.className = 'fill-handle';
-                        td.appendChild(handle);
-                    }
-
-                    tr.appendChild(td);
-                    leftOffset += col.width;
-                });
-
-                const ganttTd = document.createElement('td');
-                ganttTd.className = 'gantt-cell';
-                const barSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                barSvg.style.width = State.totalWidth + 'px';
-                barSvg.style.height = '100%';
-                barSvg.style.display = 'block';
-
-                if (task.start && task.end) {
-                    const x = timeToX(task.start);
-                    const w = timeToX(task.end) - x;
-
-                    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-                    g.classList.add('gantt-bar-group'); // Add class for context menu
-                    g.setAttribute('data-id', task.id); // Add data-id for context menu
-
-                    let barH = 20;
-                    let barY = 6;
-                    let barColor = '#3b82f6';
-                    let barRadius = 3;
-
-                    if (task.isSummary) {
-                        barH = 12; barY = 6; barColor = '#000'; barRadius = 0;
-                        // Summary Bar (Black Bracket)
-                        const rect = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                        // Draw bracket shape
-                        // M x,y+h L x,y L x+w,y L x+w,y+h
-                        const d = `M ${x},${barY + barH} L ${x},${barY} L ${x + w},${barY} L ${x + w},${barY + barH}`;
-                        rect.setAttribute('d', d);
-                        rect.setAttribute('fill', 'none');
-                        rect.setAttribute('stroke', '#000');
-                        rect.setAttribute('stroke-width', '2');
-                        g.appendChild(rect);
-                    } else {
-                        // Standard Task Bar
-                        // 1. Background (Light Blue)
-                        const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                        bgRect.setAttribute('x', x); bgRect.setAttribute('y', barY);
-                        bgRect.setAttribute('width', Math.max(w, 5)); bgRect.setAttribute('height', barH);
-
-                        // COLOR LOGIC: Check Company Color -> Default Blue
-                        const companyColor = (task.contractor && State.companyColors[task.contractor]) ? State.companyColors[task.contractor] : '#dbeafe';
-                        // If company color is set, use it for background? Or Progress?
-                        // Usually Gantt background is pale, progress is dark.
-                        // Let's make Background = Pale version of Company Color? 
-                        // Or just use Company Color for Progress and standard pale blue for background?
-                        // User Request: "sus colores". Implicitly distinctive.
-
-                        // Revised: 
-                        // Background = light gray/blue standard (or very light version of company color if we want to be fancy)
-                        // Progress = Company Color.
-
-                        // Simple: Background #dbeafe (default). 
-                        // Progress uses Company Color if exists, else #3b82f6.
-
-                        bgRect.setAttribute('fill', isHighlighted ? '#fecaca' : '#dbeafe'); // Red/Blue
-
-                        bgRect.setAttribute('rx', barRadius);
-                        g.appendChild(bgRect);
-
-                        // 2. Progress (Dark Blue)
-                        const pct = parseFloat(task.progress || 0) / 100;
-                        if (pct > 0 && !isNaN(pct)) {
-                            const progRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                            progRect.setAttribute('x', x); progRect.setAttribute('y', barY);
-                            const companyFill = (task.contractor && State.companyColors[task.contractor]) ? State.companyColors[task.contractor] : '#3b82f6';
-
-                            progRect.setAttribute('width', Math.max(w * pct, 0));
-                            progRect.setAttribute('height', barH);
-                            progRect.setAttribute('fill', isHighlighted ? '#dc2626' : companyFill); progRect.setAttribute('rx', barRadius);
-                            progRect.setAttribute('fill', isHighlighted ? '#dc2626' : companyFill); progRect.setAttribute('rx', barRadius);
-                            g.appendChild(progRect);
-                        }
-
-                        // 3. Comment Icon on Bar
-                        if (task.comments && task.comments.length > 0) {
-                            const iconText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                            iconText.setAttribute('x', x + w + 5);
-                            iconText.setAttribute('y', barY + 14); // Vertically centered approx
-                            iconText.setAttribute('font-family', '"Font Awesome 6 Free", FontAwesome');
-                            iconText.setAttribute('font-weight', '900');
-                            iconText.setAttribute('font-size', '14');
-                            iconText.setAttribute('fill', '#3b82f6');
-                            iconText.textContent = '\uf086'; // fa-comment-dots
-                            g.appendChild(iconText);
-                        }
-                    }
-                    barSvg.appendChild(g);
+                    const s = task.cellStyles[col.id];
+                    if (s.fontWeight) div.style.fontWeight = s.fontWeight;
+                    if (s.color) div.style.color = s.color;
+                    if (s.backgroundColor) td.style.backgroundColor = s.backgroundColor;
+                    if (s.fontSize) div.style.fontSize = s.fontSize;
                 }
-                ganttTd.appendChild(barSvg);
-                tr.appendChild(ganttTd);
-                tbody.appendChild(tr);
+
+                td.appendChild(div);
+
+                /* OLD EDIT LOGIC REMOVED (contentEditable) */
+
+                // FILL HANDLE (If Active Cell)
+                if (State.activeCell && State.activeCell.taskId === task.id && State.activeCell.colId === col.id) {
+                    const handle = document.createElement('div');
+                    handle.className = 'fill-handle';
+                    td.appendChild(handle);
+                }
+
+                tr.appendChild(td);
+                leftOffset += col.width;
             });
+
+            const ganttTd = document.createElement('td');
+            ganttTd.className = 'gantt-cell';
+            const barSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+            barSvg.style.width = State.totalWidth + 'px';
+            barSvg.style.height = '100%';
+            barSvg.style.display = 'block';
+
+            if (task.start && task.end) {
+                const x = timeToX(task.start);
+                const w = timeToX(task.end) - x;
+
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.classList.add('gantt-bar-group'); // Add class for context menu
+                g.setAttribute('data-id', task.id); // Add data-id for context menu
+
+                let barH = 20;
+                let barY = 6;
+                let barColor = '#3b82f6';
+                let barRadius = 3;
+
+                if (task.isSummary) {
+                    barH = 12; barY = 6; barColor = '#000'; barRadius = 0;
+                    // Summary Bar (Black Bracket)
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    // Draw bracket shape
+                    // M x,y+h L x,y L x+w,y L x+w,y+h
+                    const d = `M ${x},${barY + barH} L ${x},${barY} L ${x + w},${barY} L ${x + w},${barY + barH}`;
+                    rect.setAttribute('d', d);
+                    rect.setAttribute('fill', 'none');
+                    rect.setAttribute('stroke', '#000');
+                    rect.setAttribute('stroke-width', '2');
+                    g.appendChild(rect);
+                } else {
+                    // Standard Task Bar
+                    // 1. Background (Light Blue)
+                    const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    bgRect.setAttribute('x', x); bgRect.setAttribute('y', barY);
+                    bgRect.setAttribute('width', Math.max(w, 5)); bgRect.setAttribute('height', barH);
+
+                    // COLOR LOGIC: Check Company Color -> Default Blue
+                    const companyColor = (task.contractor && State.companyColors[task.contractor]) ? State.companyColors[task.contractor] : '#dbeafe';
+                    // If company color is set, use it for background? Or Progress?
+                    // Usually Gantt background is pale, progress is dark.
+                    // Let's make Background = Pale version of Company Color? 
+                    // Or just use Company Color for Progress and standard pale blue for background?
+                    // User Request: "sus colores". Implicitly distinctive.
+
+                    // Revised: 
+                    // Background = light gray/blue standard (or very light version of company color if we want to be fancy)
+                    // Progress = Company Color.
+
+                    // Simple: Background #dbeafe (default). 
+                    // Progress uses Company Color if exists, else #3b82f6.
+
+                    bgRect.setAttribute('fill', isHighlighted ? '#fecaca' : '#dbeafe'); // Red/Blue
+
+                    bgRect.setAttribute('rx', barRadius);
+                    g.appendChild(bgRect);
+
+                    // 2. Progress (Dark Blue)
+                    const pct = parseFloat(task.progress || 0) / 100;
+                    if (pct > 0 && !isNaN(pct)) {
+                        const progRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                        progRect.setAttribute('x', x); progRect.setAttribute('y', barY);
+                        const companyFill = (task.contractor && State.companyColors[task.contractor]) ? State.companyColors[task.contractor] : '#3b82f6';
+
+                        progRect.setAttribute('width', Math.max(w * pct, 0));
+                        progRect.setAttribute('height', barH);
+                        progRect.setAttribute('fill', isHighlighted ? '#dc2626' : companyFill); progRect.setAttribute('rx', barRadius);
+                        g.appendChild(progRect);
+                    }
+
+                    // 3. Comment Icon on Bar
+                    if (task.comments && task.comments.length > 0) {
+                        const iconText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                        iconText.setAttribute('x', x + w + 5);
+                        iconText.setAttribute('y', barY + 14); // Vertically centered approx
+                        iconText.setAttribute('font-family', '"Font Awesome 6 Free", FontAwesome');
+                        iconText.setAttribute('font-weight', '900');
+                        iconText.setAttribute('font-size', '14');
+                        iconText.setAttribute('fill', '#3b82f6');
+                        iconText.textContent = '\uf086'; // fa-comment-dots
+                        g.appendChild(iconText);
+                    }
+                }
+                barSvg.appendChild(g);
+            }
+            ganttTd.appendChild(barSvg);
+            tr.appendChild(ganttTd);
+            tbody.appendChild(tr);
+        });
         }
 
 

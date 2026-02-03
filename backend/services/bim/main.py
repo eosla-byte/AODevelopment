@@ -837,8 +837,9 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
              # If multiple versions, maybe prefix?
              # For now keep simple.
              
-             tasks_json.append({
-                "id": str(act.activity_id) if act.activity_id else str(act.id),
+            tasks_json.append({
+                "id": str(act.id), # Fix: Use Primary Key to ensure we update THIS version's task
+                "activity_id": act.activity_id, # Keep ref
                 "name": name_display,
                 "start": start_str,
                 "end": end_str,
