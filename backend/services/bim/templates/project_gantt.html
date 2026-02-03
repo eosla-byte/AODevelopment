@@ -259,7 +259,20 @@
     <div id="app">
         <!-- TOOLBAR -->
         <div id="toolbar">
-            <div class="flex items-center space-x-2">
+            <h1 class="font-bold mr-4">{{ project.name }}</h1>
+
+            <!-- Zoom Controls -->
+            <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomOut()">
+                <i class="fas fa-minus"></i>
+            </button>
+            <span id="zoom-label" class="w-16 text-center font-mono text-xs">WEEK</span>
+            <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomIn()">
+                <i class="fas fa-plus"></i>
+            </button>
+            <div class="border-l h-6 mx-2 border-gray-300"></div>
+
+            <!-- Actions -->
+            <div class="flex items-center space-x-2 ml-auto">
                 <button onclick="openImportModal()"
                     class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm flex items-center shadow-sm transition">
                     <i class="fas fa-file-import mr-2"></i> Importar .mpp
@@ -270,8 +283,7 @@
                     <i class="fas fa-save mr-2"></i> Guardar Todo
                 </button>
                 <div id="save-status" class="text-xs text-gray-500 font-medium w-24 text-right">Sincronizado</div>
-            </div> <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomIn()"><i
-                    class="fas fa-plus"></i></button>
+            </div>
         </div>
 
         <!-- MASTER SCROLL -->
@@ -358,8 +370,8 @@
         }
 
         // Post-process server tasks
-        // Defensive check: project.settings might be undefined if migration failed or object not reloaded
-        const projectSettings = {{ project.settings | default ({}) | tojson | safe }} || {};
+        // Defensive check: use explicitly passed safe settings
+        const projectSettings = {{ project_settings_json | tojson | safe }} || {};
         State.projectSettings = projectSettings;
         if (projectSettings.companyColors) {
             State.companyColors = projectSettings.companyColors;

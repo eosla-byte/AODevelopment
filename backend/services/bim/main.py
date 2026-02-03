@@ -703,9 +703,17 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
             
         # DEBUG OBJECT STATE
         print(f"DEBUG: Project Object: {project}")
+        safe_settings = {}
         try:
-             print(f"DEBUG: Project Settings Attr Exists: {hasattr(project, 'settings')}")
-             print(f"DEBUG: Project Settings Value: {getattr(project, 'settings', 'ATTR_MISSING')}")
+             if hasattr(project, 'settings'):
+                  safe_settings = project.settings or {}
+             else:
+                  print("DEBUG: Fetching settings via SQL Fallback")
+                  res = db.execute(text("SELECT settings FROM bim_projects WHERE id = :pid"), {"pid": project_id}).fetchone()
+                  if res and res[0]:
+                    import json
+                    val = res[0]
+                    safe_settings = json.loads(val) if isinstance(val, str) else val
         except Exception as e:
              print(f"DEBUG: Error inspecting project settings: {e}")
 
@@ -716,7 +724,8 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
             "tasks_json": tasks_str,
             "version": latest_version,
             "all_versions": all_versions,
-            "user": user
+            "user": user,
+            "project_settings_json": safe_settings or {}
         })
     finally:
         db.close()
