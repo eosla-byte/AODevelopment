@@ -167,208 +167,129 @@ def parse_mpp(content: bytes) -> dict:
     Parses .mpp file using MPXJ (via JPype).
     Requires 'jdk' in system and 'jpype1', 'mpxj' python packages.
     """
+# --- JVM UTILS ---
+def find_libjvm(root_path):
+    """Recursively find libjvm.so"""
+    if not root_path or not os.path.exists(root_path): return None
+    for root, dirs, files in os.walk(root_path):
+        if "libjvm.so" in files:
+            return os.path.join(root, "libjvm.so")
+    return None
+
+def ensure_jvm_started():
+    """Foundational function to find and start JVM"""
     import jpype
-    import mpxj # This automatically adds mpxj jars to jpype classpath on import
-    import tempfile
+    import mpxj
     import os
     import shutil
-    import sys
     import glob
-    
     import tarfile
     import urllib.request
-    
-    # 1. Ensure JVM is started
-    if not jpype.isJVMStarted():
+    import sys
+
+    if jpype.isJVMStarted():
+        return "JVM Already Started"
+
+    print("DEBUG: ensure_jvm_started() called. Hunting for libjvm.so...")
+
+    # A. Resolve JAVA_HOME
+    java_home = os.environ.get("JAVA_HOME")
+    jvm_path = None
+
+    # 1. Standard Search in JAVA_HOME
+    if java_home:
+        candidates = [
+            os.path.join(java_home, "lib", "server", "libjvm.so"),
+            os.path.join(java_home, "lib", "amd64", "server", "libjvm.so"),
+            os.path.join(java_home, "jre", "lib", "amd64", "server", "libjvm.so"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                jvm_path = c
+                break
+        if not jvm_path:
+            jvm_path = find_libjvm(java_home)
+
+    # 2. Heuristic Search (shutil.which)
+    if not jvm_path:
+        java_bin = shutil.which("java")
+        if java_bin:
+            # /path/to/bin/java -> /path/to
+            possible_home = os.path.dirname(os.path.dirname(os.path.realpath(java_bin)))
+            print(f"DEBUG: Found java binary at {java_bin}, guessing home: {possible_home}")
+            jvm_path = find_libjvm(possible_home)
+            if jvm_path and not java_home:
+                os.environ["JAVA_HOME"] = possible_home
+
+    # 3. Nix Store Search (Robust)
+    if not jvm_path and os.path.exists("/nix/store"):
+        print("DEBUG: Searching /nix/store for libjvm.so...")
+        # Common Nix paths for JDK
+        # patterns: /nix/store/*jdk*/lib/server/libjvm.so
+        #           /nix/store/*headless*/lib/server/libjvm.so
+        nix_candidates = glob.glob("/nix/store/*jdk*/lib/server/libjvm.so")
+        if not nix_candidates:
+            nix_candidates = glob.glob("/nix/store/*headless*/lib/server/libjvm.so")
         
-        def download_jdk():
-            """Downloads and extracts JDK to /tmp/jdk if missing."""
-            JDK_URL = "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.9%2B9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.9_9.tar.gz"
-            DEST_DIR = "/tmp/jdk"
-            LIBJVM_PATH = os.path.join(DEST_DIR, "lib", "server", "libjvm.so")
-            
-            # Check if likely already installed (e.g. from previous run if persistent /tmp?)
-            # Actually /tmp is usually ephemeral, so we assume fresh download or check existence
-            if os.path.exists(LIBJVM_PATH):
-                return LIBJVM_PATH
-
-            print(f"DEBUG: Downloading JDK from {JDK_URL}...")
-            try:
-                if not os.path.exists(DEST_DIR):
-                    os.makedirs(DEST_DIR)
-                
-                tar_path = os.path.join(DEST_DIR, "jdk.tar.gz")
-                urllib.request.urlretrieve(JDK_URL, tar_path)
-                
-                print("DEBUG: Extracting JDK...")
-                with tarfile.open(tar_path, "r:gz") as tar:
-                    # Strip first component (jdk-17...) to extract directly to DEST_DIR
-                    # Python tarfile doesn't support strip_components easily like cli
-                    # So we verify member names
-                    for member in tar.getmembers():
-                        # remove first path segment
-                        api_path = member.name.split('/', 1)
-                        if len(api_path) > 1:
-                            member.name = api_path[1]
-                            tar.extract(member, path=DEST_DIR)
-                
-                print("DEBUG: JDK Extracted.")
-                # Verify
-                # Recursive search in /tmp/jdk because structure might vary
-                found = find_libjvm(DEST_DIR)
-                if found: return found
-                
-            except Exception as e:
-                print(f"CRITICAL: Runtime JDK Download failed: {e}")
-                import traceback
-                traceback.print_exc()
-            
-            return None
-
-        # Helper to recursively find libjvm.so
-        def find_libjvm(root_path):
-            if not root_path or not os.path.exists(root_path): return None
-            for root, dirs, files in os.walk(root_path):
-                if "libjvm.so" in files:
-                    return os.path.join(root, "libjvm.so")
-            return None
-
-        # A. Resolve JAVA_HOME (Existing logic)
-        java_home = os.environ.get("JAVA_HOME")
-        jvm_path = None
+        # Deep search attempt if glob fails
+        if not nix_candidates:
+            # Look for ANY libjvm.so in nix store (expensive?)
+            # Limit to *jdk* folders to be safe
+            jdk_dirs = glob.glob("/nix/store/*jdk*") + glob.glob("/nix/store/*headless*")
+            for d in jdk_dirs:
+                found = find_libjvm(d)
+                if found:
+                    nix_candidates.append(found)
+                    break 
         
-        # ... existing search logic ...
-        
-        # Strategy 3: RUNTIME DOWNLOAD (The Ultra-Nuclear Option)
-        if not jvm_path:
-            print("WARNING: No JVM found. Attempting Runtime Download...")
-            jvm_path = download_jdk()
-            if jvm_path:
-                print(f"DEBUG: Runtime Download successful. JVM at {jvm_path}")
-                # Set env vars for other tools if needed
-                os.environ["JAVA_HOME"] = os.path.dirname(os.path.dirname(os.path.dirname(jvm_path)))
+        if nix_candidates:
+            jvm_path = nix_candidates[0]
+            print(f"DEBUG: Found in Nix Store: {jvm_path}")
+            # Try to infer JAVA_HOME
+            # .../lib/server/libjvm.so -> .../ -> ...
+            new_home = os.path.dirname(os.path.dirname(os.path.dirname(jvm_path)))
+            if not os.environ.get("JAVA_HOME"):
+                 os.environ["JAVA_HOME"] = new_home
 
-        if not jvm_path:
-             print("CRITICAL: libjvm.so not found via any method.")
-             # ... error handling ...
-        if not java_home:
-            java_path = shutil.which("java")
-            print(f"DEBUG: shutil.which('java') returned: {java_path}")
-            
-            if java_path:
-                # /nix/store/.../bin/java -> go up two levels
-                real_path = os.path.realpath(java_path)
-                java_home = os.path.dirname(os.path.dirname(real_path))
-                os.environ["JAVA_HOME"] = java_home
-                print(f"Auto-detected JAVA_HOME: {java_home}")
-            else:
-                print(f"DEBUG: PATH env var: {os.environ.get('PATH')}")
-        
-        # B. Hunt for libjvm.so
-        jvm_path = None
-        
-        # Strategy 1: Standard Search in Home
-        if java_home:
-            # Try specific common subpaths first for speed
-            candidates = [
-                os.path.join(java_home, "lib", "server", "libjvm.so"),
-                os.path.join(java_home, "lib", "amd64", "server", "libjvm.so"),
-                os.path.join(java_home, "jre", "lib", "amd64", "server", "libjvm.so"),
-                os.path.join(java_home, "lib", "jvm.cfg"), # Check existence
-            ]
-            for c in candidates:
-                if os.path.exists(c) and c.endswith("libjvm.so"):
-                    jvm_path = c
-                    break
-            
-            # If not in obvious spots, deep search inside Home
-            if not jvm_path:
-                jvm_path = find_libjvm(java_home)
+    # 4. System Paths
+    if not jvm_path:
+        sys_paths = ["/usr/lib/jvm", "/usr/java", "/opt/java", "/app/jdk"]
+        for p in sys_paths:
+            found = find_libjvm(p)
+            if found:
+                jvm_path = found
+                break
 
-        # Strategy 1.5: System Paths (Apt/Debian/Ubuntu/Manual)
-        if not jvm_path:
-             print("Searching /app/jdk and /usr/lib/jvm for libjvm.so...")
-             if os.path.exists("/app/jdk"):
-                 jvm_path = find_libjvm("/app/jdk")
-             
-             if not jvm_path:
-                 jvm_path = find_libjvm("/usr/lib/jvm")
-             
-        if not jvm_path and os.path.exists("/usr/java"):
-             jvm_path = find_libjvm("/usr/java")
-
-        # Strategy 2: Nix Store Wildcards (Last Resort - Very Broad)
-        if not jvm_path:
-            print("Searching /nix/store for libjvm.so (Broad Search)...")
-            
-            # DEBUG: Walk nix store level 2 to see what packages exist
-            try:
-                print("DEBUG: Walking /nix/store to find jdk...")
-                for root, dirs, files in os.walk("/nix/store"):
-                    if root.count(os.sep) - "/nix/store".count(os.sep) > 2:
-                        del dirs[:] # Don't go deep
-                        continue
-                    for d in dirs:
-                        if "jdk" in d or "jvm" in d or "headless" in d:
-                            print(f"DEBUG: Found candidate dir: {d}")
-                            # Check if libjvm exists inside
-                            find_libjvm(os.path.join(root, d))
-            except Exception as e:
-                print(f"DEBUG: Error walking nix store: {e}")
-
-            # 1. Broadest Search: Any package having lib/server/libjvm.so
-            # 1. Broadest Search: Any package having lib/server/libjvm.so
-            nix_dirs = glob.glob("/nix/store/*/lib/server/libjvm.so") 
-            
-            # 2. Arch specific
-            if not nix_dirs:
-                nix_dirs = glob.glob("/nix/store/*/lib/*/server/libjvm.so")
-
-            if nix_dirs:
-                # Prefer one that looks like 'jdk' or 'headless'
-                best_match = nix_dirs[0]
-                for p in nix_dirs:
-                    if "jdk" in p and "headless" in p:
-                         best_match = p
-                         break
-                jvm_path = best_match
-                print(f"DEBUG: Found libjvm.so in nix store: {jvm_path}")
-
-        if not jvm_path:
-             # Final fallback: use default and pray (likely fails based on logs)
-             try:
-                 jvm_path = jpype.getDefaultJVMPath()
-             except: pass
-
-        if not jvm_path:
-             print("CRITICAL: libjvm.so not found via any method.")
-             print(f"DEBUG: CWD is {os.getcwd()}")
-             print("DEBUG: Listing /nix/store top level (filtered)...")
-             try:
-                 # Last ditch debug: print what jdk libs exist
-                 debug_glob = glob.glob("/nix/store/*jdk*") + glob.glob("/nix/store/*openjdk*")
-                 print(f"DEBUG: Available JDK paths in store: {debug_glob[:5]}")
-                 print(f"DEBUG: All Keys: {list(os.environ.keys())}")
-                 if "JAVA_HOME" in os.environ:
-                     print(f"DEBUG: JAVA_HOME={os.environ['JAVA_HOME']}")
-             except: pass
-             
-             raise ValueError("CRITICAL: libjvm.so not found! Please set JAVA_HOME validly.")
-
-        print(f"Starting JVM with lib: {jvm_path}")
-
+    # 5. Default Fallback
+    if not jvm_path:
         try:
-            # Explicitly pass classpath from jpype.getClassPath() which mpxj populated
-            jpype.startJVM(jvm_path, classpath=jpype.getClassPath())
-        except Exception as e:
-            if "JVM is already started" in str(e):
-                pass
-            else:
-                print(f"JVM Start Error: {e}")
-                # Analyze common crashers
-                if "libjvm.so" in str(e):
-                     raise ValueError(f"JVM Link Error: {e}")
-                raise e
+            jvm_path = jpype.getDefaultJVMPath()
+        except: pass
+
+    if not jvm_path:
+        raise ValueError("CRITICAL: libjvm.so not found. Please install a JDK (e.g. jdk17 in nixpacks).")
+
+    print(f"DEBUG: Starting JVM with {jvm_path}")
+    try:
+        jpype.startJVM(jvm_path, classpath=jpype.getClassPath())
+        return jvm_path
+    except Exception as e:
+        if "JVM is already started" in str(e):
+             return "JVM Already Started"
+        raise e
+
+def parse_mpp(content: bytes) -> dict:
+    """
+    Parses .mpp file using MPXJ.
+    """
+    import jpype
+    import mpxj 
+    import tempfile
+    import os
+
+    # Ensure JVM
+    ensure_jvm_started()
+
 
     # 2. Import Java Classes via JPype
     try:

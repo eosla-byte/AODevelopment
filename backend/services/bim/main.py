@@ -938,6 +938,17 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
     finally:
         db.close()
 
+@app.on_event("startup")
+async def startup_event():
+    # Warmup JVM (Find and Start)
+    try:
+        from schedule_parser import ensure_jvm_started
+        print("INFO: Attempting to start JVM on startup...")
+        path = ensure_jvm_started()
+        print(f"INFO: JVM Started successfully at {path}")
+    except Exception as e:
+        print(f"WARNING: JVM Startup failed: {e}. Import features will differ.")
+
 @app.get("/api/debug/jvm")
 def debug_jvm():
     """Checks JVM status and Environment"""
@@ -945,14 +956,22 @@ def debug_jvm():
     import shutil
     try:
         import jpype
+        from schedule_parser import ensure_jvm_started
+        
+        # Try to ensure it's started if not
+        try:
+            ensure_jvm_started()
+        except: pass
+
         jvm_started = jpype.isJVMStarted()
         java_home = os.environ.get("JAVA_HOME")
         path_java = shutil.which("java")
+        
         return {
             "jvm_started": jvm_started,
             "java_home": java_home,
             "java_binary": path_java,
-            "jpype_path": jpype.getDefaultJVMPath() if not jvm_started else "JVM Running"
+            "details": "JVM managed by ensure_jvm_started"
         }
     except Exception as e:
         return {"error": str(e)}
