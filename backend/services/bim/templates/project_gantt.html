@@ -358,7 +358,7 @@
             childrenIds: [],
             parentId: null,
             orderIndex: i,
-            comments: t.comments ? JSON.parse(t.comments) : [] // Parse comments from string
+            comments: (typeof t.comments === 'string' ? JSON.parse(t.comments) : (t.comments || []))
         }));
 
         // Init Look Ahead defaults (Today)
