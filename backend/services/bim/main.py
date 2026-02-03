@@ -721,6 +721,7 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
              if "UndefinedColumn" in err_str or 'column "settings" does not exist' in err_str:
                  print("DEBUG: Lazy Migration - Adding 'settings' column...")
                  try:
+                     db.rollback() # Fix: Rollback the failed transaction first!
                      db.execute(text("ALTER TABLE bim_projects ADD COLUMN settings JSON DEFAULT '{}'"))
                      db.commit()
                      print("DEBUG: Lazy Migration Successful. Retrying fetch.")
