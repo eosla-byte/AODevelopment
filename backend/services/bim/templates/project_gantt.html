@@ -1063,79 +1063,88 @@
             }, 500);
         }
 
-        // --- IMPORT LOGIC ---
-        // --- IMPORT LOGIC ---
-        async function handleFileUpload(e) {
-            // DEBUG: Trace execution
-            // alert("DEBUG: handleFileUpload triggered"); 
+        // --- IMPORT LOGIC V2 (Cache Buster) ---
+        async function handleFileUploadV2(e) {
+            const debugEl = document.getElementById('save-status');
+            if (debugEl) debugEl.innerHTML = '<span class="text-blue-600">Iniciando Import...</span>';
+
+            console.log("AO Gantt: Import V2 Triggered");
 
             try {
+                // Validate Event
                 if (!e || !e.target || !e.target.files) {
-                    alert("DEBUG ERROR: Event or target missing. e=" + e);
+                    const msg = "Error: Evento inválido. Recarga la página (Ctrl+F5).";
+                    if (debugEl) debugEl.innerHTML = `<span class="text-red-600 font-bold">${msg}</span>`;
+                    alert(msg);
                     return;
                 }
 
                 const file = e.target.files[0];
-                if (!file) return;
-
-                if (!confirm(`¿Importar ${file.name}? Esto creará una nueva versión.`)) {
-                    e.target.value = ''; // Reset
+                if (!file) {
+                    if (debugEl) debugEl.innerHTML = 'Cancelado';
                     return;
                 }
+
+                if (!confirm(`¿Importar ${file.name}? Esto reemplezará la versión actual.`)) {
+                    e.target.value = '';
+                    if (debugEl) debugEl.innerHTML = 'Cancelado por usuario';
+                    return;
+                }
+
+                if (debugEl) debugEl.innerHTML = '<span class="text-orange-500"><i class="fas fa-spinner fa-spin"></i> Enviando...</span>';
 
                 const formData = new FormData();
                 formData.append('file', file);
 
                 const urlParts = window.location.pathname.split('/');
-                const projectId = urlParts[urlParts.length - 1]; // Assume ID is last part
+                const projectId = urlParts[urlParts.length - 1];
 
-                // Defensive button finding
+                // Button UI Update
                 let btn = e.target.previousElementSibling;
-                // Verify it's actually the button
+                // Fallback search
                 if (!btn || btn.tagName !== 'BUTTON') {
-                    // Try finding my ID explicitly if sibling search fails?
-                    // But for now just don't crash
-                    console.warn("Could not find button sibling");
-                    btn = { innerHTML: '', disabled: false }; // Mock
+                    btn = document.querySelector('button[onclick*="file-upload"]');
                 }
 
-                const originalText = btn.innerHTML;
-                if (btn.tagName === 'BUTTON') {
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Subiendo...';
+                const originalText = btn ? btn.innerHTML : 'Importar';
+                if (btn) {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
                     btn.disabled = true;
                 }
 
-                // alert("DEBUG: Sending request to /api/projects/" + projectId + "/schedule");
+                // FETCH
+                console.log("AO Gantt: Sending POST to /api/projects/" + projectId + "/schedule");
 
                 const res = await fetch(`/api/projects/${projectId}/schedule`, {
                     method: 'POST',
                     body: formData
                 });
 
-                // alert("DEBUG: Response status: " + res.status);
+                console.log("AO Gantt: Response", res.status);
 
                 if (res.ok) {
+                    if (debugEl) debugEl.innerHTML = '<span class="text-green-600 font-bold">¡Éxito! Recargando...</span>';
                     alert('Importación exitosa. Recargando...');
                     window.location.reload();
-                } else if (res.status === 401) {
-                    alert('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
-                    window.location.href = '/auth/login?next=' + encodeURIComponent(window.location.pathname);
                 } else {
                     const err = await res.json();
-                    alert('Error en servidor: ' + (err.detail || 'Error desconocido'));
+                    const errMsg = err.detail || 'Error desconocido';
+                    if (debugEl) debugEl.innerHTML = `<span class="text-red-600 font-bold">Error: ${errMsg}</span>`;
+                    alert('Error del Servidor: ' + errMsg);
+
+                    if (res.status === 401) {
+                        window.location.href = '/auth/login';
+                    }
                 }
             } catch (err) {
                 console.error(err);
+                if (debugEl) debugEl.innerHTML = `<span class="text-red-600 font-bold">Crash: ${err.message}</span>`;
                 alert('Error Crítico Frontend: ' + err.message);
             } finally {
                 if (e && e.target) e.target.value = '';
-                // Restore button if real
-                const btn = e.target.previousElementSibling;
-                if (btn && btn.tagName === 'BUTTON') {
-                    // We need to restore original text but we didn't save it in outer scope easily
-                    // Actually we did.
-                    // But let's just restore hardcoded fallback to be safe or originalText if valid
-                    btn.innerHTML = '<i class="fas fa-file-import mr-2"></i> Importar .mpp';
+                // Restore button
+                if (btn) {
+                    btn.innerHTML = originalText;
                     btn.disabled = false;
                 }
             }
