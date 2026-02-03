@@ -899,17 +899,17 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
     
     db = SessionExt()
     try:
-        # Check by Int ID (if purely numeric) or String ID (if using P6 IDs)
-        # My model uses Integer ID as PK, but Activity ID as String.
-        # Frontend Frappe Gantt usually uses the "id" field provided in JSON.
-        # In my view_project_gantt, I used "str(act.activity_id) if act.activity_id else str(act.id)".
-        # This is ambitious. Let's try to match either.
+        # FIX: Check by Int ID (PK) FIRST to ensure we target the exact version being viewed.
+        # The frontend sends the database ID (e.g. 1502), which is unique.
+        # P6 Activity IDs (e.g. "A1000") are strings and duplicated across versions.
         
-        act = db.query(BimActivity).filter(BimActivity.activity_id == activity_id).first()
+        act = None
+        if activity_id.isdigit():
+             act = db.query(BimActivity).filter(BimActivity.id == int(activity_id)).first()
+        
         if not act:
-            # Try by PK
-            if activity_id.isdigit():
-                 act = db.query(BimActivity).filter(BimActivity.id == int(activity_id)).first()
+             # Fallback to Activity ID (P6 ID) string 
+             act = db.query(BimActivity).filter(BimActivity.activity_id == activity_id).first()
              
         if not act:
             raise HTTPException(status_code=404, detail="Activity not found")
