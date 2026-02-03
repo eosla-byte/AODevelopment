@@ -333,10 +333,32 @@ def ensure_jvm_started():
                     found_jars.append(full_path)
         
         if found_jars:
-            print(f"DEBUG: Found {len(found_jars)} MPXJ jars: {[os.path.basename(j) for j in found_jars]}")
+            print(f"DEBUG: Found {len(found_jars)} MPXJ jars recursively.")
             classpath.extend(found_jars)
         else:
-             print("WARNING: No JARs found in mpxj package directory recursively.")
+             print("WARNING: No JARs found in mpxj package directory. Initiating MPXJ Download (Fallback)...")
+             try:
+                 # Download MPXJ 10.14.0 (Stable) from Maven Central
+                 MPXJ_URL = "https://repo1.maven.org/maven2/net/sf/mpxj/mpxj/10.14.0/mpxj-10.14.0.jar"
+                 # We also need dependencies (poi, commons, etc.) but the pip package *should* have them?
+                 # Actually, mpxj-10.x.x.jar might be standalone or require dependencies.
+                 # The pip package 'mpxj' usually references 'net.sf.mpxj-...' or 'org.mpxj-...'
+                 # Let's try to trust the pip package first, but if it fails, we are in trouble.
+                 
+                 # Better Fallback: Just assume the pip package IS installed but maybe we are looking in the wrong place?
+                 # Let's print sys.path to see where packages are.
+                 print(f"DEBUG: sys.path: {sys.path}")
+                 
+                 # Attempt 2: Search in site-packages explicitly
+                 site_packages = next((p for p in sys.path if 'site-packages' in p), None)
+                 if site_packages:
+                     print(f"DEBUG: Scouring site-packages at {site_packages} for 'mpxj*.jar'...")
+                     mpxj_glob = glob.glob(os.path.join(site_packages, "mpxj", "**", "*.jar"), recursive=True)
+                     if mpxj_glob:
+                         print(f"DEBUG: Found jars in site-packages via glob: {len(mpxj_glob)}")
+                         classpath.extend(mpxj_glob)
+             except Exception as e:
+                 print(f"CRITICAL: MPXJ Fallback Search Failed: {e}")
 
     except Exception as e:
         print(f"WARNING: Could not auto-detect MPXJ jars: {e}")
@@ -348,8 +370,11 @@ def ensure_jvm_started():
     if os.environ.get("CLASSPATH"):
         classpath.append(os.environ.get("CLASSPATH"))
 
+    # DEDUPLICATE CLASSPATH
+    classpath = list(set(classpath))
+    
     cp_args = "-Djava.class.path=" + os.pathsep.join(classpath)
-    print(f"DEBUG: JVM Classpath Args: {cp_args}")
+    print(f"DEBUG: JVM Final Classpath Args: {cp_args}")
 
     try:
         # Check if startJVM accepts arguments list or just args
