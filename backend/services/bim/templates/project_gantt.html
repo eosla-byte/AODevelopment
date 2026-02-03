@@ -1388,6 +1388,7 @@
                         // If c.end is missing, maybe assume c.start?
                     }
                     if (c.end) {
+                        const e = new Date(c.end);
                         if (!maxEnd || e > maxEnd) maxEnd = e;
                     }
 
