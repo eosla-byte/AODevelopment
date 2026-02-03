@@ -714,7 +714,24 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                     val = res[0]
                     safe_settings = json.loads(val) if isinstance(val, str) else val
         except Exception as e:
-             print(f"DEBUG: Error inspecting project settings: {e}")
+             err_str = str(e)
+             print(f"DEBUG: Error inspecting project settings: {err_str}")
+             
+             # LAZY MIGRATION: Auto-fix schema if column missing
+             if "UndefinedColumn" in err_str or 'column "settings" does not exist' in err_str:
+                 print("DEBUG: Lazy Migration - Adding 'settings' column...")
+                 try:
+                     db.execute(text("ALTER TABLE bim_projects ADD COLUMN settings JSON DEFAULT '{}'"))
+                     db.commit()
+                     print("DEBUG: Lazy Migration Successful. Retrying fetch.")
+                     # Retry fetch
+                     res = db.execute(text("SELECT settings FROM bim_projects WHERE id = :pid"), {"pid": project_id}).fetchone()
+                     if res and res[0]:
+                        import json
+                        val = res[0]
+                        safe_settings = json.loads(val) if isinstance(val, str) else val
+                 except Exception as mig_err:
+                     print(f"DEBUG: Lazy Migration Failed: {mig_err}")
 
         return templates.TemplateResponse("project_gantt.html", {
             "request": request,
