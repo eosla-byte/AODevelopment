@@ -11,7 +11,12 @@ import uuid
 import datetime
 import pydantic
 from typing import Optional, List
+from typing import Optional, List
 from sqlalchemy import text, inspect
+import json
+import csv
+import io
+from fastapi.responses import StreamingResponse
 
 # Path Setup to allow importing 'backend.common'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -812,7 +817,7 @@ async def view_project_tasks_board(project_id: str, request: Request, user = Dep
         import json
         tasks_str = json.dumps(tasks_json)
 
-        return templates.TemplateResponse("project_tasks.html", {
+        return templates.TemplateResponse("project_gantt.html", {
             "request": request,
             "project": project,
             "tasks_json": tasks_str,
@@ -897,7 +902,8 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
                         pct_complete=act.get("pct_complete", 0.0),
                         contractor=act.get("contractor"),
                         predecessors=act.get("predecessors"),
-                        style=act.get("style")
+                        style=json.dumps(act.get("style")) if isinstance(act.get("style"), dict) else act.get("style"),
+                        cell_styles=json.dumps(act.get("cell_styles")) if isinstance(act.get("cell_styles"), dict) else act.get("cell_styles")
                     )
                 except TypeError:
                     # Fallback for outdated Deployment Code (Model mismatch)
@@ -1119,7 +1125,105 @@ async def update_project_settings(project_id: str, data: ProjectSettingsRequest,
     finally:
         db.close()
 
-if __name__ == "__main__":
+@app.delete("/api/projects/{project_id}")
+async def delete_project_full(project_id: str, user = Depends(get_current_user)):
+    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    db = SessionExt()
+    try:
+        # 1. Get Project
+        project = db.query(BimProject).filter(BimProject.id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # 2. Cascade Delete: Versions -> Activities
+        versions = db.query(BimScheduleVersion).filter(BimScheduleVersion.project_id == project_id).all()
+        v_ids = [v.id for v in versions]
+        
+        if v_ids:
+            # Delete Activities in bulk
+            db.query(BimActivity).filter(BimActivity.version_id.in_(v_ids)).delete(synchronize_session=False)
+            
+            # Delete Versions
+            db.query(BimScheduleVersion).filter(BimScheduleVersion.project_id == project_id).delete(synchronize_session=False)
+            
+        # 3. Delete Project
+        db.delete(project)
+        db.commit()
+        
+        return {"status": "ok", "message": f"Project {project_id} and all associated data deleted."}
+    except Exception as e:
+        db.rollback()
+        print(f"Delete Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.get("/api/projects/{project_id}/export")
+async def export_project_schedule(project_id: str, user = Depends(get_current_user)):
+    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    db = SessionExt()
+    try:
+        # Get Latest Version
+        latest = db.query(BimScheduleVersion).filter(
+            BimScheduleVersion.project_id == project_id
+        ).order_by(BimScheduleVersion.imported_at.desc()).first()
+        
+        if not latest:
+            raise HTTPException(status_code=404, detail="No schedule versions found to export")
+            
+        # Get Activities
+        activities = db.query(BimActivity).filter(
+            BimActivity.version_id == latest.id
+        ).order_by(text("display_order ASC"), text("id ASC")).all()
+        
+        # Generate CSV
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Headers
+        writer.writerow(['ID', 'Activity ID', 'Task Name', 'Duration', 'Start', 'Finish', '% Complete', 'Contractor', 'WBS', 'Predecessors'])
+        
+        for act in activities:
+            start_str = act.planned_start.strftime("%Y-%m-%d") if act.planned_start else ""
+            end_str = act.planned_finish.strftime("%Y-%m-%d") if act.planned_finish else ""
+            
+            # Calc Duration if needed
+            duration = ""
+            if act.planned_start and act.planned_finish:
+                d = (act.planned_finish - act.planned_start).days
+                duration = f"{d} days"
+            
+            writer.writerow([
+                act.id,
+                act.activity_id or "",
+                act.name,
+                duration,
+                start_str,
+                end_str,
+                f"{int((act.pct_complete or 0) * 100)}%",
+                act.contractor or "",
+                act.wbs_code or "",
+                act.predecessors or ""
+            ])
+            
+        output.seek(0)
+        
+        filename = f"Schedule_{project_id}_{datetime.datetime.now().strftime('%Y%m%d')}.csv"
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        print(f"Export Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
     port = int(os.getenv("PORT", 8004))
     print(f"Starting BIM Service on port {port}")
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

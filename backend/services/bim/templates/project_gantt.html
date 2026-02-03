@@ -275,15 +275,22 @@
 
             <!-- Actions -->
             <div class="flex items-center space-x-2 ml-auto">
-                <button onclick="openImportModal()"
-                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm flex items-center shadow-sm transition">
-                    <i class="fas fa-file-import mr-2"></i> Importar .mpp
-                </button>
-                <button onclick="forceSaveAll()"
-                    class="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-sm flex items-center shadow-sm transition font-bold"
-                    id="btn-save-all">
-                    <i class="fas fa-save mr-2"></i> Guardar Todo
-                </button>
+                <div class="flex space-x-2">
+                    <a href="/api/projects/{{ project.id }}/export" target="_blank"
+                        class="bg-indigo-600 text-white px-3 py-1 rounded shadow text-sm flex items-center hover:bg-indigo-700">
+                        <i class="fas fa-file-export mr-2"></i> Exportar
+                    </a>
+                    <button onclick="document.getElementById('file-upload').click()"
+                        class="bg-blue-600 text-white px-3 py-1 rounded shadow text-sm flex items-center hover:bg-blue-700">
+                        <i class="fas fa-file-import mr-2"></i> Importar .mpp
+                    </button>
+                    <input type="file" id="file-upload" class="hidden" accept=".mpp,.xml"
+                        onchange="handleFileUpload(this)">
+                    <button onclick="saveAll()" id="btn-save-all"
+                        class="bg-green-600 text-white px-3 py-1 rounded shadow text-sm flex items-center hover:bg-green-700">
+                        <i class="fas fa-save mr-2"></i> Guardar Todo
+                    </button>
+                </div>
                 <div id="save-status" class="text-xs text-gray-500 font-medium w-24 text-right">Sincronizado</div>
                 <button onclick="openTaskBoard()"
                     class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm flex items-center shadow-sm transition font-bold ml-2">
