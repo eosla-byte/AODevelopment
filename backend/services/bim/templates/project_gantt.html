@@ -1076,10 +1076,7 @@
             const tasksToSave = Array.from(State.dirtyTasks);
             State.dirtyTasks.clear(); // Optimistic clear
 
-            console.log("AO Gantt: Auto-Saving", State.dirtyTasks.size, "tasks");
-
-            // We save sequentially or parallel? Parallel is fine.
-            // Ideally backend supports bulk update, but we have /api/activities/{id}
+            console.log("AO Gantt: Auto-Saving", tasksToSave.length, "tasks");
 
             const statusLabel = document.getElementById('save-status');
             if (statusLabel) {
@@ -1088,12 +1085,9 @@
                 statusLabel.classList.add('text-orange-400');
             }
 
-            const promises = Array.from(State.dirtyTasks).map(async (id) => {
+            const promises = tasksToSave.map(async (id) => {
                 const task = State.tasks.find(t => t.id === id);
-                if (!task) {
-                    State.dirtyTasks.delete(id);
-                    return;
-                }
+                if (!task) return;
 
                 // Clean data
                 const cleanStart = (typeof task.start === 'string' ? task.start.split('T')[0] : task.start);
@@ -1102,8 +1096,6 @@
 
                 // Clean Style
                 const styleObj = { ...task.style };
-                // Ensure level/collapsed are kept? usually not in style, but top level.
-                // But if style is stringified, we need to ensure structure.
 
                 const payload = {
                     name: task.name,
@@ -1117,13 +1109,41 @@
                     display_order: task.orderIndex,
                     extension_days: parseInt(task.extension_days) || 0
                 };
+
+                // DEBUG: Check payload
+                if (task.server_id == '4615' || task.id == '4615' || task.id.includes('4615')) {
+                    alert(`DEBUG SAVING 4615:\nExtDays: ${payload.extension_days}\nStyles: ${payload.cell_styles}`);
+                }
+
+                try {
+                    const targetId = task.server_id ? task.server_id : id;
+                    const res = await fetch(`/api/activities/${targetId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!res.ok) {
+                        const errText = await res.text();
+                        console.error("Save Failed for", id, res.status, errText);
+                        State.dirtyTasks.add(id); // Re-add to dirty
+                    }
+                } catch (e) {
+                    console.error("Network Error saving", id, e);
+                    State.dirtyTasks.add(id); // Re-add
+                }
+            });
+
+            await Promise.all(promises);
+
+            if (statusLabel) {
                 if (State.dirtyTasks.size === 0) {
-                    status.innerText = "Guardado";
-                    status.classList.remove('text-orange-400');
-                    status.classList.add('text-green-500');
+                    statusLabel.innerText = "Guardado";
+                    statusLabel.classList.remove('text-orange-400');
+                    statusLabel.classList.add('text-green-500');
                 } else {
-                    status.innerText = "Reintentando...";
-                    status.classList.add('text-red-500');
+                    statusLabel.innerText = "Reintentando...";
+                    statusLabel.classList.add('text-red-500');
                 }
             }
         }
