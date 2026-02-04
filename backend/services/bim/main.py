@@ -1326,6 +1326,35 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
     finally:
         db.close()
 
+# --- DELETE ACTIVITY ROUTE ---
+@app.delete("/api/activities/{activity_id}")
+async def delete_activity(activity_id: str, user = Depends(get_current_user)):
+    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    db = SessionExt()
+    try:
+        print(f"DEBUG: DELETE ACTIVITY {activity_id}")
+        
+        act = None
+        if activity_id.isdigit():
+             act = db.query(BimActivity).filter(BimActivity.id == int(activity_id)).first()
+        
+        if not act:
+             act = db.query(BimActivity).filter(BimActivity.activity_id == activity_id).first()
+             
+        if not act:
+            raise HTTPException(status_code=404, detail="Activity not found")
+            
+        db.delete(act)
+        db.commit()
+        return {"status": "ok", "deleted_id": activity_id}
+    except Exception as e:
+        print(f"ERROR DELETE: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
 @app.patch("/api/projects/{project_id}")
 async def update_project_settings(project_id: str, data: ProjectSettingsRequest, user = Depends(get_current_user)):
     if not user: raise HTTPException(status_code=401, detail="Not authenticated")

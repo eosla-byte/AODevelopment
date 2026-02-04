@@ -1660,6 +1660,8 @@
 
                 rows.forEach(t => {
                     t.level = (t.level || 0) + 1;
+                    if (!t.style) t.style = {};
+                    t.style.level = t.level; // Persist to style
                     changed = true;
                 });
 
@@ -1677,6 +1679,8 @@
                 rows.forEach(t => {
                     if (t.level > 0) {
                         t.level--;
+                        if (!t.style) t.style = {};
+                        t.style.level = t.level; // Persist to style
                         triggerAutoSave(t.id);
                     }
                 });
@@ -2606,6 +2610,8 @@
                 <div class="separator"></div>
                 <div class="item" onclick="insertTask('above')"><i class="fas fa-arrow-up mr-2 text-green-600"></i> Insertar Tarea Arriba</div>
                 <div class="item" onclick="insertTask('below')"><i class="fas fa-arrow-down mr-2 text-green-600"></i> Insertar Tarea Abajo</div>
+                <div class="separator"></div>
+                <div class="item text-red-600 hover:bg-red-50" onclick="window.deleteTask(State.contextTask.id)"><i class="fas fa-trash-alt mr-2"></i> Eliminar Tarea</div>
             `;
 
             menu.style.left = x + 'px';
@@ -2658,6 +2664,37 @@
                 initTimeEngine();
                 render(); // Re-render with new width
             }, 100);
+        };
+
+        window.deleteTask = async function (id) {
+            hideContextMenu();
+            if (!confirm("¿Estás seguro de eliminar esta tarea? Esta acción no se puede deshacer.")) return;
+
+            // Backend Call
+            try {
+                // If temporary ID (negative or string-based non-server), just local delete?
+                // Assuming all tasks have IDs.
+                const task = State.tasks.find(t => t.id === id);
+
+                const response = await fetch(`/api/activities/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) throw new Error("Error deleting task");
+
+                // UI Update
+                const idx = State.tasks.findIndex(t => t.id === id);
+                if (idx > -1) {
+                    State.tasks.splice(idx, 1);
+                    HierarchyEngine.recalculate(State.tasks);
+                    render();
+                }
+                console.log("Task deleted.");
+
+            } catch (e) {
+                console.error("Delete failed", e);
+                alert("Error al eliminar en el servidor. Refresca la página.");
+            }
         };
 
         window.insertTask = function (direction) { // 'above' or 'below'
