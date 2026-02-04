@@ -680,15 +680,26 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                  activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).order_by(text("display_order ASC"), text("id ASC")).all()
             except Exception as e:
                  err_str = str(e)
-                 if "UndefinedColumn" in err_str or "display_order" in err_str:
-                     print("DEBUG: Runtime Migration - Adding 'display_order' column...")
+                 print(f"DEBUG: Schema mismatch detected. Attempting Auto-Migration. Error: {e}")
+                 if "UndefinedColumn" in err_str or "does not exist" in err_str:
                      db.rollback()
                      with db.get_bind().connect() as conn:
                          trans = conn.begin()
-                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN display_order INTEGER DEFAULT 0"))
-                         trans.commit()
-                     # Retry
+                         try:
+                             # Robustly add all potentially missing V5 columns
+                             conn.execute(text("ALTER TABLE bim_activities ADD COLUMN IF NOT EXISTS display_order INTEGER DEFAULT 0"))
+                             conn.execute(text("ALTER TABLE bim_activities ADD COLUMN IF NOT EXISTS cell_styles JSON DEFAULT '{}'"))
+                             conn.execute(text("ALTER TABLE bim_activities ADD COLUMN IF NOT EXISTS extension_days INTEGER DEFAULT 0"))
+                             conn.execute(text("ALTER TABLE bim_activities ADD COLUMN IF NOT EXISTS history JSON DEFAULT '[]'"))
+                             trans.commit()
+                             print("DEBUG: Auto-Migration Successful.")
+                         except Exception as mig_err:
+                             trans.rollback()
+                             print(f"DEBUG: Auto-Migration Failed: {mig_err}")
+                     # Retry query
                      activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).order_by(text("display_order ASC"), text("id ASC")).all()
+                 else:
+                     raise e
                  else:
                      raise e
             for act in activities:
