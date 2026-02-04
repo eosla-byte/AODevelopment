@@ -328,7 +328,8 @@
             <div class="item" onclick="insertTask('below')"><i class="fas fa-arrow-down mr-2 text-gray-400"></i>
                 Insertar Tarea Abajo</div>
             <div class="separator"></div>
-            <div class="item" onclick="addExtraTime()"><i class="fas fa-clock mr-2 text-red-500"></i> Agregar Tiempo
+            <div class="item" onclick="triggerAddExtraTime()"><i class="fas fa-clock mr-2 text-red-500"></i> Agregar
+                Tiempo
                 Extra</div>
             <!-- Future: Delete, Indent, etc. -->
         </div>
@@ -2584,7 +2585,7 @@
                 <div class="separator"></div>
                 <div class="item" onclick="State.activeCell={taskId:contextMenuTarget.id, colId:'duration'}; enterEditMode(); hideContextMenu();"><i class="fas fa-edit mr-2"></i> Editar Duración</div>
                 <div class="separator"></div>
-                <div class="item" onclick="addExtraTime()"><i class="fas fa-clock mr-2 text-red-500"></i> Agregar Tiempo Extra</div>
+                <div class="item" onclick="triggerAddExtraTime()"><i class="fas fa-clock mr-2 text-red-500"></i> Agregar Tiempo Extra</div>
                 <div class="separator"></div>
                 <div class="item" onclick="insertTask('above')"><i class="fas fa-arrow-up mr-2 text-green-600"></i> Insertar Tarea Arriba</div>
                 <div class="item" onclick="insertTask('below')"><i class="fas fa-arrow-down mr-2 text-green-600"></i> Insertar Tarea Abajo</div>
