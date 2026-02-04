@@ -479,6 +479,16 @@
                 const serverTasks = {{ tasks | tojson | safe
             }};
         console.log("AO Gantt: Tasks loaded:", serverTasks ? serverTasks.length : 0);
+        if (serverTasks && serverTasks.length > 0) {
+            const debugTask = serverTasks.find(t => t.server_id == '4615' || t.id == '4615' || t.id.includes('4615'));
+            console.log("DEBUG Persistence Check - First Task:", serverTasks[0]);
+            if (debugTask) {
+                console.log("DEBUG Persistence Check - Target Task (4615):", debugTask);
+                console.log("DEBUG 4615 extension_days:", debugTask.extension_days);
+                console.log("DEBUG 4615 cell_styles:", debugTask.cell_styles);
+                alert(`DEBUG: Task 4615 Loaded.\nExt Days: ${debugTask.extension_days}\nStyles: ${JSON.stringify(debugTask.cell_styles)}`);
+            }
+        }
 
         if (!serverTasks || !Array.isArray(serverTasks)) {
             console.error("AO Gantt: Invalid tasks data", serverTasks);
