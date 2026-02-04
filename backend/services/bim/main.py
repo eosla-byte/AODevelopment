@@ -1070,6 +1070,15 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
              
              # Append Version info to name if comparing
              name_display = act.name
+             
+             if "Zona E" in name_display:
+                 try:
+                     print(f"DEBUG PRE-REFRESH: {name_display} (ID: {act.id}) ExtDays: {getattr(act, 'extension_days', 'N/A')}")
+                     db.refresh(act)
+                     print(f"DEBUG POST-REFRESH: {name_display} (ID: {act.id}) ExtDays: {getattr(act, 'extension_days', 'N/A')}")
+                 except Exception as e:
+                     print(f"DEBUG REFRESH ERROR: {e}")
+
              # If multiple versions, maybe prefix?
              # For now keep simple.
              
