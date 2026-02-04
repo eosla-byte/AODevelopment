@@ -2359,16 +2359,27 @@
                         bgRect.setAttribute('rx', barRadius);
                         g.appendChild(bgRect);
 
-                        // 2. Progress (Dark Blue)
+                        // 2. Progress (Dark Blue or Company Color)
                         const pct = parseFloat(task.progress || 0) / 100;
                         if (pct > 0 && !isNaN(pct)) {
                             const progRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
                             progRect.setAttribute('x', x); progRect.setAttribute('y', barY);
-                            const companyFill = (task.contractor && State.companyColors[task.contractor]) ? State.companyColors[task.contractor] : '#3b82f6';
+
+                            let companyFill = (task.contractor && State.companyColors[task.contractor]) ? State.companyColors[task.contractor] : '#3b82f6';
+
+                            // Visual Status Overrides
+                            let finalFill = companyFill;
+
+                            // 1. Look Ahead (Red) - Default High Priority
+                            if (isHighlighted) finalFill = '#dc2626';
+
+                            // 2. Completed (Soft Green) - Top Priority (Overrides Look Ahead)
+                            if (pct >= 1.0) finalFill = '#4ade80';
 
                             progRect.setAttribute('width', Math.max(w * pct, 0));
                             progRect.setAttribute('height', barH);
-                            progRect.setAttribute('fill', isHighlighted ? '#dc2626' : companyFill); progRect.setAttribute('rx', barRadius);
+                            progRect.setAttribute('fill', finalFill);
+                            progRect.setAttribute('rx', barRadius);
                             g.appendChild(progRect);
                         }
 
