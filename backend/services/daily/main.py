@@ -1,25 +1,16 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
-import sys
 import os
 
-# Path Setup to allow importing 'backend.common'
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Go up: daily -> services -> backend
-BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-if BACKEND_ROOT not in sys.path:
-    # Append root for common modules
-    sys.path.append(BACKEND_ROOT)
-
 try:
+    from .common import database
+    # Import specific models to ensure they are registered with Base
+    from .common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
+except ImportError:
+    # Fallback to absolute if running from root without package context (dev)
     from common import database
     from common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
-except ImportError:
-    # Fallback if structure is flattened (unlikely but safe)
-    from ...common import database
-    from ...common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
 
 try:
     from .aodev import connector as aodev
