@@ -820,7 +820,7 @@ async def view_project_tasks_board(project_id: str, request: Request, user = Dep
         return templates.TemplateResponse("project_gantt.html", {
             "request": request,
             "project": project,
-            "tasks_json": tasks_str,
+            "tasks": tasks_json,  # Pass raw list, template does | tojson
             "user": user
         })
     finally:
