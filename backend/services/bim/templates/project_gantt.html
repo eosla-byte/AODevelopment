@@ -480,9 +480,11 @@
             }};
         console.log("AO Gantt: Tasks loaded:", serverTasks ? serverTasks.length : 0);
         if (serverTasks && serverTasks.length > 0) {
-            const debugTask = serverTasks.find(t => t.server_id == '4615' || t.id == '4615' || t.id.includes('4615'));
+            // DEBUG: Check if Zona E loaded with extension_days
+            const debugTask = serverTasks.find(t => t.server_id == '4607' || t.id == '4607' || t.id.includes('4607'));
             if (debugTask) {
-                console.log("DEBUG Task 4615 Loaded:", debugTask);
+                console.log("DEBUG LOADED Zona E:", debugTask);
+                alert(`DEBUG LOAD: ${debugTask.name}\nExtDays: ${debugTask.extension_days}\nStyles: ${JSON.stringify(debugTask.cell_styles)}`);
             }
         }
 
