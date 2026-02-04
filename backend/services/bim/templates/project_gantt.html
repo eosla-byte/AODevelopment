@@ -1076,30 +1076,34 @@
             const tasksToSave = Array.from(State.dirtyTasks);
             State.dirtyTasks.clear(); // Optimistic clear
 
-            console.log("AO Gantt: Auto-Saving", tasksToSave.length, "tasks");
+            console.log("AO Gantt: Auto-Saving", State.dirtyTasks.size, "tasks");
 
             // We save sequentially or parallel? Parallel is fine.
             // Ideally backend supports bulk update, but we have /api/activities/{id}
 
-            const promises = tasksToSave.map(async (id) => {
+            const statusLabel = document.getElementById('save-status');
+            if (statusLabel) {
+                statusLabel.innerText = "Guardando...";
+                statusLabel.classList.remove('text-green-500', 'text-red-500');
+                statusLabel.classList.add('text-orange-400');
+            }
+
+            const promises = Array.from(State.dirtyTasks).map(async (id) => {
                 const task = State.tasks.find(t => t.id === id);
-                if (!task) return;
+                if (!task) {
+                    State.dirtyTasks.delete(id);
+                    return;
+                }
 
-                // Construct Payload
-                const styleObj = task.style || {};
-                styleObj.level = task.level;
-                styleObj.collapsed = task.collapsed;
-                styleObj.index = task.orderIndex; // Persist Sort Order
+                // Clean data
+                const cleanStart = (typeof task.start === 'string' ? task.start.split('T')[0] : task.start);
+                const cleanEnd = (typeof task.end === 'string' ? task.end.split('T')[0] : task.end);
+                const cleanProgress = parseFloat(task.progress) || 0;
 
-                // SANITIZATION
-                let cleanProgress = parseFloat(task.progress);
-                if (isNaN(cleanProgress)) cleanProgress = 0;
-
-                let cleanStart = task.start;
-                if (cleanStart && cleanStart.includes('T')) cleanStart = cleanStart.split('T')[0];
-
-                let cleanEnd = task.end;
-                if (cleanEnd && cleanEnd.includes('T')) cleanEnd = cleanEnd.split('T')[0];
+                // Clean Style
+                const styleObj = { ...task.style };
+                // Ensure level/collapsed are kept? usually not in style, but top level.
+                // But if style is stringified, we need to ensure structure.
 
                 const payload = {
                     name: task.name,
@@ -1113,33 +1117,15 @@
                     display_order: task.orderIndex,
                     extension_days: parseInt(task.extension_days) || 0
                 };
-            });
-
-            if (!res.ok) {
-                const errText = await res.text();
-                console.error("Save Failed for", id, res.status, errText);
-                // alert(`Error guardando tarea: ${res.status} - ${errText}`); // Suppress alert for smooth UX
-                State.dirtyTasks.add(id); // Re-add
+                if (State.dirtyTasks.size === 0) {
+                    status.innerText = "Guardado";
+                    status.classList.remove('text-orange-400');
+                    status.classList.add('text-green-500');
+                } else {
+                    status.innerText = "Reintentando...";
+                    status.classList.add('text-red-500');
+                }
             }
-        } catch (e) {
-            console.error("Network Error saving", id, e);
-            State.dirtyTasks.add(id);
-        }
-            });
-
-        await Promise.all(promises);
-
-        const status = document.getElementById('save-status');
-        if (status) {
-            if (State.dirtyTasks.size === 0) {
-                status.innerText = "Guardado";
-                status.classList.remove('text-orange-400');
-                status.classList.add('text-green-500');
-            } else {
-                status.innerText = "Reintentando...";
-                status.classList.add('text-red-500');
-            }
-        }
         }
 
         function createSeparator() {
