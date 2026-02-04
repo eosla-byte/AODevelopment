@@ -498,6 +498,8 @@
             return {
                 ...t,
                 style: parsedStyle, // Keep as object
+                cellStyles: (typeof t.cell_styles === 'string' ? JSON.parse(t.cell_styles) : (t.cell_styles || {})),
+                extension_days: t.extension_days || 0,
                 level: parsedStyle.level !== undefined ? parsedStyle.level : (t.level || 0),
                 collapsed: parsedStyle.collapsed !== undefined ? parsedStyle.collapsed : false,
                 isSummary: false, // Calculated later

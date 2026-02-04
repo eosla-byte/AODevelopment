@@ -1118,7 +1118,10 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
     
     db = SessionExt()
     try:
+        print(f"DEBUG: UPDATE ACTIVITY {activity_id} | Payload: {data.dict(exclude_unset=True)}")
+        
         # FIX: Check by Int ID (PK) FIRST to ensure we target the exact version being viewed.
+
         # The frontend sends the database ID (e.g. 1502), which is unique.
         # P6 Activity IDs (e.g. "A1000") are strings and duplicated across versions.
         
