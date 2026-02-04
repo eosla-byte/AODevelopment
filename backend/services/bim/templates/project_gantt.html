@@ -257,6 +257,14 @@
 
 <body>
     <div id="app">
+        <!-- Context Menu -->
+        <div id="context-menu" class="hidden">
+            <div class="item" onclick="insertTask('above')"><i class="fas fa-arrow-up mr-2 text-gray-400"></i> Insertar
+                Tarea Arriba</div>
+            <div class="item" onclick="insertTask('below')"><i class="fas fa-arrow-down mr-2 text-gray-400"></i>
+                Insertar Tarea Abajo</div>
+            <!-- Future: Delete, Indent, etc. -->
+        </div>
 
 
         <!-- TOOLBAR -->
@@ -271,6 +279,14 @@
             <span id="zoom-label" class="w-16 text-center font-mono text-xs">WEEK</span>
             <button class="bg-gray-100 hover:bg-gray-200 p-1.5 rounded" onclick="AO.Gantt.zoomIn()">
                 <i class="fas fa-plus"></i>
+            </button>
+            <div class="border-l h-6 mx-2 border-gray-300"></div>
+
+            <!-- ADD TASK BUTTON -->
+            <button
+                class="bg-red-600 hover:bg-red-700 text-white p-1.5 rounded flex items-center justify-center w-8 h-8 shadow-sm transition"
+                title="Agregar Tarea" onclick="addTask()">
+                <i class="fas fa-plus font-bold"></i>
             </button>
             <div class="border-l h-6 mx-2 border-gray-300"></div>
 
@@ -432,6 +448,11 @@
 
         // Global Keys
         document.addEventListener('keydown', handleGlobalKeys);
+
+        // Context Menu Listeners
+        document.addEventListener('click', hideContextMenu);
+        document.getElementById('main-table').addEventListener('contextmenu', handleContextMenu);
+
         console.log("AO Gantt: Render complete");
             } catch (e) {
             console.error("AO Gantt: Crash during init", e);
@@ -2276,20 +2297,46 @@
 
         function initTimeEngine() {
             if (State.tasks.length > 0) {
-                // If tasks exist, maybe center on them?
-                // But USER REQUEST: "siempre al iniciar el proyecto que el proyecto se ubique en el dia de hoy"
-                // So startDate should perhaps be Today - Offset?
+                // Dynamic Range Scan
+                let minT = new Date(8640000000000000);
+                let maxT = new Date(-8640000000000000);
+                let hasDates = false;
 
-                let min = new Date(); // Start around today
-                min.setDate(min.getDate() - 30); // 1 month buffer
-                State.startDate = min;
+                State.tasks.forEach(t => {
+                    const s = new Date(t.start);
+                    const e = new Date(t.end);
+                    if (!isNaN(s.getTime())) {
+                        if (s < minT) minT = s;
+                        hasDates = true;
+                    }
+                    if (!isNaN(e.getTime())) {
+                        if (e > maxT) maxT = e;
+                        hasDates = true;
+                    }
+                });
 
-                // However, we should also respect task bounds if they are way in the past?
-                // Let's stick to the "Scroll to Today" logic instead of changing StartDate too much
-                // But we need startDate to be before Today for Today to be visible.
-            } else { State.startDate = new Date(); }
+                if (hasDates) {
+                    // Buffer: 1 week before, 2 weeks after
+                    minT.setDate(minT.getDate() - 7);
+                    maxT.setDate(maxT.getDate() + 14);
+                    State.startDate = minT;
+
+                    // Calc dynamic Width
+                    const diffMins = (maxT - minT) / 60000;
+                    State.totalWidth = Math.max(2000, diffMins * State.pxPerMin);
+                } else {
+                    State.startDate = new Date();
+                    State.startDate.setDate(State.startDate.getDate() - 7);
+                    State.totalWidth = 3000;
+                }
+            } else {
+                State.startDate = new Date();
+                State.startDate.setDate(State.startDate.getDate() - 7);
+                State.totalWidth = 3000;
+            }
         }
-        function calculateTotalWidth() { return 3000; }
+        function calculateTotalWidth() { return State.totalWidth || 3000; }
+
         function timeToX(dateStr) {
             const d = new Date(dateStr);
             const diffMins = (d - State.startDate) / 60000;
@@ -2363,6 +2410,9 @@
                 <div class="item" onclick="triggerAddComment()"><i class="fas fa-comment mr-2"></i> Agregar Comentario</div>
                 <div class="separator"></div>
                 <div class="item" onclick="State.activeCell={taskId:contextMenuTarget.id, colId:'duration'}; enterEditMode(); hideContextMenu();"><i class="fas fa-edit mr-2"></i> Editar Duración</div>
+                <div class="separator"></div>
+                <div class="item" onclick="insertTask('above')"><i class="fas fa-arrow-up mr-2 text-green-600"></i> Insertar Tarea Arriba</div>
+                <div class="item" onclick="insertTask('below')"><i class="fas fa-arrow-down mr-2 text-green-600"></i> Insertar Tarea Abajo</div>
             `;
 
             menu.style.left = x + 'px';
@@ -2374,6 +2424,95 @@
             const menu = document.getElementById('context-menu');
             if (menu) menu.style.display = 'none';
         }
+
+        // --- ADD TASK LOGIC ---
+        window.addTask = function () {
+            const qtyStr = prompt("¿Cuántas tareas deseas agregar?", "1");
+            if (!qtyStr) return;
+            const qty = parseInt(qtyStr);
+            if (isNaN(qty) || qty <= 0) return;
+
+            const newTasks = [];
+            // Insert at bottom by default
+            const maxOrder = State.tasks.length > 0 ? Math.max(...State.tasks.map(t => t.orderIndex || 0)) : 0;
+
+            for (let i = 1; i <= qty; i++) {
+                newTasks.push({
+                    id: 'new_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substr(2, 5),
+                    name: 'Nueva Tarea ' + i,
+                    start: new Date().toISOString().split('T')[0],
+                    end: new Date().toISOString().split('T')[0],
+                    duration: 1,
+                    progress: 0,
+                    level: 0,
+                    orderIndex: maxOrder + i,
+                    contractor: 'Sin Asignar',
+                    style: {},
+                    cellStyles: {}
+                });
+            }
+
+            State.tasks.push(...newTasks);
+            HierarchyEngine.recalculate(State.tasks);
+            render();
+            triggerAutoSave(newTasks[0].id); // Trigger save
+
+            // Scroll to bottom
+            setTimeout(() => {
+                const table = document.getElementById('master-scroll');
+                table.scrollTop = table.scrollHeight;
+                // Init time engine again to expand if needed?
+                initTimeEngine();
+                render(); // Re-render with new width
+            }, 100);
+        };
+
+        window.insertTask = function (direction) { // 'above' or 'below'
+            hideContextMenu();
+            if (!contextMenuTarget) return;
+
+            const targetTask = contextMenuTarget;
+            const qtyStr = prompt("¿Cuántas tareas deseas agregar?", "1");
+            if (!qtyStr) return;
+            const qty = parseInt(qtyStr);
+            if (isNaN(qty) || qty <= 0) return;
+
+            // Determine Start Order Index
+            let insertOrder = targetTask.orderIndex;
+            if (direction === 'below') insertOrder += 1;
+
+            // Shift existing orders down to make room
+            State.tasks.forEach(t => {
+                if (t.orderIndex >= insertOrder) {
+                    t.orderIndex += qty;
+                }
+            });
+
+            const newTasks = [];
+            for (let i = 0; i < qty; i++) {
+                newTasks.push({
+                    id: 'new_ctx_' + Date.now() + '_' + i + '_' + Math.random().toString(36).substr(2, 5),
+                    name: 'Tarea Insertada ' + (i + 1),
+                    start: targetTask.start, // Copy date from neighbor
+                    end: targetTask.end,
+                    duration: 1,
+                    progress: 0,
+                    level: targetTask.level, // Copy indentation
+                    orderIndex: insertOrder + i,
+                    contractor: targetTask.contractor || 'Sin Asignar',
+                    parentId: targetTask.parentId,
+                    style: {},
+                    cellStyles: {}
+                });
+            }
+
+            State.tasks.push(...newTasks);
+            State.tasks.sort((a, b) => a.orderIndex - b.orderIndex);
+
+            HierarchyEngine.recalculate(State.tasks);
+            render();
+            triggerAutoSave(newTasks[0].id);
+        };
 
         // --- ACTIONS ---
         function triggerAssignCompany() {
