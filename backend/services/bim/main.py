@@ -176,7 +176,9 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "cell_styles": getattr(act, 'cell_styles', {}) or {},
                 "comments": getattr(act, 'comments', []) or [],
                 "wbs": getattr(act, 'wbs_code', "") or "",
-                "level": (len(getattr(act, 'wbs_code', "").split('.')) - 1) if getattr(act, 'wbs_code') else 0
+                "level": (len(getattr(act, 'wbs_code', "").split('.')) - 1) if getattr(act, 'wbs_code') else 0,
+                "extension_days": getattr(act, 'extension_days', 0) or 0,
+                "history": getattr(act, 'history', []) or []
             })
             
         return tasks_json

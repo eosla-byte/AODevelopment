@@ -535,7 +535,8 @@
 
         // Context Menu Listeners
         document.addEventListener('click', hideContextMenu);
-        document.getElementById('main-table').addEventListener('contextmenu', handleContextMenu);
+        // Context menu handled globally now
+        // document.getElementById('main-table').addEventListener('contextmenu', handleContextMenu);
 
         console.log("AO Gantt: Render complete");
             } catch (e) {
@@ -1151,6 +1152,9 @@
 
 
         async function forceSaveAll() {
+            // Alias for button compatibility
+            window.saveAll = forceSaveAll;
+
             const btn = document.getElementById('btn-save-all');
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Guardando...';
