@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session, sessionmaker, joinedload
 from sqlalchemy import create_engine
 from sqlalchemy.sql import func
 from . import models
-from .models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard, PluginSheetSession
+from .models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard, PluginSheetSession, DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
 from sqlalchemy.orm.attributes import flag_modified
 
 # DATABASE SETUP
@@ -2109,3 +2109,154 @@ def get_sheet_session(session_id: str):
         return None
     finally:
         db.close()
+
+# -----------------------------------------------------------------------------
+# DAILY APP FUNCTIONS (daily.somosao.com)
+# -----------------------------------------------------------------------------
+
+def init_user_daily_setup(user_email: str):
+    """
+    Ensures user exists and has a "My Tasks" view (not a real table, but ensures readiness).
+    If no team exists, create a default "Personal Team" for them?
+    For now, just return True.
+    """
+    return True
+
+def create_daily_team(name: str, owner_id: str):
+    db = SessionOps() # Using Ops DB for Daily
+    try:
+        new_id = str(uuid.uuid4())
+        team = models.DailyTeam(id=new_id, name=name, owner_id=owner_id, members=[owner_id])
+        db.add(team)
+        db.commit()
+        return team
+    finally:
+        db.close()
+
+def get_user_teams(user_id: str):
+    # This requires JSON contains query or filtering in memory.
+    # SQLite JSON filtering is tricky.
+    # For MVP, get all teams and filter in python (inefficient but works for small scale)
+    db = SessionOps()
+    try:
+        all_teams = db.query(models.DailyTeam).all()
+        user_teams = [t for t in all_teams if user_id in (t.members or [])]
+        return user_teams
+    finally:
+        db.close()
+
+def create_daily_project(team_id: str, name: str, user_id: str):
+    db = SessionOps()
+    try:
+        new_id = str(uuid.uuid4())
+        proj = models.DailyProject(
+            id=new_id, 
+            team_id=team_id, 
+            name=name, 
+            created_by=user_id,
+            settings={"background": "default"}
+        )
+        # Create Default Columns
+        cols = ["To Do", "In Progress", "Done"]
+        for idx, title in enumerate(cols):
+            c_id = str(uuid.uuid4())
+            col = models.DailyColumn(id=c_id, project_id=new_id, title=title, order_index=idx)
+            db.add(col)
+            
+        db.add(proj)
+        db.commit()
+        return proj
+    finally:
+        db.close()
+
+def get_daily_project_board(project_id: str):
+    db = SessionOps()
+    try:
+        # Load Project + Columns + Tasks (lightweight)
+        proj = db.query(models.DailyProject).filter(models.DailyProject.id == project_id).options(
+            joinedload(models.DailyProject.columns).joinedload(models.DailyColumn.tasks)
+        ).first()
+        return proj
+    finally:
+        db.close()
+
+def create_daily_task(project_id: str, column_id: str, title: str, user_id: str, due_date=None, priority="Medium"):
+    db = SessionOps()
+    try:
+        new_id = str(uuid.uuid4())
+        # If project_id is None, it's a direct assignment (Manager Mode)? 
+        # But 'column_id' implies a board.
+        # Direct tasks might have a hidden 'Personal Board'? 
+        # Or we allow column_id=None for personal tasks?
+        
+        task = models.DailyTask(
+            id=new_id,
+            project_id=project_id,
+            column_id=column_id,
+            title=title,
+            created_by=user_id,
+            due_date=due_date,
+            priority=priority,
+            assignees=[user_id] if user_id else []
+        )
+        db.add(task)
+        db.commit()
+        return task
+    finally:
+        db.close()
+
+def update_daily_task_location(task_id: str, new_column_id: str, new_index: int = 0):
+    db = SessionOps()
+    try:
+        task = db.query(models.DailyTask).filter(models.DailyTask.id == task_id).first()
+        if task:
+            task.column_id = new_column_id
+            # Note: Index reordering isn't implemented in DB model 'DailyTask' (no order_index on task).
+            # We usually rely on a linked list or float index. 
+            # Or frontend sends full list order and we store it?
+            # Creating 'order_index' on Task would be good. 
+            # Ignoring index for MVP or handling later.
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()
+
+def get_user_daily_tasks(user_id: str):
+    """
+    Get all tasks assigned to user across all projects.
+    """
+    db = SessionOps()
+    try:
+        # Fetch all tasks and filter by assignees JSON
+        # Optimized: In Postgres we can use @> operator. In SQLite/Generic: Python filter.
+        # Assuming DB is small enough for now.
+        # TODO: Optimize with native JSON query if Postgres.
+        all_tasks = db.query(models.DailyTask).all()
+        my_tasks = [t for t in all_tasks if user_id in (t.assignees or [])]
+        return my_tasks
+    finally:
+        db.close()
+
+def add_daily_message(project_id: str, user_id: str, content: str):
+    db = SessionOps()
+    try:
+        msg = models.DailyMessage(
+            project_id=project_id,
+            sender_id=user_id,
+            content=content
+        )
+        db.add(msg)
+        db.commit()
+        return msg
+    finally:
+        db.close()
+
+def get_daily_messages(project_id: str, limit=50):
+    db = SessionOps()
+    try:
+        msgs = db.query(models.DailyMessage).filter(models.DailyMessage.project_id == project_id).order_by(models.DailyMessage.created_at.desc()).limit(limit).all()
+        return msgs[::-1] # Return chronological
+    finally:
+        db.close()
+

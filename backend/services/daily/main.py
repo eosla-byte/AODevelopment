@@ -1,5 +1,163 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, Request, Body
+from fastapi.middleware.cors import CORSMiddleware
+from typing import List, Optional
+import os
+
+from ...common import database
+from ...common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
+from .aodev import connector as aodev
+
 app = FastAPI(title="AOdailyWork")
 
+app = FastAPI(title="AOdailyWork")
+
+# ALLOW CORS
+origins = ["*"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# -----------------------------------------------------------------------------
+# DEPENDENCIES
+# -----------------------------------------------------------------------------
+
+def get_current_user_id(request: Request):
+    # For MVP, we accept 'X-User-Email' or 'X-User-ID' header.
+    # PROD: Verify JWT.
+    user_id = request.headers.get("X-User-ID")
+    if not user_id:
+        # Fallback for dev - if testing via browser without headers, maybe query param?
+        # Or hardcode a demo user if none provided?
+        return "demo-user-id" 
+    return user_id
+
+# -----------------------------------------------------------------------------
+# ROUTES
+# -----------------------------------------------------------------------------
+
 @app.get("/health")
-def health_check(): return {"status": "ok", "service": "AOdailyWork"}
+def health_check():
+    return {"status": "ok", "service": "AOdailyWork"}
+
+@app.get("/init")
+def init_app(user_id: str = Depends(get_current_user_id)):
+    """
+    Bootstrap the app. Returns user's teams and projects.
+    """
+    database.init_user_daily_setup(user_id)
+    teams = database.get_user_teams(user_id)
+    
+    # Format for Frontend
+    teams_data = []
+    for t in teams:
+        teams_data.append({
+            "id": t.id,
+            "name": t.name,
+            "projects": [{"id": p.id, "name": p.name} for p in t.projects]
+        })
+        
+    return {
+        "user_id": user_id,
+        "teams": teams_data
+    }
+
+@app.post("/teams")
+def create_team(name: str = Body(..., embed=True), user_id: str = Depends(get_current_user_id)):
+    team = database.create_daily_team(name, user_id)
+    return {"id": team.id, "name": team.name}
+
+@app.post("/projects")
+def create_project(team_id: str = Body(...), name: str = Body(...), user_id: str = Depends(get_current_user_id)):
+    proj = database.create_daily_project(team_id, name, user_id)
+    return {"id": proj.id, "name": proj.name}
+
+@app.get("/projects/{project_id}/board")
+def get_project_board_view(project_id: str):
+    proj = database.get_daily_project_board(project_id)
+    if not proj:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    return {
+        "id": proj.id,
+        "name": proj.name,
+        "columns": [
+            {
+                "id": c.id,
+                "title": c.title,
+                "tasks": [
+                    {
+                        "id": t.id,
+                        "title": t.title,
+                        "priority": t.priority,
+                        "assignees": t.assignees
+                    }
+                    for t in c.tasks
+                ]
+            }
+            for c in proj.columns
+        ]
+    }
+
+@app.post("/tasks")
+def create_task(
+    project_id: str = Body(None),
+    column_id: str = Body(None),
+    title: str = Body(...),
+    priority: str = Body("Medium"),
+    user_id: str = Depends(get_current_user_id)
+):
+    # If direct assignment (Manager mode), project_id might be None?
+    # Logic in database.create_daily_task handles None.
+    task = database.create_daily_task(project_id, column_id, title, user_id, priority=priority)
+    
+    # Notify AOdev
+    aodev.send_event("TASK_CREATED", {"id": task.id, "title": task.title, "user": user_id})
+    
+    return {"id": task.id, "title": task.title}
+
+@app.put("/tasks/{task_id}/move")
+def move_task(
+    task_id: str,
+    column_id: str = Body(..., embed=True),
+    index: int = Body(0, embed=True)
+):
+    success = database.update_daily_task_location(task_id, column_id, index)
+    if not success:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"status": "moved"}
+
+@app.get("/my-tasks")
+def get_my_tasks(user_id: str = Depends(get_current_user_id)):
+    tasks = database.get_user_daily_tasks(user_id)
+    return [
+        {
+            "id": t.id,
+            "title": t.title,
+            "priority": t.priority,
+            "status": t.status,
+            "project_id": t.project_id # Frontend can fetch Project Name if needed
+        }
+        for t in tasks
+    ]
+
+@app.get("/chat/{project_id}")
+def get_chat(project_id: str):
+    msgs = database.get_daily_messages(project_id)
+    return [
+        {
+            "id": m.id,
+            "sender_id": m.sender_id,
+            "content": m.content,
+            "created_at": m.created_at.isoformat() if m.created_at else ""
+        }
+        for m in msgs
+    ]
+
+@app.post("/chat/{project_id}")
+def send_chat(project_id: str, content: str = Body(..., embed=True), user_id: str = Depends(get_current_user_id)):
+    msg = database.add_daily_message(project_id, user_id, content)
+    return {"id": msg.id, "status": "sent"}
