@@ -2948,75 +2948,69 @@
             for (let i = 0; i < 6; i++) {
                 color += letters[Math.floor(Math.random() * 16)];
             }
-            function getRandomColor() {
-                const letters = '0123456789ABCDEF';
-                let color = '#';
-                for (let i = 0; i < 6; i++) {
-                    color += letters[Math.floor(Math.random() * 16)];
+            return color;
+        }
+
+        // --- TAKS DETAILS CARD LOGIC ---
+        window.showTaskCard = function (task) {
+            // Close existing
+            const ex = document.getElementById('task-card-modal');
+            if (ex) ex.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'task-card-modal';
+            modal.className = 'task-card-overlay';
+
+            // Prepare History Chart Points
+            // History: [{date, progress}, ...]
+            // Map Start Date -> End Date to 0 -> 100% width
+            const history = task.history || [];
+            let svgPoints = "";
+
+            const tStart = new Date(task.start).getTime();
+            const tEnd = new Date(task.end).getTime();
+            const totalDuration = tEnd - tStart;
+
+            // Always include start point (0%)? and current point?
+            // Let's sort history by date
+            const sortedHist = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            // Points generation
+            // X = (EventDate - Start) / Duration * 100
+            // Y = 100 - Progress (SVG coords flip)
+
+            let points = [];
+            // Start Point
+            points.push([0, 100]);
+
+            sortedHist.forEach(h => {
+                const d = new Date(h.date).getTime();
+                let x = 0;
+                if (totalDuration > 0) {
+                    x = Math.max(0, Math.min(100, ((d - tStart) / totalDuration) * 100));
                 }
-                return color;
+                const y = 100 - parseFloat(h.progress);
+                points.push([x, y]);
+            });
+
+            // Current State Point (Now or Task End)
+            // If task is in progress, current pos is Today? Or just use last known progress at X=100?
+            // Requirement: "ver como fue el cumplimiento"
+            // Let's draw line to current state
+            const currentP = parseFloat(task.progress || 0);
+            if (sortedHist.length === 0 || sortedHist[sortedHist.length - 1].progress != currentP) {
+                // Add current state point. X at current time? 
+                const now = new Date().getTime();
+                let xNow = 100;
+                if (totalDuration > 0 && now < tEnd) {
+                    xNow = Math.max(0, Math.min(100, ((now - tStart) / totalDuration) * 100));
+                }
+                points.push([xNow, 100 - currentP]);
             }
 
-            // --- TAKS DETAILS CARD LOGIC ---
-            window.showTaskCard = function (task) {
-                // Close existing
-                const ex = document.getElementById('task-card-modal');
-                if (ex) ex.remove();
+            const polylinePoints = points.map(p => `${p[0]},${p[1]}`).join(' ');
 
-                const modal = document.createElement('div');
-                modal.id = 'task-card-modal';
-                modal.className = 'task-card-overlay';
-
-                // Prepare History Chart Points
-                // History: [{date, progress}, ...]
-                // Map Start Date -> End Date to 0 -> 100% width
-                const history = task.history || [];
-                let svgPoints = "";
-
-                const tStart = new Date(task.start).getTime();
-                const tEnd = new Date(task.end).getTime();
-                const totalDuration = tEnd - tStart;
-
-                // Always include start point (0%)? and current point?
-                // Let's sort history by date
-                const sortedHist = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-                // Points generation
-                // X = (EventDate - Start) / Duration * 100
-                // Y = 100 - Progress (SVG coords flip)
-
-                let points = [];
-                // Start Point
-                points.push([0, 100]);
-
-                sortedHist.forEach(h => {
-                    const d = new Date(h.date).getTime();
-                    let x = 0;
-                    if (totalDuration > 0) {
-                        x = Math.max(0, Math.min(100, ((d - tStart) / totalDuration) * 100));
-                    }
-                    const y = 100 - parseFloat(h.progress);
-                    points.push([x, y]);
-                });
-
-                // Current State Point (Now or Task End)
-                // If task is in progress, current pos is Today? Or just use last known progress at X=100?
-                // Requirement: "ver como fue el cumplimiento"
-                // Let's draw line to current state
-                const currentP = parseFloat(task.progress || 0);
-                if (sortedHist.length === 0 || sortedHist[sortedHist.length - 1].progress != currentP) {
-                    // Add current state point. X at current time? 
-                    const now = new Date().getTime();
-                    let xNow = 100;
-                    if (totalDuration > 0 && now < tEnd) {
-                        xNow = Math.max(0, Math.min(100, ((now - tStart) / totalDuration) * 100));
-                    }
-                    points.push([xNow, 100 - currentP]);
-                }
-
-                const polylinePoints = points.map(p => `${p[0]},${p[1]}`).join(' ');
-
-                modal.innerHTML = `
+            modal.innerHTML = `
                  <div class="task-card">
                      <div class="card-header">
                          <div>
@@ -3084,7 +3078,7 @@
                              <div class="card-label">Comentarios Recientes</div>
                              <div class="bg-gray-50 rounded p-2 text-sm max-h-32 overflow-y-auto">
                                  ${(task.comments && task.comments.length > 0)
-                        ? task.comments.map(c => `
+                    ? task.comments.map(c => `
                                          <div class="mb-2 border-b last:border-0 pb-1">
                                              <div class="flex justify-between text-xs text-gray-500">
                                                  <span>${c.userName}</span>
@@ -3093,16 +3087,16 @@
                                              <div class="text-gray-700">${c.text}</div>
                                          </div>
                                        `).join('')
-                        : '<span class="text-gray-400 italic">No hay comentarios</span>'
-                    }
+                    : '<span class="text-gray-400 italic">No hay comentarios</span>'
+                }
                              </div>
                              <button class="mt-2 text-blue-600 text-xs hover:underline" onclick="openCommentsModal(State.tasks.find(t=>t.id=='${task.id}'))">Ver todos / Adjuntar</button>
                          </div>
                      </div>
                  </div>
              `;
-                document.body.appendChild(modal);
-            }
+            document.body.appendChild(modal);
+        }
     </script>
 </body>
 
