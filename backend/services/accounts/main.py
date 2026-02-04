@@ -38,14 +38,14 @@ def startup_event():
         admin_email = "admin@somosao.com"
         admin = db.query(AccountUser).filter(AccountUser.email == admin_email).first()
         if admin:
-            # FORCE RESET PASSWORD TO 'admin123' to ensure access
-            # print(f"Reseting password for {admin_email}...") # Commented out to reduce noise
-            # admin.hashed_password = get_password_hash("admin123")
-            
+            # FORCE RESET to 'SuperAdmin' if it's the specific admin email
+            # regardless of current state, to ensure it's not "Admin"
             if admin.role != "SuperAdmin":
-                print(f"Promotion {admin_email} to SuperAdmin...")
+                print(f"!!! PROMOTING {admin_email} to SuperAdmin (was {admin.role}) !!!")
                 admin.role = "SuperAdmin"
-            db.commit()
+                db.commit() # Commit immediately
+            
+            # Also ensure password is reset if needed? No, let's respect password if known.
         else:
             # Create if not exists
             print(f"Creating Admin User {admin_email}...")
@@ -95,6 +95,23 @@ def startup_event():
         print(f"Startup Logic Error: {e}")
     finally:
         db.close()
+
+@app.get("/system/fix_me")
+async def manual_fix(user_jwt = Depends(get_current_admin)):
+    """
+    Self-service endpoint to promote the calling user to SuperAdmin (if they are already Admin).
+    """
+    if not user_jwt: return "Not authenticated"
+    
+    db = SessionCore()
+    user = db.query(AccountUser).filter(AccountUser.email == user_jwt["sub"]).first()
+    if user:
+        user.role = "SuperAdmin"
+        db.commit()
+        db.close()
+        return f"User {user.email} promoted to SuperAdmin. Please logout and login again."
+    db.close()
+    return "User not found"
 
 @app.get("/version_check")
 def version_check():
