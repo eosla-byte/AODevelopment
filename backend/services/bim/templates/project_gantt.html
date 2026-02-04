@@ -2951,6 +2951,29 @@
             return color;
         }
 
+        function addExtraTime() {
+            hideContextMenu();
+            const task = State.contextTask;
+            if (!task) {
+                alert("Error: No task selected");
+                return;
+            }
+
+            const current = parseInt(task.extension_days) || 0;
+            const input = prompt("Ingrese días de tiempo extra (retraso planificado):", current);
+
+            if (input !== null) {
+                const days = parseInt(input);
+                if (!isNaN(days) && days >= 0) {
+                    task.extension_days = days;
+                    if (typeof saveDirtyTasks === 'function') saveDirtyTasks();
+                    render();
+                } else {
+                    alert("Por favor ingrese un número válido.");
+                }
+            }
+        }
+
         // --- TAKS DETAILS CARD LOGIC ---
         window.showTaskCard = function (task) {
             // Close existing
