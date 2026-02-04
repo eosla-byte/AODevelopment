@@ -113,6 +113,10 @@ def ensure_schema_updates():
                          print("Adding 'cell_styles' column...")
                          conn.execute(text("ALTER TABLE bim_activities ADD COLUMN cell_styles JSON DEFAULT '{}'"))
 
+                     if "extension_days" not in columns:
+                         print("Adding 'extension_days' column...")
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN extension_days INTEGER DEFAULT 0"))
+
                      if insp.has_table("bim_projects"):
                          proj_cols = [c['name'] for c in insp.get_columns("bim_projects")]
                          if "settings" not in proj_cols:
@@ -643,6 +647,8 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                      conn.execute(text("ALTER TABLE bim_activities ADD COLUMN parent_wbs VARCHAR"))
                  if "comments" not in curr_cols:
                      conn.execute(text("ALTER TABLE bim_activities ADD COLUMN comments JSON DEFAULT '[]'"))
+                 if "extension_days" not in curr_cols:
+                     conn.execute(text("ALTER TABLE bim_activities ADD COLUMN extension_days INTEGER DEFAULT 0"))
                  trans.commit()
     except Exception as e:
         print(f"Runtime Patch Error: {e}")
@@ -701,7 +707,8 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                     "cell_styles": getattr(act, 'cell_styles', {}),
                     "comments": getattr(act, 'comments', []) or [],
                     "wbs": getattr(act, 'wbs_code', "") or "",
-                    "level": (len(getattr(act, 'wbs_code', "").split('.')) - 1) if getattr(act, 'wbs_code') else 0
+                    "display_order": getattr(act, 'display_order', 0) or 0,
+                    "extension_days": getattr(act, 'extension_days', 0) or 0
                 })
         
         if not tasks_json:
@@ -1071,7 +1078,8 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "style": getattr(act, 'style', None),
                 "cell_styles": getattr(act, 'cell_styles', {}) or {},
                 "comments": getattr(act, 'comments', []) or [],
-                "display_order": getattr(act, 'display_order', 0) or 0
+                "display_order": getattr(act, 'display_order', 0) or 0,
+                "extension_days": getattr(act, 'extension_days', 0) or 0
             })
             
         return tasks_json
@@ -1089,6 +1097,7 @@ class ActivityUpdateRequest(pydantic.BaseModel):
     comments: Optional[List[dict]] = None
     display_order: Optional[int] = None
     cell_styles: Optional[str] = None # JSON string or Dict
+    extension_days: Optional[int] = None
     
 class ProjectSettingsRequest(pydantic.BaseModel):
     settings: dict
@@ -1141,6 +1150,8 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
                       act.cell_styles = data.cell_styles
              except:
                  pass
+        if data.extension_days is not None:
+            act.extension_days = data.extension_days
             
         db.commit()
         return {"status": "ok"}

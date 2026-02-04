@@ -263,8 +263,22 @@
                 Tarea Arriba</div>
             <div class="item" onclick="insertTask('below')"><i class="fas fa-arrow-down mr-2 text-gray-400"></i>
                 Insertar Tarea Abajo</div>
+            <div class="separator"></div>
+            <div class="item" onclick="addExtraTime()"><i class="fas fa-clock mr-2 text-red-500"></i> Agregar Tiempo
+                Extra</div>
             <!-- Future: Delete, Indent, etc. -->
         </div>
+
+        <!-- SVG DEFS for Patterns -->
+        <svg width="0" height="0" style="position:absolute">
+            <defs>
+                <pattern id="hatchPattern" patternUnits="userSpaceOnUse" width="4" height="4">
+                    <path d="M-1,1 l2,-2
+                         M0,4 l4,-4
+                         M3,5 l2,-2" style="stroke:red; stroke-width:1" />
+                </pattern>
+            </defs>
+        </svg>
 
 
         <!-- TOOLBAR -->
@@ -385,8 +399,30 @@
             fillSourceRange: null, // {startRow, endRow, tasks: []}
             // Navigation & Editing
             interactionMode: 'NAVIGATION', // 'NAVIGATION', 'SELECTING', 'EDITING'
-            editingValue: ''
+            editingValue: '',
+            contextTask: null // Store task for context menu action
         };
+
+
+        function addExtraTime() {
+            hideContextMenu();
+            const task = State.contextTask;
+            if (!task) return;
+
+            const current = task.extension_days || 0;
+            const input = prompt("Ingrese días de tiempo extra (retraso planificado):", current);
+
+            if (input !== null) {
+                const days = parseInt(input);
+                if (!isNaN(days) && days >= 0) {
+                    task.extension_days = days;
+                    triggerAutoSave(task.id);
+                    render();
+                } else {
+                    alert("Por favor ingrese un número válido.");
+                }
+            }
+        }
 
         // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -1017,7 +1053,10 @@
                     style: JSON.stringify(styleObj),
                     cell_styles: JSON.stringify(task.cellStyles || {}),
                     comments: task.comments || [],
-                    display_order: task.orderIndex
+                    cell_styles: JSON.stringify(task.cellStyles || {}),
+                    comments: task.comments || [],
+                    display_order: task.orderIndex,
+                    extension_days: parseInt(task.extension_days) || 0
                 };
 
                 try {
@@ -2272,7 +2311,66 @@
                             iconText.setAttribute('font-size', '14');
                             iconText.setAttribute('fill', '#3b82f6');
                             iconText.textContent = '\uf086'; // fa-comment-dots
+                            iconText.textContent = '\uf086'; // fa-comment-dots
                             g.appendChild(iconText);
+                        }
+
+                        // 4. EXTRA TIME BAR (Red Hatched)
+                        const extDays = parseInt(task.extension_days) || 0;
+                        if (extDays > 0) {
+                            // Calculate width of extra days
+                            // We need to project finish date + extDays
+                            // Simple approximation: extDays * (pixels per day/one day width)
+                            // Better: Project new date.
+
+                            // Get end date object
+                            const dEnd = new Date(task.end);
+                            const dExt = new Date(dEnd);
+                            dExt.setDate(dExt.getDate() + extDays);
+
+                            const xStartExtra = x + w; // Starts exactly at end of main bar
+                            const xEndExtra = timeToX(dExt.toISOString().split('T')[0]);
+                            const wExtra = Math.max(xEndExtra - xStartExtra, 5); // Min 5px
+
+                            const extRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                            extRect.setAttribute('x', xStartExtra);
+                            extRect.setAttribute('y', barY + 2); // Slightly smaller? Or same. Let's do same height or slightly thinner to distinguish.
+                            // User said "del lado derecho... refleje ese tiempo extra"
+                            extRect.setAttribute('y', barY);
+                            extRect.setAttribute('width', wExtra);
+                            extRect.setAttribute('height', barH);
+
+                            // Style: Red + Hatching
+                            // We can use a pattern. check if 'hatchPattern' defined.
+                            // If we added defs to body, we can reference simply url(#hatchPattern).
+                            // But we also want a background color? "color rojo y con un ashurado distinto"
+                            // Maybe fill with pattern, stroke red.
+
+                            // Approach: White background, Red Hatch? Or Red background, Dark Hatch?
+                            // "color rojo y con un ashurado" -> Visual: Red stripes.
+
+                            // Let's rely on the pattern defined in HTML body.
+                            // NOTE: Referencing external ID from shadow DOM or deep nesting usually works unless Shadow DOM.
+                            extRect.setAttribute('fill', 'url(#hatchPattern)');
+                            extRect.setAttribute('stroke', 'red');
+                            extRect.setAttribute('stroke-width', '1');
+                            extRect.setAttribute('opacity', '0.8');
+                            // Add tooltip
+                            const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                            title.textContent = `Tiempo Extra: ${extDays} días`;
+                            extRect.appendChild(title);
+
+                            g.appendChild(extRect);
+
+                            // Optional: Label "+5d"
+                            const diffText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                            diffText.setAttribute('x', xStartExtra + wExtra + 4);
+                            diffText.setAttribute('y', barY + 12);
+                            diffText.setAttribute('font-size', '10');
+                            diffText.setAttribute('fill', 'red');
+                            diffText.setAttribute('font-weight', 'bold');
+                            diffText.textContent = `+${extDays}d`;
+                            g.appendChild(diffText);
                         }
                     }
                     barSvg.appendChild(g);
@@ -2379,6 +2477,7 @@
 
             if (task) {
                 contextMenuTarget = task;
+                State.contextTask = task; // Sync with State
                 showContextMenu(e.clientX, e.clientY);
             }
         });
