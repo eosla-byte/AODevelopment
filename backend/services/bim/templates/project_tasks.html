@@ -4,34 +4,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tablero de Tareas - {{ project.name }}</title>
+    <title>Task Board - {{ project.name }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             background-color: #f3f4f6;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
-        .task-card {
-            transition: all 0.2s ease;
+        .card-shadow {
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .ghost-card {
+            opacity: 0.5;
+            background: #f9fafb;
+            border: 1px dashed #ccc;
+        }
+
+        .drag-handle {
             cursor: move;
         }
 
-        .task-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        .drag-over {
-            background-color: #e5e7eb;
-            border: 2px dashed #9ca3af;
-        }
-
-        /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -49,520 +49,242 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #a8a8a8;
         }
-
-        .connector-line {
-            position: absolute;
-            height: 4px;
-            background-color: currentColor;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 0;
-            opacity: 0.5;
-        }
     </style>
 </head>
 
-<body class="flex flex-col h-screen overflow-hidden">
+<body>
 
-    <!-- Header -->
-    <header class="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm z-10">
+    <!-- TOOLBAR -->
+    <div class="h-14 bg-white border-b flex items-center px-4 justify-between shrink-0">
         <div class="flex items-center space-x-4">
-            <h1 class="text-xl font-bold text-gray-800">{{ project.name }} <span class="text-gray-400 font-normal">|
-                    Programación Semanal</span></h1>
-
-            <!-- Legend -->
-            <div class="flex items-center space-x-3 text-xs ml-6 bg-gray-50 px-3 py-1 rounded-full border">
-                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-blue-500 mr-1"></span> En Curso
-                </div>
-                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 mr-1"></span> Por Terminar
-                </div>
-                <div class="flex items-center"><span class="w-3 h-3 rounded-full bg-yellow-500 mr-1"></span> Por Iniciar
-                </div>
-            </div>
+            <a href="/projects/{{ project.id }}" class="text-gray-500 hover:text-black">
+                <i class="fas fa-arrow-left"></i> Gantt
+            </a>
+            <h1 class="font-bold text-lg">{{ project.name }} - Task Board</h1>
+            <span class="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full font-bold">KANBAN BETA</span>
         </div>
 
-        <div class="flex space-x-3">
-            <button onclick="exportPDF()"
-                class="bg-gray-100 text-gray-700 px-4 py-2 rounded hover:bg-gray-200 transition flex items-center shadow-sm">
-                <i class="fas fa-file-pdf mr-2"></i> Exportar Reporte
+        <div class="flex items-center space-x-3">
+            <span class="text-xs text-gray-500 font-bold uppercase">Look Ahead Starts:</span>
+            <input type="date" id="start-date" class="border rounded px-2 py-1 text-sm bg-gray-50">
+            <span class="text-xs text-gray-500 font-bold uppercase ml-2">Weeks:</span>
+            <input type="number" id="weeks-count" class="border rounded w-16 px-2 py-1 text-sm bg-gray-50" value="3"
+                min="1" max="10">
+
+            <button onclick="renderBoard()"
+                class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700 ml-4">
+                <i class="fas fa-sync-alt mr-1"></i> Refresh
             </button>
-            <button onclick="saveAndReturn()"
-                class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition flex items-center shadow-md">
-                <i class="fas fa-save mr-2"></i> Guardar Cambios
+            <button onclick="exportPDF()" class="bg-gray-700 text-white px-3 py-1 rounded text-sm hover:bg-gray-800">
+                <i class="fas fa-file-pdf mr-1"></i> PDF
             </button>
-        </div>
-    </header>
-
-    <!-- Kanban Board -->
-    <div id="board-container" class="flex-1 overflow-auto p-6 relative">
-        <!-- Rendered by JS -->
-    </div>
-
-    <!-- Edit Task Modal -->
-    <div id="edit-modal"
-        class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex justify-center items-center backdrop-blur-sm">
-        <div class="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden transform transition-all scale-100">
-            <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-                <h3 class="font-bold text-lg text-gray-800" id="modal-title">Editar Tarea</h3>
-                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500"><i
-                        class="fas fa-times text-xl"></i></button>
-            </div>
-
-            <div class="p-6 space-y-4">
-                <!-- Info Grid -->
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label
-                            class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Inicio</label>
-                        <input type="date" id="modal-start"
-                            class="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
-                    </div>
-                    <div>
-                        <label
-                            class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Fin</label>
-                        <input type="date" id="modal-end"
-                            class="w-full border rounded px-3 py-2 text-sm bg-gray-100 cursor-not-allowed" readonly>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Duración
-                            (Días)</label>
-                        <input type="number" id="modal-duration"
-                            class="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Progreso
-                            %</label>
-                        <input type="number" id="modal-progress"
-                            class="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
-                            min="0" max="100">
-                    </div>
-                </div>
-
-                <!-- Comments -->
-                <div>
-                    <label
-                        class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Comentarios</label>
-                    <div id="modal-comments-list"
-                        class="bg-gray-50 border rounded p-3 h-32 overflow-y-auto mb-2 text-sm space-y-2">
-                        <!-- Comments injected here -->
-                    </div>
-                    <div class="flex">
-                        <input type="text" id="modal-new-comment" placeholder="Escribe un comentario..."
-                            class="flex-1 border rounded-l px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
-                        <button onclick="addComment()"
-                            class="bg-blue-600 text-white px-4 rounded-r hover:bg-blue-700 text-sm">Enviar</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="px-6 py-4 border-t bg-gray-50 flex justify-end space-x-3">
-                <button onclick="closeModal()"
-                    class="px-4 py-2 rounded text-gray-600 hover:bg-gray-100 text-sm font-medium">Cancelar</button>
-                <button onclick="saveModalChanges()"
-                    class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium shadow-sm">Guardar</button>
-            </div>
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- MAIN BOARD CONTAINER -->
+    <div id="board-container" class="flex-1 overflow-auto p-4 flex flex-col space-y-6">
+        <!-- JS INJECTED SWIMLANES HERE -->
+    </div>
+
     <script>
-        // --- 1. State & Init ---
-        const ALL_TASKS = {{ tasks_json | safe }};
-        const PROJECT_ID = "{{ project.id }}";
+        // --- DATA ---
+        let tasks = {{ tasks | tojson | safe }} || [];
+        // Parse dates safely
+        tasks.forEach(t => {
+            if (t.start) t.startDate = new Date(t.start);
+            if (t.end) t.endDate = new Date(t.end);
+        });
 
-        let State = {
-            tasks: ALL_TASKS, // Working copy
-            lookAheadStart: null,
-            weeksToShow: 3,
-            columnDates: [], // Start date of each week
-            dirty: false,
-            currentEditId: null
+        // Config
+        let lookAheadStart = new Date();
+        // Try to read from URL params
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('start')) {
+            const d = new Date(urlParams.get('start'));
+            if (!isNaN(d)) lookAheadStart = d;
+        } else {
+            // Default to Monday of current week if possible? Or just Today.
+            // Usually LookAhead is from Today or Yesterday.
+        }
+
+        let weeks = parseInt(urlParams.get('weeks')) || 3;
+
+        document.getElementById('start-date').value = lookAheadStart.toISOString().split('T')[0];
+        document.getElementById('weeks-count').value = weeks;
+        document.getElementById('start-date').onchange = (e) => {
+            lookAheadStart = new Date(e.target.value);
+            renderBoard();
+        };
+        document.getElementById('weeks-count').onchange = (e) => {
+            weeks = parseInt(e.target.value);
+            renderBoard();
         };
 
-        // Parse URL Params
-        const urlParams = new URLSearchParams(window.location.search);
-        const pStart = urlParams.get('start');
-        const pWeeks = parseInt(urlParams.get('weeks')) || 3;
-
-        // Init Dates
-        if (pStart) {
-            State.lookAheadStart = new Date(pStart);
-        } else {
-            State.lookAheadStart = new Date(); // Default Today
-        }
-        State.weeksToShow = pWeeks;
-
-        // --- 2. Date Utilities ---
-        function addDays(date, days) {
-            const result = new Date(date);
-            result.setDate(result.getDate() + days);
-            return result;
-        }
-
-        function getWeekStart(date) {
-            // Assume Week starts on Sunday or Monday? Let's stick to standard input date
-            // Usually Gantt sets LookAhead start. We treat that as Week 1 Start.
-            return new Date(date);
-        }
-
-        function formatDate(d) {
-            return d.toISOString().split('T')[0];
-        }
-
-        function isBetween(check, start, end) {
-            return check >= start && check <= end;
-        }
-
-        // --- 3. Kanban Engine ---
-        function initBoard() {
-            // 3.1 Setup Columns/Weeks
-            State.columnDates = [];
-            for (let i = 0; i < State.weeksToShow; i++) {
-                State.columnDates.push(addDays(State.lookAheadStart, i * 7));
-            }
-
-            renderBoard();
-        }
-
-        function getTaskColor(task) {
-            const start = new Date(task.start);
-            const end = new Date(task.end);
-            const today = new Date();
-            const warningThreshold = 5; // days
-
-            // Blue: In Progress
-            if (start <= today && end >= today) return "border-l-4 border-blue-500 bg-white";
-
-            // Green: Finishing Soon (End is close to today but future, or just finished recently?) 
-            // Logic: "Por Terminar" -> End date is within next 7 days?
-            const diffTime = end - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            if (diffDays >= 0 && diffDays <= 7) return "border-l-4 border-green-500 bg-white";
-
-            // Yellow: Starting Soon (Start is within next X days)
-            const startDiff = start - today;
-            const startDays = Math.ceil(startDiff / (1000 * 60 * 60 * 24));
-            if (startDays >= 0 && startDays <= 14) return "border-l-4 border-yellow-500 bg-white";
-
-            return "border-l-4 border-gray-300 bg-white"; // Default
-        }
 
         function renderBoard() {
             const container = document.getElementById('board-container');
-            container.innerHTML = '';
+            container.innerHTML = ''; // Clear
 
+            // 1. Calculate Date Ranges (Buckets)
+            const buckets = [];
+            let curr = new Date(lookAheadStart);
+            for (let i = 0; i < weeks; i++) {
+                let end = new Date(curr);
+                end.setDate(end.getDate() + 6); // End of week
+                buckets.push({
+                    index: i,
+                    start: new Date(curr),
+                    end: end,
+                    label: `Semana ${getWeekNumber(curr)}`,
+                    subLabel: `${curr.getDate()}/${curr.getMonth() + 1} - ${end.getDate()}/${end.getMonth() + 1}`
+                });
+                curr.setDate(curr.getDate() + 7);
+            }
+
+            // 2. Filter & Group Tasks
             // Group by Contractor
-            const contractors = [...new Set(State.tasks.map(t => t.contractor || "Sin Asignar"))].sort();
+            const contractors = {};
+            const unassigned = 'Sin Asignar';
 
-            // Table Structure
-            const table = document.createElement('div');
-            table.className = "min-w-full";
+            tasks.forEach(t => {
+                if (!t.startDate || !t.endDate) return;
 
-            // Header Row
-            const folderHeader = document.createElement('div');
-            folderHeader.className = "flex border-b sticky top-0 bg-white z-10 shadow-sm";
+                // Intersection Check
+                const rangeStart = buckets[0].start;
+                const rangeEnd = buckets[buckets.length - 1].end;
 
-            // First Cell (Contractor Name)
-            const cHeader = document.createElement('div');
-            cHeader.className = "w-48 flex-shrink-0 p-3 font-bold text-gray-600 bg-gray-50 border-r flex items-center";
-            cHeader.innerText = "Empresa / Contratista";
-            folderHeader.appendChild(cHeader);
+                // If task ends before range starts OR starts after range ends => Skip
+                if (t.endDate < rangeStart || t.startDate > rangeEnd) return;
 
-            // Week Headers
-            State.columnDates.forEach((date, i) => {
-                const wHead = document.createElement('div');
-                wHead.className = "flex-1 min-w-[250px] p-3 text-center border-r font-medium text-gray-700 bg-gray-50";
-                const endWeek = addDays(date, 6);
-                wHead.innerHTML = `Semana ${i + 1} <br><span class="text-xs text-gray-400 font-normal">${date.getDate()}/${date.getMonth() + 1} - ${endWeek.getDate()}/${endWeek.getMonth() + 1}</span>`;
-                folderHeader.appendChild(wHead);
+                const c = (t.contractor || unassigned).trim();
+                if (!contractors[c]) contractors[c] = [];
+                contractors[c].push(t);
             });
-            table.appendChild(folderHeader);
 
-            // Contractor Rows
-            contractors.forEach(contractor => {
-                const row = document.createElement('div');
-                row.className = "flex border-b group hover:bg-gray-50 transition-colors";
+            // 3. Render Swimlanes
+            Object.keys(contractors).sort().forEach(c => {
+                const section = document.createElement('div');
+                section.className = "bg-white rounded-lg shadow border border-gray-200";
 
-                // Contractor Name Cell
-                const cCell = document.createElement('div');
-                cCell.className = "w-48 flex-shrink-0 p-4 font-bold text-gray-700 border-r bg-white flex items-center";
-                // Generate a consistent color avatar for contractor
-                const color = stringToColor(contractor);
-                cCell.innerHTML = `<div class="w-2 h-full absolute left-0 top-0 bottom-0" style="background-color: ${color}"></div><span class="ml-2">${contractor}</span>`;
-                cCell.style.position = 'relative';
-                row.appendChild(cCell);
+                // Header
+                section.innerHTML = `
+                    <div class="px-4 py-2 bg-gray-50 border-b font-bold text-gray-700 flex justify-between items-center">
+                        <span>${c}</span>
+                        <span class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">${contractors[c].length} Tareas</span>
+                    </div>
+                 `;
 
-                // Week Cells
-                State.columnDates.forEach((weekStartDate, colIndex) => {
-                    const wCell = document.createElement('div');
-                    wCell.className = "flex-1 min-w-[250px] p-3 border-r relative min-h-[120px]";
-                    wCell.ondragover = (e) => { e.preventDefault(); wCell.classList.add('drag-over'); };
-                    wCell.ondragleave = (e) => { wCell.classList.remove('drag-over'); };
-                    wCell.ondrop = (e) => handleDrop(e, weekStartDate);
+                // Grid Container
+                const grid = document.createElement('div');
+                grid.className = `grid grid-cols-${weeks} divide-x divide-gray-100`;
 
-                    const weekEnd = addDays(weekStartDate, 6);
+                // Render Columns
+                buckets.forEach(bucket => {
+                    const col = document.createElement('div');
+                    col.className = "p-2 min-h-[150px] relative bg-white";
+                    col.setAttribute('data-week-idx', bucket.index);
 
-                    // Filter tasks for this cell
-                    // Logic: Task overlaps this week
-                    const relevant = State.tasks.filter(t => {
-                        if (t.contractor !== contractor && (!t.contractor && contractor !== "Sin Asignar")) return false;
-                        if (!t.contractor && contractor === "Sin Asignar") return true;
-                        if (t.contractor === contractor) return true;
-                        return false;
-                    }).filter(t => {
-                        const tStart = new Date(t.start);
-                        const tEnd = new Date(t.end);
-                        // Check overlap
-                        return (tStart <= weekEnd && tEnd >= weekStartDate);
+                    // Column Header (Optional per row, or just top?)
+                    // Maybe only show specific dates per column if header is generic?
+                    // Let's rely on a master header for dates? 
+                    // Actually, putting dates in each swimlane is repetitive.
+                    // Better: Master Header row stuck to top?
+                    // For now, simple: Just render tasks.
+
+                    // Find tasks in this bucket
+                    const validTasks = contractors[c].filter(t => {
+                        // Task overlaps bucket?
+                        // t.start <= bucket.end && t.end >= bucket.start
+                        return t.startDate <= bucket.end && t.endDate >= bucket.start;
                     });
 
-                    // Render Cards
-                    relevant.forEach(task => {
-                        const card = document.createElement('div');
-                        card.className = `task-card p-3 mb-2 rounded shadow-sm border text-sm relative z-10 ${getTaskColor(task)}`;
-                        card.draggable = true;
-                        card.ondragstart = (e) => {
-                            e.dataTransfer.setData("text/taskId", task.server_id);
-                            e.dataTransfer.setData("text/offsetDays", 0); // Todo: nicer drag offset
-                        };
-
-                        // Check if multi-week (ghost logic)
-                        const tStart = new Date(task.start);
-                        const tEnd = new Date(task.end);
-                        const isStart = (tStart >= weekStartDate && tStart <= weekEnd);
-                        const isEnd = (tEnd >= weekStartDate && tEnd <= weekEnd);
-                        const isMiddle = (!isStart && !isEnd);
-
-                        let content = `<div class="font-bold text-gray-800 mb-1">${task.name}</div>`;
-
-                        // Badges
-                        content += `<div class="flex space-x-2 text-xs text-gray-500 mb-2">
-                            <span><i class="far fa-clock"></i> ${task.duration}d</span>
-                            <span><i class="fas fa-percentage"></i> ${task.progress}%</span>
-                        </div>`;
-
-                        // Comments Badge
-                        if (task.comments && task.comments.length > 0) {
-                            content += `<div class="text-xs text-blue-500"><i class="far fa-comment"></i> ${task.comments.length}</div>`;
-                        }
-
-                        // Connectors
-                        if (!isStart) content += `<div class="absolute left-0 top-1/2 -ml-3 w-4 h-1 bg-gray-300"></div>`; // Left connector
-                        if (!isEnd) content += `<div class="absolute right-0 top-1/2 -mr-3 w-4 h-1 bg-gray-300"></div>`; // Right connector
-
-                        card.innerHTML = content;
-
-                        // Edit Click
-                        card.onclick = () => openEditModal(task);
-
-                        wCell.appendChild(card);
+                    validTasks.forEach(task => {
+                        const card = createCard(task, bucket);
+                        col.appendChild(card);
                     });
 
-                    row.appendChild(wCell);
+                    grid.appendChild(col);
                 });
 
-                table.appendChild(row);
+                section.appendChild(grid);
+                container.appendChild(section);
             });
 
-            container.appendChild(table);
-        }
-
-        // --- 4. Drag & Drop Logic ---
-        function handleDrop(e, targetWeekStart) {
-            e.preventDefault();
-            e.target.classList.remove('drag-over');
-
-            const taskId = e.dataTransfer.getData("text/taskId");
-            const task = State.tasks.find(t => t.server_id === taskId);
-
-            if (task) {
-                // Calculate new Start Date
-                // We set the task start to the Monday (or Start) of the target week?
-                // Or preserve day-of-week offset?
-                // Ideally, snap to Target Week Start.
-
-                const oldStart = new Date(task.start);
-                const duration = parseInt(task.duration) || 1;
-
-                // Calculate diff
-                // Let's just set Start = targetWeekStart for simplicity, user can fine tune in modal if needed.
-                // Or maybe preserve existing weekday? Better user experience: Snap to start of week.
-
-                const newStart = new Date(targetWeekStart);
-                const newEnd = addDays(newStart, duration); // Approximate, excludes weekends logic for now but good enough for Kanban visualization
-
-                task.start = formatDate(newStart);
-                task.end = formatDate(newEnd);
-
-                State.dirty = true;
-                renderBoard(); // Re-render to show updated position (and multi-week split)
+            // If empty
+            if (Object.keys(contractors).length === 0) {
+                container.innerHTML = `<div class="text-center text-gray-400 mt-20">No tasks found in this date range. Try allowing more weeks or changing start date.</div>`;
             }
-        }
 
-        // --- 5. Modal Logic ---
-        function openEditModal(task) {
-            State.currentEditId = task.server_id;
-            document.getElementById('modal-title').innerText = "Editar: " + task.name;
-            document.getElementById('modal-start').value = task.start;
-            document.getElementById('modal-end').value = task.end;
-            document.getElementById('modal-duration').value = task.duration;
-            document.getElementById('modal-progress').value = task.progress;
+            // Insert Master Header (Sticky)
+            const headerRow = document.createElement('div');
+            headerRow.className = "flex space-x-4 mb-4 sticky top-0 z-10 bg-[#f3f4f6] pb-2";
+            // Wait, this flex doesn't align with grid.
+            // Better: Single Header Block that mimics the grid? 
+            // Or just put headers inside the first swimlane?
+            // Let's prepend a header block.
 
-            // Comments
-            const list = document.getElementById('modal-comments-list');
-            list.innerHTML = '';
-            (task.comments || []).forEach(c => {
-                const d = document.createElement('div');
-                d.className = "bg-white p-2 rounded shadow-sm border text-gray-700";
-                d.innerText = typeof c === 'string' ? c : c.text; // Handle old format
-                list.appendChild(d);
+            const masterHeader = document.createElement('div');
+            masterHeader.className = `grid grid-cols-${weeks} gap-0 bg-white shadow rounded mb-4 sticky top-0 z-20 border-b-2 border-indigo-500`;
+            buckets.forEach(b => {
+                const h = document.createElement('div');
+                h.className = "p-2 text-center border-r last:border-0";
+                h.innerHTML = `<div class="font-bold text-gray-700">${b.label}</div><div class="text-xs text-gray-500">${b.subLabel}</div>`;
+                masterHeader.appendChild(h);
             });
-
-            document.getElementById('edit-modal').classList.remove('hidden');
-            document.getElementById('edit-modal').classList.add('flex');
+            container.insertBefore(masterHeader, container.firstChild);
         }
 
-        function closeModal() {
-            document.getElementById('edit-modal').classList.add('hidden');
-            document.getElementById('edit-modal').classList.remove('flex');
-            State.currentEditId = null;
+        function createCard(task, bucket) {
+            const div = document.createElement('div');
+            div.className = "bg-white border p-2 mb-2 rounded shadow-sm text-sm hover:shadow-md transition cursor-pointer relative l-card";
+            div.style.borderLeftWidth = "4px";
+
+            // Color Logic
+            const now = new Date();
+            let statusColor = "border-gray-300";
+            if (task.endDate < now) statusColor = "border-gray-400 opacity-70"; // Done/Past
+            else if (task.startDate < now && task.endDate > now) statusColor = "border-blue-500 bg-blue-50"; // In Progress
+            else if (getTimeDiffDays(now, task.startDate) < 7) statusColor = "border-yellow-400"; // Starting Soon
+
+            div.classList.add(statusColor.split(' ')[0]);
+            if (statusColor.includes('bg')) div.classList.add(statusColor.split(' ')[1]);
+
+            // Content
+            div.innerHTML = `
+                 <div class="font-bold text-gray-800 leading-tight mb-1">${task.name}</div>
+                 <div class="text-xs text-gray-500 flex justify-between">
+                     <span>${task.duration}d</span>
+                     <span>${task.progress}%</span>
+                 </div>
+                 ${task.comments && task.comments.length > 0 ? '<div class="absolute top-1 right-1 text-blue-400 text-[10px]"><i class="fas fa-comment"></i></div>' : ''}
+             `;
+
+            div.onclick = () => openTaskModal(task);
+
+            return div;
         }
 
-        function addComment() {
-            const input = document.getElementById('modal-new-comment');
-            const val = input.value.trim();
-            if (!val) return;
-
-            const task = State.tasks.find(t => t.server_id === State.currentEditId);
-            if (task) {
-                if (!task.comments) task.comments = [];
-                // Add timestamp
-                const ts = new Date().toLocaleString();
-                task.comments.push(`[${ts}] ${val}`);
-
-                // Update UI
-                const list = document.getElementById('modal-comments-list');
-                const d = document.createElement('div');
-                d.className = "bg-white p-2 rounded shadow-sm border text-gray-700";
-                d.innerText = `[${ts}] ${val}`;
-                list.appendChild(d);
-
-                input.value = '';
-                State.dirty = true;
-            }
+        function getWeekNumber(d) {
+            d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+            d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+            var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+            return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
         }
 
-        function saveModalChanges() {
-            const task = State.tasks.find(t => t.server_id === State.currentEditId);
-            if (task) {
-                const newStart = document.getElementById('modal-start').value;
-                const newDur = parseInt(document.getElementById('modal-duration').value);
-                const newProg = parseInt(document.getElementById('modal-progress').value);
-
-                task.start = newStart;
-                task.duration = newDur;
-                task.progress = newProg;
-
-                // Recalculate End
-                const sDate = new Date(newStart);
-                const eDate = addDays(sDate, newDur);
-                task.end = formatDate(eDate);
-
-                State.dirty = true;
-                closeModal();
-                renderBoard();
-            }
+        function getTimeDiffDays(d1, d2) {
+            return Math.ceil((d2 - d1) / (1000 * 60 * 60 * 24));
         }
 
-        // --- 6. Persistence ---
-        async function saveAndReturn() {
-            if (!State.dirty) {
-                window.close(); // Just close if no changes? Or generic return
-                // Actually button says "Guardar y Volver", so maybe just redirect back or close tab
-                // If opened in new tab, window.close() might work if opened by script.
-                // Otherwise show alert.
-                alert("No hay cambios pendientes. Puedes cerrar esta pestaña.");
-                return;
-            }
-
-            // Save only modified tasks? Or simplistic "save all relevant".
-            // Since we don't track *which* exact task is dirty easily without a diff, 
-            // lets iterate and save all tasks that match "relevant" to this view?
-            // Safer: We have all tasks in State.tasks. We can just send individual updates for changed ones?
-            // For now, simpler implementation: Loop all tasks (or just dirty ones if we tracked IDs).
-
-            // Let's implement a 'smart' save. Frontend should theoretically track dirty IDs.
-            // But 'State.dirty' is global.
-            // Let's just save ALL tasks in the view. It's safer.
-
-            try {
-                const btn = document.querySelector('button[onclick="saveAndReturn()"]');
-                const oldText = btn.innerHTML;
-                btn.innerText = "Guardando...";
-                btn.disabled = true;
-
-                // We need to send updates to /api/activities/{id}
-                // Parallel requests might be heavy. Let's do batches or sequential.
-                for (const t of State.tasks) {
-                    // Construct payload
-                    // Only needed fields
-                    const payload = {
-                        start: t.start,
-                        finish: t.end, // Map end -> finish
-                        duration: t.duration,
-                        pct_complete: t.progress,
-                        comments: t.comments
-                    };
-
-                    // Fire and forget (await to ensure completion)
-                    await fetch(`/api/activities/${t.server_id}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                }
-
-                btn.innerHTML = "<i class='fas fa-check'></i> Guardado!";
-                setTimeout(() => {
-                    // Close tab or redirect
-                    // window.close(); 
-                    // Better: Redirect to Gantt project page
-                    window.location.href = `/projects/${PROJECT_ID}`;
-                }, 1000);
-
-            } catch (e) {
-                console.error(e);
-                alert("Error al guardar: " + e.message);
-                btn.innerHTML = oldText;
-                btn.disabled = false;
-            }
+        function openTaskModal(task) {
+            alert(`Edit Task: ${task.name}\n(Modal Implementation Coming Soon)`);
         }
 
-        // --- 7. Export PDF ---
         function exportPDF() {
-            const element = document.getElementById('board-container');
-            const opt = {
-                margin: 0.5,
-                filename: `Reporte_Semanal_${PROJECT_ID}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'in', format: 'letter', orientation: 'landscape' }
-            };
-            html2pdf().set(opt).from(element).save();
+            window.print();
         }
 
-        // Utils
-        function stringToColor(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) { hash = str.charCodeAt(i) + ((hash << 5) - hash); }
-            let color = '#';
-            for (let i = 0; i < 3; i++) { let value = (hash >> (i * 8)) & 0xFF; color += ('00' + value.toString(16)).substr(-2); }
-            return color + '40'; // Transparent
-        }
-
-        // Start
-        initBoard();
-
+        // Init
+        if (tasks.length > 0) renderBoard();
     </script>
 </body>
 

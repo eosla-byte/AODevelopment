@@ -815,12 +815,11 @@ async def view_project_tasks_board(project_id: str, request: Request, user = Dep
                  })
 
         import json
-        tasks_str = json.dumps(tasks_json)
-
-        return templates.TemplateResponse("project_gantt.html", {
+        
+        return templates.TemplateResponse("project_tasks.html", {
             "request": request,
             "project": project,
-            "tasks": tasks_json,  # Pass raw list, template does | tojson
+            "tasks": tasks_json, 
             "user": user
         })
     finally:
