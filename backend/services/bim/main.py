@@ -636,7 +636,7 @@ async def view_project_dashboard(request: Request, project_id: str, user = Depen
     try:
         latest_version = db.query(BimScheduleVersion)\
             .filter(BimScheduleVersion.project_id == project_id)\
-            .order_by(BimScheduleVersion.version_number.desc())\
+            .order_by(BimScheduleVersion.imported_at.desc())\
             .first()
             
         if not latest_version:
