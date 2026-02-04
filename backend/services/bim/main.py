@@ -1187,6 +1187,8 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
             act.extension_days = data.extension_days
             
         db.commit()
+        db.refresh(act)
+        print(f"DEBUG POST-COMMIT: Activity {act.id} ({act.name}) ExtDays is now: {act.extension_days}")
         return {"status": "ok"}
     except Exception as e:
         db.rollback()
