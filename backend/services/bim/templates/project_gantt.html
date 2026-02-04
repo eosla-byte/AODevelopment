@@ -469,24 +469,24 @@
         };
 
 
-        function addExtraTime() {
-            hideContextMenu();
-            const task = State.contextTask;
-            if (!task) return;
 
-            const current = task.extension_days || 0;
-            const input = prompt("Ingrese días de tiempo extra (retraso planificado):", current);
+        hideContextMenu();
+        const task = State.contextTask;
+        if (!task) return;
 
-            if (input !== null) {
-                const days = parseInt(input);
-                if (!isNaN(days) && days >= 0) {
-                    task.extension_days = days;
-                    triggerAutoSave(task.id);
-                    render();
-                } else {
-                    alert("Por favor ingrese un número válido.");
-                }
+        const current = task.extension_days || 0;
+        const input = prompt("Ingrese días de tiempo extra (retraso planificado):", current);
+
+        if (input !== null) {
+            const days = parseInt(input);
+            if (!isNaN(days) && days >= 0) {
+                task.extension_days = days;
+                triggerAutoSave(task.id);
+                render();
+            } else {
+                alert("Por favor ingrese un número válido.");
             }
+        }
         }
 
         // --- INIT ---
@@ -2952,7 +2952,7 @@
             return color;
         }
 
-        function addExtraTime() {
+        function triggerAddExtraTime() {
             hideContextMenu();
             const task = State.contextTask;
             if (!task) {
