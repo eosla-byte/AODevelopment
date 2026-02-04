@@ -1102,8 +1102,6 @@
                     style: JSON.stringify(styleObj),
                     cell_styles: JSON.stringify(task.cellStyles || {}),
                     comments: task.comments || [],
-                    cell_styles: JSON.stringify(task.cellStyles || {}),
-                    comments: task.comments || [],
                     display_order: task.orderIndex,
                     extension_days: parseInt(task.extension_days) || 0
                 };
@@ -1150,10 +1148,11 @@
             return sep;
         }
 
+        // Expose globally for button access
+        window.saveAll = forceSaveAll;
 
         async function forceSaveAll() {
-            // Alias for button compatibility
-            window.saveAll = forceSaveAll;
+
 
             const btn = document.getElementById('btn-save-all');
             const originalText = btn.innerHTML;
