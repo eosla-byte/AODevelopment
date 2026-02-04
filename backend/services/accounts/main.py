@@ -96,22 +96,7 @@ def startup_event():
     finally:
         db.close()
 
-@app.get("/system/fix_me")
-async def manual_fix(user_jwt = Depends(get_current_admin)):
-    """
-    Self-service endpoint to promote the calling user to SuperAdmin (if they are already Admin).
-    """
-    if not user_jwt: return "Not authenticated"
-    
-    db = SessionCore()
-    user = db.query(AccountUser).filter(AccountUser.email == user_jwt["sub"]).first()
-    if user:
-        user.role = "SuperAdmin"
-        db.commit()
-        db.close()
-        return f"User {user.email} promoted to SuperAdmin. Please logout and login again."
-    db.close()
-    return "User not found"
+# Removed misplaced endpoint
 
 @app.get("/version_check")
 def version_check():
@@ -443,6 +428,23 @@ async def delete_user(user_id: str, user_jwt = Depends(get_current_admin)):
     return JSONResponse({"status": "ok", "message": "User deleted"})
 
 # Setup Script Route (Temporary, to create first admin if none)
+@app.get("/system/fix_me")
+async def manual_fix(user_jwt = Depends(get_current_admin)):
+    """
+    Self-service endpoint to promote the calling user to SuperAdmin (if they are already Admin).
+    """
+    if not user_jwt: return "Not authenticated"
+    
+    db = SessionCore()
+    user = db.query(AccountUser).filter(AccountUser.email == user_jwt["sub"]).first()
+    if user:
+        user.role = "SuperAdmin"
+        db.commit()
+        db.close()
+        return f"User {user.email} promoted to SuperAdmin. Please logout and login again."
+    db.close()
+    return "User not found"
+
 @app.get("/setup_initial_admin")
 async def setup_admin():
     db = SessionCore()
