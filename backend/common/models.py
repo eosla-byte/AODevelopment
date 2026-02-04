@@ -376,6 +376,10 @@ class BimActivity(Base):
     style = Column(String) # JSON: {"font": "Calibri", "fontSize": 11, "bold": true, "fill": "#ffff00", "color": "#ff0000"}
     cell_styles = Column(JSON, default={}) # New: {"colId": {"backgroundColor": "red"}}
     comments = Column(JSON, default=[]) # Log of delays/notes
+    
+    # New Fields for Advanced Gantt
+    extension_days = Column(Integer, default=0)
+    history = Column(JSON, default=[]) # [{date, progress, user}]
     # Force Rebuild Check 2
     
     # Hierarchy
