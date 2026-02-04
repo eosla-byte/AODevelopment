@@ -627,6 +627,107 @@ async def projects_list(request: Request, user = Depends(get_current_user)):
         "request": request, "user_name": user.get("sub"), "user_initials": user.get("sub")[:2], "org_name": "TBD"
     })
 
+# --- DASHBOARD ROUTE ---
+@app.get("/projects/{project_id}/dashboard", response_class=HTMLResponse)
+async def view_project_dashboard(request: Request, project_id: str, user = Depends(get_current_user)):
+    if not user: return RedirectResponse("/auth/login")
+    
+    db = SessionExt()
+    try:
+        latest_version = db.query(BimScheduleVersion)\
+            .filter(BimScheduleVersion.project_uid == project_id)\
+            .order_by(BimScheduleVersion.version_number.desc())\
+            .first()
+            
+        if not latest_version:
+            return HTMLResponse("<h1>Proyecto no encontrado o sin versiones</h1>")
+
+        activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).all()
+        
+        if not activities:
+             return HTMLResponse("<h1>No hay tareas en este proyecto</h1>")
+
+        from collections import defaultdict
+        
+        total_tasks = len(activities)
+        completed_tasks = 0
+        total_extensions = 0
+        sum_progress = 0
+        
+        companies = defaultdict(lambda: {
+            "name": "Sin Asignar", 
+            "color": "#cbd5e1", 
+            "task_count": 0, 
+            "completed": 0, 
+            "pending": 0, 
+            "extension_days": 0, 
+            "total_duration": 0,
+            "sum_pct": 0
+        })
+        
+        for t in activities:
+            pct = t.pct_complete or 0
+            sum_progress += pct
+            if pct >= 100:
+                completed_tasks += 1
+            
+            ext = t.extension_days or 0
+            total_extensions += ext
+            
+            c_name = t.contractor or "Sin Asignar"
+            c_data = companies[c_name]
+            c_data["name"] = c_name
+            
+            if c_name != "Sin Asignar":
+                hash_val = sum(ord(c) for c in c_name)
+                c_data["color"] = f"hsl({hash_val % 360}, 70%, 50%)"
+                
+            c_data["task_count"] += 1
+            c_data["sum_pct"] += pct
+            
+            if pct >= 100:
+                c_data["completed"] += 1
+            else:
+                c_data["pending"] += 1
+                
+            c_data["extension_days"] += ext
+            c_data["total_duration"] += (t.duration or 0)
+
+        global_progress = round(sum_progress / total_tasks, 1) if total_tasks > 0 else 0
+        total_pending = total_tasks - completed_tasks
+        
+        companies_list = []
+        for c_name, data in companies.items():
+            count = data["task_count"]
+            if count > 0:
+                data["progress"] = round(data["sum_pct"] / count, 1)
+                data["avg_duration"] = round(data["total_duration"] / count, 1)
+            else:
+                data["progress"] = 0
+                data["avg_duration"] = 0
+            companies_list.append(data)
+            
+        companies_list.sort(key=lambda x: x["task_count"], reverse=True)
+
+        return templates.TemplateResponse("project_dashboard.html", {
+            "request": request,
+            "project_name": f"Proyecto {project_id[:8]}...", 
+            "generation_date": datetime.datetime.now().strftime("%d/%m/%Y"),
+            "global_progress": global_progress,
+            "total_completed": completed_tasks,
+            "total_pending": total_pending,
+            "pct_completed_count": (completed_tasks / total_tasks * 100) if total_tasks else 0,
+            "total_extensions": total_extensions,
+            "companies": companies_list
+        })
+        
+    except Exception as e:
+        print(f"DASHBOARD ERROR: {e}")
+        return HTMLResponse(f"<h1>Error generando dashboard: {e}</h1>")
+    finally:
+        db.close()
+
+
 @app.get("/projects/{project_id}", response_class=HTMLResponse)
 async def view_project_gantt(request: Request, project_id: str, user = Depends(get_current_user)):
     if not user: return RedirectResponse("/auth/login")

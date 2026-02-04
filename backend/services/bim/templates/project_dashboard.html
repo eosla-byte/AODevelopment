@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard del Proyecto | AO BIM</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <!-- HTML2PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            /* Gray 100 */
+        }
+
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .glass-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(229, 231, 235, 0.5);
+        }
+
+        /* Circular Progress */
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+
+<body class="text-gray-800">
+
+    <!-- Top Navigation -->
+    <nav class="glass-header fixed w-full z-10 top-0 px-8 py-4 flex justify-between items-center shadow-sm">
+        <div class="flex items-center space-x-4">
+            <div class="bg-blue-600 text-white p-2 rounded-lg">
+                <i class="fas fa-chart-pie text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-gray-900">Dashboard de Proyecto</h1>
+                <p class="text-xs text-gray-500 uppercase tracking-widest text-xs">Analytics & Performance</p>
+            </div>
+        </div>
+
+        <div class="flex items-center space-x-3">
+            <button onclick="window.close()"
+                class="px-4 py-2 text-gray-500 hover:text-gray-700 font-medium text-sm transition-colors">
+                Cerrar
+            </button>
+            <button onclick="exportToPDF()"
+                class="bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-lg shadow-lg flex items-center space-x-2 transition-all transform active:scale-95">
+                <i class="fas fa-file-pdf"></i>
+                <span>Exportar PDF</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="dashboard-content" class="pt-24 pb-12 px-8 max-w-7xl mx-auto">
+
+        <!-- Project Title Section -->
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-800">{{ project_name }}</h2>
+            <p class="text-gray-500 mt-1">Reporte de Estatus General • {{ generation_date }}</p>
+        </div>
+
+        <!-- Global KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+            <!-- Total Progress -->
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-400 uppercase">Avance Global</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-1">{{ global_progress }}%</p>
+                </div>
+                <div class="w-16 h-16 relative">
+                    <!-- Simple SVG Ring -->
+                    <svg class="w-full h-full" viewBox="0 0 100 100">
+                        <circle class="text-gray-200 stroke-current" stroke-width="10" cx="50" cy="50" r="40"
+                            fill="transparent"></circle>
+                        <circle class="text-blue-600 progress-ring__circle stroke-current" stroke-width="10"
+                            stroke-linecap="round" cx="50" cy="50" r="40" fill="transparent" stroke-dasharray="251.2"
+                            stroke-dashoffset="calc(251.2 - (251.2 * {{ global_progress }}) / 100)"></circle>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Completed Tasks -->
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div
+                        class="bg-green-100 text-green-600 w-8 h-8 rounded-full flex items-center justify-center text-sm">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <p class="text-sm font-medium text-gray-400 uppercase">Tareas Finalizadas</p>
+                </div>
+                <p class="text-3xl font-bold text-gray-800">{{ total_completed }}</p>
+                <div class="w-full bg-gray-100 rounded-full h-1.5 mt-3">
+                    <div class="bg-green-500 h-1.5 rounded-full" style="width: {{ pct_completed_count }}%"></div>
+                </div>
+            </div>
+
+            <!-- Pending Tasks -->
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div
+                        class="bg-orange-100 text-orange-600 w-8 h-8 rounded-full flex items-center justify-center text-sm">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                    <p class="text-sm font-medium text-gray-400 uppercase">Pendientes</p>
+                </div>
+                <p class="text-3xl font-bold text-gray-800">{{ total_pending }}</p>
+                <p class="text-xs text-orange-500 mt-2 font-medium">Requieren atención</p>
+            </div>
+
+            <!-- Total Extensions -->
+            <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+                <div class="flex items-center space-x-3 mb-2">
+                    <div class="bg-red-100 text-red-600 w-8 h-8 rounded-full flex items-center justify-center text-sm">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <p class="text-sm font-medium text-gray-400 uppercase">Días Extendidos</p>
+                </div>
+                <p class="text-3xl font-bold text-red-600">{{ total_extensions }} <span
+                        class="text-lg text-gray-400 font-normal">días</span></p>
+                <p class="text-xs text-gray-400 mt-2">Acumulado total</p>
+            </div>
+        </div>
+
+        <div class="border-t border-gray-200 my-8"></div>
+
+        <!-- Contractor Grid -->
+        <h3 class="text-xl font-bold text-gray-800 mb-6">Desempeño por Empresa</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            {% for company in companies %}
+            <div
+                class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 card-hover transition-all duration-300 relative overflow-hidden">
+                <!-- Top Color Bar -->
+                <div class="absolute top-0 left-0 w-full h-1.5" style="background-color: {{ company.color }}"></div>
+
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h4 class="font-bold text-lg text-gray-900 truncate pr-4">{{ company.name }}</h4>
+                        <p class="text-xs text-gray-400 font-mono mt-1">{{ company.task_count }} Tareas</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-2xl font-bold text-gray-800">{{ company.progress }}%</p>
+                        <p class="text-[10px] text-gray-400 uppercase">Avance</p>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="w-full bg-gray-100 rounded-full h-2 mb-6">
+                    <div class="h-2 rounded-full transition-all duration-1000"
+                        style="width: {{ company.progress }}%; background-color: {{ company.color }}"></div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <p class="text-xs text-gray-500 mb-1">Finalizadas</p>
+                        <p class="font-bold text-green-600 text-lg flex items-center">
+                            <i class="fas fa-check-circle mr-2 text-xs"></i> {{ company.completed }}
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <p class="text-xs text-gray-500 mb-1">Pendientes</p>
+                        <p class="font-bold text-gray-700 text-lg">{{ company.pending }}</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <p class="text-xs text-gray-500 mb-1">Días Extra</p>
+                        <p class="font-bold text-red-500 text-lg">{{ company.extension_days }}</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <p class="text-xs text-gray-500 mb-1">Tiempo Prom.</p>
+                        <p class="font-bold text-blue-500 text-lg">{{ company.avg_duration }}d</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+        </div>
+
+        <footer class="mt-16 text-center text-gray-400 text-sm">
+            <p>Generado por Sistema BIM • {{ generation_date }}</p>
+        </footer>
+
+    </main>
+
+    <script>
+        function exportToPDF() {
+            const element = document.getElementById('dashboard-content');
+            const opt = {
+                margin: [10, 10, 10, 10], // top, left, bottom, right
+                filename: `Dashboard_{{ project_name }}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+
+            // Temporary styling for PDF
+            const originalBg = document.body.style.backgroundColor;
+            // element.style.backgroundColor = "white"; 
+
+            // Show loading or toast?
+            // alert("Generando PDF..."); // Remove alert per user preference, maybe button text change?
+            const btn = document.querySelector('button[onclick="exportToPDF()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span> Generando...</span>';
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                btn.innerHTML = '<i class="fas fa-check"></i><span> Descargado</span>';
+                setTimeout(() => btn.innerHTML = originalText, 2000);
+            });
+        }
+    </script>
+</body>
+
+</html>

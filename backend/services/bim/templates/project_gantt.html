@@ -612,6 +612,13 @@
             btnCompanies.onclick = openCompanyModal;
             toolbar.appendChild(btnCompanies);
 
+            // --- 6. DASHBOARD (NEW) ---
+            const btnDash = document.createElement('button');
+            btnDash.className = "ml-2 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white px-3 py-1 rounded text-sm font-bold shadow flex items-center transform transition hover:scale-105";
+            btnDash.innerHTML = 'DASHBOARD'; // As per user image: Uppercase red button
+            btnDash.onclick = () => window.open(window.location.pathname + '/dashboard', '_blank');
+            toolbar.appendChild(btnDash);
+
             // --- 7. SEPARATOR ---
             toolbar.appendChild(createSeparator());
 
