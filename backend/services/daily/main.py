@@ -1,11 +1,31 @@
 from fastapi import FastAPI, Depends, HTTPException, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
+import sys
 import os
 
-from ...common import database
-from ...common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
-from .aodev import connector as aodev
+# Path Setup to allow importing 'backend.common'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Go up: daily -> services -> backend
+BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+if BACKEND_ROOT not in sys.path:
+    # Append root for common modules
+    sys.path.append(BACKEND_ROOT)
+
+try:
+    from common import database
+    from common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
+except ImportError:
+    # Fallback if structure is flattened (unlikely but safe)
+    from ...common import database
+    from ...common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
+
+try:
+    from .aodev import connector as aodev
+except ImportError:
+    import aodev as aodev_module
+    aodev = aodev_module.connector
 
 app = FastAPI(title="AOdailyWork")
 
