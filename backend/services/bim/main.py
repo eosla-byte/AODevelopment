@@ -700,8 +700,7 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                      activities = db.query(BimActivity).filter(BimActivity.version_id == latest_version.id).order_by(text("display_order ASC"), text("id ASC")).all()
                  else:
                      raise e
-                 else:
-                     raise e
+
             for act in activities:
                 # Format for Frappe Gantt
                 # {id: "Task 1", name: "Redesign website", start: "2016-12-28", end: "2016-12-31", progress: 20, dependencies: "Task 2, Task 3"}
