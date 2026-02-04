@@ -702,6 +702,15 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                 if not start_str: start_str = datetime.datetime.now().strftime("%Y-%m-%d")
                 if not end_str: end_str = datetime.datetime.now().strftime("%Y-%m-%d")
                 
+                # DEBUG: Deep inspection for Zona E/D persistence issue (HTML RENDER PATH)
+                if "Zona" in act.name:
+                    try:
+                        # Refresh to be sure we are not serving stale session data
+                        db.refresh(act)
+                        print(f"DEBUG HTML RENDER: {act.name} (ID: {act.id}) ExtDays: {getattr(act, 'extension_days', 'N/A')}")
+                    except Exception as e:
+                        print(f"DEBUG HTML RENDER ERROR: {e}")
+                
                 tasks_json.append({
                     "id": str(act.activity_id) if act.activity_id else str(act.id),
                     "server_id": str(act.id), # UNIQUE DB ID
