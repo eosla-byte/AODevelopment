@@ -117,6 +117,10 @@ def ensure_schema_updates():
                          print("Adding 'extension_days' column...")
                          conn.execute(text("ALTER TABLE bim_activities ADD COLUMN extension_days INTEGER DEFAULT 0"))
 
+                     if "history" not in columns:
+                         print("Adding 'history' column...")
+                         conn.execute(text("ALTER TABLE bim_activities ADD COLUMN history JSON DEFAULT '[]'"))
+
                      if insp.has_table("bim_projects"):
                          proj_cols = [c['name'] for c in insp.get_columns("bim_projects")]
                          if "settings" not in proj_cols:
@@ -649,6 +653,8 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                      conn.execute(text("ALTER TABLE bim_activities ADD COLUMN comments JSON DEFAULT '[]'"))
                  if "extension_days" not in curr_cols:
                      conn.execute(text("ALTER TABLE bim_activities ADD COLUMN extension_days INTEGER DEFAULT 0"))
+                 if "history" not in curr_cols:
+                     conn.execute(text("ALTER TABLE bim_activities ADD COLUMN history JSON DEFAULT '[]'"))
                  trans.commit()
     except Exception as e:
         print(f"Runtime Patch Error: {e}")
@@ -708,7 +714,8 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
                     "comments": getattr(act, 'comments', []) or [],
                     "wbs": getattr(act, 'wbs_code', "") or "",
                     "display_order": getattr(act, 'display_order', 0) or 0,
-                    "extension_days": getattr(act, 'extension_days', 0) or 0
+                    "extension_days": getattr(act, 'extension_days', 0) or 0,
+                    "history": getattr(act, 'history', []) or []
                 })
         
         if not tasks_json:
@@ -1079,7 +1086,8 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
                 "cell_styles": getattr(act, 'cell_styles', {}) or {},
                 "comments": getattr(act, 'comments', []) or [],
                 "display_order": getattr(act, 'display_order', 0) or 0,
-                "extension_days": getattr(act, 'extension_days', 0) or 0
+                "extension_days": getattr(act, 'extension_days', 0) or 0,
+                "history": getattr(act, 'history', []) or []
             })
             
         return tasks_json
@@ -1124,7 +1132,27 @@ async def update_activity(activity_id: str, data: ActivityUpdateRequest, user = 
             raise HTTPException(status_code=404, detail="Activity not found")
             
         if data.name is not None: act.name = data.name
-        if data.progress is not None: act.pct_complete = data.progress
+        if data.progress is not None: 
+            # Capture History if changed
+            old_prog = act.pct_complete or 0
+            if float(data.progress) != float(old_prog):
+                # Append to history
+                current_hist = act.history or []
+                if isinstance(current_hist, str):
+                    import json
+                    try: current_hist = json.loads(current_hist)
+                    except: current_hist = []
+                
+                # Entry: { date, progress, user }
+                current_hist.append({
+                    "date": datetime.datetime.now().isoformat(),
+                    "progress": data.progress,
+                    "user": user.get("sub", "Unknown")
+                })
+                act.history = current_hist
+            
+            act.pct_complete = data.progress
+
         if data.start is not None:
             try: act.planned_start = datetime.datetime.strptime(data.start, "%Y-%m-%d")
             except: pass
