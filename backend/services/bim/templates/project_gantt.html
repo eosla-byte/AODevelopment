@@ -480,16 +480,8 @@
             }};
         console.log("AO Gantt: Tasks loaded:", serverTasks ? serverTasks.length : 0);
         if (serverTasks && serverTasks.length > 0) {
-            // DEBUG: Check ANY task with extension_days (Generalized for User Testing)
-            const extendedTasks = serverTasks.filter(t => t.extension_days > 0);
-            if (extendedTasks.length > 0) {
-                const t = extendedTasks[0];
-                alert(`DEBUG LOAD SUCCESS: Found ${extendedTasks.length} tasks with ExtDays.\nFirst: ${t.name}\nID: ${t.server_id}\nExtDays: ${t.extension_days}`);
-            } else {
-                // Check specially for Zona D or E just in case
-                const debugTask = serverTasks.find(t => t.name.includes("Zona D") || t.name.includes("Zona E"));
-                if (debugTask) alert(`DEBUG LOAD FAIL: Checked ${debugTask.name}\nID: ${debugTask.server_id}\nExtDays: ${debugTask.extension_days}`);
-            }
+            // DEBUG: Extension checks removed for production
+
         }
 
         if (!serverTasks || !Array.isArray(serverTasks)) {
@@ -1185,7 +1177,8 @@
             setTimeout(() => {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
-                alert("Guardado completo.");
+                console.log("Guardado completo.");
+
             }, 500);
         }
 
