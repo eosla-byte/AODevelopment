@@ -481,12 +481,8 @@
         console.log("AO Gantt: Tasks loaded:", serverTasks ? serverTasks.length : 0);
         if (serverTasks && serverTasks.length > 0) {
             const debugTask = serverTasks.find(t => t.server_id == '4615' || t.id == '4615' || t.id.includes('4615'));
-            console.log("DEBUG Persistence Check - First Task:", serverTasks[0]);
             if (debugTask) {
-                console.log("DEBUG Persistence Check - Target Task (4615):", debugTask);
-                console.log("DEBUG 4615 extension_days:", debugTask.extension_days);
-                console.log("DEBUG 4615 cell_styles:", debugTask.cell_styles);
-                alert(`DEBUG: Task 4615 Loaded.\nExt Days: ${debugTask.extension_days}\nStyles: ${JSON.stringify(debugTask.cell_styles)}`);
+                console.log("DEBUG Task 4615 Loaded:", debugTask);
             }
         }
 
@@ -1117,41 +1113,33 @@
                     display_order: task.orderIndex,
                     extension_days: parseInt(task.extension_days) || 0
                 };
-
-                try {
-                    // FIX: Use server_id (Unique DB ID) if available, else id
-                    const targetId = task.server_id ? task.server_id : id;
-                    const res = await fetch(`/api/activities/${targetId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!res.ok) {
-                        const errText = await res.text();
-                        console.error("Save Failed for", id, res.status, errText);
-                        // alert(`Error guardando tarea: ${res.status} - ${errText}`); // Suppress alert for smooth UX
-                        State.dirtyTasks.add(id); // Re-add
-                    }
-                } catch (e) {
-                    console.error("Network Error saving", id, e);
-                    State.dirtyTasks.add(id);
-                }
             });
 
-            await Promise.all(promises);
-
-            const status = document.getElementById('save-status');
-            if (status) {
-                if (State.dirtyTasks.size === 0) {
-                    status.innerText = "Guardado";
-                    status.classList.remove('text-orange-400');
-                    status.classList.add('text-green-500');
-                } else {
-                    status.innerText = "Reintentando...";
-                    status.classList.add('text-red-500');
-                }
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error("Save Failed for", id, res.status, errText);
+                // alert(`Error guardando tarea: ${res.status} - ${errText}`); // Suppress alert for smooth UX
+                State.dirtyTasks.add(id); // Re-add
             }
+        } catch (e) {
+            console.error("Network Error saving", id, e);
+            State.dirtyTasks.add(id);
+        }
+            });
+
+        await Promise.all(promises);
+
+        const status = document.getElementById('save-status');
+        if (status) {
+            if (State.dirtyTasks.size === 0) {
+                status.innerText = "Guardado";
+                status.classList.remove('text-orange-400');
+                status.classList.add('text-green-500');
+            } else {
+                status.innerText = "Reintentando...";
+                status.classList.add('text-red-500');
+            }
+        }
         }
 
         function createSeparator() {
