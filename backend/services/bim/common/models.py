@@ -370,11 +370,18 @@ class BimActivity(Base):
     
     # Visuals & Meta
     style = Column(String) # JSON or String for simple style? Main.py treats as string.
+    cell_styles = Column(JSON, default={}) # New: {"colId": {"backgroundColor": "red"}}
+    display_order = Column(Integer, default=0) # For manual row reordering
+    
     contractor = Column(String)
     predecessors = Column(String)
     
     # Social Comments: [{id, userId, text, timestamp, attachments:[]}]
     comments = Column(JSON, default=[])
+
+    # New Fields for Advanced Gantt
+    extension_days = Column(Integer, default=0)
+    history = Column(JSON, default=[]) # [{date, progress, user}]
     
     # Hierarchy
     parent_wbs = Column(String)
