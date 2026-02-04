@@ -2968,6 +2968,7 @@
         }
 
         // --- TAKS DETAILS CARD LOGIC ---
+        // --- TASK DETAILS CARD LOGIC ---
         window.showTaskCard = function (task) {
             // Close existing
             const ex = document.getElementById('task-card-modal');
@@ -2977,28 +2978,32 @@
             modal.id = 'task-card-modal';
             modal.className = 'task-card-overlay';
 
-            // Prepare History Chart Points
-            // History: [{date, progress}, ...]
-            // Map Start Date -> End Date to 0 -> 100% width
-            const history = task.history || [];
-            let svgPoints = "";
+            // Calculate Duration if undefined
+            let dispDuration = task.duration;
+            if (!dispDuration || dispDuration === 'undefined') {
+                const s = new Date(task.start);
+                const e = new Date(task.end);
+                if (!isNaN(s) && !isNaN(e)) {
+                    dispDuration = Math.round((e - s) / (1000 * 60 * 60 * 24));
+                } else {
+                    dispDuration = 0;
+                }
+            }
 
+            // Contractor Options
+            const companyOptions = Object.keys(State.companyColors).map(c =>
+                `<option value="${c}" ${task.contractor === c ? 'selected' : ''}>${c}</option>`
+            ).join('');
+            const addNewOption = `<option value="__NEW__">+ Nueva...</option>`;
+
+            // Helper to render chart (same as before)
+            const history = task.history || [];
             const tStart = new Date(task.start).getTime();
             const tEnd = new Date(task.end).getTime();
             const totalDuration = tEnd - tStart;
-
-            // Always include start point (0%)? and current point?
-            // Let's sort history by date
             const sortedHist = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-            // Points generation
-            // X = (EventDate - Start) / Duration * 100
-            // Y = 100 - Progress (SVG coords flip)
-
             let points = [];
-            // Start Point
             points.push([0, 100]);
-
             sortedHist.forEach(h => {
                 const d = new Date(h.date).getTime();
                 let x = 0;
@@ -3008,14 +3013,8 @@
                 const y = 100 - parseFloat(h.progress);
                 points.push([x, y]);
             });
-
-            // Current State Point (Now or Task End)
-            // If task is in progress, current pos is Today? Or just use last known progress at X=100?
-            // Requirement: "ver como fue el cumplimiento"
-            // Let's draw line to current state
             const currentP = parseFloat(task.progress || 0);
             if (sortedHist.length === 0 || sortedHist[sortedHist.length - 1].progress != currentP) {
-                // Add current state point. X at current time? 
                 const now = new Date().getTime();
                 let xNow = 100;
                 if (totalDuration > 0 && now < tEnd) {
@@ -3023,96 +3022,154 @@
                 }
                 points.push([xNow, 100 - currentP]);
             }
-
             const polylinePoints = points.map(p => `${p[0]},${p[1]}`).join(' ');
 
             modal.innerHTML = `
                  <div class="task-card">
                      <div class="card-header">
-                         <div>
-                             <h2 class="text-xl font-bold text-gray-800">${task.name}</h2>
-                             <span class="text-xs text-blue-600 font-mono">${task.id}</span>
+                         <div class="w-full mr-4">
+                             <input type="text" id="card-name" value="${task.name}" class="text-xl font-bold text-gray-800 w-full border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none bg-transparent" placeholder="Nombre de la tarea">
+                             <span class="text-xs text-blue-600 font-mono select-all">${task.id}</span>
                          </div>
                          <button onclick="document.getElementById('task-card-modal').remove()" class="text-gray-400 hover:text-red-500 text-2xl">&times;</button>
                      </div>
                      <div class="card-body">
                          <div class="card-row">
-                             <div>
+                             <div class="flex-1 mr-2">
                                  <div class="card-label">Inicio</div>
-                                 <div class="card-value">${task.start}</div>
+                                 <input type="date" id="card-start" value="${task.start}" class="w-full border rounded px-1 py-0.5 text-sm" onchange="recalcCardDuration()">
                              </div>
-                             <div>
+                             <div class="flex-1 ml-2">
                                  <div class="card-label">Fin</div>
-                                 <div class="card-value">${task.end}</div>
+                                 <input type="date" id="card-end" value="${task.end}" class="w-full border rounded px-1 py-0.5 text-sm" onchange="recalcCardDuration()">
                              </div>
                          </div>
                          <div class="card-row">
-                             <div>
-                                 <div class="card-label">Duración</div>
-                                 <div class="card-value">${task.duration} días</div>
+                             <div class="flex-1 mr-2">
+                                 <div class="card-label">Duración (Días)</div>
+                                 <input type="number" id="card-duration" value="${dispDuration}" class="w-full border rounded px-1 py-0.5 text-sm bg-gray-50" readonly>
                              </div>
-                             <div>
+                             <div class="flex-1 ml-2">
                                  <div class="card-label">Empresa</div>
-                                 <div class="card-value flex items-center">
-                                     <span class="w-3 h-3 rounded-full mr-2" style="background:${State.companyColors[task.contractor] || '#ccc'}"></span>
-                                     ${task.contractor || 'N/A'}
+                                 <div class="flex items-center">
+                                    <span id="card-comp-color" class="w-3 h-3 rounded-full mr-2" style="background:${State.companyColors[task.contractor] || '#ccc'}"></span>
+                                    <select id="card-contractor" class="w-full border rounded px-1 py-0.5 text-sm" onchange="handleCardCompChange(this)">
+                                        <option value="">-- Sin Asignar --</option>
+                                        ${companyOptions}
+                                        ${addNewOption}
+                                    </select>
                                  </div>
                              </div>
                          </div>
                          <div class="card-row">
-                             <div>
-                                 <div class="card-label">Avance</div>
-                                 <div class="card-value text-blue-600 font-bold">${task.progress}%</div>
+                             <div class="flex-1 mr-2">
+                                 <div class="card-label">Avance (%)</div>
+                                 <input type="number" id="card-progress" value="${task.progress || 0}" min="0" max="100" class="w-full border rounded px-1 py-0.5 text-sm font-bold text-blue-600">
                              </div>
-                             <div>
-                                 <div class="card-label">Tiempo Extra</div>
-                                 <div class="card-value text-red-600 font-bold">${task.extension_days || 0} días</div>
+                             <div class="flex-1 ml-2">
+                                 <div class="card-label">Tiempo Extra (Días)</div>
+                                 <input type="number" id="card-extension" value="${task.extension_days || 0}" min="0" class="w-full border rounded px-1 py-0.5 text-sm font-bold text-red-600">
                              </div>
                          </div>
                          
+                         <!-- Chart Section (Read Only) -->
                          <div class="mb-4">
                              <div class="card-label">Métrica de Cumplimiento (% vs Tiempo)</div>
                              <div class="metric-chart">
                                  <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-                                      <!-- Grid Lines -->
                                       <line x1="0" y1="25" x2="100" y2="25" stroke="#eee" stroke-width="0.5" />
                                       <line x1="0" y1="50" x2="100" y2="50" stroke="#eee" stroke-width="0.5" />
                                       <line x1="0" y1="75" x2="100" y2="75" stroke="#eee" stroke-width="0.5" />
-                                      
-                                      <!-- Progression Line -->
                                       <polyline points="${polylinePoints}" fill="none" stroke="#3b82f6" stroke-width="2" />
-                                      
-                                      <!-- Points -->
                                       ${points.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="1.5" fill="#2563eb" />`).join('')}
                                  </svg>
-                                 <div class="absolute bottom-1 right-1 text-[8px] text-gray-400">Tiempo &rarr;</div>
-                                 <div class="absolute top-1 left-1 text-[8px] text-gray-400">&uarr; %</div>
                              </div>
                          </div>
 
                          <div>
                              <div class="card-label">Comentarios Recientes</div>
-                             <div class="bg-gray-50 rounded p-2 text-sm max-h-32 overflow-y-auto">
+                             <button class="mt-1 text-blue-600 text-xs hover:underline float-right" onclick="openCommentsModal(State.tasks.find(t=>t.id=='${task.id}'))">Gestionar Comentarios</button>
+                             <div class="bg-gray-50 rounded p-2 text-sm max-h-24 overflow-y-auto clear-both border">
                                  ${(task.comments && task.comments.length > 0)
-                    ? task.comments.map(c => `
-                                         <div class="mb-2 border-b last:border-0 pb-1">
-                                             <div class="flex justify-between text-xs text-gray-500">
-                                                 <span>${c.userName}</span>
-                                                 <span>${new Date(c.timestamp).toLocaleDateString()}</span>
-                                             </div>
-                                             <div class="text-gray-700">${c.text}</div>
+                    ? task.comments.slice(-3).map(c => `
+                                         <div class="mb-1 border-b last:border-0 pb-1">
+                                             <span class="font-bold text-xs">${c.userName}:</span> <span class="text-gray-700 text-xs">${c.text}</span>
                                          </div>
                                        `).join('')
-                    : '<span class="text-gray-400 italic">No hay comentarios</span>'
+                    : '<span class="text-gray-400 italic text-xs">No hay comentarios</span>'
                 }
                              </div>
-                             <button class="mt-2 text-blue-600 text-xs hover:underline" onclick="openCommentsModal(State.tasks.find(t=>t.id=='${task.id}'))">Ver todos / Adjuntar</button>
+                         </div>
+                         
+                         <!-- Actions -->
+                         <div class="mt-4 flex justify-end gap-2 border-t pt-2">
+                             <button class="px-3 py-1 text-gray-600 text-sm hover:bg-gray-100 rounded" onclick="document.getElementById('task-card-modal').remove()">Cancelar</button>
+                             <button class="px-3 py-1 bg-blue-600 text-white text-sm rounded shadow hover:bg-blue-700 font-bold" onclick="saveTaskFromCard('${task.id}')">Guardar Cambios</button>
                          </div>
                      </div>
                  </div>
              `;
             document.body.appendChild(modal);
-        }
+        };
+
+        window.recalcCardDuration = function () {
+            const sStr = document.getElementById('card-start').value;
+            const eStr = document.getElementById('card-end').value;
+            if (sStr && eStr) {
+                const s = new Date(sStr);
+                const e = new Date(eStr);
+                const diffTime = Math.abs(e - s);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                document.getElementById('card-duration').value = diffDays >= 0 ? diffDays : 0;
+            }
+        };
+
+        window.handleCardCompChange = function (select) {
+            const val = select.value;
+            if (val === '__NEW__') {
+                const n = prompt("Nombre de la nueva empresa:");
+                if (n) {
+                    if (!State.companyColors[n]) {
+                        State.companyColors[n] = '#' + Math.floor(Math.random() * 16777215).toString(16);
+                    }
+                    // Add option
+                    const opt = document.createElement('option');
+                    opt.value = n;
+                    opt.text = n;
+                    opt.selected = true;
+                    // Insert before last
+                    select.add(opt, select.options[select.length - 1]);
+                    select.value = n;
+                } else {
+                    select.value = "";
+                }
+            }
+            const c = select.value;
+            const color = State.companyColors[c] || '#ccc';
+            document.getElementById('card-comp-color').style.background = color;
+        };
+
+        window.saveTaskFromCard = function (taskId) {
+            const task = State.tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            task.name = document.getElementById('card-name').value;
+            task.start = document.getElementById('card-start').value;
+            task.end = document.getElementById('card-end').value;
+            // Recalc duration in object just in case
+            task.duration = parseInt(document.getElementById('card-duration').value) || 0;
+
+            task.contractor = document.getElementById('card-contractor').value;
+            task.progress = parseInt(document.getElementById('card-progress').value) || 0;
+            task.extension_days = parseInt(document.getElementById('card-extension').value) || 0;
+
+            // Logic: If dates changed, we might need to recalc parents? 
+            // HierarchyEngine.recalculate(State.tasks); // If available
+
+            triggerAutoSave(taskId);
+            render();
+            document.getElementById('task-card-modal').remove();
+        };
     </script>
 </body>
 
