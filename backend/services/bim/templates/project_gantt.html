@@ -1110,9 +1110,11 @@
                     extension_days: parseInt(task.extension_days) || 0
                 };
 
+
                 // DEBUG: Check payload
-                if (task.server_id == '4615' || task.id == '4615' || task.id.includes('4615')) {
-                    alert(`DEBUG SAVING 4615:\nExtDays: ${payload.extension_days}\nStyles: ${payload.cell_styles}`);
+                // Show alert if task has extension_days or matches specific IDs we are debugging
+                if (payload.extension_days > 0 || task.server_id == '4615' || task.id.includes('4607')) {
+                    alert(`DEBUG SAVING: ${payload.name}\nID: ${id}\nExtDays: ${payload.extension_days}\nStyles: ${payload.cell_styles}`);
                 }
 
                 try {
