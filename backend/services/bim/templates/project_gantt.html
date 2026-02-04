@@ -2372,9 +2372,15 @@
                             iconText.setAttribute('font-size', '14');
                             iconText.setAttribute('fill', '#3b82f6');
                             iconText.textContent = '\uf086'; // fa-comment-dots
-                            iconText.textContent = '\uf086'; // fa-comment-dots
                             g.appendChild(iconText);
                         }
+
+                        // CLICK HANDLER FOR STANDARD TASK
+                        g.style.cursor = 'pointer';
+                        g.onclick = (e) => {
+                            e.stopPropagation();
+                            showTaskCard(task);
+                        };
 
                         // 4. EXTRA TIME BAR (Red Hatched)
                         const extDays = parseInt(task.extension_days) || 0;
@@ -2936,8 +2942,10 @@
         }
 
         function triggerAddExtraTime() {
+            console.log("triggerAddExtraTime called");
             hideContextMenu();
             const task = State.contextTask;
+            console.log("Context task:", task);
             if (!task) {
                 alert("Error: No task selected");
                 return;
