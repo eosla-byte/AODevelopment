@@ -172,3 +172,62 @@ def get_chat(project_id: str):
 def send_chat(project_id: str, content: str = Body(..., embed=True), user_id: str = Depends(get_current_user_id)):
     msg = database.add_daily_message(project_id, user_id, content)
     return {"id": msg.id, "status": "sent"}
+
+# -----------------------------------------------------------------------------
+# STATIC FILES & FRONTEND
+# -----------------------------------------------------------------------------
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# -----------------------------------------------------------------------------
+# STATIC FILES & FRONTEND
+# -----------------------------------------------------------------------------
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+
+# Path Setup
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+# DEBUG LOGGING
+print(f"deployment_debug: BASE_DIR={BASE_DIR}")
+print(f"deployment_debug: STATIC_DIR={STATIC_DIR}")
+if os.path.exists(BASE_DIR):
+    print(f"deployment_debug: Listing BASE_DIR: {os.listdir(BASE_DIR)}")
+
+# Mount /assets if it exists, otherwise just log
+ASSETS_DIR = os.path.join(STATIC_DIR, "assets")
+if os.path.exists(ASSETS_DIR):
+    app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+else:
+    print(f"deployment_debug: Assets dir missing at {ASSETS_DIR}")
+
+@app.get("/")
+async def serve_root():
+    # Debug response if file is missing
+    index_path = os.path.join(STATIC_DIR, "daily.html")
+    if not os.path.exists(index_path):
+        # Return debug info to the browser/client to see what's wrong
+        return JSONResponse({
+            "error": "daily.html not found",
+            "path_attempted": index_path,
+            "cwd": os.getcwd(),
+            "base_dir_contents": os.listdir(BASE_DIR) if os.path.exists(BASE_DIR) else "BASE_DIR missing",
+            "static_dir_contents": os.listdir(STATIC_DIR) if os.path.exists(STATIC_DIR) else "STATIC_DIR missing"
+        }, status_code=404)
+        
+    return FileResponse(index_path)
+
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    # Serve static file if it exists
+    file_path = os.path.join(STATIC_DIR, full_path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+        
+    # Fallback to SPA entry point
+    index_path = os.path.join(STATIC_DIR, "daily.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+        
+    return JSONResponse({"detail": "Not Found (SPA Fallback missing)"}, status_code=404)
