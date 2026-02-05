@@ -2122,30 +2122,42 @@ def init_user_daily_setup(user_email: str):
     """
     return True
 
-def create_daily_team(name: str, owner_id: str):
+def create_daily_team(name: str, owner_id: str, organization_id: str = None):
     db = SessionOps() # Using Ops DB for Daily
     try:
         new_id = str(uuid.uuid4())
-        team = models.DailyTeam(id=new_id, name=name, owner_id=owner_id, members=[owner_id])
+        team = models.DailyTeam(
+            id=new_id, 
+            name=name, 
+            owner_id=owner_id, 
+            organization_id=organization_id,
+            members=[owner_id]
+        )
         db.add(team)
         db.commit()
         return team
     finally:
         db.close()
 
-def get_user_teams(user_id: str):
+def get_user_teams(user_id: str, organization_id: str = None):
     # This requires JSON contains query or filtering in memory.
     # SQLite JSON filtering is tricky.
     # For MVP, get all teams and filter in python (inefficient but works for small scale)
     db = SessionOps()
     try:
-        all_teams = db.query(models.DailyTeam).all()
+        query = db.query(models.DailyTeam)
+        
+        # 1. Organization Isolation (If Org Context Provided)
+        if organization_id:
+            query = query.filter(models.DailyTeam.organization_id == organization_id)
+            
+        all_teams = query.all()
         user_teams = [t for t in all_teams if user_id in (t.members or [])]
         return user_teams
     finally:
         db.close()
 
-def create_daily_project(team_id: str, name: str, user_id: str):
+def create_daily_project(team_id: str, name: str, user_id: str, organization_id: str = None):
     db = SessionOps()
     try:
         new_id = str(uuid.uuid4())
@@ -2154,6 +2166,7 @@ def create_daily_project(team_id: str, name: str, user_id: str):
             team_id=team_id, 
             name=name, 
             created_by=user_id,
+            organization_id=organization_id,
             settings={"background": "default"}
         )
         # Create Default Columns

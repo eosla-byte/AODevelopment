@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, CheckSquare, MessageSquare, BarChart2, Folder } from 'lucide-react';
+import { Layout, CheckSquare, MessageSquare, BarChart2, Folder, ArrowLeftRight } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const Sidebar = () => {
@@ -45,7 +45,17 @@ const Sidebar = () => {
             </nav>
 
             <div style={{ padding: '1rem', borderTop: '1px solid #1e293b' }}>
-                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Team: AO Devs</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Organization</div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#e2e8f0' }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
+                        {localStorage.getItem("ao_org_id") === 'org_123' ? 'AO Architecture' :
+                            localStorage.getItem("ao_org_id") === 'org_456' ? 'Constructora Demo' :
+                                'Personal Workspace'}
+                    </div>
+                    <NavLink to="/select-org" style={{ color: '#94a3b8', transition: 'color 0.2s' }} title="Switch Organization">
+                        <ArrowLeftRight size={16} />
+                    </NavLink>
+                </div>
             </div>
         </div>
     );
