@@ -603,14 +603,7 @@ async def upload_file(file: UploadFile = File(...)):
         "type": file.content_type,
         "size": 0 # TODO: Calculate size
     }
-        {
-            "id": m.id,
-            "sender_id": m.sender_id,
-            "content": m.content,
-            "created_at": m.created_at.isoformat() if m.created_at else ""
-        }
-        for m in msgs
-    ]
+
 
 @app.post("/chat/{project_id}")
 def send_chat(project_id: str, content: str = Body(..., embed=True), user_id: str = Depends(get_current_user_id)):
