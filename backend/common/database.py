@@ -4,7 +4,7 @@ import json
 import uuid
 from typing import List, Optional
 from sqlalchemy.orm import Session, sessionmaker, joinedload
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.sql import func
 from . import models
 from .models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard, PluginSheetSession, DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
@@ -2163,7 +2163,28 @@ def create_daily_team(name: str, owner_id: str, organization_id: str = None, mem
             members=initial_members
         )
         db.add(team)
-        db.commit()
+        try:
+            db.commit()
+        except Exception as e:
+            # Self-Healing Pattern: Cross-DB FK Fix
+            # If we get a ForeignKeyViolation on owner_id (which is in a DIFFERENT DB),
+            # we must drop that constraint.
+            err_str = str(e).lower()
+            if "foreignkeyviolation" in err_str and "daily_teams_owner_id_fkey" in err_str:
+                print("⚠️ [SELF-HEALING] Detected invalid Cross-DB FK. Dropping constraint...")
+                db.rollback()
+                
+                # Drop Constraint
+                db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_owner_id_fkey"))
+                db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_organization_id_fkey"))
+                db.commit()
+                
+                # Retry
+                print("🔄 [SELF-HEALING] Retrying Team Creation...")
+                db.add(team)
+                db.commit()
+            else:
+                raise e
         return team
     finally:
         db.close()
