@@ -110,6 +110,11 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
 
                 <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.25rem' }}>Create New Project</h2>
 
+                {/* DEBUG: Remove this later */}
+                <div style={{ fontSize: '0.75rem', color: 'red', marginBottom: '1rem' }}>
+                    DEBUG: isNewTeam={isNewTeam.toString()}, teamId={teamId}, Value={isNewTeam ? "NEW" : teamId}
+                </div>
+
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div>
                         <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>Project Name</label>
