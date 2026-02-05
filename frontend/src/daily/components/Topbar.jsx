@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Bell, User } from 'lucide-react';
+import { Search, Bell, User, LogOut } from 'lucide-react';
 
 const Topbar = ({ user }) => {
     return (
@@ -40,17 +40,34 @@ const Topbar = ({ user }) => {
                         <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{user?.name || 'User'}</div>
                         <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{user?.email || 'user@example.com'}</div>
                     </div>
-                    <div style={{
-                        width: '36px',
-                        height: '36px',
-                        background: '#e2e8f0',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#64748b'
-                    }}>
-                        <User size={20} />
+                    <div style={{ position: 'relative', display: 'flex', gap: '0.5rem' }}>
+                        <div style={{
+                            width: '36px',
+                            height: '36px',
+                            background: '#e2e8f0',
+                            borderRadius: '50%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#64748b'
+                        }}>
+                            <User size={20} />
+                        </div>
+                        <button
+                            onClick={() => {
+                                localStorage.removeItem("ao_user");
+                                localStorage.removeItem("ao_org_id");
+                                window.location.href = "/#/login";
+                                window.location.reload();
+                            }}
+                            title="Logout"
+                            style={{
+                                background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                        >
+                            <LogOut size={20} />
+                        </button>
                     </div>
                 </div>
             </div>

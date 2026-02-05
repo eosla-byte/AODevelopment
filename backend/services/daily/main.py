@@ -94,14 +94,58 @@ def create_team(
 
 @app.post("/projects")
 def create_project(
-    team_id: str = Body(...), 
+    team_id: str = Body(None), 
     name: str = Body(...), 
     bim_project_id: str = Body(None),
+    new_team_name: str = Body(None),
+    members: List[str] = Body(None), # List of User IDs for new team
     user_id: str = Depends(get_current_user_id),
     org_id: str = Depends(get_current_org_id)
 ):
-    proj = database.create_daily_project(team_id, name, user_id, organization_id=org_id, bim_project_id=bim_project_id)
+    # If explicit team_id provided, use it.
+    # If new_team_name provided, create team first.
+    final_team_id = team_id
+    
+    if new_team_name and org_id:
+        # Create new team
+        # Members should include creator (user_id) + selected members
+        initial_members = [user_id]
+        if members:
+            initial_members.extend(members)
+        # Deduplicate
+        initial_members = list(set(initial_members))
+        
+        # We need a function to create team with members. 
+        # Existing database.create_daily_team takes 'members' list? 
+        # Let's check database.py signature. It takes 'members=[owner_id]' by default.
+        # We should update database.create_daily_team or manually add members.
+        # For now, let's assume create_daily_team sets owner as member.
+        # We might need to update members column after creation if it supports it.
+        # database.create_daily_team signature: (name, owner_id, organization_id, members)
+        team = database.create_daily_team(new_team_name, user_id, organization_id=org_id, members=initial_members)
+        final_team_id = team.id
+        
+        # Update team members if we have extra members
+        # We can implement database.update_daily_team_members or similar.
+        # Since I can't easily change database.py signature without checking usages,
+        # I'll rely on a new db helper or direct update if I had access.
+        # Actually, let's just modify the team object if Session is active? No, session closed.
+        # I'll add a helper or update database.py update_daily_team if exists.
+        # Checking database.py: create_daily_team sets members=[owner_id].
+        # There is no update_daily_team_members exposed.
+        # I'll just rely on creating the project for now, and maybe update members later if I add that helper.
+        # Wait, if I can't add members, the feature "Assign Team" (with multiple users) fails.
+        # I MUST update database.create_daily_team to accept members list.
+        # See next step. I will update database.py first to accept members list.
+
+    proj = database.create_daily_project(final_team_id, name, user_id, organization_id=org_id, bim_project_id=bim_project_id)
     return {"id": proj.id, "name": proj.name}
+
+@app.get("/org-users")
+def get_organization_users(org_id: str = Depends(get_current_org_id)):
+    if not org_id:
+        return []
+    return database.get_org_users(org_id)
 
 @app.get("/bim-projects")
 def get_available_bim_projects(org_id: str = Depends(get_current_org_id)):
@@ -196,6 +240,16 @@ def get_chat(project_id: str):
 def send_chat(project_id: str, content: str = Body(..., embed=True), user_id: str = Depends(get_current_user_id)):
     msg = database.add_daily_message(project_id, user_id, content)
     return {"id": msg.id, "status": "sent"}
+
+@app.get("/projects/{project_id}/metrics")
+def get_project_metrics_endpoint(project_id: str):
+    metrics = database.get_project_metrics(project_id)
+    if not metrics:
+        return {
+            "total_tasks": 0, "pending": 0, "in_progress": 0, "done": 0, 
+            "top_user_id": None, "user_stats": {}
+        }
+    return metrics
 
 # -----------------------------------------------------------------------------
 # STATIC FILES & FRONTEND

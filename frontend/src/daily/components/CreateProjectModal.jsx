@@ -4,17 +4,21 @@ import { X } from 'lucide-react';
 const CreateProjectModal = ({ onClose, onCreated, teams }) => {
     const [name, setName] = useState("");
     const [teamId, setTeamId] = useState(teams[0]?.id || "");
+    const [isNewTeam, setIsNewTeam] = useState(false);
+    const [newTeamName, setNewTeamName] = useState("");
+    const [orgUsers, setOrgUsers] = useState([]);
+    const [selectedMembers, setSelectedMembers] = useState([]);
+
     const [bimProjectId, setBimProjectId] = useState("");
     const [bimProjects, setBimProjects] = useState([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        // Fetch available BIM projects from backend
-        // For MVP/Dev, we'll try to fetch, if fail, show empty
-        const fetchBimProjects = async () => {
-            const orgId = localStorage.getItem("ao_org_id");
-            if (!orgId) return;
+        const orgId = localStorage.getItem("ao_org_id");
+        if (!orgId) return;
 
+        // Fetch BIM Projects
+        const fetchBimProjects = async () => {
             try {
                 const response = await fetch('/bim-projects', {
                     headers: { 'X-Organization-ID': orgId }
@@ -25,12 +29,26 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
                 }
             } catch (error) {
                 console.error("Failed to fetch BIM projects", error);
-                // Mock for dev if backend not ready
-                // setBimProjects([{ id: "bim1", name: "Torre Reforma (BIM)" }]);
+            }
+        };
+
+        // Fetch Org Users for Team Creation
+        const fetchOrgUsers = async () => {
+            try {
+                const response = await fetch('/org-users', {
+                    headers: { 'X-Organization-ID': orgId }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    setOrgUsers(data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch Org users", error);
             }
         };
 
         fetchBimProjects();
+        fetchOrgUsers();
     }, []);
 
     const handleSubmit = async (e) => {
@@ -43,6 +61,18 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
         // We need to ensure we send that.
 
         try {
+            const payload = {
+                name: name,
+                bim_project_id: bimProjectId || null
+            };
+
+            if (isNewTeam) {
+                payload.new_team_name = newTeamName;
+                payload.members = selectedMembers;
+            } else {
+                payload.team_id = teamId;
+            }
+
             const response = await fetch('/projects', {
                 method: 'POST',
                 headers: {
@@ -50,11 +80,7 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
                     'X-Organization-ID': orgId,
                     'X-User-ID': "u123" // Mock ID matching App.jsx mock
                 },
-                body: JSON.stringify({
-                    name: name,
-                    team_id: teamId,
-                    bim_project_id: bimProjectId || null
-                })
+                body: JSON.stringify(payload)
             });
 
             if (response.ok) {
@@ -100,15 +126,59 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
                     <div>
                         <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>Team</label>
                         <select
-                            value={teamId}
-                            onChange={e => setTeamId(e.target.value)}
+                            value={isNewTeam ? "NEW" : teamId}
+                            onChange={e => {
+                                if (e.target.value === "NEW") {
+                                    setIsNewTeam(true);
+                                    setTeamId("");
+                                } else {
+                                    setIsNewTeam(false);
+                                    setTeamId(e.target.value);
+                                }
+                            }}
                             style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}
                         >
                             {teams.map(t => (
                                 <option key={t.id} value={t.id}>{t.name}</option>
                             ))}
+                            <option value="NEW">+ Create New Team</option>
                         </select>
                     </div>
+
+                    {isNewTeam && (
+                        <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', fontWeight: 600 }}>New Team Name</label>
+                            <input
+                                type="text"
+                                value={newTeamName}
+                                onChange={e => setNewTeamName(e.target.value)}
+                                required={isNewTeam}
+                                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', marginBottom: '0.75rem' }}
+                                placeholder="e.g. Frontend Squad"
+                            />
+
+                            <label style={{ display: 'block', fontSize: '0.8rem', marginBottom: '0.5rem', fontWeight: 600 }}>Add Members</label>
+                            <div style={{ maxHeight: '100px', overflowY: 'auto', border: '1px solid #e2e8f0', background: 'white', padding: '0.5rem', borderRadius: '4px' }}>
+                                {orgUsers.length === 0 ? <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>No users found</p> :
+                                    orgUsers.map(u => (
+                                        <div key={u.id} style={{ display: 'flex', alignItems: 'center', marginBottom: '0.25rem' }}>
+                                            <input
+                                                type="checkbox"
+                                                value={u.id}
+                                                checked={selectedMembers.includes(u.id)}
+                                                onChange={e => {
+                                                    if (e.target.checked) setSelectedMembers([...selectedMembers, u.id]);
+                                                    else setSelectedMembers(selectedMembers.filter(id => id !== u.id));
+                                                }}
+                                                style={{ marginRight: '0.5rem' }}
+                                            />
+                                            <span style={{ fontSize: '0.85rem' }}>{u.name || u.email}</span>
+                                        </div>
+                                    ))
+                                }
+                            </div>
+                        </div>
+                    )}
 
                     <div>
                         <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>Link to BIM Project (Optional)</label>

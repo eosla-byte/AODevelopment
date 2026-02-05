@@ -2137,16 +2137,23 @@ def init_user_daily_setup(user_email: str):
     """
     return True
 
-def create_daily_team(name: str, owner_id: str, organization_id: str = None):
+def create_daily_team(name: str, owner_id: str, organization_id: str = None, members: List[str] = None):
     db = SessionOps() # Using Ops DB for Daily
     try:
         new_id = str(uuid.uuid4())
+        
+        initial_members = [owner_id]
+        if members:
+            initial_members.extend(members)
+        # Deduplicate
+        initial_members = list(set(initial_members))
+
         team = models.DailyTeam(
             id=new_id, 
             name=name, 
             owner_id=owner_id, 
             organization_id=organization_id,
-            members=[owner_id]
+            members=initial_members
         )
         db.add(team)
         db.commit()
@@ -2337,3 +2344,69 @@ def create_org_project(organization_id: str, name: str, cost: float = 0.0, sq_me
     finally:
         db.close()
 
+
+def get_org_users(organization_id: str):
+    """
+    Get all users belonging to an organization.
+    """
+    db = SessionCore()
+    try:
+        members = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.organization_id == organization_id
+        ).options(joinedload(models.OrganizationUser.user)).all()
+        
+        users = []
+        for m in members:
+            if m.user:
+                users.append({
+                    "id": m.user.id, # AccountUser ID
+                    "name": m.user.full_name,
+                    "email": m.user.email,
+                    "role": m.role
+                })
+        return users
+    finally:
+        db.close()
+
+def get_project_metrics(project_id: str):
+    db = SessionOps()
+    try:
+        project = db.query(models.DailyProject).filter(models.DailyProject.id == project_id).first()
+        if not project:
+            return None
+            
+        tasks = db.query(models.DailyTask).filter(models.DailyTask.project_id == project_id).all()
+        
+        total_tasks = len(tasks)
+        pending = len([t for t in tasks if t.status == "Pending"])
+        in_progress = len([t for t in tasks if t.status == "In Progress"])
+        done = len([t for t in tasks if t.status == "Done"])
+        
+        # User Stats
+        user_stats = {} # {user_id: count}
+        for t in tasks:
+            if t.assignees:
+                for uid in t.assignees:
+                    user_stats[uid] = user_stats.get(uid, 0) + 1
+                    
+        # Find top user
+        top_user_id = None
+        max_tasks = 0
+        for uid, count in user_stats.items():
+            if count > max_tasks:
+                max_tasks = count
+                top_user_id = uid
+                
+        # Resolve top user name (optional, or frontend does it with user list)
+        # For simplicity, returning ID
+        
+        return {
+            "total_tasks": total_tasks,
+            "pending": pending,
+            "in_progress": in_progress,
+            "done": done,
+            "top_user_id": top_user_id,
+            "user_stats": user_stats
+        }
+    finally:
+        db.close()
