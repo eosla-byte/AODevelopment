@@ -88,6 +88,7 @@ def run_db_fix():
 
 @app.on_event("startup")
 def startup_event():
+    print("🚀 [STARTUP] Daily Service Starting - Version POJO_FIX_V2")
     run_db_fix()
 
 @app.get("/fix-db")
