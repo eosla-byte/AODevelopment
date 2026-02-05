@@ -509,6 +509,53 @@ async def force_admin_reset():
     db.close()
     return f"ÉXITO: {msg} Usa: {email} / admin123"
 
+@app.get("/system/migrate_db")
+def migrate_db_schema(user_jwt = Depends(get_current_admin)):
+    """
+    Emergency endpoint to apply schema changes (Migrations) that Create_All misses.
+    """
+    if not user_jwt: return "Unauthorized"
+    
+    from sqlalchemy import text
+    db = SessionCore() # Or SessionOps if separate? Assuming shared for now or try both.
+    messages = []
+    
+    def run_migration(session, sql):
+        try:
+            session.execute(text(sql))
+            session.commit()
+            messages.append(f"SUCCESS: {sql}")
+        except Exception as e:
+            session.rollback()
+            # Ignore "duplicate column" errors
+            if "duplicate column" in str(e) or "already exists" in str(e):
+                messages.append(f"SKIPPED (Exists): {sql}")
+            else:
+                messages.append(f"ERROR: {sql} | {e}")
+
+    # 1. daily_teams: organization_id
+    run_migration(db, 'ALTER TABLE daily_teams ADD COLUMN organization_id VARCHAR')
+    
+    # 2. daily_projects: organization_id, bim_project_id
+    run_migration(db, 'ALTER TABLE daily_projects ADD COLUMN organization_id VARCHAR')
+    run_migration(db, 'ALTER TABLE daily_projects ADD COLUMN bim_project_id VARCHAR')
+    
+    db.close()
+    
+    # If using SessionOps separately?
+    # Ensure usage of correct engine.
+    # In database.py, SessionCore binds to CORE_DB_URL. SessionOps binds to OPS_DB_URL.
+    # If they are different, we must also migrate Ops.
+    from common.database import SessionOps
+    db_ops = SessionOps()
+    # Try same migrations on Ops just in case
+    run_migration(db_ops, 'ALTER TABLE daily_teams ADD COLUMN organization_id VARCHAR')
+    run_migration(db_ops, 'ALTER TABLE daily_projects ADD COLUMN organization_id VARCHAR')
+    run_migration(db_ops, 'ALTER TABLE daily_projects ADD COLUMN bim_project_id VARCHAR')
+    db_ops.close()
+
+    return {"status": "done", "log": messages}
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8005))
     print(f"Starting Accounts Service v2.1 (Passlib) on port {port}")
