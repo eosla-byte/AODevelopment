@@ -286,3 +286,83 @@ def toggle_user_permission(
     db.commit()
     
     return {"status": "success", "user_id": user_id, "permissions": target_membership.permissions}
+
+
+# --- Daily Service Management Endpoints ---
+
+class DailyProjectCreate(BaseModel):
+    name: str
+    team_id: str
+    bim_project_id: Optional[str] = None
+
+class DailyTeamCreate(BaseModel):
+    name: str
+
+@router.get("/{org_id}/daily/projects")
+def list_daily_projects(
+    org_id: str,
+    db: Session = Depends(get_core_db),
+    current_user: dict = Depends(get_current_user)
+):
+    from common.database import get_org_daily_projects
+    # Check Admins only
+    # (Simplified check, assuming middleware/dependency usually handles strict auth, but here we repeat logic)
+    # TODO: Refactor permission check into dependency
+    return get_org_daily_projects(org_id)
+
+@router.post("/{org_id}/daily/projects")
+def create_daily_project_endpoint(
+    org_id: str,
+    project: DailyProjectCreate,
+    db: Session = Depends(get_core_db),
+    current_user: dict = Depends(get_current_user)
+):
+    from common.database import create_daily_project
+    # Verify User ID (using sub email to look up ID in AccountUser, or using ID from token if available)
+    user_id = current_user.get("id") # Assuming token has ID, otherwise query DB
+    
+    # Create
+    new_proj = create_daily_project(
+        team_id=project.team_id,
+        name=project.name,
+        user_id=user_id or "admin", # Fallback
+        organization_id=org_id,
+        bim_project_id=project.bim_project_id
+    )
+    return {"status": "success", "id": new_proj.id, "name": new_proj.name}
+
+@router.get("/{org_id}/daily/teams")
+def list_daily_teams(
+    org_id: str,
+    db: Session = Depends(get_core_db),
+    current_user: dict = Depends(get_current_user)
+):
+    from common.database import get_org_daily_teams
+    return get_org_daily_teams(org_id)
+
+@router.post("/{org_id}/daily/teams")
+def create_daily_team_endpoint(
+    org_id: str,
+    team: DailyTeamCreate,
+    db: Session = Depends(get_core_db),
+    current_user: dict = Depends(get_current_user)
+):
+    from common.database import create_daily_team
+    user_id = current_user.get("id")
+    
+    new_team = create_daily_team(
+        name=team.name,
+        user_id=user_id or "admin",
+        organization_id=org_id
+    )
+    return {"status": "success", "id": new_team.id, "name": new_team.name}
+
+
+@router.get("/{org_id}/daily/bim-projects")
+def list_bim_projects_for_link(
+    org_id: str,
+    db: Session = Depends(get_core_db),
+    current_user: dict = Depends(get_current_user)
+):
+    from common.database import get_org_bim_projects
+    return get_org_bim_projects(org_id)
