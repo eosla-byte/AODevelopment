@@ -6,11 +6,11 @@ import os
 try:
     from .common import database
     # Import specific models to ensure they are registered with Base
-    from .common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
+    from .common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
 except ImportError:
     # Fallback to absolute if running from root without package context (dev)
     from common import database
-    from common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
+    from common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
 
 try:
     from .aodev import connector as aodev
