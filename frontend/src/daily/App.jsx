@@ -45,10 +45,12 @@ function App() {
 
     useEffect(() => {
         // Check for existing session (Mock)
-        // In real app, check cookie/token
+        const savedUser = localStorage.getItem("ao_user");
+
         setTimeout(() => {
-            // For now, we start unauthenticated to test flows
-            // Only set user if we have some persistence logic or after login
+            if (savedUser) {
+                setUser(JSON.parse(savedUser));
+            }
             setLoading(false);
         }, 500);
     }, []);

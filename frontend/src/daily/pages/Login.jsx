@@ -20,6 +20,7 @@ function Login({ setUser }) {
         if (email) { // Accept any email for now in Dev
             const user = { ...MOCK_USER, email: email };
             setUser(user);
+            localStorage.setItem("ao_user", JSON.stringify(user));
             // In a real app, we'd get a token. Here we rely on the parent state for the session.
             navigate('/select-org');
         }
