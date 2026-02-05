@@ -12,18 +12,74 @@ const ProjectsList = () => {
         const orgId = localStorage.getItem("ao_org_id");
         if (!orgId) return;
 
+        // CORRECT USER ID RETRIEVAL
+        let userId = null;
         try {
-            // Re-using /init logic or creating a dedicated /teams endpoint GET
-            // For now, let's assume /init gives us everything we need
+            // 1. Try 'ao_user' object (set by Login)
+            const storedUser = JSON.parse(localStorage.getItem("ao_user") || "{}");
+            if (storedUser.id && storedUser.id !== 'u123') {
+                userId = storedUser.id;
+            } else if (storedUser.email) {
+                // 2. Fallback: Try to use email if ID is mock or missing?
+                // Actually, backend expects UUID. If we have email only, we might fail unless backend handles email lookup.
+                // But init_app does not take email.
+                // Let's rely on what CreateProjectModal does: it fetches Org Users to find real ID.
+                // But we can't do that easily here without another fetch.
+
+                // QUICK FIX: If 'ao_user' has a real ID (from previous session?), use it.
+                // Login.jsx sets MOCK_USER with id="u123". This IS the problem.
+                // We need to resolve the real ID via /org-users first or assume the backend can handle something else.
+
+                // Wait, CreateProjectModal fetches /org-users and matches email.
+                // We should do the same here or rely on specific backend endpoint that accepts email?
+                // Backend has /my-organizations?email=...
+                // Let's use the same logic as CreateProjectModal? It's heavy for a list fetch.
+
+                // BETTER FIX: The MOCK LOGIN defaults to u123.
+                // We should probably rely on the user manually selecting a real user in a Dev Environment,
+                // OR, since this is "Daily Service", we should probably have a real login.
+
+                // For now, let's just grab the BEST GUESS we have.
+                // If the user refreshed after Project Creation, they might have a Real ID stored?
+                // No, CreateProjectModal doesn't update localStorage 'ao_user'.
+                // Determine effective user from email if only email is present
+                userId = "u123"; // Temporarily set to fallback to trigger resolution below
+            }
+        } catch (e) {
+            console.error("Error parsing user", e);
+        }
+
+        const rawUserId = userId || "u123";
+        let effectiveUserId = rawUserId;
+
+        if (rawUserId === 'u123') {
+            try {
+                const storedUser = JSON.parse(localStorage.getItem("ao_user") || "{}");
+                if (storedUser.email) {
+                    const usersRes = await fetch('/org-users', { headers: { 'X-Organization-ID': orgId } });
+                    if (usersRes.ok) {
+                        const users = await usersRes.json();
+                        const found = users.find(u => u.email.toLowerCase() === storedUser.email.toLowerCase());
+                        if (found) {
+                            effectiveUserId = found.id;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Error resolving user email", e);
+            }
+        }
+
+        try {
             const response = await fetch('/init', {
                 headers: {
                     'X-Organization-ID': orgId,
-                    'X-User-ID': localStorage.getItem("ao_user_id") || "u123"
+                    'X-User-ID': effectiveUserId
                 }
             });
             if (response.ok) {
                 const data = await response.json();
-                setTeams(data.teams); // [{id, name, projects: []}]
+                setTeams(data.teams);
             }
         } catch (error) {
             console.error("Failed to load projects", error);
