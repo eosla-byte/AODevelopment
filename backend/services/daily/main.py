@@ -427,7 +427,10 @@ def delete_daily_project_safe(project_id: str, user_id: str):
         # 3. Delete Messages
         db.query(DailyMessage).filter(DailyMessage.project_id == project_id).delete()
         
-        # 4. Delete Project
+        # 4. Delete Channels
+        db.query(DailyChannel).filter(DailyChannel.project_id == project_id).delete()
+        
+        # 5. Delete Project
         db.delete(proj)
         db.commit()
         print(f"✅ [API] Project Deleted: {project_id}")
