@@ -61,6 +61,30 @@ def get_current_org_id(request: Request):
 def health_check():
     return {"status": "ok", "service": "AOdailyWork"}
 
+@app.get("/fix-db")
+def fix_database_schema():
+    from sqlalchemy import text
+    # Use SessionOps because Daily tables are in Ops DB
+    db = database.SessionOps()
+    try:
+        constraints = [
+            ("daily_teams", "daily_teams_owner_id_fkey"),
+            ("daily_teams", "daily_teams_organization_id_fkey"),
+            ("daily_projects", "daily_projects_organization_id_fkey")
+        ]
+        results = []
+        for table, cons in constraints:
+            try:
+                # Use raw connection for DDL if needed, or session execute
+                db.execute(text(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {cons}"))
+                results.append(f"Dropped {cons}")
+            except Exception as e:
+                results.append(f"Error {cons}: {str(e)}")
+        db.commit()
+        return {"status": "done", "results": results}
+    finally:
+        db.close()
+
 @app.get("/init")
 def init_app(user_id: str = Depends(get_current_user_id), org_id: str = Depends(get_current_org_id)):
     """
