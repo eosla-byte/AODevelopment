@@ -551,12 +551,20 @@ def migrate_db_schema(user_jwt = Depends(get_current_admin)):
             else:
                 messages.append(f"ERROR: {sql} | {e}")
 
-    # 1. daily_teams: organization_id
-    # Run on Ops DB mainly (where Daily lives)
+    # 1. Projects Table Updates (Organization & Metrics)
+    # Run on CORE DB (where Projects are)
+    db_core = SessionCore()
+    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN organization_id VARCHAR')
+    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN sq_meters FLOAT DEFAULT 0.0')
+    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN project_cost FLOAT DEFAULT 0.0')
+    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN ratio FLOAT DEFAULT 0.0')
+    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN estimated_time VARCHAR')
+    db_core.close()
+    
+    # 2. Ops DB (in case of Daily tables, keep them just in case)
     db_ops = SessionOps()
     run_migration(db_ops, 'ALTER TABLE daily_teams ADD COLUMN organization_id VARCHAR')
     run_migration(db_ops, 'ALTER TABLE daily_projects ADD COLUMN organization_id VARCHAR')
-    run_migration(db_ops, 'ALTER TABLE daily_projects ADD COLUMN bim_project_id VARCHAR')
     db_ops.close()
 
     return {"status": "done", "log": messages}

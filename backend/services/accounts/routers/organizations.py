@@ -290,72 +290,50 @@ def toggle_user_permission(
 
 # --- Daily Service Management Endpoints ---
 
-class DailyProjectCreate(BaseModel):
-    name: str
-    team_id: str
-    bim_project_id: Optional[str] = None
 
-class DailyTeamCreate(BaseModel):
-    name: str
+# --- Organization Project Profiles Endpoints ---
 
-@router.get("/{org_id}/daily/projects")
-def list_daily_projects(
+class ProjectProfileCreate(BaseModel):
+    name: str
+    project_cost: float = 0.0
+    sq_meters: float = 0.0
+    ratio: float = 0.0
+    estimated_time: Optional[str] = None
+
+@router.get("/{org_id}/projects")
+def list_org_projects_endpoint(
     org_id: str,
     db: Session = Depends(get_core_db),
     current_user: dict = Depends(get_current_user)
 ):
-    from common.database import get_org_daily_projects
-    # Check Admins only
-    # (Simplified check, assuming middleware/dependency usually handles strict auth, but here we repeat logic)
-    # TODO: Refactor permission check into dependency
-    return get_org_daily_projects(org_id)
+    from common.database import get_org_projects
+    return get_org_projects(org_id)
 
-@router.post("/{org_id}/daily/projects")
-def create_daily_project_endpoint(
+@router.post("/{org_id}/projects")
+def create_org_project_endpoint(
     org_id: str,
-    project: DailyProjectCreate,
+    project: ProjectProfileCreate,
     db: Session = Depends(get_core_db),
     current_user: dict = Depends(get_current_user)
 ):
-    from common.database import create_daily_project
-    # Verify User ID (using sub email to look up ID in AccountUser, or using ID from token if available)
-    user_id = current_user.get("id") # Assuming token has ID, otherwise query DB
+    from common.database import create_org_project
     
-    # Create
-    new_proj = create_daily_project(
-        team_id=project.team_id,
-        name=project.name,
-        user_id=user_id or "admin", # Fallback
+    # Check Perms (Admin or Member?)
+    # Allowing Members to create definitions for now, or restrict?
+    # Restrict to Admins?
+    # assuming standard org check logic is done by caller context usually, 
+    # but here we rely on the fact that if they have access to dashboard they are in the org.
+    
+    new_proj = create_org_project(
         organization_id=org_id,
-        bim_project_id=project.bim_project_id
+        name=project.name,
+        cost=project.project_cost,
+        sq_meters=project.sq_meters,
+        ratio=project.ratio,
+        estimated_time=project.estimated_time
     )
     return {"status": "success", "id": new_proj.id, "name": new_proj.name}
 
-@router.get("/{org_id}/daily/teams")
-def list_daily_teams(
-    org_id: str,
-    db: Session = Depends(get_core_db),
-    current_user: dict = Depends(get_current_user)
-):
-    from common.database import get_org_daily_teams
-    return get_org_daily_teams(org_id)
-
-@router.post("/{org_id}/daily/teams")
-def create_daily_team_endpoint(
-    org_id: str,
-    team: DailyTeamCreate,
-    db: Session = Depends(get_core_db),
-    current_user: dict = Depends(get_current_user)
-):
-    from common.database import create_daily_team
-    user_id = current_user.get("id")
-    
-    new_team = create_daily_team(
-        name=team.name,
-        user_id=user_id or "admin",
-        organization_id=org_id
-    )
-    return {"status": "success", "id": new_team.id, "name": new_team.name}
 
 
 @router.get("/{org_id}/daily/bim-projects")
