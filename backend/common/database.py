@@ -2286,3 +2286,39 @@ def get_org_bim_projects(organization_id: str):
     finally:
         db.close()
 
+def get_org_projects(organization_id: str):
+    """
+    Get all Core Projects ('resources_projects') associated with an organization.
+    """
+    db = SessionCore()
+    try:
+        # Filter by organization_id
+        projects = db.query(models.Project).filter(models.Project.organization_id == organization_id).all()
+        return projects
+    finally:
+        db.close()
+
+def create_org_project(organization_id: str, name: str, cost: float = 0.0, sq_meters: float = 0.0, ratio: float = 0.0, estimated_time: str = None):
+    """
+    Create a new Core Project Profile.
+    """
+    db = SessionCore()
+    try:
+        new_id = str(uuid.uuid4())
+        project = models.Project(
+            id=new_id,
+            organization_id=organization_id,
+            name=name,
+            project_cost=cost,
+            sq_meters=sq_meters,
+            ratio=ratio,
+            estimated_time=estimated_time,
+            status="Active"
+        )
+        db.add(project)
+        db.commit()
+        db.refresh(project)
+        return project
+    finally:
+        db.close()
+
