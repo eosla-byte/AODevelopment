@@ -89,6 +89,53 @@ def run_db_fix():
                 actions.append("Added bim_project_id column")
                 db.commit()
 
+            # Chat Fixes
+            try:
+                # Create Channels Table if not exists
+                db.execute(text("""
+                    CREATE TABLE IF NOT EXISTS daily_channels (
+                        id VARCHAR PRIMARY KEY,
+                        project_id VARCHAR,
+                        name VARCHAR NOT NULL,
+                        type VARCHAR DEFAULT 'text',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY(project_id) REFERENCES daily_projects(id)
+                    )
+                """))
+                actions.append("Ensured daily_channels table")
+                db.commit()
+                
+                # Check channel_id in daily_messages
+                try:
+                    db.execute(text("SELECT channel_id FROM daily_messages LIMIT 1"))
+                except Exception:
+                    db.rollback()
+                    db.execute(text("ALTER TABLE daily_messages ADD COLUMN IF NOT EXISTS channel_id VARCHAR REFERENCES daily_channels(id)"))
+                    actions.append("Added channel_id to daily_messages")
+                    db.commit()
+
+                # Check attachments in daily_messages
+                try:
+                    db.execute(text("SELECT attachments FROM daily_messages LIMIT 1"))
+                except Exception:
+                    db.rollback()
+                    db.execute(text("ALTER TABLE daily_messages ADD COLUMN IF NOT EXISTS attachments JSON DEFAULT '[]'"))
+                    actions.append("Added attachments to daily_messages")
+                    db.commit()
+                    
+                # Check thread_root_id in daily_messages
+                try:
+                    db.execute(text("SELECT thread_root_id FROM daily_messages LIMIT 1"))
+                except Exception:
+                    db.rollback()
+                    db.execute(text("ALTER TABLE daily_messages ADD COLUMN IF NOT EXISTS thread_root_id INTEGER"))
+                    actions.append("Added thread_root_id to daily_messages")
+                    db.commit()
+
+            except Exception as e:
+                print(f"⚠️ [SCHEMA FIX] Chat Schema Warning: {e}")
+                db.rollback()
+
             db.commit()
             print(f"✅ [STARTUP] DB Fix Result: {actions}")
         except Exception as e:
@@ -427,10 +474,135 @@ def get_my_tasks(user_id: str = Depends(get_current_user_id)):
         for t in tasks
     ]
 
-@app.get("/chat/{project_id}")
-def get_chat(project_id: str):
-    msgs = database.get_daily_messages(project_id)
-    return [
+# --- ADVANCED CHAT (Inline Safe) ---
+
+def get_project_channels_safe(project_id: str):
+    import types
+    db = database.SessionOps()
+    try:
+        channels = db.query(DailyChannel).filter(DailyChannel.project_id == project_id).all()
+        # If no channels, create default 'general'
+        if not channels:
+            gen = DailyChannel(id=str(uuid.uuid4()), project_id=project_id, name="general", type="text")
+            db.add(gen)
+            db.commit()
+            channels = [gen]
+            
+        return [types.SimpleNamespace(id=c.id, name=c.name, type=c.type) for c in channels]
+    finally:
+        db.close()
+
+def create_channel_safe(project_id: str, name: str, type: str = "text"):
+    import types
+    db = database.SessionOps()
+    try:
+        new_id = str(uuid.uuid4())
+        chan = DailyChannel(id=new_id, project_id=project_id, name=name, type=type)
+        db.add(chan)
+        db.commit()
+        return types.SimpleNamespace(id=chan.id, name=chan.name, type=chan.type)
+    finally:
+        db.close()
+
+def get_channel_messages_safe(channel_id: str, limit: int = 50):
+    import types
+    db = database.SessionOps()
+    try:
+        # Fetch with attachments and threading info
+        # Order by created_at DESC for pagination, then flip
+        msgs = db.query(DailyMessage).filter(DailyMessage.channel_id == channel_id).order_by(DailyMessage.created_at.desc()).limit(limit).all()
+        
+        result = []
+        for m in msgs:
+            result.append({
+                "id": m.id,
+                "sender_id": m.sender_id,
+                "content": m.content,
+                "attachments": m.attachments or [],
+                "parent_id": m.parent_id,
+                "created_at": m.created_at.isoformat() if m.created_at else None
+            })
+        return result[::-1]
+    finally:
+        db.close()
+
+def create_message_safe(channel_id: str, user_id: str, content: str, parent_id: int = None, attachments: list = None):
+    db = database.SessionOps()
+    try:
+        msg = DailyMessage(
+            channel_id=channel_id,
+            sender_id=user_id,
+            content=content,
+            parent_id=parent_id,
+            attachments=attachments or []
+        )
+        db.add(msg)
+        db.commit()
+        return {
+            "id": msg.id,
+            "sender_id": msg.sender_id,
+            "content": msg.content,
+            "attachments": msg.attachments,
+            "parent_id": msg.parent_id,
+            "created_at": msg.created_at.isoformat() if msg.created_at else None
+        }
+    finally:
+        db.close()
+
+@app.get("/projects/{project_id}/channels")
+def get_channels(project_id: str):
+    return get_project_channels_safe(project_id)
+
+@app.post("/projects/{project_id}/channels")
+def create_channel(project_id: str, name: str = Body(..., embed=True), type: str = Body("text", embed=True)):
+    return create_channel_safe(project_id, name, type)
+
+@app.get("/channels/{channel_id}/messages")
+def get_messages(channel_id: str):
+    return get_channel_messages_safe(channel_id)
+
+@app.post("/channels/{channel_id}/messages")
+def post_message(
+    channel_id: str, 
+    content: str = Body(None), 
+    parent_id: int = Body(None),
+    attachments: list = Body(None), # [{name, url, type}]
+    user_id: str = Depends(get_current_user_id) # Uses header X-User-ID
+):
+    if not content and not attachments:
+        raise HTTPException(status_code=400, detail="Message must have content or attachments")
+    return create_message_safe(channel_id, user_id, content, parent_id, attachments)
+
+# Legacy Chat (Redirect to/Bridge to #general if possible, or just keep working as project-level for legacy)
+# For now, let's leave legacy alone or deprecate it. The new UI will use new endpoints.
+# If I remove the old one, the old UI breaks immediately before I deploy the new one.
+# So I will keep the old one BUT making it use 'general' channel would be smart.
+# But for safety, I'll just add NEW specific endpoints above.
+
+# FILE UPLOAD (Simple Static)
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    import shutil
+    import os
+    
+    # Save to static/uploads
+    UPLOAD_DIR = "backend/services/daily/static/uploads"
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    
+    file_id = str(uuid.uuid4())
+    ext = file.filename.split('.')[-1]
+    safe_name = f"{file_id}.{ext}"
+    file_path = os.path.join(UPLOAD_DIR, safe_name)
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    return {
+        "url": f"/static/uploads/{safe_name}",
+        "name": file.filename,
+        "type": file.content_type,
+        "size": 0 # TODO: Calculate size
+    }
         {
             "id": m.id,
             "sender_id": m.sender_id,
