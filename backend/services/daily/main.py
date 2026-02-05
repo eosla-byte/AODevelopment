@@ -114,7 +114,8 @@ def init_app(user_id: str = Depends(get_current_user_id), org_id: str = Depends(
     Bootstrap the app. Returns user's teams and projects.
     """
     database.init_user_daily_setup(user_id)
-    teams = database.get_user_teams(user_id, organization_id=org_id)
+    # USE SAFE INLINED RETRIEVAL
+    teams = get_user_teams_safe(user_id, organization_id=org_id)
     
     # Format for Frontend
     teams_data = []
@@ -212,6 +213,45 @@ def create_daily_project_safe(team_id: str, name: str, user_id: str, organizatio
         
         # KEY FIX: Return POJO
         return types.SimpleNamespace(id=proj.id, name=proj.name)
+    finally:
+        db.close()
+
+def get_user_teams_safe(user_id: str, organization_id: str = None):
+    import types
+    # Ensure fresh session
+    db = database.SessionOps()
+    try:
+        # We need to filter manually because JSON query in SQLite/Postgres differs and we want safety
+        query = db.query(DailyTeam)
+        if organization_id:
+            query = query.filter(DailyTeam.organization_id == organization_id)
+        
+        all_teams = query.all()
+        # Filter: check if user_id is in members list
+        # We assume members is a JSON list of strings
+        user_teams_orm = []
+        for t in all_teams:
+            mems = t.members or []
+            if user_id in mems:
+                user_teams_orm.append(t)
+        
+        # Copia a POJO
+        result = []
+        for t in user_teams_orm:
+            # Manually fetch projects to avoid lazy load issues after session close
+            # and to bypass stale cache
+            projs = db.query(DailyProject).filter(DailyProject.team_id == t.id).all()
+            safe_projs = [types.SimpleNamespace(id=p.id, name=p.name) for p in projs]
+            
+            safe_team = types.SimpleNamespace(
+                id=t.id, 
+                name=t.name, 
+                projects=safe_projs
+            )
+            result.append(safe_team)
+            
+        print(f"✅ [INLINED RETRIEVAL] Found {len(result)} teams for user {user_id}")
+        return result
     finally:
         db.close()
 
