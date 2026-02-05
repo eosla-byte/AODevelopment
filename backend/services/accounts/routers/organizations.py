@@ -391,31 +391,11 @@ def create_org_project_endpoint(
             return {"status": "success", "id": new_id, "name": project.name, "method": "raw_sql_fallback"}
             
         except Exception as retry_err:
+            import traceback
             error_msg = f"FATAL PROJECT CREATION ERROR: {str(retry_err)} | Trace: {traceback.format_exc()}"
             print(error_msg)
             # Explicitly return 500 with detail so user can see it
             raise HTTPException(status_code=500, detail=error_msg)
-                        print(f"Migration step ignored: {sql} | {migration_err}")
-                        db.rollback() 
-
-                # Retry insertion
-                print("✅ [LAZY MIGRATION] Schema patched. Retrying insertion...")
-                db.add(new_proj)
-                db.commit()
-                db.refresh(new_proj)
-                return {"status": "success", "id": new_proj.id, "name": new_proj.name}
-            
-            except Exception as retry_err:
-                import traceback
-                error_msg = f"MIGRATION TRIED & FAILED: {str(retry_err)} | {traceback.format_exc()}"
-                print(error_msg)
-                raise HTTPException(status_code=500, detail=error_msg)
-
-        # Standard Error Handling
-        import traceback
-        error_msg = f"{str(e)} | {traceback.format_exc()}"
-        print(f"ERROR CREATING PROJECT: {error_msg}")
-        raise HTTPException(status_code=500, detail=error_msg)
 
 
 
