@@ -323,23 +323,29 @@ def create_org_project_endpoint(
     # Validation: Ensure User is part of this Org (Optional but recommended)
     # For now, we assume Dashboard access implies Org access.
 
-    new_id = str(uuid.uuid4())
-    new_proj = models.Project(
-        id=new_id,
-        organization_id=org_id,
-        name=project.name,
-        project_cost=project.project_cost,
-        sq_meters=project.sq_meters,
-        ratio=project.ratio,
-        estimated_time=project.estimated_time,
-        status="Active"
-    )
-    
-    db.add(new_proj)
-    db.commit()
-    db.refresh(new_proj)
-    
-    return {"status": "success", "id": new_proj.id, "name": new_proj.name}
+    try:
+        new_id = str(uuid.uuid4())
+        new_proj = models.Project(
+            id=new_id,
+            organization_id=org_id,
+            name=project.name,
+            project_cost=project.project_cost,
+            sq_meters=project.sq_meters,
+            ratio=project.ratio,
+            estimated_time=project.estimated_time,
+            status="Active"
+        )
+        
+        db.add(new_proj)
+        db.commit()
+        db.refresh(new_proj)
+        
+        return {"status": "success", "id": new_proj.id, "name": new_proj.name}
+    except Exception as e:
+        import traceback
+        error_msg = f"{str(e)} | {traceback.format_exc()}"
+        print(f"ERROR CREATING PROJECT: {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 
