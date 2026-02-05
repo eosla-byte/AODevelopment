@@ -78,7 +78,8 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Organization-ID': orgId,
-                    'X-User-ID': "u123" // Mock ID matching App.jsx mock
+                    'X-Organization-ID': orgId,
+                    'X-User-ID': localStorage.getItem("ao_user_id") || "u123" // Fallback only if missing
                 },
                 body: JSON.stringify(payload)
             });

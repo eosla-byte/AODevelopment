@@ -18,7 +18,7 @@ const ProjectsList = () => {
             const response = await fetch('/init', {
                 headers: {
                     'X-Organization-ID': orgId,
-                    'X-User-ID': "u123"
+                    'X-User-ID': localStorage.getItem("ao_user_id") || "u123"
                 }
             });
             if (response.ok) {
