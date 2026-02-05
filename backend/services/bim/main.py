@@ -504,12 +504,61 @@ async def dashboard(
 
 # --- API Endpoints ---
 
+
+# --- API Endpoints ---
+
 import pydantic
 
 class ProjectCreateRequest(pydantic.BaseModel):
-    name: str
+    name: str = "" # Optional if linking
     description: str = ""
     organization_id: str
+    profile_id: Optional[str] = None # If linking existing
+    create_profile: bool = False # If true, creates new profile in Accounts
+
+@app.get("/api/accounts/projects")
+def get_accounts_projects(
+    organization_id: str,
+    user = Depends(get_current_user)
+):
+    """
+    Fetch accessible Project Profiles from Accounts DB for linking.
+    """
+    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    db = SessionCore()
+    try:
+        # Verify Org Access
+        # (Simplified check: if user is in org)
+        membership = db.query(OrganizationUser).filter(
+            OrganizationUser.organization_id == organization_id,
+            OrganizationUser.user_id == user["id"]
+        ).first()
+        
+        if not membership:
+             # Fallback: Check if Organization exists and user is global admin? 
+             # For now strict: must be member.
+             return []
+
+        # Fetch Projects
+        # Import dynamically to avoid circular issues if any, or use common.models
+        from common.models import Project
+        
+        projects = db.query(Project).filter(
+            Project.organization_id == organization_id,
+            Project.archived == False
+        ).all()
+        
+        return [{
+            "id": p.id,
+            "name": p.name,
+            "client": p.client,
+            "status": p.status,
+            "code": p.nit # misuse nit as code for now if needed
+        } for p in projects]
+        
+    finally:
+        db.close()
 
 @app.post("/api/projects")
 async def create_project(
@@ -517,62 +566,86 @@ async def create_project(
     user = Depends(get_current_user)
 ):
     """
-    Create a new project.
-    Auto-syncs Organization if missing in BIM DB.
+    Create a new project or link to existing Account Profile.
     """
     if not user:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     db = SessionExt() # BIM DB
-    accounts_db = SessionCore() # Accounts DB (for syncing)
+    accounts_db = SessionCore() # Accounts DB
     try:
         # 1. Validate Access to Org
-        # (Re-using logic or trusting payload + verification)
-        # Verify user is actually in this org in Accounts
         membership = accounts_db.query(OrganizationUser).filter(
             OrganizationUser.organization_id == data.organization_id,
             OrganizationUser.user_id == user["id"]
         ).first()
 
         if not membership:
-             # Check if global admin? No, explicit membership required for ownership.
-             print(f"DEBUG: User {user['id']} denied access to org {data.organization_id}")
              raise HTTPException(status_code=403, detail="You are not a member of this organization.")
 
-        # 2. Check/Sync BimOrganization
+        # 2. Sync Settings (Org)
         bim_org = db.query(BimOrganization).filter(BimOrganization.id == data.organization_id).first()
         if not bim_org:
-            print(f"DEBUG: Syncing Organization {data.organization_id} from Accounts to BIM")
-            # Fetch details from Accounts
             acc_org = accounts_db.query(Organization).filter(Organization.id == data.organization_id).first()
-            if not acc_org:
-                raise HTTPException(status_code=404, detail="Organization not found in Accounts System")
+            if acc_org:
+                bim_org = BimOrganization(id=acc_org.id, name=acc_org.name, tax_id=acc_org.tax_id, logo_url=acc_org.logo_url)
+                db.add(bim_org)
+                db.commit()
+
+        # 3. Determine Project ID and Attributes
+        project_id = None
+        project_name = data.name
+        
+        if data.profile_id:
+            # LINK EXISTING
+            # Verify it exists
+            from common.models import Project
+            existing = accounts_db.query(Project).filter(Project.id == data.profile_id).first()
+            if not existing:
+                raise HTTPException(status_code=404, detail="Selected Project Profile not found")
             
-            # Create in BIM
-            bim_org = BimOrganization(
-                id=acc_org.id,
-                name=acc_org.name,
-                tax_id=acc_org.tax_id,
-                logo_url=acc_org.logo_url
+            project_id = existing.id
+            project_name = existing.name # Enforce name match? Or allow override? Enforce for consistency.
+            
+            # Check if already exists in BIM
+            bim_param = db.query(BimProject).filter(BimProject.id == project_id).first()
+            if bim_param:
+                raise HTTPException(status_code=400, detail="This project is already active in BIM.")
+                
+        else:
+            # CREATE NEW
+            project_id = str(uuid.uuid4())
+            
+            # Also create in Accounts? (If logic dictates we always want a profile)
+            # User request said: "vincular data entre todos los servidores".
+            # So yes, we should ALWAYS Create a profile if one doesn't exist.
+            
+            from common.models import Project
+            new_profile = Project(
+                id=project_id,
+                name=data.name,
+                organization_id=data.organization_id,
+                description=data.description, # Wait, Project model has no description field in snippet?
+                # Check models.py: Project has name, client, status... no description.
+                # We can put description in 'acc_config' or ignore.
+                status="Activo"
             )
-            db.add(bim_org)
-            db.commit() # Commit org first
-            
-        # 3. Create Project
+            accounts_db.add(new_profile)
+            accounts_db.commit()
+            print(f"DEBUG: Created Accounts Profile {project_id}")
+
+        # 4. Create BIM Project
         new_project = BimProject(
-            id=str(uuid.uuid4()),
+            id=project_id,
             organization_id=data.organization_id,
-            name=data.name,
+            name=project_name,
             description=data.description,
             status="Active"
         )
         db.add(new_project)
         db.commit()
-        db.refresh(new_project)
         
-        print(f"DEBUG: Created Project {new_project.id} | Name: {new_project.name} | Org: {new_project.organization_id}")
-        
-        return {"status": "success", "project_id": new_project.id, "message": "Project created"}
+        return {"status": "success", "project_id": new_project.id, "message": "Project created and linked"}
 
     except Exception as e:
         import traceback

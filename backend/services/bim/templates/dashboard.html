@@ -138,21 +138,47 @@
     <div id="newProjectModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full"
         style="z-index: 50;">
         <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div class="mt-3 text-center">
-                <h3 class="text-lg leading-6 font-medium text-gray-900">Crear Nuevo Proyecto</h3>
-                <div class="mt-2 text-left">
-                    <label class="block text-sm font-medium text-gray-700">Nombre del Proyecto</label>
-                    <input type="text" id="projName"
-                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2">
+            <div class="mt-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900 text-center">Gestión de Proyecto</h3>
 
-                    <label class="block text-sm font-medium text-gray-700 mt-4">Descripción</label>
+                <!-- Tabs -->
+                <div class="flex border-b border-gray-200 mt-4 mb-4">
+                    <button id="tabLink" onclick="switchTab('link')"
+                        class="flex-1 py-2 text-indigo-600 border-b-2 border-indigo-600 font-medium text-sm">Vincular
+                        Existente</button>
+                    <button id="tabNew" onclick="switchTab('new')"
+                        class="flex-1 py-2 text-gray-500 font-medium text-sm hover:text-gray-700">Crear Nuevo</button>
+                </div>
+
+                <div class="mt-2 text-left">
+
+                    <!-- Link Section -->
+                    <div id="sectionLink">
+                        <label class="block text-sm font-medium text-gray-700">Seleccionar Perfil de Accounts</label>
+                        <select id="projSelect"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2">
+                            <option value="">Cargando proyectos...</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Se vinculará este espacio de trabajo al perfil
+                            seleccionado.</p>
+                    </div>
+
+                    <!-- Create Section -->
+                    <div id="sectionNew" class="hidden">
+                        <label class="block text-sm font-medium text-gray-700">Nombre del Proyecto</label>
+                        <input type="text" id="projName"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2">
+                    </div>
+
+                    <label class="block text-sm font-medium text-gray-700 mt-4">Descripción (Opcional)</label>
                     <textarea id="projDesc"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"></textarea>
                 </div>
+
                 <div class="items-center px-4 py-3 mt-4">
                     <button id="createProjBtn" onclick="createProject()"
                         class="px-4 py-2 bg-indigo-600 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                        Crear
+                        Confirmar
                     </button>
                     <button onclick="document.getElementById('newProjectModal').classList.add('hidden')"
                         class="mt-3 px-4 py-2 bg-gray-100 text-gray-700 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-300">
@@ -165,30 +191,93 @@
 
     <script>
         const ORG_ID = "{{ org_id }}";
+        let currentMode = 'link'; // 'link' or 'new'
+        let existingProjects = [];
 
-        function openNewProjectModal() {
+        async function openNewProjectModal() {
             document.getElementById('newProjectModal').classList.remove('hidden');
+            loadAccountsProjects();
+        }
+
+        function switchTab(mode) {
+            currentMode = mode;
+            const tabLink = document.getElementById('tabLink');
+            const tabNew = document.getElementById('tabNew');
+            const secLink = document.getElementById('sectionLink');
+            const secNew = document.getElementById('sectionNew');
+
+            if (mode === 'link') {
+                tabLink.className = "flex-1 py-2 text-indigo-600 border-b-2 border-indigo-600 font-medium text-sm";
+                tabNew.className = "flex-1 py-2 text-gray-500 font-medium text-sm hover:text-gray-700";
+                secLink.classList.remove('hidden');
+                secNew.classList.add('hidden');
+            } else {
+                tabNew.className = "flex-1 py-2 text-indigo-600 border-b-2 border-indigo-600 font-medium text-sm";
+                tabLink.className = "flex-1 py-2 text-gray-500 font-medium text-sm hover:text-gray-700";
+                secNew.classList.remove('hidden');
+                secLink.classList.add('hidden');
+            }
+        }
+
+        async function loadAccountsProjects() {
+            const select = document.getElementById('projSelect');
+            select.innerHTML = '<option value="">Cargando...</option>';
+            try {
+                const res = await fetch(`/api/accounts/projects?organization_id=${ORG_ID}`);
+                if (res.ok) {
+                    existingProjects = await res.json();
+                    if (existingProjects.length === 0) {
+                        select.innerHTML = '<option value="">No hay perfiles disponibles</option>';
+                        return;
+                    }
+                    select.innerHTML = '<option value="">Selecciona un proyecto...</option>';
+                    existingProjects.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.text = `${p.name} (${p.status})`;
+                        select.appendChild(opt);
+                    });
+                } else {
+                    select.innerHTML = '<option value="">Error cargando proyectos</option>';
+                }
+            } catch (e) {
+                console.error(e);
+                select.innerHTML = '<option value="">Error de conexión</option>';
+            }
         }
 
         async function createProject() {
-            const name = document.getElementById('projName').value;
-            const desc = document.getElementById('projDesc').value;
             const btn = document.getElementById('createProjBtn');
+            const desc = document.getElementById('projDesc').value;
 
-            if (!name) return alert("Nombre requerido");
+            let payload = {
+                organization_id: ORG_ID,
+                description: desc
+            };
+
+            if (currentMode === 'link') {
+                const profileId = document.getElementById('projSelect').value;
+                if (!profileId) return alert("Selecciona un proyecto para vincular");
+                // Find name for consistency check (optional)
+                const p = existingProjects.find(x => x.id === profileId);
+                payload.profile_id = profileId;
+                payload.name = p ? p.name : "Linked Project";
+
+            } else {
+                const name = document.getElementById('projName').value;
+                if (!name) return alert("Nombre requerido");
+                payload.name = name;
+                payload.create_profile = true;
+            }
 
             btn.disabled = true;
-            btn.innerText = "Creando...";
+            btn.innerText = "Procesando...";
 
             try {
                 const res = await fetch('/api/projects', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        name: name,
-                        description: desc,
-                        organization_id: ORG_ID
-                    })
+                    body: JSON.stringify(payload)
                 });
 
                 if (res.ok) {
@@ -197,13 +286,13 @@
                     const data = await res.json();
                     alert("Error: " + (data.detail || "Unknown error"));
                     btn.disabled = false;
-                    btn.innerText = "Crear";
+                    btn.innerText = "Confirmar";
                 }
             } catch (e) {
                 console.error(e);
                 alert("Error de conexión");
                 btn.disabled = false;
-                btn.innerText = "Crear";
+                btn.innerText = "Confirmar";
             }
         }
 
