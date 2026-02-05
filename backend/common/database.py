@@ -2371,6 +2371,7 @@ def get_org_users(organization_id: str):
                     "email": m.user.email,
                     "role": m.role
                 })
+        return users
     finally:
         db.close()
 
