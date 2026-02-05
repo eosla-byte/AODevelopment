@@ -6,7 +6,7 @@ const Sidebar = () => {
     const navItems = [
         { icon: <CheckSquare size={20} />, label: "My Tasks", path: "/" },
         { icon: <Folder size={20} />, label: "Projects", path: "/projects" },
-        { icon: <MessageSquare size={20} />, label: "Chat", path: "/chat/demo" },
+        { icon: <MessageSquare size={20} />, label: "Chat", path: "/chat" },
         { icon: <BarChart2 size={20} />, label: "Dashboard", path: "/dashboard" },
     ];
 

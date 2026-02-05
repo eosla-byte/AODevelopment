@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 // Imports from 'lucide-react'
-import { Send, User, Hash, Paperclip, MessageSquare, Plus, ChevronRight, X, Folder, AlertCircle } from 'lucide-react';
+import { Send, User, Hash, Paperclip, MessageSquare, Plus, ChevronRight, X, Folder, AlertCircle, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ChatLayout = () => {
@@ -51,6 +51,31 @@ const ChatLayout = () => {
         }
     };
 
+    const handleDeleteProject = async (e, projectId) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!window.confirm("Are you sure you want to delete this project?")) return;
+
+        const aoUser = localStorage.getItem("ao_user");
+        let userId = "u123";
+        if (aoUser) try { userId = JSON.parse(aoUser).id || "u123"; } catch { }
+
+        try {
+            const res = await fetch(`/projects/${projectId}`, {
+                method: 'DELETE',
+                headers: { 'X-User-ID': userId }
+            });
+            if (res.ok) {
+                fetchProjects(); // Refresh list
+            } else {
+                alert("Failed to delete project");
+            }
+        } catch (error) {
+            console.error("Delete failed", error);
+            alert("Error deleting project");
+        }
+    };
+
     const fetchChannels = async () => {
         if (!projectId) return;
         try {
@@ -93,28 +118,66 @@ const ChatLayout = () => {
             <div style={{ padding: '2rem', height: '100%', overflowY: 'auto' }}>
                 <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1e293b', marginBottom: '2rem' }}>Select a Project to Chat</h1>
                 {teams.every(t => t.projects.length === 0) ? (
-                    <div style={{ color: '#64748b' }}>No projects found. Create one in the Projects tab.</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#64748b', marginTop: '4rem' }}>
+                        <Folder size={48} style={{ opacity: 0.5, marginBottom: '1rem' }} />
+                        <p>No projects found. Create one in the Projects tab.</p>
+                    </div>
                 ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem' }}>
-                        {teams.flatMap(t => t.projects).map(p => (
-                            <div
-                                key={p.id}
-                                onClick={() => navigate(`/chat/${p.id}`)}
-                                style={{
-                                    background: 'white', padding: '1.5rem', borderRadius: '12px',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0',
-                                    cursor: 'pointer', transition: 'transform 0.2s', display: 'flex', flexDirection: 'column',
-                                    gap: '1rem'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                            >
-                                <div style={{ width: '40px', height: '40px', background: '#eff6ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
-                                    <MessageSquare size={20} />
-                                </div>
-                                <div>
-                                    <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1.1rem', color: '#1e293b' }}>{p.name}</h3>
-                                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Tap to join chat</span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                        {teams.filter(t => t.projects.length > 0).map(team => (
+                            <div key={team.id}>
+                                <h3 style={{ fontSize: '1.1rem', color: '#475569', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    {team.name}
+                                </h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                                    {team.projects.map(p => (
+                                        <div
+                                            key={p.id}
+                                            onClick={() => navigate(`/chat/${p.id}`)}
+                                            style={{
+                                                background: 'white', padding: '1.5rem', borderRadius: '12px',
+                                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0',
+                                                cursor: 'pointer', transition: 'transform 0.2s', display: 'flex', flexDirection: 'column',
+                                                gap: '1rem', position: 'relative'
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                                        >
+                                            <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                                    <div style={{ width: '40px', height: '40px', background: '#eff6ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
+                                                        <MessageSquare size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <h3 style={{ margin: '0', fontSize: '1.1rem', color: '#1e293b' }}>{p.name}</h3>
+                                                        <span style={{ fontSize: '0.85rem', color: '#64748b' }}>{team.name}</span>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => handleDeleteProject(e, p.id)}
+                                                    style={{
+                                                        background: 'transparent', border: 'none', cursor: 'pointer',
+                                                        color: '#cbd5e1', padding: '4px', borderRadius: '4px'
+                                                    }}
+                                                    onMouseEnter={(e) => { e.target.style.color = '#ef4444'; e.target.style.background = '#fee2e2'; }}
+                                                    onMouseLeave={(e) => { e.target.style.color = '#cbd5e1'; e.target.style.background = 'transparent'; }}
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+
+                                            <div style={{ display: 'flex', gap: '1.5rem', borderTop: '1px solid #f1f5f9', paddingTop: '1rem', marginTop: 'auto' }}>
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <span style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a' }}>{p.channel_count || 0}</span>
+                                                    <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 500 }}>Channels</span>
+                                                </div>
+                                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                    <span style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a' }}>-</span>
+                                                    <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 500 }}>Threads</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         ))}

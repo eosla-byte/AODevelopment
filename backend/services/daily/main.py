@@ -170,7 +170,11 @@ def init_app(user_id: str = Depends(get_current_user_id), org_id: str = Depends(
         teams_data.append({
             "id": t.id,
             "name": t.name,
-            "projects": [{"id": p.id, "name": p.name} for p in t.projects]
+            "projects": [{
+                "id": p.id, 
+                "name": p.name, 
+                "channel_count": getattr(p, 'channel_count', 0)
+            } for p in t.projects]
         })
         
     return {
@@ -253,7 +257,13 @@ def create_daily_project_safe(team_id: str, name: str, user_id: str, organizatio
         for idx, title in enumerate(cols):
             c_id = str(uuid.uuid4())
             col = DailyColumn(id=c_id, project_id=new_id, title=title, order_index=idx)
+            col = DailyColumn(id=c_id, project_id=new_id, title=title, order_index=idx)
             db.add(col)
+            
+        # Create Default Channel #general
+        chan_id = str(uuid.uuid4())
+        chan = DailyChannel(id=chan_id, project_id=new_id, name="general", type="text")
+        db.add(chan)
             
         db.add(proj)
         db.commit()
@@ -288,7 +298,17 @@ def get_user_teams_safe(user_id: str, organization_id: str = None):
             # Manually fetch projects to avoid lazy load issues after session close
             # and to bypass stale cache
             projs = db.query(DailyProject).filter(DailyProject.team_id == t.id).all()
-            safe_projs = [types.SimpleNamespace(id=p.id, name=p.name) for p in projs]
+            
+            safe_projs = []
+            for p in projs:
+                # Count channels manually (avoid lazy load error)
+                chan_count = db.query(DailyChannel).filter(DailyChannel.project_id == p.id).count()
+                
+                safe_projs.append(types.SimpleNamespace(
+                    id=p.id, 
+                    name=p.name, 
+                    channel_count=chan_count
+                ))
             
             safe_team = types.SimpleNamespace(
                 id=t.id, 
