@@ -240,6 +240,7 @@ def get_chat(project_id: str):
 
 @app.post("/chat/{project_id}")
 def send_chat(project_id: str, content: str = Body(..., embed=True), user_id: str = Depends(get_current_user_id)):
+    # Trigger deployment for user
     msg = database.add_daily_message(project_id, user_id, content)
     return {"id": msg.id, "status": "sent"}
 
