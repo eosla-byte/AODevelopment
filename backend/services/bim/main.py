@@ -290,9 +290,11 @@ def debug_context(
 from common.models import Organization, OrganizationUser, ServicePermission, AccountUser
 from common.auth_utils import get_current_user
 
+from common.database import get_core_db
+
 @app.get("/api/me/organizations")
 def get_my_organizations(
-    db: SessionExt = Depends(get_db),
+    db: SessionCore = Depends(get_core_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
