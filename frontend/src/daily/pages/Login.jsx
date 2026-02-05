@@ -17,7 +17,8 @@ function Login({ setUser }) {
         console.log("AO Daily: Logging in with", email);
 
         // Mock Login
-        if (email) { // Accept any email for now in Dev
+        if (email) {
+            // We use the email entered by the user to fetch real orgs
             const user = { ...MOCK_USER, email: email };
             setUser(user);
             localStorage.setItem("ao_user", JSON.stringify(user));

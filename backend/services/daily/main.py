@@ -150,6 +150,13 @@ def get_organization_users(org_id: str = Depends(get_current_org_id)):
     print(f"✅ [API] Found {len(users)} users")
     return users
 
+@app.get("/my-organizations")
+def get_my_organizations(email: str):
+    print(f"🔍 [API] /my-organizations requested for: {email}")
+    orgs = database.get_user_organizations(email)
+    print(f"✅ [API] Found {len(orgs)} orgs")
+    return orgs
+
 @app.get("/bim-projects")
 def get_available_bim_projects(org_id: str = Depends(get_current_org_id)):
     if not org_id:

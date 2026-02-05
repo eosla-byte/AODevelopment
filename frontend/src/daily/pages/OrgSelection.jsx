@@ -13,9 +13,29 @@ function OrgSelection() {
     const [orgs, setOrgs] = useState([]);
 
     useEffect(() => {
-        // Here we would fetch the user's organizations from the backend
-        // fetch('/api/user/orgs')...
-        setOrgs(MOCK_ORGS);
+        const fetchOrgs = async () => {
+            const savedUser = localStorage.getItem("ao_user");
+            if (!savedUser) return;
+
+            try {
+                const user = JSON.parse(savedUser);
+                const response = await fetch(`/my-organizations?email=${encodeURIComponent(user.email)}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.length > 0) {
+                        setOrgs(data);
+                    } else {
+                        // Fallback purely for dev/first-state or show empty message
+                        // Keeping mock only if absolutely failed? No, let's show real data.
+                        console.warn("No organizations found for user.");
+                        setOrgs([]);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch organizations", error);
+            }
+        };
+        fetchOrgs();
     }, []);
 
     const handleSelectOrg = (orgId) => {
