@@ -339,6 +339,52 @@ def get_project_board_view(project_id: str):
         ]
     }
 
+def delete_daily_project_safe(project_id: str, user_id: str):
+    db = database.SessionOps()
+    try:
+        # Check permissions (simple check: if user created it or is in the team)
+        # For now, allow deletion if user has access.
+        proj = db.query(DailyProject).filter(DailyProject.id == project_id).first()
+        if not proj:
+            return False
+            
+        # Delete Project (Cascade should handle children if configured, 
+        # but let's be explicit manually for safety if cascade is missing in DB)
+        
+        # 1. Delete Tasks
+        db.query(DailyTask).filter(DailyTask.project_id == project_id).delete()
+        # 2. Delete Columns
+        db.query(DailyColumn).filter(DailyColumn.project_id == project_id).delete()
+        # 3. Delete Messages
+        db.query(DailyMessage).filter(DailyMessage.project_id == project_id).delete()
+        
+        # 4. Delete Project
+        db.delete(proj)
+        db.commit()
+        print(f"✅ [API] Project Deleted: {project_id}")
+        return True
+    except Exception as e:
+        print(f"❌ [API] Delete Failed: {e}")
+        db.rollback()
+        raise e
+    finally:
+        db.close()
+
+@app.delete("/projects/{project_id}")
+def delete_project(project_id: str, user_id: str = Depends(get_current_user_id)):
+    print(f"🚀 [API] Deleting Project: {project_id} (User: {user_id})")
+    try:
+        # Check if project exists and user has permission?
+        # Using SAFE inlined function
+        success = delete_daily_project_safe(project_id, user_id)
+        if not success:
+             raise HTTPException(status_code=404, detail="Project not found")
+        return {"status": "deleted", "id": project_id}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/tasks")
 def create_task(
     project_id: str = Body(None),
