@@ -343,31 +343,58 @@ def create_org_project_endpoint(
         return {"status": "success", "id": new_proj.id, "name": new_proj.name}
 
     except Exception as e:
+        import traceback
         error_str = str(e).lower()
-        # Check for missing column error (Postgres: "column ... does not exist", SQLite: "no such column")
-        if "column" in error_str and ("does not exist" in error_str or "no such column" in error_str):
-            print("⚠️ [LAZY MIGRATION] Detetect missing columns. Attempting to patch schema...")
-            from sqlalchemy import text
+        print(f"⚠️ [PROJECT CREATION ERROR] {str(e)}")
+        
+        # Emergency Fallback: If ORM fails (due to code sync or DB schema), use Raw SQL
+        from sqlalchemy import text
+        
+        # 1. Lazy Migration (Attempt to patch schema)
+        print("⚠️ [LAZY MIGRATION] Attempting to patch schema (Blind Fix)...")
+        migrations = [
+            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS organization_id VARCHAR",
+            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS project_cost FLOAT DEFAULT 0.0",
+            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS sq_meters FLOAT DEFAULT 0.0",
+            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS ratio FLOAT DEFAULT 0.0",
+            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS estimated_time VARCHAR"
+        ]
+        
+        for sql in migrations:
             try:
-                # Attempt to add columns one by one (ignore errors if they exist)
-                # We use raw SQL because we are fixing the DB state at runtime
-                # Note: SQLite ALTER TABLE is limited, but adding columns is generally supported.
-                
-                # List of columns to ensure
-                migrations = [
-                    "ALTER TABLE resources_projects ADD COLUMN organization_id VARCHAR",
-                    "ALTER TABLE resources_projects ADD COLUMN project_cost FLOAT DEFAULT 0.0",
-                    "ALTER TABLE resources_projects ADD COLUMN sq_meters FLOAT DEFAULT 0.0",
-                    "ALTER TABLE resources_projects ADD COLUMN ratio FLOAT DEFAULT 0.0",
-                    "ALTER TABLE resources_projects ADD COLUMN estimated_time VARCHAR"
-                ]
-                
-                for sql in migrations:
-                    try:
-                        db.execute(text(sql))
-                        db.commit() # Commit each change
-                    except Exception as migration_err:
-                        # Ignore "duplicate column" errors
+                db.execute(text(sql))
+                db.commit()
+            except Exception as mig_err:
+                print(f"Migration step ignored: {sql} | {mig_err}")
+                db.rollback()
+
+        # 2. Raw SQL Insertion (Bypass ORM Constructor)
+        print("✅ [RAW SQL FALLBACK] Schema patched. Retrying insertion via Raw SQL...")
+        try:
+            sql_insert = text("""
+                INSERT INTO resources_projects 
+                (id, organization_id, name, project_cost, sq_meters, ratio, estimated_time, status)
+                VALUES (:id, :org_id, :name, :cost, :sq, :ratio, :time, 'Active')
+            """)
+            
+            db.execute(sql_insert, {
+                "id": new_id,
+                "org_id": org_id,
+                "name": project.name,
+                "cost": project.project_cost,
+                "sq": project.sq_meters,
+                "ratio": project.ratio,
+                "time": project.estimated_time
+            })
+            db.commit()
+            
+            return {"status": "success", "id": new_id, "name": project.name, "method": "raw_sql_fallback"}
+            
+        except Exception as retry_err:
+            error_msg = f"FATAL PROJECT CREATION ERROR: {str(retry_err)} | Trace: {traceback.format_exc()}"
+            print(error_msg)
+            # Explicitly return 500 with detail so user can see it
+            raise HTTPException(status_code=500, detail=error_msg)
                         print(f"Migration step ignored: {sql} | {migration_err}")
                         db.rollback() 
 
