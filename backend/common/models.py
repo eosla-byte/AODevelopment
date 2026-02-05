@@ -506,6 +506,7 @@ class DailyProject(Base):
     
     # Linked Resources Project (Optional integration)
     resources_project_id = Column(String, nullable=True) 
+    bim_project_id = Column(String, nullable=True) # Check if we want FK or loose link. Loose link is safer for microservices. 
     
     # Settings
     settings = Column(JSON, default={}) # { "background": "...", "features": ["chat", "kanban"] }

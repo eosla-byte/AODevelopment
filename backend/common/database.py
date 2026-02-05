@@ -2157,7 +2157,7 @@ def get_user_teams(user_id: str, organization_id: str = None):
     finally:
         db.close()
 
-def create_daily_project(team_id: str, name: str, user_id: str, organization_id: str = None):
+def create_daily_project(team_id: str, name: str, user_id: str, organization_id: str = None, bim_project_id: str = None):
     db = SessionOps()
     try:
         new_id = str(uuid.uuid4())
@@ -2167,6 +2167,7 @@ def create_daily_project(team_id: str, name: str, user_id: str, organization_id:
             name=name, 
             created_by=user_id,
             organization_id=organization_id,
+            bim_project_id=bim_project_id,
             settings={"background": "default"}
         )
         # Create Default Columns
@@ -2270,6 +2271,18 @@ def get_daily_messages(project_id: str, limit=50):
     try:
         msgs = db.query(models.DailyMessage).filter(models.DailyMessage.project_id == project_id).order_by(models.DailyMessage.created_at.desc()).limit(limit).all()
         return msgs[::-1] # Return chronological
+    finally:
+        db.close()
+
+def get_org_bim_projects(organization_id: str):
+    # This queries the Core/BIM DB to get available projects for linking
+    if not organization_id:
+        return []
+        
+    db = SessionOps() # BIM tables are in Ops/Shared DB for now
+    try:
+        projects = db.query(models.BimProject).filter(models.BimProject.organization_id == organization_id).all()
+        return projects
     finally:
         db.close()
 

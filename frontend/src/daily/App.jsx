@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
 import Login from './pages/Login';
 import OrgSelection from './pages/OrgSelection';
+import ProjectsList from './pages/ProjectsList';
 import InitLoading from './components/InitLoading';
 
 function AuthGuard({ children, user }) {
@@ -73,6 +74,7 @@ function App() {
                                 <Route path="/" element={<Navigate to="/dashboard" replace />} /> {/* Default to dashboard */}
                                 <Route path="/dashboard" element={<Dashboard />} />
                                 <Route path="/my-tasks" element={<MyTasks />} />
+                                <Route path="/projects" element={<ProjectsList />} />
                                 <Route path="/board/:projectId" element={<ProjectBoard />} />
                                 <Route path="/chat/:projectId" element={<Chat />} />
                             </Routes>

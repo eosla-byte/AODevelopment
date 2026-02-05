@@ -96,11 +96,19 @@ def create_team(
 def create_project(
     team_id: str = Body(...), 
     name: str = Body(...), 
+    bim_project_id: str = Body(None),
     user_id: str = Depends(get_current_user_id),
     org_id: str = Depends(get_current_org_id)
 ):
-    proj = database.create_daily_project(team_id, name, user_id, organization_id=org_id)
+    proj = database.create_daily_project(team_id, name, user_id, organization_id=org_id, bim_project_id=bim_project_id)
     return {"id": proj.id, "name": proj.name}
+
+@app.get("/bim-projects")
+def get_available_bim_projects(org_id: str = Depends(get_current_org_id)):
+    if not org_id:
+        return []
+    projects = database.get_org_bim_projects(org_id)
+    return [{"id": p.id, "name": p.name} for p in projects]
 
 @app.get("/projects/{project_id}/board")
 def get_project_board_view(project_id: str):
