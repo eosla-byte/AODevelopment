@@ -128,10 +128,13 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
                         <select
                             value={isNewTeam ? "NEW" : teamId}
                             onChange={e => {
+                                console.log("Team Selection Change:", e.target.value);
                                 if (e.target.value === "NEW") {
+                                    console.log("Setting isNewTeam to TRUE");
                                     setIsNewTeam(true);
                                     setTeamId("");
                                 } else {
+                                    console.log("Setting isNewTeam to FALSE", e.target.value);
                                     setIsNewTeam(false);
                                     setTeamId(e.target.value);
                                 }
