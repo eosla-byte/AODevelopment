@@ -126,6 +126,82 @@ def create_team(
     team = database.create_daily_team(name, user_id, organization_id=org_id)
     return {"id": team.id, "name": team.name}
 
+# -----------------------------------------------------------------------------
+# SAFE INLINED DB HELPERS (Bypass Stale Cache)
+# -----------------------------------------------------------------------------
+
+def create_daily_team_safe(name: str, owner_id: str, organization_id: str = None, members: List[str] = None):
+    import uuid
+    import types
+    from sqlalchemy import text
+    
+    db = database.SessionOps()
+    try:
+        new_id = str(uuid.uuid4())
+        initial_members = [owner_id]
+        if members:
+            initial_members.extend(members)
+        initial_members = list(set(initial_members))
+
+        team = DailyTeam(
+            id=new_id, 
+            name=name, 
+            owner_id=owner_id, 
+            organization_id=organization_id,
+            members=initial_members
+        )
+        db.add(team)
+        try:
+            db.commit()
+        except Exception as e:
+            err_str = str(e).lower()
+            if "foreignkey" in err_str:
+                print("⚠️ [INLINED] Dropping Constraints...")
+                db.rollback()
+                db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_owner_id_fkey"))
+                db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_organization_id_fkey"))
+                db.commit()
+                db.add(team)
+                db.commit()
+            else:
+                raise e
+        
+        # KEY FIX: Return POJO
+        return types.SimpleNamespace(id=team.id, name=team.name)
+    finally:
+        db.close()
+
+def create_daily_project_safe(team_id: str, name: str, user_id: str, organization_id: str = None, bim_project_id: str = None):
+    import uuid
+    import types
+    
+    db = database.SessionOps()
+    try:
+        new_id = str(uuid.uuid4())
+        proj = DailyProject(
+            id=new_id, 
+            team_id=team_id, 
+            name=name, 
+            created_by=user_id,
+            organization_id=organization_id,
+            bim_project_id=bim_project_id,
+            settings={"background": "default"}
+        )
+        
+        cols = ["To Do", "In Progress", "Done"]
+        for idx, title in enumerate(cols):
+            c_id = str(uuid.uuid4())
+            col = DailyColumn(id=c_id, project_id=new_id, title=title, order_index=idx)
+            db.add(col)
+            
+        db.add(proj)
+        db.commit()
+        
+        # KEY FIX: Return POJO
+        return types.SimpleNamespace(id=proj.id, name=proj.name)
+    finally:
+        db.close()
+
 @app.post("/projects")
 def create_project(
     team_id: str = Body(None), 
@@ -136,44 +212,25 @@ def create_project(
     user_id: str = Depends(get_current_user_id),
     org_id: str = Depends(get_current_org_id)
 ):
-    # If explicit team_id provided, use it.
-    # If new_team_name provided, create team first.
-    final_team_id = team_id
-    
-    if new_team_name and org_id:
-        # Create new team
-        # Members should include creator (user_id) + selected members
-        initial_members = [user_id]
-        if members:
-            initial_members.extend(members)
-        # Deduplicate
-        initial_members = list(set(initial_members))
+    print(f"🚀 [API] Creating Project: {name} (User: {user_id}, Org: {org_id})")
+    try:
+        final_team_id = team_id
         
-        # We need a function to create team with members. 
-        # Existing database.create_daily_team takes 'members' list? 
-        # Let's check database.py signature. It takes 'members=[owner_id]' by default.
-        # We should update database.create_daily_team or manually add members.
-        # For now, let's assume create_daily_team sets owner as member.
-        # We might need to update members column after creation if it supports it.
-        # database.create_daily_team signature: (name, owner_id, organization_id, members)
-        team = database.create_daily_team(new_team_name, user_id, organization_id=org_id, members=initial_members)
-        final_team_id = team.id
-        
-        # Update team members if we have extra members
-        # We can implement database.update_daily_team_members or similar.
-        # Since I can't easily change database.py signature without checking usages,
-        # I'll rely on a new db helper or direct update if I had access.
-        # Actually, let's just modify the team object if Session is active? No, session closed.
-        # I'll add a helper or update database.py update_daily_team if exists.
-        # Checking database.py: create_daily_team sets members=[owner_id].
-        # There is no update_daily_team_members exposed.
-        # I'll just rely on creating the project for now, and maybe update members later if I add that helper.
-        # Wait, if I can't add members, the feature "Assign Team" (with multiple users) fails.
-        # I MUST update database.create_daily_team to accept members list.
-        # See next step. I will update database.py first to accept members list.
+        if new_team_name and org_id:
+            # Use SAFE inlined function
+            team = create_daily_team_safe(new_team_name, user_id, organization_id=org_id, members=members)
+            final_team_id = team.id
+            print(f"✅ Team Created Safe: {final_team_id}")
 
-    proj = database.create_daily_project(final_team_id, name, user_id, organization_id=org_id, bim_project_id=bim_project_id)
-    return {"id": proj.id, "name": proj.name}
+        # Use SAFE inlined function
+        proj = create_daily_project_safe(final_team_id, name, user_id, organization_id=org_id, bim_project_id=bim_project_id)
+        print(f"✅ Project Created Safe: {proj.id}")
+        return {"id": proj.id, "name": proj.name}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/org-users")
 def get_organization_users(org_id: str = Depends(get_current_org_id)):
