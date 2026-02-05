@@ -20,6 +20,15 @@ function App() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // 1. Capture Organization Context from URL
+        const params = new URLSearchParams(window.location.search);
+        const orgIdParam = params.get("orgId");
+
+        if (orgIdParam) {
+            console.log("AO Daily: Setting Organization Context to", orgIdParam);
+            localStorage.setItem("ao_org_id", orgIdParam);
+        }
+
         // Simulate Init
         setTimeout(() => {
             setUser(MOCK_USER);

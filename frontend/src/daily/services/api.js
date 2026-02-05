@@ -30,10 +30,21 @@ const MOCK_BOARD = {
 };
 
 export const api = {
+    getHeaders() {
+        const headers = { "Content-Type": "application/json" };
+        const orgId = localStorage.getItem("ao_org_id");
+        if (orgId) {
+            headers["X-Organization-ID"] = orgId;
+        }
+        return headers;
+    },
+
     async getBoard(projectId) {
         // return MOCK_BOARD;
         try {
-            const res = await fetch(`${API_BASE}/projects/${projectId}/board`);
+            const res = await fetch(`${API_BASE}/projects/${projectId}/board`, {
+                headers: this.getHeaders()
+            });
             if (!res.ok) throw new Error("Failed to fetch");
             return await res.json();
         } catch (e) {
@@ -46,7 +57,7 @@ export const api = {
         try {
             await fetch(`${API_BASE}/tasks/${taskId}/move`, {
                 method: "PUT",
-                headers: { "Content-Type": "application/json" },
+                headers: this.getHeaders(),
                 body: JSON.stringify({ column_id: columnId, index })
             });
         } catch (e) {

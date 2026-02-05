@@ -2122,30 +2122,47 @@ def init_user_daily_setup(user_email: str):
     """
     return True
 
-def create_daily_team(name: str, owner_id: str):
+def create_daily_team(name: str, owner_id: str, organization_id: str = None):
     db = SessionOps() # Using Ops DB for Daily
     try:
         new_id = str(uuid.uuid4())
-        team = models.DailyTeam(id=new_id, name=name, owner_id=owner_id, members=[owner_id])
+        team = models.DailyTeam(
+            id=new_id, 
+            name=name, 
+            owner_id=owner_id, 
+            organization_id=organization_id,
+            members=[owner_id]
+        )
         db.add(team)
         db.commit()
+        db.refresh(team)
+        try:
+            db.expunge(team)
+        except: pass
         return team
     finally:
         db.close()
 
-def get_user_teams(user_id: str):
+def get_user_teams(user_id: str, organization_id: str = None):
     # This requires JSON contains query or filtering in memory.
     # SQLite JSON filtering is tricky.
     # For MVP, get all teams and filter in python (inefficient but works for small scale)
     db = SessionOps()
     try:
         all_teams = db.query(models.DailyTeam).all()
-        user_teams = [t for t in all_teams if user_id in (t.members or [])]
+        user_teams = []
+        for t in all_teams:
+            # Filter by Org if provided
+            if organization_id and t.organization_id != organization_id:
+                continue
+                
+            if user_id in (t.members or []):
+                user_teams.append(t)
         return user_teams
     finally:
         db.close()
 
-def create_daily_project(team_id: str, name: str, user_id: str):
+def create_daily_project(team_id: str, name: str, user_id: str, organization_id: str = None):
     db = SessionOps()
     try:
         new_id = str(uuid.uuid4())
@@ -2153,6 +2170,7 @@ def create_daily_project(team_id: str, name: str, user_id: str):
             id=new_id, 
             team_id=team_id, 
             name=name, 
+            organization_id=organization_id,
             created_by=user_id,
             settings={"background": "default"}
         )
@@ -2165,6 +2183,10 @@ def create_daily_project(team_id: str, name: str, user_id: str):
             
         db.add(proj)
         db.commit()
+        db.refresh(proj)
+        try:
+            db.expunge(proj)
+        except: pass
         return proj
     finally:
         db.close()

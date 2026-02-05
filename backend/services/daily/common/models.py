@@ -488,6 +488,7 @@ class DailyTeam(Base):
     
     id = Column(String, primary_key=True) # UUID
     name = Column(String, nullable=False)
+    organization_id = Column(String, nullable=True) # Organization Context
     owner_id = Column(String, ForeignKey('accounts_users.id')) # Maps to AccountUser
     members = Column(JSON, default=[]) # List of User IDs
     created_at = Column(DateTime, default=func.now())
@@ -498,6 +499,7 @@ class DailyProject(Base):
     __tablename__ = 'daily_projects'
     
     id = Column(String, primary_key=True) # UUID
+    organization_id = Column(String, nullable=True) # Organization Context
     team_id = Column(String, ForeignKey('daily_teams.id'), nullable=True) # Optional (Personal/Manager tasks might not have team?)
     name = Column(String, nullable=False)
     description = Column(Text)

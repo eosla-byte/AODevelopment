@@ -46,6 +46,13 @@ def get_current_user_id(request: Request):
         return "demo-user-id" 
     return user_id
 
+def get_current_org_id(request: Request):
+    # Organization Context Header
+    # If missing, we might default to None (Global/Personal) or Error depending on strictness.
+    # For alignment, we prefer it to be present for "Company" views.
+    org_id = request.headers.get("X-Organization-ID")
+    return org_id
+
 # -----------------------------------------------------------------------------
 # ROUTES
 # -----------------------------------------------------------------------------
@@ -55,12 +62,12 @@ def health_check():
     return {"status": "ok", "service": "AOdailyWork"}
 
 @app.get("/init")
-def init_app(user_id: str = Depends(get_current_user_id)):
+def init_app(user_id: str = Depends(get_current_user_id), org_id: str = Depends(get_current_org_id)):
     """
     Bootstrap the app. Returns user's teams and projects.
     """
     database.init_user_daily_setup(user_id)
-    teams = database.get_user_teams(user_id)
+    teams = database.get_user_teams(user_id, organization_id=org_id)
     
     # Format for Frontend
     teams_data = []
@@ -77,13 +84,22 @@ def init_app(user_id: str = Depends(get_current_user_id)):
     }
 
 @app.post("/teams")
-def create_team(name: str = Body(..., embed=True), user_id: str = Depends(get_current_user_id)):
-    team = database.create_daily_team(name, user_id)
+def create_team(
+    name: str = Body(..., embed=True), 
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Depends(get_current_org_id)
+):
+    team = database.create_daily_team(name, user_id, organization_id=org_id)
     return {"id": team.id, "name": team.name}
 
 @app.post("/projects")
-def create_project(team_id: str = Body(...), name: str = Body(...), user_id: str = Depends(get_current_user_id)):
-    proj = database.create_daily_project(team_id, name, user_id)
+def create_project(
+    team_id: str = Body(...), 
+    name: str = Body(...), 
+    user_id: str = Depends(get_current_user_id),
+    org_id: str = Depends(get_current_org_id)
+):
+    proj = database.create_daily_project(team_id, name, user_id, organization_id=org_id)
     return {"id": proj.id, "name": proj.name}
 
 @app.get("/projects/{project_id}/board")
