@@ -238,10 +238,20 @@
                         select.appendChild(opt);
                     });
                 } else {
+                    const errorText = await res.text(); // Get raw error
+                    try {
+                        const jsonError = JSON.parse(errorText);
+                        alert(`Error Sistema: ${jsonError.detail}`);
+                        console.error("API Error JSON:", jsonError);
+                    } catch (e) {
+                        alert(`Error Crítico del Servidor: ${errorText.substring(0, 100)}...`);
+                        console.error("API Error Text:", errorText);
+                    }
                     select.innerHTML = '<option value="">Error cargando proyectos</option>';
                 }
             } catch (e) {
                 console.error(e);
+                alert("Error de Conexión: " + e.message);
                 select.innerHTML = '<option value="">Error de conexión</option>';
             }
         }
