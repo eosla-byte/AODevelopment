@@ -145,7 +145,10 @@ def create_project(
 def get_organization_users(org_id: str = Depends(get_current_org_id)):
     if not org_id:
         return []
-    return database.get_org_users(org_id)
+    print(f"🔍 [API] /org-users requested for Org: {org_id}")
+    users = database.get_org_users(org_id)
+    print(f"✅ [API] Found {len(users)} users")
+    return users
 
 @app.get("/bim-projects")
 def get_available_bim_projects(org_id: str = Depends(get_current_org_id)):
@@ -153,7 +156,9 @@ def get_available_bim_projects(org_id: str = Depends(get_current_org_id)):
         return []
     # Fetching Project Profiles (resources_projects) instead of bim_projects
     # because that is what the user understands as "Projects" to link.
+    print(f"🔍 [API] /bim-projects requested for Org: {org_id}")
     projects = database.get_org_projects(org_id)
+    print(f"✅ [API] Found {len(projects)} projects")
     return [{"id": p.id, "name": p.name} for p in projects]
 
 @app.get("/projects/{project_id}/board")

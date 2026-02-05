@@ -33,8 +33,15 @@ PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///
 # Note: These services ALSO need CORE_DB_URL set to authenticate users!
 EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
 
-print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'}")
-print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'}")
+# Helper to extract host for logging
+def get_db_host(url):
+    try:
+        if "sqlite" in url: return "SQLite Local"
+        return url.split("@")[1].split("/")[0] if "@" in url else "Unknown"
+    except: return "Unknown"
+
+print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'} | Host: {get_db_host(CORE_DB_URL)}")
+print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'} | Host: {get_db_host(OPS_DB_URL)}")
 
 # Create Engines
 engine_core = create_engine(CORE_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in CORE_DB_URL else {})
