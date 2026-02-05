@@ -61,8 +61,8 @@ def get_current_org_id(request: Request):
 def health_check():
     return {"status": "ok", "service": "AOdailyWork"}
 
-@app.get("/fix-db")
-def fix_database_schema():
+def run_db_fix():
+    print("🔧 [STARTUP] Checking Database Schema Constraints...")
     from sqlalchemy import text
     # Use SessionOps because Daily tables are in Ops DB
     db = database.SessionOps()
@@ -81,9 +81,18 @@ def fix_database_schema():
             except Exception as e:
                 results.append(f"Error {cons}: {str(e)}")
         db.commit()
+        print(f"✅ [STARTUP] DB Fix Result: {results}")
         return {"status": "done", "results": results}
     finally:
         db.close()
+
+@app.on_event("startup")
+def startup_event():
+    run_db_fix()
+
+@app.get("/fix-db")
+def fix_database_schema():
+    return run_db_fix()
 
 @app.get("/init")
 def init_app(user_id: str = Depends(get_current_user_id), org_id: str = Depends(get_current_org_id)):
