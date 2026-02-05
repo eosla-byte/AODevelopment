@@ -2186,6 +2186,7 @@ def create_daily_team(name: str, owner_id: str, organization_id: str = None, mem
                 db.commit()
             else:
                 raise e
+        db.refresh(team)
         return team
     finally:
         db.close()
@@ -2230,6 +2231,7 @@ def create_daily_project(team_id: str, name: str, user_id: str, organization_id:
             
         db.add(proj)
         db.commit()
+        db.refresh(proj)
         return proj
     finally:
         db.close()
