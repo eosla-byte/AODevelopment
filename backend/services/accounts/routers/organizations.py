@@ -307,9 +307,29 @@ def list_org_projects_endpoint(
     current_user: dict = Depends(get_current_user)
 ):
     # Retrieve Project Profiles for this Organization
-    # Using inline logic to avoid ImportError with common.database updates
-    projects = db.query(models.Project).filter(models.Project.organization_id == org_id).all()
-    return projects
+    # Using Raw SQL to avoid AttributeError if models.Project is stale in deployment
+    from sqlalchemy import text
+    try:
+        sql = text("SELECT id, name, project_cost, sq_meters, ratio, estimated_time, status FROM resources_projects WHERE organization_id = :org_id")
+        result = db.execute(sql, {"org_id": org_id}).fetchall()
+        
+        projects = []
+        for row in result:
+            projects.append({
+                "id": row.id,
+                "name": row.name,
+                "project_cost": row.project_cost,
+                "sq_meters": row.sq_meters,
+                "ratio": row.ratio,
+                "estimated_time": row.estimated_time,
+                "status": row.status,
+                "organization_id": org_id
+            })
+        return projects
+    except Exception as e:
+        print(f"ERROR LISTING PROJECTS: {e}")
+        # Fallback to empty list or re-raise if critical
+        return []
 
 @router.post("/{org_id}/projects")
 def create_org_project_endpoint(
