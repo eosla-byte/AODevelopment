@@ -585,13 +585,9 @@ def get_accounts_projects(
 ):
     """
     Fetch accessible Project Profiles from Accounts DB for linking.
+    Includes projects belonging to the org OR unassigned (legacy) projects.
     """
     if not user: raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    # Use SessionOps for Projects (Resources Schema)
-    # verify org access via SessionCore (Identity Schema) first?
-    # Or just Assume SessionOps has access to OrgUsers too? 
-    # Logic in database.py suggests strict splitting.
     
     db_core = SessionCore()
     db_ops = SessionOps()
@@ -607,9 +603,13 @@ def get_accounts_projects(
 
         # Fetch Projects (Operations)
         from common.models import Project
+        from sqlalchemy import or_
         
         projects = db_ops.query(Project).filter(
-            Project.organization_id == organization_id,
+            or_(
+                Project.organization_id == organization_id,
+                Project.organization_id == None
+            ),
             Project.archived == False
         ).all()
         
@@ -618,7 +618,8 @@ def get_accounts_projects(
             "name": p.name,
             "client": p.client,
             "status": p.status,
-            "code": p.nit
+            "code": p.nit,
+            "is_legacy": p.organization_id is None
         } for p in projects]
         
     except Exception as e:
@@ -674,6 +675,12 @@ async def create_project(
             if not existing:
                 raise HTTPException(status_code=404, detail="Selected Project Profile not found")
             
+            # CLAIM LEGACY PROJECT (If missing org_id)
+            if not existing.organization_id:
+                print(f"DEBUG: Claiming Legacy Project {existing.id} for Org {data.organization_id}")
+                existing.organization_id = data.organization_id
+                ops_db.commit()
+
             project_id = existing.id
             project_name = existing.name 
             
