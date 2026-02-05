@@ -2,6 +2,7 @@ import os
 import datetime
 import json
 import uuid
+import types
 from typing import List, Optional
 from sqlalchemy.orm import Session, sessionmaker, joinedload
 from sqlalchemy import create_engine, text
@@ -2186,9 +2187,10 @@ def create_daily_team(name: str, owner_id: str, organization_id: str = None, mem
                 db.commit()
             else:
                 raise e
-        db.refresh(team)
-        db.expunge(team)
-        return team
+        
+        # Return POJO to avoid DetachedInstanceError
+        result = types.SimpleNamespace(id=team.id, name=team.name)
+        return result
     finally:
         db.close()
 
@@ -2232,9 +2234,10 @@ def create_daily_project(team_id: str, name: str, user_id: str, organization_id:
             
         db.add(proj)
         db.commit()
-        db.refresh(proj)
-        db.expunge(proj)
-        return proj
+        
+        # Return POJO
+        result = types.SimpleNamespace(id=proj.id, name=proj.name)
+        return result
     finally:
         db.close()
 
