@@ -2170,7 +2170,8 @@ def create_daily_team(name: str, owner_id: str, organization_id: str = None, mem
             # If we get a ForeignKeyViolation on owner_id (which is in a DIFFERENT DB),
             # we must drop that constraint.
             err_str = str(e).lower()
-            if "foreignkeyviolation" in err_str and "daily_teams_owner_id_fkey" in err_str:
+            print(f"⚠️ [DB DEBUG] Error detected: {err_str}")
+            if "foreignkey" in err_str or "daily_teams_owner_id_fkey" in err_str:
                 print("⚠️ [SELF-HEALING] Detected invalid Cross-DB FK. Dropping constraint...")
                 db.rollback()
                 
