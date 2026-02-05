@@ -13,10 +13,34 @@ from sqlalchemy.orm.attributes import flag_modified
 # DATABASE SETUP
 # Multi-DB Configuration for Microservices/Monolith Hybrid
 
-CORE_DB_URL = os.getenv("CORE_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
-OPS_DB_URL = os.getenv("OPS_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
-PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
-EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+# DATABASE SETUP
+# Multi-DB Configuration for Microservices/Monolith Hybrid
+
+# 1. Master Default: Try to find ANY valid Postgres connection in env
+# This handles Railway's auto-injected variables like DATABASE_URL
+DEFAULT_DB_URL = os.getenv("DATABASE_URL", "")
+
+if not DEFAULT_DB_URL or "sqlite" in DEFAULT_DB_URL:
+    # Fallback: Scan env for ANY variable that looks like a Postgres URL (Railway dynamic vars)
+    for key, val in os.environ.items():
+        if ("DATABASE" in key or "POSTGRES" in key) and "postgres" in str(val):
+            print(f"⚠️ [DB AUTO-DISCOVERY] Found Postgres URL in {key}. Using as default.")
+            DEFAULT_DB_URL = val
+            break
+
+# Final Fallback to local SQLite if absolutely nothing is found
+if not DEFAULT_DB_URL:
+    DEFAULT_DB_URL = "sqlite:///./aodev.db"
+    print("⚠️ [DB WARNING] No Postgres URL found. Falling back to local SQLite.")
+
+# Normalize Protocol
+DEFAULT_DB_URL = DEFAULT_DB_URL.strip().replace("postgres://", "postgresql://")
+
+# 2. Assign to specific contexts (allow overrides if explicitly set)
+CORE_DB_URL = os.getenv("CORE_DB_URL", DEFAULT_DB_URL).strip().replace("postgres://", "postgresql://")
+OPS_DB_URL = os.getenv("OPS_DB_URL", DEFAULT_DB_URL).strip().replace("postgres://", "postgresql://")
+PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", DEFAULT_DB_URL).strip().replace("postgres://", "postgresql://")
+EXT_DB_URL = os.getenv("EXT_DB_URL", DEFAULT_DB_URL).strip().replace("postgres://", "postgresql://")
 
 print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'}")
 print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'}")
