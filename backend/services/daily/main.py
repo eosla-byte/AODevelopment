@@ -151,7 +151,9 @@ def get_organization_users(org_id: str = Depends(get_current_org_id)):
 def get_available_bim_projects(org_id: str = Depends(get_current_org_id)):
     if not org_id:
         return []
-    projects = database.get_org_bim_projects(org_id)
+    # Fetching Project Profiles (resources_projects) instead of bim_projects
+    # because that is what the user understands as "Projects" to link.
+    projects = database.get_org_projects(org_id)
     return [{"id": p.id, "name": p.name} for p in projects]
 
 @app.get("/projects/{project_id}/board")
