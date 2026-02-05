@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Folder, Calendar } from 'lucide-react';
+import { Plus, Folder, Calendar, Trash2 } from 'lucide-react';
 import CreateProjectModal from '../components/CreateProjectModal';
 
 const ProjectsList = () => {
@@ -88,6 +88,41 @@ const ProjectsList = () => {
         }
     };
 
+    const handleDeleteProject = async (e, projectId) => {
+        e.preventDefault(); // Prevent Link navigation
+        e.stopPropagation();
+
+        if (!window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+            return;
+        }
+
+        // Resolve User ID for API (reuse logic or just use stored if available)
+        // Ideally we should have a centralized way to get headers.
+        const aoUser = localStorage.getItem("ao_user");
+        let userId = "u123";
+        if (aoUser) {
+            const u = JSON.parse(aoUser);
+            userId = u.id || "u123";
+        }
+
+        try {
+            const res = await fetch(`/projects/${projectId}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-User-ID': userId
+                }
+            });
+            if (res.ok) {
+                fetchProjects();
+            } else {
+                alert("Failed to delete project");
+            }
+        } catch (error) {
+            console.error("Delete failed", error);
+            alert("Error deleting project");
+        }
+    };
+
     useEffect(() => {
         fetchProjects();
     }, []);
@@ -144,7 +179,8 @@ const ProjectsList = () => {
                                                 background: 'white', padding: '1.5rem', borderRadius: '12px',
                                                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0',
                                                 transition: 'transform 0.2s',
-                                                height: '100%', display: 'flex', flexDirection: 'column'
+                                                height: '100%', display: 'flex', flexDirection: 'column',
+                                                position: 'relative'
                                             }}
                                                 onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
                                                 onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
@@ -153,6 +189,17 @@ const ProjectsList = () => {
                                                     <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '0.5rem', borderRadius: '8px' }}>
                                                         <Folder size={20} />
                                                     </div>
+                                                    <button
+                                                        onClick={(e) => handleDeleteProject(e, project.id)}
+                                                        style={{
+                                                            background: 'transparent', border: 'none', cursor: 'pointer',
+                                                            color: '#cbd5e1', padding: '4px', borderRadius: '4px'
+                                                        }}
+                                                        onMouseEnter={(e) => { e.target.style.color = '#ef4444'; e.target.style.background = '#fee2e2'; }}
+                                                        onMouseLeave={(e) => { e.target.style.color = '#cbd5e1'; e.target.style.background = 'transparent'; }}
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
                                                 </div>
                                                 <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e293b', fontSize: '1.1rem' }}>{project.name}</h4>
                                                 <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>
