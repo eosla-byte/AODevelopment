@@ -64,27 +64,40 @@ def health_check():
 def run_db_fix():
     print("🔧 [STARTUP] Checking Database Schema Constraints...")
     from sqlalchemy import text
-    # Use SessionOps because Daily tables are in Ops DB
-    db = database.SessionOps()
     try:
-        constraints = [
-            ("daily_teams", "daily_teams_owner_id_fkey"),
-            ("daily_teams", "daily_teams_organization_id_fkey"),
-            ("daily_projects", "daily_projects_organization_id_fkey")
-        ]
-        results = []
-        for table, cons in constraints:
+        db = database.SessionOps()
+        # 1. Drop Invalid Constraints
+        # Drop Constraint if exists (Self-healing for cross-db FKs)
+        actions = []
+        try:
+            db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_owner_id_fkey"))
+            actions.append("Dropped daily_teams_owner_id_fkey")
+            db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_organization_id_fkey"))
+            actions.append("Dropped daily_teams_organization_id_fkey")
+            # Also check daily_projects if necessary
+            db.execute(text("ALTER TABLE daily_projects DROP CONSTRAINT IF EXISTS daily_projects_organization_id_fkey"))
+            actions.append("Dropped daily_projects_organization_id_fkey")
+            
+            # 2. Check for Missing Columns (Schema Mismatch Fix)
+            # Check bim_project_id in daily_projects
             try:
-                # Use raw connection for DDL if needed, or session execute
-                db.execute(text(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {cons}"))
-                results.append(f"Dropped {cons}")
-            except Exception as e:
-                results.append(f"Error {cons}: {str(e)}")
-        db.commit()
-        print(f"✅ [STARTUP] DB Fix Result: {results}")
-        return {"status": "done", "results": results}
-    finally:
-        db.close()
+                db.execute(text("SELECT bim_project_id FROM daily_projects LIMIT 1"))
+            except Exception:
+                db.rollback()
+                print("⚠️ [SCHEMA FIX] Adding missing column: bim_project_id to daily_projects")
+                db.execute(text("ALTER TABLE daily_projects ADD COLUMN IF NOT EXISTS bim_project_id VARCHAR"))
+                actions.append("Added bim_project_id column")
+                db.commit()
+
+            db.commit()
+            print(f"✅ [STARTUP] DB Fix Result: {actions}")
+        except Exception as e:
+            print(f"⚠️ [STARTUP] DB Fix Warning: {e}")
+            db.rollback()
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ [STARTUP] DB Fix Failed: {e}")
 
 @app.on_event("startup")
 def startup_event():
