@@ -173,7 +173,8 @@ def init_app(user_id: str = Depends(get_current_user_id), org_id: str = Depends(
             "projects": [{
                 "id": p.id, 
                 "name": p.name, 
-                "channel_count": getattr(p, 'channel_count', 0)
+                "channel_count": getattr(p, 'channel_count', 0),
+                "created_at": getattr(p, 'created_at', None)
             } for p in t.projects]
         })
         

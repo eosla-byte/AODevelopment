@@ -189,10 +189,12 @@ const ProjectsList = () => {
                                                         onClick={(e) => handleDeleteProject(e, project.id)}
                                                         style={{
                                                             background: 'transparent', border: 'none', cursor: 'pointer',
-                                                            color: '#cbd5e1', padding: '4px', borderRadius: '4px'
+                                                            color: '#94a3b8', padding: '4px', borderRadius: '4px', // Darker gray
+                                                            zIndex: 10
                                                         }}
-                                                        onMouseEnter={(e) => { e.target.style.color = '#ef4444'; e.target.style.background = '#fee2e2'; }}
-                                                        onMouseLeave={(e) => { e.target.style.color = '#cbd5e1'; e.target.style.background = 'transparent'; }}
+                                                        onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = '#fee2e2'; }}
+                                                        onMouseLeave={(e) => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'transparent'; }}
+                                                        title="Delete Project"
                                                     >
                                                         <Trash2 size={18} />
                                                     </button>

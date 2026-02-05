@@ -57,7 +57,7 @@ const Dashboard = () => {
                     const all = [];
                     data.teams.forEach(t => all.push(...t.projects));
                     setProjects(all);
-                    if (all.length > 0) setSelectedProjectId(all[0].id);
+                    // if (all.length > 0) setSelectedProjectId(all[0].id); // Removed auto-select
                 }
             } catch (e) {
                 console.error(e);
@@ -86,14 +86,75 @@ const Dashboard = () => {
         loadMetrics();
     }, [selectedProjectId]);
 
-    if (!selectedProjectId && projects.length === 0) {
-        return <div style={{ padding: '2rem', textAlign: 'center', color: '#64748b' }}>Loading or No Projects...</div>;
+    if (!selectedProjectId) {
+        if (loading && projects.length === 0) return <div style={{ padding: '2rem' }}>Loading Projects...</div>;
+
+        // Group projects by team (Quick grouping since we flattened them earlier? No, projects is flat.
+        // Effectively we want the same view as Chat. But here we flattened projects in loadProjects.
+        // Let's refactor loadProjects to keep teams structure or just show flat?
+        // User asked for "same as Chat". Chat is grouped.
+        // I should refactor loadProjects to setTeams too.
+
+        // To stay consistent and fast: I will render a grid of projects (flat or gathered).
+        // Since I already have `projects` state, I will render them.
+        return (
+            <div style={{ padding: '2rem' }}>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1e293b', marginBottom: '2rem' }}>Select Project for Dashboard</h1>
+                {projects.length === 0 ? (
+                    <div style={{ textAlign: 'center', marginTop: '4rem', color: '#64748b' }}>
+                        <p>No projects found.</p>
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                        {projects.map(p => (
+                            <div
+                                key={p.id}
+                                onClick={() => setSelectedProjectId(p.id)}
+                                style={{
+                                    background: 'white', padding: '1.5rem', borderRadius: '12px',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0',
+                                    cursor: 'pointer', transition: 'transform 0.2s', display: 'flex', flexDirection: 'column',
+                                    gap: '1rem'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                    <div style={{ background: '#ecfdf5', color: '#10b981', padding: '0.5rem', borderRadius: '8px' }}>
+                                        <BarChart2 size={24} />
+                                    </div>
+                                    <div>
+                                        <h3 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b' }}>{p.name}</h3>
+                                        {/* We don't have team name easily here unless we change fetch logic */}
+                                    </div>
+                                </div>
+                                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+                                    Click to view metrics
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
     }
 
     return (
         <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem' }}>
-                <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1e293b', margin: 0 }}>Project Dashboard</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <button
+                        onClick={() => setSelectedProjectId(null)}
+                        style={{ background: 'white', border: '1px solid #cbd5e1', padding: '0.5rem', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    >
+                        ← Back
+                    </button>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1e293b', margin: 0 }}>
+                        {projects.find(p => p.id === selectedProjectId)?.name} Metrics
+                    </h1>
+                </div>
+
+                {/* Optional Quick Switcher */}
                 <select
                     value={selectedProjectId || ""}
                     onChange={e => setSelectedProjectId(e.target.value)}

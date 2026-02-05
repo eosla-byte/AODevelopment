@@ -42,7 +42,18 @@ const ChatLayout = () => {
             const res = await fetch('/init', { headers: { 'X-Organization-ID': orgId, 'X-User-ID': userId } });
             if (res.ok) {
                 const data = await res.json();
-                setTeams(data.teams || []);
+                let teamsData = data.teams || [];
+                // Sort projects by created_at desc
+                teamsData.forEach(t => {
+                    if (t.projects) {
+                        t.projects.sort((a, b) => {
+                            const dateA = new Date(a.created_at || 0);
+                            const dateB = new Date(b.created_at || 0);
+                            return dateB - dateA;
+                        });
+                    }
+                });
+                setTeams(teamsData);
             }
         } catch (e) {
             console.error(e);
@@ -86,9 +97,13 @@ const ChatLayout = () => {
                 if (data.length > 0 && !activeChannelId) {
                     setActiveChannelId(data[0].id); // Default to first channel (likely general)
                 }
+            } else {
+                // If project not found or permission denied, redirect to selector
+                navigate('/chat');
             }
         } catch (e) {
             console.error(e);
+            navigate('/chat');
         } finally {
             setLoadingChannels(false);
         }
