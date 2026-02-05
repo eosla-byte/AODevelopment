@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request, Body, UploadFile, 
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 import os
+import uuid
 
 try:
     from .common import database
