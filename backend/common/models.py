@@ -30,6 +30,13 @@ class Project(Base):
     duration_months = Column(Float, default=0.0)
     additional_time_months = Column(Float, default=0.0)
     archived = Column(Boolean, default=False)
+
+    # Core Project Profile Fields (Added via Migration)
+    organization_id = Column(String, nullable=True)
+    project_cost = Column(Float, default=0.0)
+    sq_meters = Column(Float, default=0.0)
+    ratio = Column(Float, default=0.0)
+    estimated_time = Column(String)
     
     # Financial metrics
     projected_profit_margin = Column(Float, default=0.0)
