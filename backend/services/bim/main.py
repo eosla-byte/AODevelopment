@@ -35,7 +35,7 @@ elif sys.path[0] != BASE_DIR:
     sys.path.remove(BASE_DIR)
     sys.path.insert(0, BASE_DIR)
 
-from common.database import get_db, SessionExt, SessionCore 
+from common.database import get_db, SessionExt, SessionCore, SessionOps 
 # Note: For this service, get_db should ideally point to SessionExt or we explicitely use SessionExt
 from common.auth_utils import decode_access_token, require_org_access, get_current_user
 from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity
@@ -526,25 +526,27 @@ def get_accounts_projects(
     """
     if not user: raise HTTPException(status_code=401, detail="Not authenticated")
     
-    db = SessionCore()
+    # Use SessionOps for Projects (Resources Schema)
+    # verify org access via SessionCore (Identity Schema) first?
+    # Or just Assume SessionOps has access to OrgUsers too? 
+    # Logic in database.py suggests strict splitting.
+    
+    db_core = SessionCore()
+    db_ops = SessionOps()
     try:
-        # Verify Org Access
-        # (Simplified check: if user is in org)
-        membership = db.query(OrganizationUser).filter(
+        # Verify Org Access (Identity)
+        membership = db_core.query(OrganizationUser).filter(
             OrganizationUser.organization_id == organization_id,
             OrganizationUser.user_id == user["id"]
         ).first()
         
         if not membership:
-             # Fallback: Check if Organization exists and user is global admin? 
-             # For now strict: must be member.
              return []
 
-        # Fetch Projects
-        # Import dynamically to avoid circular issues if any, or use common.models
+        # Fetch Projects (Operations)
         from common.models import Project
         
-        projects = db.query(Project).filter(
+        projects = db_ops.query(Project).filter(
             Project.organization_id == organization_id,
             Project.archived == False
         ).all()
@@ -554,11 +556,16 @@ def get_accounts_projects(
             "name": p.name,
             "client": p.client,
             "status": p.status,
-            "code": p.nit # misuse nit as code for now if needed
+            "code": p.nit
         } for p in projects]
         
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
-        db.close()
+        db_core.close()
+        db_ops.close()
 
 @app.post("/api/projects")
 async def create_project(
@@ -572,7 +579,8 @@ async def create_project(
         raise HTTPException(status_code=401, detail="Not authenticated")
 
     db = SessionExt() # BIM DB
-    accounts_db = SessionCore() # Accounts DB
+    accounts_db = SessionCore() # Accounts Identity
+    ops_db = SessionOps() # Accounts Operations (Projects)
     try:
         # 1. Validate Access to Org
         membership = accounts_db.query(OrganizationUser).filter(
@@ -598,14 +606,14 @@ async def create_project(
         
         if data.profile_id:
             # LINK EXISTING
-            # Verify it exists
             from common.models import Project
-            existing = accounts_db.query(Project).filter(Project.id == data.profile_id).first()
+            # Query from Ops DB
+            existing = ops_db.query(Project).filter(Project.id == data.profile_id).first()
             if not existing:
                 raise HTTPException(status_code=404, detail="Selected Project Profile not found")
             
             project_id = existing.id
-            project_name = existing.name # Enforce name match? Or allow override? Enforce for consistency.
+            project_name = existing.name 
             
             # Check if already exists in BIM
             bim_param = db.query(BimProject).filter(BimProject.id == project_id).first()
@@ -616,22 +624,16 @@ async def create_project(
             # CREATE NEW
             project_id = str(uuid.uuid4())
             
-            # Also create in Accounts? (If logic dictates we always want a profile)
-            # User request said: "vincular data entre todos los servidores".
-            # So yes, we should ALWAYS Create a profile if one doesn't exist.
-            
             from common.models import Project
             new_profile = Project(
                 id=project_id,
                 name=data.name,
                 organization_id=data.organization_id,
-                description=data.description, # Wait, Project model has no description field in snippet?
-                # Check models.py: Project has name, client, status... no description.
-                # We can put description in 'acc_config' or ignore.
+                description=data.description, 
                 status="Activo"
             )
-            accounts_db.add(new_profile)
-            accounts_db.commit()
+            ops_db.add(new_profile)
+            ops_db.commit()
             print(f"DEBUG: Created Accounts Profile {project_id}")
 
         # 4. Create BIM Project
@@ -654,6 +656,7 @@ async def create_project(
     finally:
         db.close()
         accounts_db.close()
+        ops_db.close()
 
 @app.delete("/api/projects/{project_id}")
 async def delete_project(project_id: str, user = Depends(get_current_user)):
