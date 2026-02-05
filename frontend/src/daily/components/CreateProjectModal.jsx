@@ -56,9 +56,32 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
         setLoading(true);
 
         const orgId = localStorage.getItem("ao_org_id");
-        // Mock User ID for now, or get from context if we had it. Backend dependencies handle it via headers usually or token.
-        // But the create_project endpoint uses Depends(get_current_user_id) which reads X-User-ID.
-        // We need to ensure we send that.
+
+        // Resolve Real User ID
+        // The Mock Login stores "u123", which is invalid in the DB.
+        // We match the logged-in email against the fetched Organization Users to find the REAL ID.
+        let userId = null;
+        try {
+            const storedUser = JSON.parse(localStorage.getItem("ao_user") || "{}");
+            const email = storedUser.email;
+            if (email && orgUsers.length > 0) {
+                const found = orgUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+                if (found) userId = found.id;
+            }
+            // Fallback: Use the first user if match fails (desperate measure for dev) or keep null
+            if (!userId && orgUsers.length > 0) {
+                console.warn("Could not match logged in email to Org Users. Using first user as fallback.");
+                userId = orgUsers[0].id;
+            }
+        } catch (e) {
+            console.error("Error resolving user ID", e);
+        }
+
+        if (!userId) {
+            alert("Error: Could not identify current user. Please reload.");
+            setLoading(false);
+            return;
+        }
 
         try {
             const payload = {
@@ -78,8 +101,7 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Organization-ID': orgId,
-                    'X-Organization-ID': orgId,
-                    'X-User-ID': localStorage.getItem("ao_user_id") || "u123" // Fallback only if missing
+                    'X-User-ID': userId
                 },
                 body: JSON.stringify(payload)
             });
