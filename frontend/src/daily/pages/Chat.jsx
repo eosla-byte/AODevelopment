@@ -33,13 +33,42 @@ const ChatLayout = () => {
     const fetchProjects = async () => {
         setLoadingProjects(true);
         const orgId = localStorage.getItem("ao_org_id");
-        const aoUser = localStorage.getItem("ao_user");
-        let userId = "u123";
-        if (aoUser) try { userId = JSON.parse(aoUser).id || "u123"; } catch { }
+        // CORRECT USER ID RETRIEVAL
+        let userId = null;
+        try {
+            const storedUser = JSON.parse(localStorage.getItem("ao_user") || "{}");
+            if (storedUser.id && storedUser.id !== 'u123') {
+                userId = storedUser.id;
+            } else if (storedUser.email) {
+                userId = "u123"; // Fallback to trigger resolution
+            }
+        } catch (e) {
+            console.error("Error parsing user", e);
+        }
+
+        const rawUserId = userId || "u123";
+        let effectiveUserId = rawUserId;
+
+        if (rawUserId === 'u123') {
+            try {
+                const storedUser = JSON.parse(localStorage.getItem("ao_user") || "{}");
+                if (storedUser.email) {
+                    const usersRes = await fetch('/org-users', { headers: { 'X-Organization-ID': orgId } });
+                    if (usersRes.ok) {
+                        const users = await usersRes.json();
+                        const found = users.find(u => u.email.toLowerCase() === storedUser.email.toLowerCase());
+                        if (found) {
+                            effectiveUserId = found.id;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Error resolving user email", e);
+            }
+        }
 
         try {
-            // Reusing /init or creating a lighter endpoint? /init is fine.
-            const res = await fetch('/init', { headers: { 'X-Organization-ID': orgId, 'X-User-ID': userId } });
+            const res = await fetch('/init', { headers: { 'X-Organization-ID': orgId, 'X-User-ID': effectiveUserId } });
             if (res.ok) {
                 const data = await res.json();
                 let teamsData = data.teams || [];

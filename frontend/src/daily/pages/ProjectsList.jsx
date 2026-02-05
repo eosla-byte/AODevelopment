@@ -157,71 +157,69 @@ const ProjectsList = () => {
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                        {teams.filter(t => t.projects.length > 0).map(team => (
-                            <div key={team.id}>
-                                <h3 style={{ fontSize: '1.1rem', color: '#475569', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    {team.name}
-                                </h3>
+                    {teams.filter(t => t.projects.length > 0).map(team => (
+                        <div key={team.id}>
+                            <h3 style={{ fontSize: '1.1rem', color: '#475569', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                {team.name}
+                            </h3>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-                                    {team.projects.map(project => (
-                                        <Link
-                                            key={project.id}
-                                            to={`/board/${project.id}`}
-                                            style={{ textDecoration: 'none' }}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+                                {team.projects.map(project => (
+                                    <Link
+                                        key={project.id}
+                                        to={`/board/${project.id}`}
+                                        style={{ textDecoration: 'none' }}
+                                    >
+                                        <div style={{
+                                            background: 'white', padding: '1.5rem', borderRadius: '12px',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0',
+                                            transition: 'transform 0.2s',
+                                            height: '100%', display: 'flex', flexDirection: 'column',
+                                            position: 'relative'
+                                        }}
+                                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
                                         >
-                                            <div style={{
-                                                background: 'white', padding: '1.5rem', borderRadius: '12px',
-                                                boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0',
-                                                transition: 'transform 0.2s',
-                                                height: '100%', display: 'flex', flexDirection: 'column',
-                                                position: 'relative'
-                                            }}
-                                                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-                                                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                                            >
-                                                <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                                                    <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '0.5rem', borderRadius: '8px' }}>
-                                                        <Folder size={20} />
-                                                    </div>
-                                                    <button
-                                                        onClick={(e) => handleDeleteProject(e, project.id)}
-                                                        style={{
-                                                            background: 'transparent', border: 'none', cursor: 'pointer',
-                                                            color: '#94a3b8', padding: '4px', borderRadius: '4px', // Darker gray
-                                                            zIndex: 10
-                                                        }}
-                                                        onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = '#fee2e2'; }}
-                                                        onMouseLeave={(e) => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'transparent'; }}
-                                                        title="Delete Project"
-                                                    >
-                                                        <Trash2 size={18} />
-                                                    </button>
+                                            <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                                                <div style={{ background: '#eff6ff', color: '#3b82f6', padding: '0.5rem', borderRadius: '8px' }}>
+                                                    <Folder size={20} />
                                                 </div>
-                                                <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e293b', fontSize: '1.1rem' }}>{project.name}</h4>
-                                                <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>
-                                                    Kanban Board
-                                                </p>
+                                                <button
+                                                    onClick={(e) => handleDeleteProject(e, project.id)}
+                                                    style={{
+                                                        background: 'transparent', border: 'none', cursor: 'pointer',
+                                                        color: '#94a3b8', padding: '4px', borderRadius: '4px', // Darker gray
+                                                        zIndex: 10
+                                                    }}
+                                                    onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = '#fee2e2'; }}
+                                                    onMouseLeave={(e) => { e.currentTarget.style.color = '#94a3b8'; e.currentTarget.style.background = 'transparent'; }}
+                                                    title="Delete Project"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
                                             </div>
-                                        </Link>
-                                    ))}
-                                </div>
-                            )}
+                                            <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e293b', fontSize: '1.1rem' }}>{project.name}</h4>
+                                            <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>
+                                                Kanban Board
+                                            </p>
+                                        </div>
+                                    </Link>
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    ))}
+                </div>
             )}
 
-                    {showCreateModal && (
-                        <CreateProjectModal
-                            onClose={() => setShowCreateModal(false)}
-                            onCreated={handleProjectCreated}
-                            teams={teams}
-                        />
-                    )}
-                </div>
-            );
+            {showCreateModal && (
+                <CreateProjectModal
+                    onClose={() => setShowCreateModal(false)}
+                    onCreated={handleProjectCreated}
+                    teams={teams}
+                />
+            )}
+        </div>
+    );
 };
 
-            export default ProjectsList;
+export default ProjectsList;

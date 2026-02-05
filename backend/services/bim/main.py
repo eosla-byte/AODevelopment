@@ -882,7 +882,12 @@ async def view_project_dashboard(request: Request, project_id: str, user = Depen
 
 
 @app.get("/projects/{project_id}", response_class=HTMLResponse)
-async def view_project_gantt(request: Request, project_id: str, user = Depends(get_current_user)):
+async def view_project_gantt(
+    request: Request, 
+    project_id: str, 
+    embedded: bool = False,
+    user = Depends(get_current_user)
+):
     if not user: return RedirectResponse("/auth/login")
     
     # 1. Fetch Project & Latest Version
@@ -1055,7 +1060,8 @@ async def view_project_gantt(request: Request, project_id: str, user = Depends(g
             "version": latest_version,
             "all_versions": all_versions,
             "user": user,
-            "project_settings_json": safe_settings or {}
+            "project_settings_json": safe_settings or {},
+            "embedded": embedded
         })
     finally:
         db.close()

@@ -47,9 +47,36 @@ const Dashboard = () => {
         const loadProjects = async () => {
             const orgId = localStorage.getItem("ao_org_id");
             if (!orgId) return;
+            // CORRECT USER ID RETRIEVAL
+            let userId = null;
+            try {
+                const storedUser = JSON.parse(localStorage.getItem("ao_user") || "{}");
+                if (storedUser.id && storedUser.id !== 'u123') {
+                    userId = storedUser.id;
+                } else if (storedUser.email) {
+                    userId = "u123";
+                }
+            } catch (e) { console.error(e); }
+
+            const rawUserId = userId || "u123";
+            let effectiveUserId = rawUserId;
+
+            if (rawUserId === 'u123') {
+                try {
+                    const storedUser = JSON.parse(localStorage.getItem("ao_user") || "{}");
+                    if (storedUser.email) {
+                        const usersRes = await fetch('/org-users', { headers: { 'X-Organization-ID': orgId } });
+                        if (usersRes.ok) {
+                            const users = await usersRes.json();
+                            const found = users.find(u => u.email.toLowerCase() === storedUser.email.toLowerCase());
+                            if (found) effectiveUserId = found.id;
+                        }
+                    }
+                } catch (e) { console.error(e); }
+            }
             try {
                 const res = await fetch('/init', {
-                    headers: { 'X-Organization-ID': orgId, 'X-User-ID': "u123" }
+                    headers: { 'X-Organization-ID': orgId, 'X-User-ID': effectiveUserId }
                 });
                 if (res.ok) {
                     const data = await res.json();

@@ -58,6 +58,16 @@
             background: white;
         }
 
+        /* EMBEDDED MODE STYLES */
+        body.embedded-mode #toolbar {
+            display: none !important;
+            /* Optionally hide toolbar or simplify it */
+        }
+
+        body.embedded-mode {
+            background: transparent;
+        }
+
         /* --- THE MASTER SCROLL CONTAINER --- */
         #master-scroll {
             flex: 1;
@@ -475,9 +485,18 @@
         // --- INIT ---
         document.addEventListener('DOMContentLoaded', () => {
             console.log("AO Gantt: Starting...");
-            try {
-                const serverTasks = {{ tasks | tojson | safe
-            }};
+
+            // --- EMBEDDED FLAG INJECTION ---
+            window.isEmbedded = {{ 'true' if embedded else 'false' }
+        };
+        if (window.isEmbedded) {
+            document.body.classList.add('embedded-mode');
+            // Hide toolbar items if needed, or CSS handles it
+        }
+
+        try {
+            const serverTasks = {{ tasks | tojson | safe
+        }};
         console.log("AO Gantt: Tasks loaded:", serverTasks ? serverTasks.length : 0);
         if (serverTasks && serverTasks.length > 0) {
             // DEBUG: Extension checks removed for production
@@ -2104,6 +2123,21 @@
             }
         }
 
+        function sendMessageToParent(type, payload) {
+            if (window.parent) {
+                window.parent.postMessage({ type, payload }, '*');
+            }
+        }
+
+        // Listen for messages from parent
+        window.addEventListener('message', (event) => {
+            // Security: In prod check event.origin
+            const { type, payload } = event.data;
+            if (type === 'REFRESH') {
+                location.reload();
+            }
+        });
+
         function getWeekNumber(d) {
             d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
             d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
@@ -2411,7 +2445,21 @@
                         g.style.cursor = 'pointer';
                         g.onclick = (e) => {
                             e.stopPropagation();
-                            showTaskCard(task);
+                            // If embedded, send message to parent
+                            if (window.isEmbedded) {
+                                sendMessageToParent('TASK_CLICK', {
+                                    id: task.id,
+                                    name: task.name,
+                                    contractor: task.contractor,
+                                    start: task.start,
+                                    end: task.end,
+                                    progress: task.progress,
+                                    comments: task.comments,
+                                    extension_days: task.extension_days
+                                });
+                            } else {
+                                showTaskCard(task);
+                            }
                         };
 
                         // 4. EXTRA TIME BAR (Red Hatched)
@@ -2462,7 +2510,20 @@
                             // Bind Click to Ext Rect too
                             extRect.onclick = (e) => {
                                 e.stopPropagation();
-                                showTaskCard(task);
+                                if (window.isEmbedded) {
+                                    sendMessageToParent('TASK_CLICK', {
+                                        id: task.id,
+                                        name: task.name,
+                                        contractor: task.contractor,
+                                        start: task.start,
+                                        end: task.end,
+                                        progress: task.progress,
+                                        comments: task.comments,
+                                        extension_days: task.extension_days
+                                    });
+                                } else {
+                                    showTaskCard(task);
+                                }
                             };
 
                             g.appendChild(extRect);
