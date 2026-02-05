@@ -525,6 +525,7 @@ class DailyProject(Base):
     columns = relationship("DailyColumn", back_populates="project", cascade="all, delete-orphan", order_by="DailyColumn.order_index")
     tasks = relationship("DailyTask", back_populates="project", cascade="all, delete-orphan")
     messages = relationship("DailyMessage", back_populates="project", cascade="all, delete-orphan")
+    channels = relationship("DailyChannel", back_populates="project", cascade="all, delete-orphan")
 
 class DailyColumn(Base):
     __tablename__ = 'daily_columns'
@@ -592,6 +593,18 @@ class DailyComment(Base):
     task = relationship("DailyTask", back_populates="comments")
     replies = relationship("DailyComment", remote_side=[id]) # Self-referential
 
+class DailyChannel(Base):
+    __tablename__ = 'daily_channels'
+    
+    id = Column(String, primary_key=True)
+    project_id = Column(String, ForeignKey('daily_projects.id'))
+    name = Column(String, nullable=False)
+    type = Column(String, default="text") # text, voice
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    project = relationship("DailyProject", back_populates="channels")
+    messages = relationship("DailyMessage", back_populates="channel", cascade="all, delete-orphan")
+
 class DailyMessage(Base):
     """
     Chat messages for Projects or DMs.
@@ -601,6 +614,7 @@ class DailyMessage(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     
     # Context (Either Project OR DM)
+    channel_id = Column(String, ForeignKey('daily_channels.id'), nullable=True)
     project_id = Column(String, ForeignKey('daily_projects.id'), nullable=True)
     dm_room_id = Column(String, nullable=True) # UUID for 1:1 chat room
     
@@ -615,5 +629,6 @@ class DailyMessage(Base):
     created_at = Column(DateTime, default=func.now())
     
     project = relationship("DailyProject", back_populates="messages")
+    channel = relationship("DailyChannel", back_populates="messages")
 
 
