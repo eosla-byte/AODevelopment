@@ -110,11 +110,6 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
 
                 <h2 style={{ marginTop: 0, marginBottom: '1.5rem', fontSize: '1.25rem' }}>Create New Project</h2>
 
-                {/* DEBUG: Remove this later */}
-                <div style={{ fontSize: '0.75rem', color: 'red', marginBottom: '1rem' }}>
-                    DEBUG: isNewTeam={isNewTeam.toString()}, teamId={teamId}, Value={isNewTeam ? "NEW" : teamId}
-                </div>
-
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div>
                         <label style={{ display: 'block', fontSize: '0.9rem', marginBottom: '0.5rem', fontWeight: 500 }}>Project Name</label>
@@ -135,17 +130,16 @@ const CreateProjectModal = ({ onClose, onCreated, teams }) => {
                             onChange={e => {
                                 console.log("Team Selection Change:", e.target.value);
                                 if (e.target.value === "NEW") {
-                                    console.log("Setting isNewTeam to TRUE");
                                     setIsNewTeam(true);
                                     setTeamId("");
                                 } else {
-                                    console.log("Setting isNewTeam to FALSE", e.target.value);
                                     setIsNewTeam(false);
                                     setTeamId(e.target.value);
                                 }
                             }}
                             style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}
                         >
+                            <option value="" disabled>-- Select a Team --</option>
                             {teams.map(t => (
                                 <option key={t.id} value={t.id}>{t.name}</option>
                             ))}
