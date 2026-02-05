@@ -253,13 +253,13 @@
                                     Project Name</th>
                                 <th
                                     class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                                    Cost ($)</th>
+                                    Cost (Q)</th>
                                 <th
                                     class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                                     Area (m²)</th>
                                 <th
                                     class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                                    Ratio $/m²</th>
+                                    Ratio Q/m²</th>
                                 <th
                                     class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                                     Est. Time</th>
@@ -504,7 +504,7 @@
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-slate-700">Project Cost ($)</label>
+                            <label class="block text-sm font-medium text-slate-700">Project Cost (Q)</label>
                             <input type="number" step="0.01" name="project_cost" placeholder="0.00"
                                 class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
                         </div>
@@ -516,7 +516,7 @@
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-slate-700">Ratio ($/m²)</label>
+                            <label class="block text-sm font-medium text-slate-700">Ratio (Q/m²)</label>
                             <input type="number" step="0.01" name="ratio" placeholder="Calculated automatically..."
                                 class="mt-1 block w-full border border-slate-300 rounded-md p-2 bg-slate-100 text-slate-500">
                         </div>
@@ -738,9 +738,9 @@
                             </div>
                         </div>
                     </td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">$${(p.project_cost || 0).toLocaleString()}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">Q${(p.project_cost || 0).toLocaleString()}</td>
                     <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">${(p.sq_meters || 0).toLocaleString()} m²</td>
-                    <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">$${(p.ratio || 0).toLocaleString()} /m²</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">Q${(p.ratio || 0).toLocaleString()} /m²</td>
                     <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">${p.estimated_time || '-'}</td>
                 </tr>
             `).join('');
