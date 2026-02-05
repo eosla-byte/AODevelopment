@@ -517,8 +517,25 @@ def migrate_db_schema(user_jwt = Depends(get_current_admin)):
     if not user_jwt: return "Unauthorized"
     
     from sqlalchemy import text
-    db = SessionCore() # Or SessionOps if separate? Assuming shared for now or try both.
+    from common.database import SessionCore, SessionOps, engine_core, engine_ops
+    from common.models import Base
+    
     messages = []
+
+    # 0. Ensure Tables Exist (Create All)
+    # This handles "UndefinedTable" errors by creating them fresh if missing.
+    try:
+        Base.metadata.create_all(bind=engine_ops)
+        messages.append("SUCCESS: Base.metadata.create_all(bind=engine_ops)")
+    except Exception as e:
+         messages.append(f"ERROR: Create All Ops failed | {e}")
+
+    try:
+        Base.metadata.create_all(bind=engine_core)
+        messages.append("SUCCESS: Base.metadata.create_all(bind=engine_core)")
+    except Exception as e:
+         messages.append(f"ERROR: Create All Core failed | {e}")
+    
     
     def run_migration(session, sql):
         try:
@@ -527,28 +544,16 @@ def migrate_db_schema(user_jwt = Depends(get_current_admin)):
             messages.append(f"SUCCESS: {sql}")
         except Exception as e:
             session.rollback()
-            # Ignore "duplicate column" errors
-            if "duplicate column" in str(e) or "already exists" in str(e):
+            # Ignore "duplicate column" errors or "already exists"
+            msg = str(e).lower()
+            if "duplicate column" in msg or "already exists" in msg:
                 messages.append(f"SKIPPED (Exists): {sql}")
             else:
                 messages.append(f"ERROR: {sql} | {e}")
 
     # 1. daily_teams: organization_id
-    run_migration(db, 'ALTER TABLE daily_teams ADD COLUMN organization_id VARCHAR')
-    
-    # 2. daily_projects: organization_id, bim_project_id
-    run_migration(db, 'ALTER TABLE daily_projects ADD COLUMN organization_id VARCHAR')
-    run_migration(db, 'ALTER TABLE daily_projects ADD COLUMN bim_project_id VARCHAR')
-    
-    db.close()
-    
-    # If using SessionOps separately?
-    # Ensure usage of correct engine.
-    # In database.py, SessionCore binds to CORE_DB_URL. SessionOps binds to OPS_DB_URL.
-    # If they are different, we must also migrate Ops.
-    from common.database import SessionOps
+    # Run on Ops DB mainly (where Daily lives)
     db_ops = SessionOps()
-    # Try same migrations on Ops just in case
     run_migration(db_ops, 'ALTER TABLE daily_teams ADD COLUMN organization_id VARCHAR')
     run_migration(db_ops, 'ALTER TABLE daily_projects ADD COLUMN organization_id VARCHAR')
     run_migration(db_ops, 'ALTER TABLE daily_projects ADD COLUMN bim_project_id VARCHAR')
