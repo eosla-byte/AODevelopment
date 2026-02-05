@@ -553,12 +553,13 @@ def migrate_db_schema(user_jwt = Depends(get_current_admin)):
 
     # 1. Projects Table Updates (Organization & Metrics)
     # Run on CORE DB (where Projects are)
+    # Table name is 'resources_projects' NOT 'projects'
     db_core = SessionCore()
-    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN organization_id VARCHAR')
-    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN sq_meters FLOAT DEFAULT 0.0')
-    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN project_cost FLOAT DEFAULT 0.0')
-    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN ratio FLOAT DEFAULT 0.0')
-    run_migration(db_core, 'ALTER TABLE projects ADD COLUMN estimated_time VARCHAR')
+    run_migration(db_core, 'ALTER TABLE resources_projects ADD COLUMN organization_id VARCHAR')
+    run_migration(db_core, 'ALTER TABLE resources_projects ADD COLUMN sq_meters FLOAT DEFAULT 0.0')
+    run_migration(db_core, 'ALTER TABLE resources_projects ADD COLUMN project_cost FLOAT DEFAULT 0.0')
+    run_migration(db_core, 'ALTER TABLE resources_projects ADD COLUMN ratio FLOAT DEFAULT 0.0')
+    run_migration(db_core, 'ALTER TABLE resources_projects ADD COLUMN estimated_time VARCHAR')
     db_core.close()
     
     # 2. Ops DB (in case of Daily tables, keep them just in case)
