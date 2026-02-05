@@ -604,6 +604,15 @@ def get_accounts_projects(
         # Fetch Projects (Operations)
         from common.models import Project
         from sqlalchemy import or_
+
+        # --- DEBUG LOGGING ---
+        total_projects = db_ops.query(Project).count()
+        print(f"DEBUG: Total Projects in DB: {total_projects}")
+        
+        sample = db_ops.query(Project).all()
+        for p in sample:
+            print(f"   -> ID: {p.id} | Name: {p.name} | Org: {p.organization_id} | Archived: {p.archived} ({type(p.archived)})")
+        # ---------------------
         
         projects = db_ops.query(Project).filter(
             or_(
