@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { Send, User, Hash, Paperclip, MessageSquare, Plus, ChevronRight, X } from 'lucide-react';
+// Imports from 'lucide-react'
+import { Send, User, Hash, Paperclip, MessageSquare, Plus, ChevronRight, X, Folder, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const ChatLayout = () => {
     const { projectId } = useParams();
+    const navigate = useNavigate();
     const [channels, setChannels] = useState([]);
     const [activeChannelId, setActiveChannelId] = useState(null);
+
+    // Project List State (for Selector)
+    const [teams, setTeams] = useState([]); // Reusing team/project structure
+    const [loadingProjects, setLoadingProjects] = useState(false);
 
     // UI State
     const [showThread, setShowThread] = useState(false);
@@ -14,13 +21,38 @@ const ChatLayout = () => {
     // Loading
     const [loadingChannels, setLoadingChannels] = useState(true);
 
-    // Initial Fetch
+    // Fetch Projects if no projectId
     useEffect(() => {
-        if (!projectId) return;
-        fetchChannels();
+        if (!projectId) {
+            fetchProjects();
+        } else {
+            fetchChannels();
+        }
     }, [projectId]);
 
+    const fetchProjects = async () => {
+        setLoadingProjects(true);
+        const orgId = localStorage.getItem("ao_org_id");
+        const aoUser = localStorage.getItem("ao_user");
+        let userId = "u123";
+        if (aoUser) try { userId = JSON.parse(aoUser).id || "u123"; } catch { }
+
+        try {
+            // Reusing /init or creating a lighter endpoint? /init is fine.
+            const res = await fetch('/init', { headers: { 'X-Organization-ID': orgId, 'X-User-ID': userId } });
+            if (res.ok) {
+                const data = await res.json();
+                setTeams(data.teams || []);
+            }
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoadingProjects(false);
+        }
+    };
+
     const fetchChannels = async () => {
+        if (!projectId) return;
         try {
             const res = await fetch(`/projects/${projectId}/channels`);
             if (res.ok) {
@@ -53,6 +85,44 @@ const ChatLayout = () => {
             console.error(e);
         }
     };
+
+    if (!projectId) {
+        // Project Selector View
+        if (loadingProjects) return <div style={{ padding: '2rem' }}>Loading Projects...</div>;
+        return (
+            <div style={{ padding: '2rem', height: '100%', overflowY: 'auto' }}>
+                <h1 style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1e293b', marginBottom: '2rem' }}>Select a Project to Chat</h1>
+                {teams.every(t => t.projects.length === 0) ? (
+                    <div style={{ color: '#64748b' }}>No projects found. Create one in the Projects tab.</div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1.5rem' }}>
+                        {teams.flatMap(t => t.projects).map(p => (
+                            <div
+                                key={p.id}
+                                onClick={() => navigate(`/chat/${p.id}`)}
+                                style={{
+                                    background: 'white', padding: '1.5rem', borderRadius: '12px',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #e2e8f0',
+                                    cursor: 'pointer', transition: 'transform 0.2s', display: 'flex', flexDirection: 'column',
+                                    gap: '1rem'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                            >
+                                <div style={{ width: '40px', height: '40px', background: '#eff6ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
+                                    <MessageSquare size={20} />
+                                </div>
+                                <div>
+                                    <h3 style={{ margin: '0 0 0.25rem 0', fontSize: '1.1rem', color: '#1e293b' }}>{p.name}</h3>
+                                    <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Tap to join chat</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )
+    }
 
     if (loadingChannels) return <div style={{ padding: '1rem' }}>Loading Chat...</div>;
 

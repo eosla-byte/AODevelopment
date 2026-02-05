@@ -157,17 +157,13 @@ const ProjectsList = () => {
                 </div>
             ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                    {teams.map(team => (
-                        <div key={team.id}>
-                            <h3 style={{ fontSize: '1.1rem', color: '#475569', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                {team.name}
-                            </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                        {teams.filter(t => t.projects.length > 0).map(team => (
+                            <div key={team.id}>
+                                <h3 style={{ fontSize: '1.1rem', color: '#475569', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    {team.name}
+                                </h3>
 
-                            {team.projects.length === 0 ? (
-                                <div style={{ padding: '1rem', border: '1px dashed #cbd5e1', borderRadius: '8px', color: '#94a3b8', fontSize: '0.9rem' }}>
-                                    No projects in this team yet.
-                                </div>
-                            ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
                                     {team.projects.map(project => (
                                         <Link
@@ -210,20 +206,20 @@ const ProjectsList = () => {
                                     ))}
                                 </div>
                             )}
-                        </div>
-                    ))}
-                </div>
+                            </div>
+                        ))}
+                    </div>
             )}
 
-            {showCreateModal && (
-                <CreateProjectModal
-                    onClose={() => setShowCreateModal(false)}
-                    onCreated={handleProjectCreated}
-                    teams={teams}
-                />
-            )}
-        </div>
-    );
+                    {showCreateModal && (
+                        <CreateProjectModal
+                            onClose={() => setShowCreateModal(false)}
+                            onCreated={handleProjectCreated}
+                            teams={teams}
+                        />
+                    )}
+                </div>
+            );
 };
 
-export default ProjectsList;
+            export default ProjectsList;

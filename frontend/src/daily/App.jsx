@@ -76,6 +76,7 @@ function App() {
                                 <Route path="/my-tasks" element={<MyTasks />} />
                                 <Route path="/projects" element={<ProjectsList />} />
                                 <Route path="/board/:projectId" element={<ProjectBoard />} />
+                                <Route path="/chat" element={<Chat />} />
                                 <Route path="/chat/:projectId" element={<Chat />} />
                             </Routes>
                         </Layout>
