@@ -13,9 +13,24 @@ from sqlalchemy.orm.attributes import flag_modified
 # DATABASE SETUP
 # Multi-DB Configuration for Microservices/Monolith Hybrid
 
+# DATABASE SETUP
+# Multi-DB Configuration for Microservices/Monolith Hybrid
+
+# 1. Load Specific Database Configurations
+# Use 'DATABASE_URL' as a fallback ONLY if it makes sense for the primary purpose of that variable.
+# Ideally, DevOps should set each variable explicitly (CORE_DB_URL, EXT_DB_URL, etc.)
+
+# Core DB (Identity, Users, Orgs) - Primary for Accounts Service
 CORE_DB_URL = os.getenv("CORE_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+
+# Ops DB (Finance, Admin) - Primary for Finance Service
 OPS_DB_URL = os.getenv("OPS_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+
+# Plugin DB - Primary for Plugin API
 PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+
+# External DB (Daily, BIM, Portal) - Primary for Client Services
+# Note: These services ALSO need CORE_DB_URL set to authenticate users!
 EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
 
 print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'}")
@@ -2122,23 +2137,26 @@ def init_user_daily_setup(user_email: str):
     """
     return True
 
-def create_daily_team(name: str, owner_id: str, organization_id: str = None):
+def create_daily_team(name: str, owner_id: str, organization_id: str = None, members: List[str] = None):
     db = SessionOps() # Using Ops DB for Daily
     try:
         new_id = str(uuid.uuid4())
+        
+        initial_members = [owner_id]
+        if members:
+            initial_members.extend(members)
+        # Deduplicate
+        initial_members = list(set(initial_members))
+
         team = models.DailyTeam(
             id=new_id, 
             name=name, 
             owner_id=owner_id, 
             organization_id=organization_id,
-            members=[owner_id]
+            members=initial_members
         )
         db.add(team)
         db.commit()
-        db.refresh(team)
-        try:
-            db.expunge(team)
-        except: pass
         return team
     finally:
         db.close()
@@ -2149,20 +2167,19 @@ def get_user_teams(user_id: str, organization_id: str = None):
     # For MVP, get all teams and filter in python (inefficient but works for small scale)
     db = SessionOps()
     try:
-        all_teams = db.query(models.DailyTeam).all()
-        user_teams = []
-        for t in all_teams:
-            # Filter by Org if provided
-            if organization_id and t.organization_id != organization_id:
-                continue
-                
-            if user_id in (t.members or []):
-                user_teams.append(t)
+        query = db.query(models.DailyTeam)
+        
+        # 1. Organization Isolation (If Org Context Provided)
+        if organization_id:
+            query = query.filter(models.DailyTeam.organization_id == organization_id)
+            
+        all_teams = query.all()
+        user_teams = [t for t in all_teams if user_id in (t.members or [])]
         return user_teams
     finally:
         db.close()
 
-def create_daily_project(team_id: str, name: str, user_id: str, organization_id: str = None):
+def create_daily_project(team_id: str, name: str, user_id: str, organization_id: str = None, bim_project_id: str = None):
     db = SessionOps()
     try:
         new_id = str(uuid.uuid4())
@@ -2170,8 +2187,9 @@ def create_daily_project(team_id: str, name: str, user_id: str, organization_id:
             id=new_id, 
             team_id=team_id, 
             name=name, 
-            organization_id=organization_id,
             created_by=user_id,
+            organization_id=organization_id,
+            bim_project_id=bim_project_id,
             settings={"background": "default"}
         )
         # Create Default Columns
@@ -2183,10 +2201,6 @@ def create_daily_project(team_id: str, name: str, user_id: str, organization_id:
             
         db.add(proj)
         db.commit()
-        db.refresh(proj)
-        try:
-            db.expunge(proj)
-        except: pass
         return proj
     finally:
         db.close()
@@ -2282,3 +2296,117 @@ def get_daily_messages(project_id: str, limit=50):
     finally:
         db.close()
 
+def get_org_bim_projects(organization_id: str):
+    # This queries the Core/BIM DB to get available projects for linking
+    if not organization_id:
+        return []
+        
+    db = SessionOps() # BIM tables are in Ops/Shared DB for now
+    try:
+        projects = db.query(models.BimProject).filter(models.BimProject.organization_id == organization_id).all()
+        return projects
+    finally:
+        db.close()
+
+def get_org_projects(organization_id: str):
+    """
+    Get all Core Projects ('resources_projects') associated with an organization.
+    """
+    db = SessionCore()
+    try:
+        # Filter by organization_id
+        projects = db.query(models.Project).filter(models.Project.organization_id == organization_id).all()
+        return projects
+    finally:
+        db.close()
+
+def create_org_project(organization_id: str, name: str, cost: float = 0.0, sq_meters: float = 0.0, ratio: float = 0.0, estimated_time: str = None):
+    """
+    Create a new Core Project Profile.
+    """
+    db = SessionCore()
+    try:
+        new_id = str(uuid.uuid4())
+        project = models.Project(
+            id=new_id,
+            organization_id=organization_id,
+            name=name,
+            project_cost=cost,
+            sq_meters=sq_meters,
+            ratio=ratio,
+            estimated_time=estimated_time,
+            status="Active"
+        )
+        db.add(project)
+        db.commit()
+        db.refresh(project)
+        return project
+    finally:
+        db.close()
+
+
+def get_org_users(organization_id: str):
+    """
+    Get all users belonging to an organization.
+    """
+    db = SessionCore()
+    try:
+        members = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.organization_id == organization_id
+        ).options(joinedload(models.OrganizationUser.user)).all()
+        
+        users = []
+        for m in members:
+            if m.user:
+                users.append({
+                    "id": m.user.id, # AccountUser ID
+                    "name": m.user.full_name,
+                    "email": m.user.email,
+                    "role": m.role
+                })
+        return users
+    finally:
+        db.close()
+
+def get_project_metrics(project_id: str):
+    db = SessionOps()
+    try:
+        project = db.query(models.DailyProject).filter(models.DailyProject.id == project_id).first()
+        if not project:
+            return None
+            
+        tasks = db.query(models.DailyTask).filter(models.DailyTask.project_id == project_id).all()
+        
+        total_tasks = len(tasks)
+        pending = len([t for t in tasks if t.status == "Pending"])
+        in_progress = len([t for t in tasks if t.status == "In Progress"])
+        done = len([t for t in tasks if t.status == "Done"])
+        
+        # User Stats
+        user_stats = {} # {user_id: count}
+        for t in tasks:
+            if t.assignees:
+                for uid in t.assignees:
+                    user_stats[uid] = user_stats.get(uid, 0) + 1
+                    
+        # Find top user
+        top_user_id = None
+        max_tasks = 0
+        for uid, count in user_stats.items():
+            if count > max_tasks:
+                max_tasks = count
+                top_user_id = uid
+                
+        # Resolve top user name (optional, or frontend does it with user list)
+        # For simplicity, returning ID
+        
+        return {
+            "total_tasks": total_tasks,
+            "pending": pending,
+            "in_progress": in_progress,
+            "done": done,
+            "top_user_id": top_user_id,
+            "user_stats": user_stats
+        }
+    finally:
+        db.close()

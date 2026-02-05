@@ -30,6 +30,13 @@ class Project(Base):
     duration_months = Column(Float, default=0.0)
     additional_time_months = Column(Float, default=0.0)
     archived = Column(Boolean, default=False)
+
+    # Core Project Profile Fields (Added via Migration)
+    organization_id = Column(String, nullable=True)
+    project_cost = Column(Float, default=0.0)
+    sq_meters = Column(Float, default=0.0)
+    ratio = Column(Float, default=0.0)
+    estimated_time = Column(String)
     
     # Financial metrics
     projected_profit_margin = Column(Float, default=0.0)
@@ -488,7 +495,7 @@ class DailyTeam(Base):
     
     id = Column(String, primary_key=True) # UUID
     name = Column(String, nullable=False)
-    organization_id = Column(String, nullable=True) # Organization Context
+    organization_id = Column(String, ForeignKey('accounts_organizations.id'), nullable=True) # Multi-tenant link
     owner_id = Column(String, ForeignKey('accounts_users.id')) # Maps to AccountUser
     members = Column(JSON, default=[]) # List of User IDs
     created_at = Column(DateTime, default=func.now())
@@ -499,13 +506,14 @@ class DailyProject(Base):
     __tablename__ = 'daily_projects'
     
     id = Column(String, primary_key=True) # UUID
-    organization_id = Column(String, nullable=True) # Organization Context
+    organization_id = Column(String, ForeignKey('accounts_organizations.id'), nullable=True) # Multi-tenant link
     team_id = Column(String, ForeignKey('daily_teams.id'), nullable=True) # Optional (Personal/Manager tasks might not have team?)
     name = Column(String, nullable=False)
     description = Column(Text)
     
     # Linked Resources Project (Optional integration)
     resources_project_id = Column(String, nullable=True) 
+    bim_project_id = Column(String, nullable=True) # Check if we want FK or loose link. Loose link is safer for microservices. 
     
     # Settings
     settings = Column(JSON, default={}) # { "background": "...", "features": ["chat", "kanban"] }
