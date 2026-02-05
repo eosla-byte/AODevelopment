@@ -50,6 +50,68 @@ except ImportError:
     # Fallback to direct import, relying on sys.path[0] == BASE_DIR
     import routers.auth as auth
 
+# Validates standard env vars
+if not os.getenv("CORE_DB_URL"):
+    print("⚠️  WARNING: CORE_DB_URL not set. Auth may fail.")
+
+# --- Self-Healing Schema Migration (Ops DB) ---
+def ensure_ops_schema():
+    """
+    Ensures that the Operations DB (Accounts) has the necessary columns 
+    for Project linking, specifically 'organization_id' in 'resources_projects'.
+    This is critical for the BIM <-> Accounts integration.
+    """
+    try:
+        from common.database import SessionOps
+        from sqlalchemy import text
+        print("🔧 [STARTUP] Checking Ops Database Schema...")
+        db = SessionOps()
+        try:
+            # 1. organization_id
+            try:
+                db.execute(text("ALTER TABLE resources_projects ADD COLUMN organization_id VARCHAR"))
+                print("   -> Added organization_id column")
+            except Exception as e:
+                # Ignore "duplicate/exists" errors
+                pass
+
+            # 2. project_cost
+            try:
+                db.execute(text("ALTER TABLE resources_projects ADD COLUMN project_cost FLOAT DEFAULT 0.0"))
+                print("   -> Added project_cost column")
+            except: pass
+
+            # 3. sq_meters
+            try:
+                db.execute(text("ALTER TABLE resources_projects ADD COLUMN sq_meters FLOAT DEFAULT 0.0"))
+                print("   -> Added sq_meters column")
+            except: pass
+            
+            # 4. ratio
+            try:
+                 db.execute(text("ALTER TABLE resources_projects ADD COLUMN ratio FLOAT DEFAULT 0.0"))
+                 print("   -> Added ratio column")
+            except: pass
+            
+            # 5. estimated_time
+            try:
+                db.execute(text("ALTER TABLE resources_projects ADD COLUMN estimated_time VARCHAR"))
+                print("   -> Added estimated_time column")
+            except: pass
+
+            db.commit()
+            print("✅ [STARTUP] Ops Schema Check Complete.")
+        except Exception as e:
+            print(f"❌ [STARTUP] Ops Schema Check Failed: {e}")
+            # Don't crash main app, just log
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"❌ [STARTUP] Critical Migration Error: {e}")
+
+# Run Migration
+ensure_ops_schema()
+
 app = FastAPI()
 
 app.add_middleware(
