@@ -212,70 +212,66 @@
                 </div>
             </div>
 
-            <!-- DAILY SERVICE MANAGEMENT -->
-            <div id="dailyManagementSection" class="hidden mb-8 bg-white border border-slate-200 rounded-lg p-6">
+            <!-- ORGANIZATION PROJECTS MANAGEMENT -->
+            <!-- Removed 'hidden' class to ensure visibility even if loading fails/lags -->
+            <div id="orgProjectsSection" class="mb-8 bg-white border border-slate-200 rounded-lg p-6">
                 <div class="flex justify-between items-center mb-6">
                     <div class="flex items-center">
                         <div
-                            class="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 mr-3">
+                            class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mr-3">
                             <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01">
+                                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4">
                                 </path>
                             </svg>
                         </div>
                         <div>
-                            <h3 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">AO Daily
-                                Management</h3>
-                            <p class="text-xs text-slate-500">Manage Teams and Projects for Daily Operations</p>
+                            <h3 class="text-sm font-semibold text-slate-900 uppercase tracking-wider">Project Profiles
+                            </h3>
+                            <p class="text-xs text-slate-500">Manage High-Level Project Definitions, Costs, and Metrics
+                            </p>
                         </div>
                     </div>
                     <div class="flex space-x-3">
-                        <button onclick="openCreateTeamModal()"
-                            class="px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 shadow-sm flex items-center">
-                            <svg class="w-4 h-4 mr-1 text-slate-400" fill="none" stroke="currentColor"
-                                viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z">
-                                </path>
-                            </svg>
-                            New Team
-                        </button>
                         <button onclick="openCreateProjectModal()"
-                            class="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700 shadow-sm flex items-center">
+                            class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 shadow-sm flex items-center">
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
                             </svg>
-                            New Project
+                            New Project Profile
                         </button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <!-- Teams List -->
-                    <div class="bg-slate-50 rounded-lg border border-slate-200 p-4">
-                        <h4 class="text-xs font-bold text-slate-500 mb-3 uppercase flex justify-between">
-                            Active Teams
-                            <span id="teamCountBadge"
-                                class="bg-slate-200 text-slate-600 py-0.5 px-2 rounded-full text-[10px]">0</span>
-                        </h4>
-                        <div id="dailyTeamsList" class="space-y-2 max-h-60 overflow-y-auto pr-2">
-                            <p class="text-sm text-slate-400 italic text-center py-4">Loading teams...</p>
-                        </div>
-                    </div>
-
-                    <!-- Projects List -->
-                    <div class="bg-slate-50 rounded-lg border border-slate-200 p-4">
-                        <h4 class="text-xs font-bold text-slate-500 mb-3 uppercase flex justify-between">
-                            Active Projects
-                            <span id="projectCountBadge"
-                                class="bg-slate-200 text-slate-600 py-0.5 px-2 rounded-full text-[10px]">0</span>
-                        </h4>
-                        <div id="dailyProjectsList" class="space-y-2 max-h-60 overflow-y-auto pr-2">
-                            <p class="text-sm text-slate-400 italic text-center py-4">Loading projects...</p>
-                        </div>
-                    </div>
+                <div class="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-100">
+                            <tr>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    Project Name</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    Cost ($)</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    Area (m²)</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    Ratio $/m²</th>
+                                <th
+                                    class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                                    Est. Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orgProjectsList" class="bg-white divide-y divide-slate-200">
+                            <tr>
+                                <td colspan="5" class="px-4 py-4 text-center text-sm text-slate-400 italic">Loading
+                                    projects...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -492,66 +488,51 @@
         </div>
     </div>
 
-    <!-- Modal: CREATE TEAM -->
-    <div id="createTeamModal"
-        class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
-        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50" onclick="closeCreateTeamModal()"></div>
-        <div class="bg-white w-full max-w-md mx-auto rounded-xl shadow-2xl z-50 p-6">
-            <h2 class="text-xl font-bold text-slate-800 mb-4">Create Daily Team</h2>
-            <form onsubmit="submitCreateTeam(event)">
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700">Team Name</label>
-                        <input type="text" name="name" required placeholder="e.g. Design Studio"
-                            class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500">
-                    </div>
-                </div>
-                <div class="mt-6 flex justify-end space-x-3">
-                    <button type="button" onclick="closeCreateTeamModal()"
-                        class="px-4 py-2 text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200">Cancel</button>
-                    <button type="submit"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Create Team</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal: CREATE PROJECT -->
+    <!-- Modal: CREATE PROJECT PROFILE -->
     <div id="createProjectModal"
         class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
         <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50" onclick="closeCreateProjectModal()">
         </div>
-        <div class="bg-white w-full max-w-md mx-auto rounded-xl shadow-2xl z-50 p-6">
-            <h2 class="text-xl font-bold text-slate-800 mb-4">Create Daily Project</h2>
+        <div class="bg-white w-full max-w-lg mx-auto rounded-xl shadow-2xl z-50 p-6">
+            <h2 class="text-xl font-bold text-slate-800 mb-4">Create Project Profile</h2>
             <form onsubmit="submitCreateProject(event)">
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700">Project Name</label>
-                        <input type="text" name="name" required placeholder="e.g. Website Redesign"
-                            class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <input type="text" name="name" required placeholder="e.g. Torre Reforma"
+                            class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700">Assign to Team</label>
-                        <select name="team_id" id="projectTeamSelect" required
-                            class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="">Select a team...</option>
-                        </select>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Project Cost ($)</label>
+                            <input type="number" step="0.01" name="project_cost" placeholder="0.00"
+                                class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Area (sq meters)</label>
+                            <input type="number" step="0.01" name="sq_meters" placeholder="0.00"
+                                class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700">Link to BIM Project (Optional)</label>
-                        <select name="bim_project_id" id="projectBimSelect"
-                            class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-indigo-500 focus:border-indigo-500">
-                            <option value="">-- None --</option>
-                        </select>
-                        <p class="text-xs text-slate-500 mt-1">Enables 4D scheduling and asset syncing.</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Ratio ($/m²)</label>
+                            <input type="number" step="0.01" name="ratio" placeholder="Calculated automatically..."
+                                class="mt-1 block w-full border border-slate-300 rounded-md p-2 bg-slate-100 text-slate-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700">Estimated Time</label>
+                            <input type="text" name="estimated_time" placeholder="e.g. 18 months"
+                                class="mt-1 block w-full border border-slate-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
                     </div>
+
                 </div>
                 <div class="mt-6 flex justify-end space-x-3">
                     <button type="button" onclick="closeCreateProjectModal()"
                         class="px-4 py-2 text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200">Cancel</button>
-                    <button type="submit"
-                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Create
-                        Project</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Create
+                        Profile</button>
                 </div>
             </form>
         </div>
@@ -717,151 +698,61 @@
 
         // --- Daily Management Logic ---
 
-        // Globals for cached data
-        let dailyTeams = [];
+        // --- Organization Projects Logic ---
 
-        async function loadDailyData() {
+        async function loadOrgProjects() {
             const orgIdInput = document.getElementById('currentOrgId');
-            if (!orgIdInput) return; // Not in Org Admin View
-
+            if (!orgIdInput) return;
             const orgId = orgIdInput.value;
 
-            // Check if Daily service is active roughly by checking DOM or just try fetch
-            // But we want to show/hide the section.
-            // We can check if "AODailyWork" pill exists in active services.
-            // Simplified: Fetch teams. If 403 or error, hide section.
-
             try {
-                // 1. Load Teams
-                const resTeams = await fetch(`/api/organizations/${orgId}/daily/teams`);
-                if (resTeams.ok) {
-                    dailyTeams = await resTeams.json();
-                    renderTeams(dailyTeams);
-                    document.getElementById('dailyManagementSection').classList.remove('hidden');
+                const res = await fetch(`/api/organizations/${orgId}/projects`);
+                if (res.ok) {
+                    const projects = await res.json();
+                    renderOrgProjects(projects);
+                    // document.getElementById('orgProjectsSection').classList.remove('hidden'); // Removed hidden class in HTML
                 } else {
-                    return; // Likely service not active or permission denied
+                    const tbody = document.getElementById('orgProjectsList');
+                    tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-sm text-red-500">Error loading projects. Status: ${res.status}</td></tr>`;
                 }
-
-                // 2. Load Projects
-                const resProjs = await fetch(`/api/organizations/${orgId}/daily/projects`);
-                if (resProjs.ok) {
-                    const projects = await resProjs.json();
-                    renderProjects(projects, dailyTeams);
-                }
-            } catch (e) {
-                console.error("Daily data load error", e);
-            }
+            } catch (e) { console.error(e); }
         }
 
-        function renderTeams(teams) {
-            const listFn = document.getElementById('dailyTeamsList');
-            document.getElementById('teamCountBadge').textContent = teams.length;
-
-            if (teams.length === 0) {
-                listFn.innerHTML = `<div class="text-sm text-slate-400 p-4 text-center border border-dashed border-slate-200 rounded">No teams created yet.</div>`;
-                return;
-            }
-
-            listFn.innerHTML = teams.map(t => `
-                <div class="flex items-center justify-between p-3 bg-white rounded border border-slate-100 shadow-sm hover:border-slate-300 transition">
-                    <div class="flex items-center">
-                        <div class="h-8 w-8 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs mr-3">
-                            ${t.name.substring(0, 2).toUpperCase()}
-                        </div>
-                        <span class="font-medium text-slate-700 text-sm">${t.name}</span>
-                    </div>
-                    <!-- Actions could go here -->
-                </div>
-            `).join('');
-
-            // Populate Selects
-            const projSelect = document.getElementById('projectTeamSelect');
-            if (projSelect) {
-                projSelect.innerHTML = `<option value="">Select a team...</option>` +
-                    teams.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
-            }
-        }
-
-        function renderProjects(projects, teams) {
-            const listFn = document.getElementById('dailyProjectsList');
-            document.getElementById('projectCountBadge').textContent = projects.length;
-
+        function renderOrgProjects(projects) {
+            const tbody = document.getElementById('orgProjectsList');
             if (projects.length === 0) {
-                listFn.innerHTML = `<div class="text-sm text-slate-400 p-4 text-center border border-dashed border-slate-200 rounded">No projects created yet.</div>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-sm text-slate-400 italic">No project profiles found. Create one to get started.</td></tr>`;
                 return;
             }
 
-            listFn.innerHTML = projects.map(p => {
-                const team = teams.find(t => t.id === p.team_id);
-                const teamName = team ? team.name : 'Unknown Team';
-                const hasBim = !!p.bim_project_id;
-
-                return `
-                <div class="flex items-center justify-between p-3 bg-white rounded border border-slate-100 shadow-sm hover:border-slate-300 transition">
-                    <div>
+            tbody.innerHTML = projects.map(p => `
+                <tr class="hover:bg-slate-50 transition">
+                    <td class="px-4 py-3 whitespace-nowrap">
                         <div class="flex items-center">
-                            <span class="font-medium text-slate-700 text-sm mr-2">${p.name}</span>
-                            ${hasBim ? `<span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] uppercase font-bold rounded">BIM Linked</span>` : ''}
+                            <div class="h-8 w-8 rounded bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs mr-3">
+                                ${p.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-slate-900">${p.name}</div>
+                                <div class="text-xs text-slate-500">${p.status || 'Active'}</div>
+                            </div>
                         </div>
-                        <div class="text-xs text-slate-500 flex items-center mt-1">
-                            <span class="bg-slate-100 px-1.5 rounded mr-1">${teamName}</span>
-                            <!-- <span>${p.created_at || ''}</span> -->
-                        </div>
-                    </div>
-                     <a href="https://daily.somosao.com/#/board/${p.id}" target="_blank" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Open &rarr;</a>
-                </div>
-                `;
-            }).join('');
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">$${(p.project_cost || 0).toLocaleString()}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">${(p.sq_meters || 0).toLocaleString()} m²</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">$${(p.ratio || 0).toLocaleString()} /m²</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-600">${p.estimated_time || '-'}</td>
+                </tr>
+            `).join('');
         }
 
         // Modal Handlers
-        function openCreateTeamModal() {
-            document.getElementById('createTeamModal').classList.remove('opacity-0', 'pointer-events-none');
-        }
-        function closeCreateTeamModal() {
-            document.getElementById('createTeamModal').classList.add('opacity-0', 'pointer-events-none');
-        }
-
         async function openCreateProjectModal() {
             document.getElementById('createProjectModal').classList.remove('opacity-0', 'pointer-events-none');
-
-            // Check BIM projects
-            const orgId = document.getElementById('currentOrgId').value;
-            try {
-                const res = await fetch(`/api/organizations/${orgId}/daily/bim-projects`);
-                if (res.ok) {
-                    const projects = await res.json();
-                    const select = document.getElementById('projectBimSelect');
-                    select.innerHTML = `<option value="">-- None --</option>` +
-                        projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-                }
-            } catch (e) { }
         }
 
         function closeCreateProjectModal() {
             document.getElementById('createProjectModal').classList.add('opacity-0', 'pointer-events-none');
-        }
-
-        async function submitCreateTeam(e) {
-            e.preventDefault();
-            const form = e.target;
-            const orgId = document.getElementById('currentOrgId').value;
-
-            try {
-                const res = await fetch(`/api/organizations/${orgId}/daily/teams`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: form.name.value })
-                });
-
-                if (res.ok) {
-                    closeCreateTeamModal();
-                    form.reset();
-                    loadDailyData(); // Refresh list
-                } else {
-                    alert('Error creating team');
-                }
-            } catch (e) { console.error(e); }
         }
 
         async function submitCreateProject(e) {
@@ -869,30 +760,37 @@
             const form = e.target;
             const orgId = document.getElementById('currentOrgId').value;
 
+            // Calculate Ratio if possible
+            const cost = parseFloat(form.project_cost.value) || 0;
+            const sqm = parseFloat(form.sq_meters.value) || 0;
+            const ratio = (sqm > 0) ? (cost / sqm) : 0;
+
             try {
-                const res = await fetch(`/api/organizations/${orgId}/daily/projects`, {
+                const res = await fetch(`/api/organizations/${orgId}/projects`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         name: form.name.value,
-                        team_id: form.team_id.value,
-                        bim_project_id: form.bim_project_id.value || null
+                        project_cost: cost,
+                        sq_meters: sqm,
+                        ratio: ratio,
+                        estimated_time: form.estimated_time.value
                     })
                 });
 
                 if (res.ok) {
                     closeCreateProjectModal();
                     form.reset();
-                    loadDailyData(); // Refresh list
+                    loadOrgProjects(); // Refresh list
                 } else {
-                    alert('Error creating project');
+                    alert('Error creating project profile');
                 }
             } catch (e) { console.error(e); }
         }
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            loadDailyData();
+            loadOrgProjects();
         });
 
     </script>
