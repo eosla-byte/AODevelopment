@@ -341,7 +341,50 @@ def create_org_project_endpoint(
         db.refresh(new_proj)
         
         return {"status": "success", "id": new_proj.id, "name": new_proj.name}
+
     except Exception as e:
+        error_str = str(e).lower()
+        # Check for missing column error (Postgres: "column ... does not exist", SQLite: "no such column")
+        if "column" in error_str and ("does not exist" in error_str or "no such column" in error_str):
+            print("⚠️ [LAZY MIGRATION] Detetect missing columns. Attempting to patch schema...")
+            from sqlalchemy import text
+            try:
+                # Attempt to add columns one by one (ignore errors if they exist)
+                # We use raw SQL because we are fixing the DB state at runtime
+                # Note: SQLite ALTER TABLE is limited, but adding columns is generally supported.
+                
+                # List of columns to ensure
+                migrations = [
+                    "ALTER TABLE resources_projects ADD COLUMN organization_id VARCHAR",
+                    "ALTER TABLE resources_projects ADD COLUMN project_cost FLOAT DEFAULT 0.0",
+                    "ALTER TABLE resources_projects ADD COLUMN sq_meters FLOAT DEFAULT 0.0",
+                    "ALTER TABLE resources_projects ADD COLUMN ratio FLOAT DEFAULT 0.0",
+                    "ALTER TABLE resources_projects ADD COLUMN estimated_time VARCHAR"
+                ]
+                
+                for sql in migrations:
+                    try:
+                        db.execute(text(sql))
+                        db.commit() # Commit each change
+                    except Exception as migration_err:
+                        # Ignore "duplicate column" errors
+                        print(f"Migration step ignored: {sql} | {migration_err}")
+                        db.rollback() 
+
+                # Retry insertion
+                print("✅ [LAZY MIGRATION] Schema patched. Retrying insertion...")
+                db.add(new_proj)
+                db.commit()
+                db.refresh(new_proj)
+                return {"status": "success", "id": new_proj.id, "name": new_proj.name}
+            
+            except Exception as retry_err:
+                import traceback
+                error_msg = f"MIGRATION TRIED & FAILED: {str(retry_err)} | {traceback.format_exc()}"
+                print(error_msg)
+                raise HTTPException(status_code=500, detail=error_msg)
+
+        # Standard Error Handling
         import traceback
         error_msg = f"{str(e)} | {traceback.format_exc()}"
         print(f"ERROR CREATING PROJECT: {error_msg}")
