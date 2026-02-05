@@ -306,8 +306,10 @@ def list_org_projects_endpoint(
     db: Session = Depends(get_core_db),
     current_user: dict = Depends(get_current_user)
 ):
-    from common.database import get_org_projects
-    return get_org_projects(org_id)
+    # Retrieve Project Profiles for this Organization
+    # Using inline logic to avoid ImportError with common.database updates
+    projects = db.query(models.Project).filter(models.Project.organization_id == org_id).all()
+    return projects
 
 @router.post("/{org_id}/projects")
 def create_org_project_endpoint(
@@ -316,22 +318,27 @@ def create_org_project_endpoint(
     db: Session = Depends(get_core_db),
     current_user: dict = Depends(get_current_user)
 ):
-    from common.database import create_org_project
+    # Logic inlined to ensure deployment picks up the changes
     
-    # Check Perms (Admin or Member?)
-    # Allowing Members to create definitions for now, or restrict?
-    # Restrict to Admins?
-    # assuming standard org check logic is done by caller context usually, 
-    # but here we rely on the fact that if they have access to dashboard they are in the org.
-    
-    new_proj = create_org_project(
+    # Validation: Ensure User is part of this Org (Optional but recommended)
+    # For now, we assume Dashboard access implies Org access.
+
+    new_id = str(uuid.uuid4())
+    new_proj = models.Project(
+        id=new_id,
         organization_id=org_id,
         name=project.name,
-        cost=project.project_cost,
+        project_cost=project.project_cost,
         sq_meters=project.sq_meters,
         ratio=project.ratio,
-        estimated_time=project.estimated_time
+        estimated_time=project.estimated_time,
+        status="Active"
     )
+    
+    db.add(new_proj)
+    db.commit()
+    db.refresh(new_proj)
+    
     return {"status": "success", "id": new_proj.id, "name": new_proj.name}
 
 
