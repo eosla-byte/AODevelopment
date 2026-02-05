@@ -2371,7 +2371,47 @@ def get_org_users(organization_id: str):
                     "email": m.user.email,
                     "role": m.role
                 })
-        return users
+    finally:
+        db.close()
+
+def get_user_organizations(email: str):
+    """
+    Get all organizations a user belongs to, enabling the Frontend to drop Mocks.
+    """
+    db = SessionCore()
+    try:
+        print(f"🔍 [DB] Looking for user with email: {email}")
+        # Find user by email first (Case Insensitive)
+        user = db.query(models.AccountUser).filter(models.AccountUser.email.ilike(email)).first()
+        
+        if not user:
+            print(f"❌ [DB] User not found in accounts_users for email: {email}")
+            return []
+            
+        print(f"✅ [DB] Found User: {user.id} ({user.full_name})")
+            
+        memberships = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.user_id == user.id
+        ).options(joinedload(models.OrganizationUser.organization)).all()
+        
+        print(f"🔍 [DB] Found {len(memberships)} memberships for user {user.id}")
+        
+        orgs = []
+        for m in memberships:
+            if m.organization:
+                print(f"  -> Org: {m.organization.name} (ID: {m.organization.id})")
+                orgs.append({
+                    "id": m.organization.id,
+                    "name": m.organization.name,
+                    "role": m.role
+                })
+            else:
+                print(f"  -> Warning: Membership {m.id} has no linked Organization")
+                
+        return orgs
+    except Exception as e:
+        print(f"💥 [DB] Error fetching user organizations: {e}")
+        return []
     finally:
         db.close()
 
