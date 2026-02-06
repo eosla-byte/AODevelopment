@@ -125,12 +125,15 @@ const KanbanColumn = ({ column, onTaskClick }) => {
     );
 };
 
-const KanbanBoard = ({ projectId }) => {
+const KanbanBoard = ({ projectId, onBoardLoaded }) => {
     const [board, setBoard] = useState(null);
     const [selectedTask, setSelectedTask] = useState(null);
 
     const fetchBoard = () => {
-        api.getBoard(projectId).then(setBoard);
+        api.getBoard(projectId).then(data => {
+            setBoard(data);
+            if (data && onBoardLoaded) onBoardLoaded(data);
+        });
     };
 
     useEffect(() => {

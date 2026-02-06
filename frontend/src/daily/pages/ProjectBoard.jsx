@@ -4,12 +4,13 @@ import KanbanBoard from '../components/KanbanBoard';
 
 const ProjectBoard = () => {
     const { projectId } = useParams();
+    const [projectTitle, setProjectTitle] = React.useState(null);
 
     return (
         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Project: {projectId}</h1>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>{projectTitle || `Project`} <span className='text-sm text-slate-400 font-normal'>#{projectId.slice(0, 8)}</span></h1>
                     <p style={{ color: '#64748b' }}>Task Board</p>
                 </div>
 
@@ -25,7 +26,7 @@ const ProjectBoard = () => {
             {/* View Area */}
             <div style={{ flex: 1, overflow: 'hidden' }}>
                 <div style={{ height: '100%', overflowX: 'auto' }}>
-                    <KanbanBoard projectId={projectId} />
+                    <KanbanBoard projectId={projectId} onBoardLoaded={(b) => setProjectTitle(b.name)} />
                 </div>
             </div>
         </div>

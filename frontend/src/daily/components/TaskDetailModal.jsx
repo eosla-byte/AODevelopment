@@ -12,9 +12,11 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
 
     useEffect(() => {
         // Fetch project members
-        const pathParts = window.location.pathname.split('/');
-        // URL is likely /projects/{id}/board
-        const pId = pathParts[2];
+        // Fetch project members
+        // URL is likely #/board/{id} or #/projects/{id}/board
+        const hash = window.location.hash;
+        const matches = hash.match(/\/board\/([a-zA-Z0-9-]+)/) || hash.match(/\/projects\/([a-zA-Z0-9-]+)\/board/);
+        const pId = matches ? matches[1] : null;
         if (pId) {
             api.getProjectMembers(pId).then(data => {
                 if (Array.isArray(data)) setMembers(data);
@@ -100,7 +102,8 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                 attachments: [...(prev.attachments || []), newAttach]
             }));
         } catch (e) {
-            alert("Upload failed");
+            console.error("Upload error details:", e);
+            alert("Upload failed: " + (e.message || "Unknown error"));
         }
     };
 
