@@ -629,6 +629,41 @@ def add_task_comment(
     finally:
         db.close()
         
+
+def get_user_map(user_ids: List[str]):
+    """Helper to fetch user names from Core DB"""
+    if not user_ids: return {}
+    db = database.SessionCore()
+    try:
+        users = db.query(models.User).filter(models.User.id.in_(user_ids)).all()
+        return {u.id: f"{u.first_name} {u.last_name}" for u in users}
+    except Exception:
+        return {}
+    finally:
+        db.close()
+
+@app.get("/projects/{project_id}/members")
+def get_project_members(project_id: str):
+    """Get all members associated with this project's organization/team"""
+    db = database.SessionCore()
+    try:
+        # For now, just return all users in the organization (simplified)
+        # Ideally we check Project -> Team -> Members
+        # But we might need to rely on Org context
+        
+        # 1. Get Project to find Org
+        project = db.query(models.Project).filter(models.Project.id == project_id).first()
+        if not project: return []
+        
+        # 2. Get Users in Org
+        users = db.query(models.User).filter(models.User.organization_id == project.organization_id).all()
+        return [
+            {"id": u.id, "name": f"{u.first_name} {u.last_name}", "email": u.email, "role": u.role}
+            for u in users
+        ]
+    finally:
+        db.close()
+
 @app.get("/tasks/{task_id}")
 def get_task_details(task_id: str):
     db = database.SessionOps()
@@ -639,11 +674,17 @@ def get_task_details(task_id: str):
             
         # Get Comments
         comments = db.query(DailyComment).filter(DailyComment.task_id == task_id).order_by(DailyComment.created_at.desc()).all()
+        
+        # Resolve User Names
+        user_ids = list(set([c.user_id for c in comments]))
+        user_map = get_user_map(user_ids)
+        
         formatted_comments = [
             {
                 "id": c.id,
                 "content": c.content,
                 "user_id": c.user_id,
+                "user_name": user_map.get(c.user_id, f"User {c.user_id}"),
                 "created_at": c.created_at.isoformat() if c.created_at else None
             }
             for c in comments
@@ -655,8 +696,7 @@ def get_task_details(task_id: str):
             "description": task.description,
             "priority": task.priority,
             "status": task.status,
-            "started_at": task.started_at.isoformat() if getattr(task, 'started_at', None) else None,
-            "completed_at": task.completed_at.isoformat() if getattr(task, 'completed_at', None) else None,
+            "due_date": task.due_date.isoformat() if task.due_date else None,
             "assignees": task.assignees or [],
             "attachments": task.attachments or [],
             "comments": formatted_comments

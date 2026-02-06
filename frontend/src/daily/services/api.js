@@ -93,6 +93,19 @@ export const api = {
         return await res.json();
     },
 
+    async getProjectMembers(projectId) {
+        try {
+            const res = await fetch(`${API_BASE}/projects/${projectId}/members`, {
+                headers: this.getHeaders()
+            });
+            if (!res.ok) throw new Error("Failed to fetch members");
+            return await res.json();
+        } catch (e) {
+            console.warn("Failed to fetch members", e);
+            return [];
+        }
+    },
+
     async createTask(columnId, title) {
         const res = await fetch(`${API_BASE}/tasks`, {
             method: "POST",

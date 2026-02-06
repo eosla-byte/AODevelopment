@@ -236,7 +236,7 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                                                 </div>
                                                 <div className="flex-1">
                                                     <div className="flex items-baseline gap-2">
-                                                        <span className="text-sm font-semibold text-slate-800">User {c.user_id}</span>
+                                                        <span className="text-sm font-semibold text-slate-800">{c.user_name || `User ${c.user_id}`}</span>
                                                         <span className="text-[10px] text-slate-400">{c.created_at ? new Date(c.created_at).toLocaleString() : 'Just now'}</span>
                                                     </div>
                                                     <div className="text-sm text-slate-600 mt-0.5 leading-relaxed bg-slate-50 p-2.5 rounded-r-xl rounded-bl-xl inline-block border border-slate-100">
@@ -297,24 +297,13 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                         <div className="bg-white rounded-lg border border-slate-200 shadow-sm divide-y divide-slate-100">
                             <div className="p-3">
                                 <label className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                                    <Clock size={12} /> Start Date
-                                </label>
-                                <input
-                                    type="date"
-                                    className="w-full text-sm bg-transparent border-none p-0 text-slate-700 focus:ring-0"
-                                    value={task.started_at ? task.started_at.slice(0, 10) : ""}
-                                    onChange={(e) => handleUpdate('start_date', e.target.value)}
-                                />
-                            </div>
-                            <div className="p-3">
-                                <label className="flex items-center gap-2 text-xs text-slate-500 mb-1">
                                     <CheckCircle size={12} /> Due Date
                                 </label>
                                 <input
                                     type="date"
                                     className="w-full text-sm bg-transparent border-none p-0 text-slate-700 focus:ring-0"
-                                    value={task.completed_at ? task.completed_at.slice(0, 10) : ""}
-                                    onChange={(e) => handleUpdate('end_date', e.target.value)}
+                                    value={task.due_date ? task.due_date.slice(0, 10) : ""}
+                                    onChange={(e) => handleUpdate('due_date', e.target.value)}
                                 />
                             </div>
                         </div>
@@ -326,7 +315,7 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                         <div className="flex gap-2 flex-wrap">
                             <button
                                 onClick={() => {
-                                    const me = "u1";
+                                    const me = "u1"; // fallback if no auth context
                                     const current = task.assignees || [];
                                     if (!current.includes(me)) {
                                         handleUpdate('assignees', [...current, me]);
@@ -335,12 +324,37 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                                     }
                                 }}
                                 className={`h-8 px-3 rounded-full text-xs font-bold border transition-all flex items-center gap-1 ${(task.assignees || []).includes("u1")
-                                        ? "bg-indigo-100 text-indigo-700 border-indigo-200"
-                                        : "bg-white text-slate-500 border-slate-200 hover:border-indigo-300"
+                                    ? "bg-indigo-100 text-indigo-700 border-indigo-200"
+                                    : "bg-white text-slate-500 border-slate-200 hover:border-indigo-300"
                                     }`}
                             >
                                 <User size={12} /> ME
                             </button>
+
+                            {/* Team Members */}
+                            {/* Ideally loaded from API, hardcoded demo for now if not fetched */}
+                            {members.map(m => (
+                                <button
+                                    key={m.id}
+                                    onClick={() => {
+                                        const current = task.assignees || [];
+                                        if (!current.includes(m.id)) {
+                                            handleUpdate('assignees', [...current, m.id]);
+                                        } else {
+                                            handleUpdate('assignees', current.filter(u => u !== m.id));
+                                        }
+                                    }}
+                                    className={`h-8 px-3 rounded-full text-xs font-bold border transition-all flex items-center gap-1 ${(task.assignees || []).includes(m.id)
+                                        ? "bg-blue-100 text-blue-700 border-blue-200"
+                                        : "bg-white text-slate-500 border-slate-200 hover:border-blue-300"
+                                        }`}
+                                    title={m.email}
+                                >
+                                    <span className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[8px]">{m.name.charAt(0)}</span>
+                                    {m.name.split(' ')[0]}
+                                </button>
+                            ))}
+
                             <button
                                 onClick={() => {
                                     const email = prompt("Enter email to assign:");
@@ -350,7 +364,7 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                                 }}
                                 className="w-8 h-8 rounded-full border border-dashed border-slate-300 flex items-center justify-center text-slate-400 hover:border-slate-400 hover:text-slate-600 transition-all"
                             >
-                                <User size={14} />
+                                <User size={14} /> +
                             </button>
                         </div>
                     </div>
