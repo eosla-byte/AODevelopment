@@ -62,6 +62,17 @@ def get_current_org_id(request: Request):
 def health_check():
     return {"status": "ok", "service": "AOdailyWork"}
 
+@app.get("/auth/token")
+def get_auth_token(request: Request):
+    """
+    Exposes the HTTP-Only cookie token to the Frontend application (JS)
+    so it can be passed to the BIM Iframe which cannot read the cookie directly due to partitions.
+    """
+    token = request.cookies.get("accounts_access_token")
+    if token and token.startswith("Bearer "):
+        token = token.split(" ")[1]
+    return {"token": token}
+
 def run_db_fix():
     print("🔧 [STARTUP] Checking Database Schema Constraints...")
     from sqlalchemy import text

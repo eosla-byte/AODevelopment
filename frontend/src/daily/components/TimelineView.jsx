@@ -17,6 +17,26 @@ const TimelineView = ({ projectId }) => {
     const iframeRef = useRef(null);
     const [selectedTask, setSelectedTask] = useState(null);
     const [bimUrl] = useState(getBimUrl());
+    const [authToken, setAuthToken] = useState(null);
+
+    // Fetch Auth Token for Iframe
+    useEffect(() => {
+        const fetchToken = async () => {
+            try {
+                const res = await fetch('/auth/token');
+                const data = await res.json();
+                if (data.token) {
+                    console.log("TimelineView: Token received for Iframe");
+                    setAuthToken(data.token);
+                } else {
+                    console.warn("TimelineView: No token returned from backend");
+                }
+            } catch (e) {
+                console.error("TimelineView: Failed to fetch auth token", e);
+            }
+        };
+        fetchToken();
+    }, []);
 
     // Message Listener for Iframe Communication
     useEffect(() => {
@@ -72,13 +92,17 @@ const TimelineView = ({ projectId }) => {
         }
     };
 
+    if (!authToken) {
+        return <div className="p-4 text-gray-500">Loading secure timeline...</div>;
+    }
+
     return (
         <div className="w-full h-full flex flex-col relative bg-gray-50 border rounded-lg overflow-hidden">
             {/* Iframe Container */}
             <div className="flex-1 w-full bg-white relative">
                 <iframe
                     ref={iframeRef}
-                    src={`${bimUrl}/projects/${projectId}?embedded=true`}
+                    src={`${bimUrl}/projects/${projectId}?embedded=true&token=${authToken}`}
                     title="BIM Timeline"
                     className="w-full h-full border-0"
                     sandbox="allow-scripts allow-same-origin allow-forms allow-popups" // Security hardening

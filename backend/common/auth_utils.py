@@ -73,6 +73,10 @@ async def get_current_user(
                 token = cookie_token.split(" ")[1]
             else:
                 token = cookie_token
+        
+    # 3. Fallback: Query Param (Bulletproof for Iframes where cookies are blocked)
+    if not token:
+        token = request.query_params.get("token") or request.query_params.get("access_token")
     
     if not token:
         print("DEBUG AUTH: No token found in Header OR Cookie.")
