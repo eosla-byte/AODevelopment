@@ -8,6 +8,19 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
     const [loading, setLoading] = useState(!initialTask.isNew);
     const [comment, setComment] = useState("");
     const [activeTab, setActiveTab] = useState('activity');
+    const [members, setMembers] = useState([]);
+
+    useEffect(() => {
+        // Fetch project members
+        const pathParts = window.location.pathname.split('/');
+        // URL is likely /projects/{id}/board
+        const pId = pathParts[2];
+        if (pId) {
+            api.getProjectMembers(pId).then(data => {
+                if (Array.isArray(data)) setMembers(data);
+            });
+        }
+    }, []);
 
     // Load full details ONLY if it's an existing task
     useEffect(() => {
