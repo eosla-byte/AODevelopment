@@ -76,7 +76,7 @@ def get_auth_token(request: Request):
 def run_db_fix():
     print("🔧 [STARTUP] Checking Database Schema Constraints...")
     from sqlalchemy import text
-    logger.info("🚀 [STARTUP] Daily Service Starting - Version V7.6-QueryFix")
+    print("🚀 [STARTUP] Daily Service Starting - Version V7.6-QueryFix")
     
     try:
         index_path = os.path.join(STATIC_DIR, "daily.html")
