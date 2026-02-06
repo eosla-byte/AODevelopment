@@ -2,7 +2,7 @@ import './style.css';
 
 // Client Portal Javascript with Real API Integration
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = "/api";
 
 document.addEventListener('DOMContentLoaded', () => {
     const loginSection = document.getElementById('login-section');

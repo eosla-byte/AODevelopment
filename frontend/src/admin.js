@@ -1,6 +1,6 @@
 import './style.css';
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = "/api";
 
 document.addEventListener('DOMContentLoaded', () => {
     // Ideally we check for Admin Token here, but for now we trust the "Admin" access

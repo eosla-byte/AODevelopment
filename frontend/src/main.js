@@ -315,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function fetchStats() {
   console.log("Fetching stats from backend...");
   try {
-    const response = await fetch('http://localhost:8000/api/projects/stats', {
+    const response = await fetch('/api/projects/stats', {
       method: 'GET',
       headers: {
         'Accept': 'application/json',

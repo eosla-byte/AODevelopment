@@ -1,5 +1,5 @@
 
-const API_BASE = "http://localhost:8000"; // Adjust port if needed
+const API_BASE = ""; // Relative path for production
 
 // Mock Data
 const MOCK_BOARD = {
