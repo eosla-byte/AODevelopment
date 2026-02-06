@@ -12,8 +12,12 @@ const TaskCard = ({ task, index, onClick }) => {
                     ref={provided.innerRef}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
-                    className="card group"
-                    onClick={() => onClick(task)}
+                    className="card group cursor-pointer"
+                    onClick={(e) => {
+                        if (!e.defaultPrevented) {
+                            onClick(task);
+                        }
+                    }}
                     style={{
                         marginBottom: '0.75rem',
                         userSelect: 'none',
