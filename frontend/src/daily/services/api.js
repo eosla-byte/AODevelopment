@@ -93,6 +93,16 @@ export const api = {
         return await res.json();
     },
 
+    async createTask(columnId, title) {
+        const res = await fetch(`${API_BASE}/tasks`, {
+            method: "POST",
+            headers: this.getHeaders(),
+            body: JSON.stringify({ column_id: columnId, title, priority: "Medium" })
+        });
+        if (!res.ok) throw new Error("Failed to create task");
+        return await res.json();
+    },
+
     async uploadAttachment(taskId, file) {
         const formData = new FormData();
         formData.append("file", file);

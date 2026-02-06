@@ -83,10 +83,17 @@ const KanbanColumn = ({ column, onTaskClick }) => {
         }}>
             {/* Header */}
             <div style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontWeight: 600, color: '#334155' }}>
-                    {column.title} <span style={{ color: '#94a3b8', fontSize: '0.8rem', marginLeft: '0.5rem' }}>{column.tasks.length}</span>
+                <div style={{ fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {column.title}
+                    <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{column.tasks.length}</span>
+                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded border border-purple-200" title="Deployment Version">V6.1-FullCreate</span>
                 </div>
-                <button className="btn p-1 hover:bg-white rounded"><Plus size={16} /></button>
+                <button
+                    className="btn p-1 hover:bg-white rounded"
+                    onClick={() => onTaskClick({ isNew: true, columnId: column.id })}
+                >
+                    <Plus size={16} />
+                </button>
             </div>
 
             {/* List */}
@@ -107,7 +114,10 @@ const KanbanColumn = ({ column, onTaskClick }) => {
                 </Droppable>
             </div>
             <div style={{ padding: '0.75rem' }}>
-                <button className="btn w-full flex items-center justify-center gap-2 text-gray-500 hover:bg-white hover:shadow-sm">
+                <button
+                    className="btn w-full flex items-center justify-center gap-2 text-gray-500 hover:bg-white hover:shadow-sm"
+                    onClick={() => onTaskClick({ isNew: true, columnId: column.id })}
+                >
                     <Plus size={16} /> Add Task
                 </button>
             </div>
@@ -154,6 +164,11 @@ const KanbanBoard = ({ projectId }) => {
         api.moveTask(draggableId, destCol.id, destination.index);
     };
 
+    const handleTaskClick = async (taskOrEvent) => {
+        // Just open the modal (TaskDetailModal handles creation now)
+        setSelectedTask(taskOrEvent);
+    };
+
     const handleTaskUpdate = (updatedTask) => {
         // Simple Refresh for now to unsure consistency
         fetchBoard();
@@ -167,7 +182,7 @@ const KanbanBoard = ({ projectId }) => {
             <DragDropContext onDragEnd={onDragEnd}>
                 <div style={{ display: 'flex', gap: '1.5rem', height: '100%', alignItems: 'flex-start' }}>
                     {board.columns.map(col => (
-                        <KanbanColumn key={col.id} column={col} onTaskClick={setSelectedTask} />
+                        <KanbanColumn key={col.id} column={col} onTaskClick={handleTaskClick} />
                     ))}
                 </div>
             </DragDropContext>
