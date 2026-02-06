@@ -10,11 +10,12 @@ cmds = [
     "cd frontend && rm -rf dist node_modules && npm install && npm run build || exit 1",
     "if [ ! -f frontend/dist/daily.html ]; then echo 'FATAL: daily.html MISSING from dist'; ls -R frontend/dist; exit 1; fi",
     "echo 'Build Complete. Checking files:'",
-    "ls -laR frontend/dist/",
+    "ls -R frontend/dist/",
     "mkdir -p backend/static",
     "mkdir -p backend/services/daily/static",
     "rm -rf backend/services/daily/static/*", 
     "cp -r frontend/dist/* backend/static/",
+    "cp frontend/dist/daily.html backend/static/daily.html || echo 'WARNING: Failed to cp daily.html explicitly'",
     "cp -r frontend/dist/* backend/services/daily/static/"
 ]
 
