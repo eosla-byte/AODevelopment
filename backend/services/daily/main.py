@@ -647,20 +647,54 @@ def get_project_members(project_id: str):
     """Get all members associated with this project's organization/team"""
     db = database.SessionCore()
     try:
-        # For now, just return all users in the organization (simplified)
-        # Ideally we check Project -> Team -> Members
-        # But we might need to rely on Org context
-        
-        # 1. Get Project to find Org
+        # 1. Get Project
         project = db.query(models.Project).filter(models.Project.id == project_id).first()
         if not project: return []
         
-        # 2. Get Users in Org
-        users = db.query(models.User).filter(models.User.organization_id == project.organization_id).all()
-        return [
-            {"id": u.id, "name": f"{u.first_name} {u.last_name}", "email": u.email, "role": u.role}
-            for u in users
-        ]
+        users_in_org = []
+        
+        # 2a. Try Organization ID
+        if project.organization_id:
+            users_in_org = db.query(models.User).filter(models.User.organization_id == project.organization_id).all()
+            
+        # 2b. Fallback/Supplement: Check Assigned Collaborators (JSON)
+        # assigned_collaborators is { "id": %, ... }
+        collab_users = []
+        if project.assigned_collaborators:
+            collab_ids = list(project.assigned_collaborators.keys())
+            if collab_ids:
+                # Query Collaborators table (resources_collaborators)
+                # Note: These might not be in AppUser table, or might be linked.
+                # Ideally check both User and Collaborator tables.
+                collab_records = db.query(models.Collaborator).filter(models.Collaborator.id.in_(collab_ids)).all()
+                collab_users = [
+                    {"id": c.id, "name": c.name, "email": c.email, "role": c.role} 
+                    for c in collab_records
+                ]
+
+        # Combine results
+        # Only include AppUsers (users_in_org) if they are not already in collab_users to avoid duplications?
+        # Actually, prioritize AppUsers as they can login.
+        
+        final_members = []
+        seen_ids = set()
+        
+        # Add Org Users first
+        for u in users_in_org:
+            if u.id not in seen_ids:
+                final_members.append({"id": u.id, "name": f"{u.first_name} {u.last_name}", "email": u.email, "role": u.role})
+                seen_ids.add(u.id)
+                
+        # Add Collaborators next
+        for c in collab_users:
+            if c["id"] not in seen_ids:
+                final_members.append(c)
+                seen_ids.add(c["id"])
+                
+        return final_members
+    except Exception as e:
+        print(f"Error fetching members: {e}")
+        return []
     finally:
         db.close()
 
@@ -720,7 +754,9 @@ async def upload_task_attachment(
             raise HTTPException(status_code=404, detail="Task not found")
             
         # Save File
-        UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
+        # Ensure absolute path to avoid CWD issues
+        abs_static = os.path.abspath(STATIC_DIR)
+        UPLOAD_DIR = os.path.join(abs_static, "uploads")
         os.makedirs(UPLOAD_DIR, exist_ok=True)
         
         file_id = str(uuid.uuid4())

@@ -632,3 +632,7 @@ class DailyMessage(Base):
     channel = relationship("DailyChannel", back_populates="messages")
 
 
+
+# Alias for backwards compatibility or cleaner optional references
+# If 'User' is referenced in main.py, it likely expects AppUser
+User = AppUser
