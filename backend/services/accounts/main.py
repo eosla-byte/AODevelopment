@@ -194,7 +194,7 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             key="accounts_access_token", 
             value=f"Bearer {access_token}", 
             httponly=True,
-            httponly=True,
+
             samesite="none",
             secure=True, # Required for SameSite=None
             domain=".somosao.com" # Allow sharing with *.somosao.com
