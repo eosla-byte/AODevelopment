@@ -139,6 +139,7 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 @app.on_event("startup")
 def ensure_schema_updates():
     print(">>> Startup: Checking BIM Schema...")
+    print("🚀 [STARTUP] Auth Patch Applied - Force Redeploy V2")
     try:
         # Use SessionExt to get engine
         db = SessionExt()
