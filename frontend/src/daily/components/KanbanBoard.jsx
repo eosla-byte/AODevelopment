@@ -86,7 +86,7 @@ const KanbanColumn = ({ column, onTaskClick }) => {
                 <div style={{ fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {column.title}
                     <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>{column.tasks.length}</span>
-                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded border border-purple-200" title="Deployment Version">V7.2-Assign</span>
+                    <span className="text-[10px] bg-purple-100 text-purple-700 px-1 rounded border border-purple-200" title="Deployment Version">V7.2-Assign-Retry</span>
                 </div>
                 <button
                     className="btn p-1 hover:bg-white rounded"
