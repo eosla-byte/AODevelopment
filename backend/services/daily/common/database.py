@@ -2217,7 +2217,10 @@ def get_daily_project_board(project_id: str):
     try:
         # Load Project + Columns + Tasks (lightweight)
         proj = db.query(models.DailyProject).filter(models.DailyProject.id == project_id).options(
-            joinedload(models.DailyProject.columns).joinedload(models.DailyColumn.tasks)
+            joinedload(models.DailyProject.columns)
+            .joinedload(models.DailyColumn.tasks)
+            .joinedload(models.DailyTask.comments)
+            .joinedload(models.DailyTask.attachments)
         ).first()
         return proj
     finally:
