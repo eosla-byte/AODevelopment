@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { api } from '../services/api';
-import { Plus, MoreHorizontal } from 'lucide-react';
+import { Plus, MoreHorizontal, MessageSquare, Paperclip } from 'lucide-react';
+import TaskDetailModal from './TaskDetailModal';
 
-const TaskCard = ({ task, index }) => {
+const TaskCard = ({ task, index, onClick }) => {
     return (
         <Draggable draggableId={task.id} index={index}>
             {(provided, snapshot) => (
@@ -11,7 +12,8 @@ const TaskCard = ({ task, index }) => {
                     ref={provided.innerRef}
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
-                    className="card"
+                    className="card group"
+                    onClick={() => onClick(task)}
                     style={{
                         marginBottom: '0.75rem',
                         userSelect: 'none',
@@ -27,14 +29,35 @@ const TaskCard = ({ task, index }) => {
                             background: task.priority === 'Urgent' ? '#fee2e2' : '#f1f5f9',
                             color: task.priority === 'Urgent' ? '#ef4444' : '#64748b'
                         }}>
-                            {task.priority}
+                            {task.priority || 'Medium'}
                         </span>
                         <MoreHorizontal size={14} color="#94a3b8" />
                     </div>
-                    <div style={{ fontWeight: 500, fontSize: '0.95rem', marginBottom: '0.75rem' }}>{task.title}</div>
+                    <div style={{ fontWeight: 500, fontSize: '0.95rem', marginBottom: '0.75rem', color: '#1e293b' }}>
+                        {task.title}
+                    </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: '#cbd5e1', border: '2px solid white' }}></div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        {/* Indicators */}
+                        <div className="flex gap-2 text-gray-400">
+                            {(task.comment_count > 0 || task.comments?.length > 0) && (
+                                <div className="flex items-center gap-1 text-[10px]">
+                                    <MessageSquare size={12} /> {task.comment_count || task.comments?.length}
+                                </div>
+                            )}
+                            {(task.attachment_count > 0 || task.attachments?.length > 0) && (
+                                <div className="flex items-center gap-1 text-[10px]">
+                                    <Paperclip size={12} /> {task.attachment_count || task.attachments?.length}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Assignees (Placeholder) */}
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', marginLeft: 'auto' }}>
+                            <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold border-2 border-white">
+                                {(task.assignees?.[0] || "U").charAt(0).toUpperCase()}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -42,7 +65,7 @@ const TaskCard = ({ task, index }) => {
     );
 };
 
-const KanbanColumn = ({ column }) => {
+const KanbanColumn = ({ column, onTaskClick }) => {
     return (
         <div style={{
             background: '#f8fafc',
@@ -59,7 +82,7 @@ const KanbanColumn = ({ column }) => {
                 <div style={{ fontWeight: 600, color: '#334155' }}>
                     {column.title} <span style={{ color: '#94a3b8', fontSize: '0.8rem', marginLeft: '0.5rem' }}>{column.tasks.length}</span>
                 </div>
-                <button className="btn" style={{ padding: '0.25rem' }}><Plus size={16} /></button>
+                <button className="btn p-1 hover:bg-white rounded"><Plus size={16} /></button>
             </div>
 
             {/* List */}
@@ -72,7 +95,7 @@ const KanbanColumn = ({ column }) => {
                             style={{ minHeight: '100px', background: snapshot.isDraggingOver ? '#f1f5f9' : 'transparent', borderRadius: '0.5rem' }}
                         >
                             {column.tasks.map((task, index) => (
-                                <TaskCard key={task.id} task={task} index={index} />
+                                <TaskCard key={task.id} task={task} index={index} onClick={onTaskClick} />
                             ))}
                             {provided.placeholder}
                         </div>
@@ -80,7 +103,7 @@ const KanbanColumn = ({ column }) => {
                 </Droppable>
             </div>
             <div style={{ padding: '0.75rem' }}>
-                <button className="btn" style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', justifyContent: 'center' }}>
+                <button className="btn w-full flex items-center justify-center gap-2 text-gray-500 hover:bg-white hover:shadow-sm">
                     <Plus size={16} /> Add Task
                 </button>
             </div>
@@ -90,9 +113,14 @@ const KanbanColumn = ({ column }) => {
 
 const KanbanBoard = ({ projectId }) => {
     const [board, setBoard] = useState(null);
+    const [selectedTask, setSelectedTask] = useState(null);
+
+    const fetchBoard = () => {
+        api.getBoard(projectId).then(setBoard);
+    };
 
     useEffect(() => {
-        api.getBoard(projectId).then(setBoard);
+        fetchBoard();
     }, [projectId]);
 
     const onDragEnd = (result) => {
@@ -122,16 +150,33 @@ const KanbanBoard = ({ projectId }) => {
         api.moveTask(draggableId, destCol.id, destination.index);
     };
 
+    const handleTaskUpdate = (updatedTask) => {
+        // Simple Refresh for now to unsure consistency
+        fetchBoard();
+        // Or Optimistic update locally if needed
+    };
+
     if (!board) return <div>Loading Board...</div>;
 
     return (
-        <DragDropContext onDragEnd={onDragEnd}>
-            <div style={{ display: 'flex', gap: '1.5rem', height: '100%', alignItems: 'flex-start' }}>
-                {board.columns.map(col => (
-                    <KanbanColumn key={col.id} column={col} />
-                ))}
-            </div>
-        </DragDropContext>
+        <>
+            <DragDropContext onDragEnd={onDragEnd}>
+                <div style={{ display: 'flex', gap: '1.5rem', height: '100%', alignItems: 'flex-start' }}>
+                    {board.columns.map(col => (
+                        <KanbanColumn key={col.id} column={col} onTaskClick={setSelectedTask} />
+                    ))}
+                </div>
+            </DragDropContext>
+
+            {/* Modal */}
+            {selectedTask && (
+                <TaskDetailModal
+                    task={selectedTask}
+                    onClose={() => setSelectedTask(null)}
+                    onUpdate={handleTaskUpdate}
+                />
+            )}
+        </>
     );
 };
 

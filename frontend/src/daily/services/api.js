@@ -63,5 +63,50 @@ export const api = {
         } catch (e) {
             console.error(e);
         }
+    },
+
+    async getTask(taskId) {
+        const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
+            headers: this.getHeaders()
+        });
+        if (!res.ok) throw new Error("Failed to fetch task");
+        return await res.json();
+    },
+
+    async updateTask(taskId, updates) {
+        const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
+            method: "PATCH",
+            headers: this.getHeaders(),
+            body: JSON.stringify(updates)
+        });
+        if (!res.ok) throw new Error("Failed to update task");
+        return await res.json();
+    },
+
+    async addComment(taskId, content) {
+        const res = await fetch(`${API_BASE}/tasks/${taskId}/comments`, {
+            method: "POST",
+            headers: this.getHeaders(),
+            body: JSON.stringify({ content })
+        });
+        if (!res.ok) throw new Error("Failed to add comment");
+        return await res.json();
+    },
+
+    async uploadAttachment(taskId, file) {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        // Note: Do NOT set Content-Type header for FormData, browser does it with boundary
+        const headers = this.getHeaders();
+        delete headers["Content-Type"];
+
+        const res = await fetch(`${API_BASE}/tasks/${taskId}/attachments`, {
+            method: "POST",
+            headers: headers,
+            body: formData
+        });
+        if (!res.ok) throw new Error("Failed to upload attachment");
+        return await res.json();
     }
 };

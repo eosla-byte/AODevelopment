@@ -161,6 +161,24 @@ def run_db_fix():
                     actions.append("Added thread_root_id to daily_messages")
                     db.commit()
 
+                # [NEW] Check started_at in daily_tasks
+                try:
+                    db.execute(text("SELECT started_at FROM daily_tasks LIMIT 1"))
+                except Exception:
+                    db.rollback()
+                    db.execute(text("ALTER TABLE daily_tasks ADD COLUMN IF NOT EXISTS started_at TIMESTAMP"))
+                    actions.append("Added started_at to daily_tasks")
+                    db.commit()
+
+                # [NEW] Check completed_at in daily_tasks
+                try:
+                    db.execute(text("SELECT completed_at FROM daily_tasks LIMIT 1"))
+                except Exception:
+                    db.rollback()
+                    db.execute(text("ALTER TABLE daily_tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP"))
+                    actions.append("Added completed_at to daily_tasks")
+                    db.commit()
+
             except Exception as e:
                 print(f"⚠️ [SCHEMA FIX] Chat Schema Warning: {e}")
                 db.rollback()
@@ -427,7 +445,9 @@ def get_project_board_view(project_id: str):
                         "id": t.id,
                         "title": t.title,
                         "priority": t.priority,
-                        "assignees": t.assignees
+                        "assignees": t.assignees,
+                        "comment_count": len(t.comments or []),
+                        "attachment_count": len(t.attachments or [])
                     }
                     for t in c.tasks
                 ]
@@ -524,10 +544,193 @@ def get_my_tasks(user_id: str = Depends(get_current_user_id)):
             "status": t.status,
             "project_id": t.project_id # Frontend can fetch Project Name if needed
         }
-        for t in tasks
     ]
 
-# --- ADVANCED CHAT (Inline Safe) ---
+@app.patch("/tasks/{task_id}")
+def update_task_details(
+    task_id: str,
+    title: Optional[str] = Body(None),
+    description: Optional[str] = Body(None),
+    priority: Optional[str] = Body(None),
+    status: Optional[str] = Body(None),
+    start_date: Optional[str] = Body(None), # ISO Format
+    end_date: Optional[str] = Body(None),   # ISO Format
+    assignees: Optional[List[str]] = Body(None),
+    user_id: str = Depends(get_current_user_id)
+):
+    import datetime
+    db = database.SessionOps()
+    try:
+        task = db.query(DailyTask).filter(DailyTask.id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+            
+        if title is not None: task.title = title
+        if description is not None: task.description = description
+        if priority is not None: task.priority = priority
+        if status is not None: task.status = status
+        
+        # Date Handling
+        if start_date is not None:
+             # Expect simplified ISO or just date
+             try:
+                 # Check if empty string to clear
+                 if start_date == "":
+                     task.started_at = None
+                 else:
+                     task.started_at = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+             except ValueError:
+                 pass # Ignore bad dates for now
+                 
+        if end_date is not None:
+             try:
+                 if end_date == "":
+                     task.completed_at = None
+                 else:
+                     task.completed_at = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+             except ValueError:
+                 pass
+
+        if assignees is not None: task.assignees = assignees
+        
+        task.updated_at = datetime.datetime.now()
+        db.commit()
+        
+        # Return updated task POJO
+        return {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "priority": task.priority,
+            "status": task.status,
+            "started_at": task.started_at.isoformat() if task.started_at else None,
+            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            "assignees": task.assignees or []
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.post("/tasks/{task_id}/comments")
+def add_task_comment(
+    task_id: str,
+    content: str = Body(..., embed=True),
+    user_id: str = Depends(get_current_user_id)
+):
+    db = database.SessionOps()
+    try:
+        # Verify task exists
+        task = db.query(DailyTask).filter(DailyTask.id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+            
+        comment = DailyComment(
+            task_id=task_id,
+            user_id=user_id,
+            content=content
+        )
+        db.add(comment)
+        db.commit()
+        return {
+            "id": comment.id,
+            "content": comment.content,
+            "user_id": comment.user_id,
+            "created_at": comment.created_at.isoformat() if comment.created_at else None
+        }
+    finally:
+        db.close()
+        
+@app.get("/tasks/{task_id}")
+def get_task_details(task_id: str):
+    db = database.SessionOps()
+    try:
+        task = db.query(DailyTask).filter(DailyTask.id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+            
+        # Get Comments
+        comments = db.query(DailyComment).filter(DailyComment.task_id == task_id).order_by(DailyComment.created_at.desc()).all()
+        formatted_comments = [
+            {
+                "id": c.id,
+                "content": c.content,
+                "user_id": c.user_id,
+                "created_at": c.created_at.isoformat() if c.created_at else None
+            }
+            for c in comments
+        ]
+        
+        return {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "priority": task.priority,
+            "status": task.status,
+            "started_at": task.started_at.isoformat() if getattr(task, 'started_at', None) else None,
+            "completed_at": task.completed_at.isoformat() if getattr(task, 'completed_at', None) else None,
+            "assignees": task.assignees or [],
+            "attachments": task.attachments or [],
+            "comments": formatted_comments
+        }
+    finally:
+        db.close()
+
+@app.post("/tasks/{task_id}/attachments")
+async def upload_task_attachment(
+    task_id: str,
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_id)
+):
+    import shutil
+    import os
+    
+    db = database.SessionOps()
+    try:
+        task = db.query(DailyTask).filter(DailyTask.id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+            
+        # Save File
+        UPLOAD_DIR = "backend/services/daily/static/uploads"
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        
+        file_id = str(uuid.uuid4())
+        ext = file.filename.split('.')[-1]
+        safe_name = f"{file_id}.{ext}"
+        file_path = os.path.join(UPLOAD_DIR, safe_name)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        new_attachment = {
+            "name": file.filename,
+            "url": f"/static/uploads/{safe_name}",
+            "type": file.content_type,
+            "uploaded_by": user_id,
+            "uploaded_at": str(datetime.datetime.now())
+        }
+        
+        # Update Task Attachments
+        current_attachments = task.attachments or []
+        # Ensure it's a list (sometimes JSON defaults behave oddly in different DBs)
+        if not isinstance(current_attachments, list):
+            current_attachments = []
+            
+        current_attachments.append(new_attachment)
+        
+        # Re-assign to force detection of change
+        task.attachments = list(current_attachments) 
+        db.add(task) # Ensure dirty state
+        db.commit()
+        
+        return new_attachment
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 def get_project_channels_safe(project_id: str):
     import types
