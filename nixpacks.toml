@@ -1,9 +1,19 @@
 [phases.setup]
-nixPkgs = ["python3", "postgresql"]
+nixPkgs = ["python3", "postgresql", "nodejs_20"]
 aptPkgs = ["openjdk-17-jdk-headless"]
 
 [phases.build]
-cmds = ["pip install -r backend/requirements.txt"]
+cmds = [
+    "pip install -r backend/requirements.txt",
+    "cd frontend && npm install && npm run build",
+    "mkdir -p backend/static",
+    "mkdir -p backend/services/daily/static",
+    "cp -r frontend/dist/* backend/static/",
+    "cp -r frontend/dist/* backend/services/daily/static/"
+]
 
 [start]
+# Try to detect which service to start or default to backend/main.py. 
+# But if Daily is the target, the User might have overridden this in Railway settings. 
+# We keep the default command safe, assuming Railway overrides it for Daily if needed.
 cmd = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
