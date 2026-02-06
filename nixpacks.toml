@@ -8,6 +8,7 @@ cmds = [
     "echo 'Check vite.config.js BEFORE build:'",
     "cat frontend/vite.config.js",
     "cd frontend && rm -rf dist node_modules && npm install && npm run build || exit 1",
+    "if [ ! -f frontend/dist/daily.html ]; then echo 'FATAL: daily.html MISSING from dist'; ls -R frontend/dist; exit 1; fi",
     "echo 'Build Complete. Checking files:'",
     "ls -laR frontend/dist/",
     "mkdir -p backend/static",
