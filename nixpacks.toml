@@ -7,7 +7,7 @@ cmds = [
     "pip install -r backend/requirements.txt",
     "echo 'Check vite.config.js BEFORE build:'",
     "cat frontend/vite.config.js",
-    "cd frontend && rm -rf dist node_modules && npm install && npm run build",
+    "cd frontend && rm -rf dist node_modules && npm install && npm run build || exit 1",
     "echo 'Build Complete. Checking files:'",
     "ls -laR frontend/dist/",
     "mkdir -p backend/static",

@@ -13,15 +13,15 @@ export default defineConfig({
     plugins: [react()],
     build: {
         logLevel: 'info',
-        rollupOptions: {
-            input: {
-                daily: 'daily.html',
-            },
-            output: {
-                entryFileNames: `assets/[name]-[hash]-v4.js`,
-                chunkFileNames: `assets/[name]-[hash]-v4.js`,
-                assetFileNames: `assets/[name]-[hash]-v4.[ext]`
-            }
+        input: {
+            main: resolve(__dirname, 'index.html'),
+            daily: resolve(__dirname, 'daily.html'),
         },
+        output: {
+            entryFileNames: `assets/[name]-[hash]-v4.js`,
+            chunkFileNames: `assets/[name]-[hash]-v4.js`,
+            assetFileNames: `assets/[name]-[hash]-v4.[ext]`
+        }
     },
+},
 })
