@@ -2220,7 +2220,6 @@ def get_daily_project_board(project_id: str):
             joinedload(models.DailyProject.columns)
             .joinedload(models.DailyColumn.tasks)
             .joinedload(models.DailyTask.comments)
-            .joinedload(models.DailyTask.attachments)
         ).first()
         return proj
     finally:
