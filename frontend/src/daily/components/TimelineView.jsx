@@ -14,6 +14,7 @@ const getBimUrl = () => {
 };
 
 const TimelineView = ({ projectId }) => {
+    // V4 DEBUG MARKER
     const iframeRef = useRef(null);
     const [selectedTask, setSelectedTask] = useState(null);
     const [bimUrl] = useState(getBimUrl());

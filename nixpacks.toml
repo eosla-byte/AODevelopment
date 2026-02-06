@@ -5,10 +5,11 @@ aptPkgs = ["openjdk-17-jdk-headless"]
 [phases.build]
 cmds = [
     "pip install -r backend/requirements.txt",
-    "cd frontend && npm install && npm run build",
+    "echo 'Check vite.config.js BEFORE build:'",
+    "cat frontend/vite.config.js",
+    "cd frontend && rm -rf dist node_modules && npm install && npm run build",
     "echo 'Build Complete. Checking files:'",
     "ls -la frontend/dist/assets/",
-    "cat frontend/vite.config.js",
     "mkdir -p backend/static",
     "mkdir -p backend/services/daily/static",
     "rm -rf backend/services/daily/static/*", 
