@@ -17,7 +17,8 @@ cmds = [
     "rm -rf backend/services/daily/static/*", 
     "cp -r frontend/dist/* backend/static/",
     "cp frontend/dist/daily.html backend/static/daily.html || echo 'WARNING: Failed to cp daily.html explicitly'",
-    "cp -r frontend/dist/* backend/services/daily/static/"
+    "cp -r frontend/dist/* backend/services/daily/static/",
+    "if [ ! -f backend/services/daily/static/daily.html ]; then echo 'FATAL: COPY FAILED - daily.html missing in destination'; exit 1; fi"
 ]
 
 [start]
