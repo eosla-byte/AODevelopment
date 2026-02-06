@@ -76,7 +76,7 @@ def get_auth_token(request: Request):
 def run_db_fix():
     print("🔧 [STARTUP] Checking Database Schema Constraints...")
     from sqlalchemy import text
-    print("🚀 [STARTUP] Daily Service Starting - Version V3_STATIC_DEBUG_FIX")
+    print("🚀 [STARTUP] Daily Service Starting - Version V5_KANBAN_FORCED")
     
     try:
         index_path = os.path.join(STATIC_DIR, "daily.html")
@@ -195,7 +195,7 @@ def run_db_fix():
 
 @app.on_event("startup")
 def startup_event():
-    print("🚀 [STARTUP] Daily Service Starting - Version POJO_FIX_V2")
+    print("🚀 [STARTUP] Daily Service Starting - Version V5_KANBAN_FORCED")
     run_db_fix()
 
 @app.get("/fix-db")
