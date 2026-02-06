@@ -720,7 +720,7 @@ async def upload_task_attachment(
             raise HTTPException(status_code=404, detail="Task not found")
             
         # Save File
-        UPLOAD_DIR = "backend/services/daily/static/uploads"
+        UPLOAD_DIR = os.path.join(STATIC_DIR, "uploads")
         os.makedirs(UPLOAD_DIR, exist_ok=True)
         
         file_id = str(uuid.uuid4())
