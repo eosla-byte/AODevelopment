@@ -15,8 +15,8 @@ export default defineConfig({
         logLevel: 'info',
         rollupOptions: {
             input: {
-                main: resolve(__dirname, 'index.html'),
-                daily: resolve(__dirname, 'daily.html'),
+                main: 'index.html',
+                daily: 'daily.html',
             },
             output: {
                 entryFileNames: `assets/[name]-[hash]-v4.js`,
