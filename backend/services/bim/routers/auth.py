@@ -89,7 +89,7 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
             key="accounts_access_token", 
             value=f"Bearer {access_token}", 
             httponly=True,
-            httponly=True,
+
             samesite="none",
             domain=".somosao.com",
             secure=True # Required for SameSite=None
