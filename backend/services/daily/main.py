@@ -78,13 +78,16 @@ def run_db_fix():
     from sqlalchemy import text
     print("🚀 [STARTUP] Daily Service Starting - Version V3_STATIC_DEBUG_FIX")
     
-    # DEBUG: Check daily.html content
     try:
         index_path = os.path.join(STATIC_DIR, "daily.html")
         if os.path.exists(index_path):
              with open(index_path, "r") as f:
-                 content = f.read(200)
-                 print(f"🔍 [DEBUG] daily.html start: {content}")
+                 content = f.read()
+                 print(f"🔍 [DEBUG] daily.html loaded. Length: {len(content)}")
+                 # Extract script src
+                 import re
+                 scripts = re.findall(r'src="([^"]+)"', content)
+                 print(f"🔍 [DEBUG] daily.html SCRIPTS: {scripts}")
         else:
             print("⚠️ [DEBUG] daily.html NOT FOUND during startup")
     except Exception as e:
@@ -714,7 +717,11 @@ async def serve_root():
             "static_dir_contents": os.listdir(STATIC_DIR) if os.path.exists(STATIC_DIR) else "STATIC_DIR missing"
         }, status_code=404)
         
-    return FileResponse(index_path)
+    response = FileResponse(index_path)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.get("/{full_path:path}")
 async def catch_all(full_path: str):

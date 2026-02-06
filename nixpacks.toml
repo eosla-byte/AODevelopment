@@ -6,6 +6,8 @@ aptPkgs = ["openjdk-17-jdk-headless"]
 cmds = [
     "pip install -r backend/requirements.txt",
     "cd frontend && npm install && npm run build",
+    "echo 'Build Complete. Checking files:'",
+    "ls -la frontend/dist/assets/",
     "mkdir -p backend/static",
     "mkdir -p backend/services/daily/static",
     "rm -rf backend/services/daily/static/*", 
