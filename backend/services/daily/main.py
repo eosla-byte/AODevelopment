@@ -553,8 +553,7 @@ def update_task_details(
     description: Optional[str] = Body(None),
     priority: Optional[str] = Body(None),
     status: Optional[str] = Body(None),
-    start_date: Optional[str] = Body(None), # ISO Format
-    end_date: Optional[str] = Body(None),   # ISO Format
+    due_date: Optional[str] = Body(None),   # ISO Format
     assignees: Optional[List[str]] = Body(None),
     user_id: str = Depends(get_current_user_id)
 ):
@@ -570,26 +569,15 @@ def update_task_details(
         if priority is not None: task.priority = priority
         if status is not None: task.status = status
         
-        # Date Handling
-        if start_date is not None:
-             # Expect simplified ISO or just date
+        # Date Handling: due_date
+        if due_date is not None:
              try:
-                 # Check if empty string to clear
-                 if start_date == "":
-                     task.started_at = None
+                 if due_date == "":
+                     task.due_date = None
                  else:
-                     task.started_at = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+                     task.due_date = datetime.datetime.fromisoformat(due_date.replace("Z", "+00:00"))
              except ValueError:
-                 pass # Ignore bad dates for now
-                 
-        if end_date is not None:
-             try:
-                 if end_date == "":
-                     task.completed_at = None
-                 else:
-                     task.completed_at = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
-             except ValueError:
-                 pass
+                 pass 
 
         if assignees is not None: task.assignees = assignees
         
@@ -603,8 +591,7 @@ def update_task_details(
             "description": task.description,
             "priority": task.priority,
             "status": task.status,
-            "started_at": task.started_at.isoformat() if task.started_at else None,
-            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            "due_date": task.due_date.isoformat() if task.due_date else None,
             "assignees": task.assignees or []
         }
     except Exception as e:
