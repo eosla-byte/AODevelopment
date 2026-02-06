@@ -8,6 +8,7 @@ cmds = [
     "cd frontend && npm install && npm run build",
     "mkdir -p backend/static",
     "mkdir -p backend/services/daily/static",
+    "rm -rf backend/services/daily/static/*", 
     "cp -r frontend/dist/* backend/static/",
     "cp -r frontend/dist/* backend/services/daily/static/"
 ]

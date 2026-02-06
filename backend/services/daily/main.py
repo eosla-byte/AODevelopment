@@ -65,6 +65,20 @@ def health_check():
 def run_db_fix():
     print("🔧 [STARTUP] Checking Database Schema Constraints...")
     from sqlalchemy import text
+    print("🚀 [STARTUP] Daily Service Starting - Version V3_STATIC_DEBUG_FIX")
+    
+    # DEBUG: Check daily.html content
+    try:
+        index_path = os.path.join(STATIC_DIR, "daily.html")
+        if os.path.exists(index_path):
+             with open(index_path, "r") as f:
+                 content = f.read(200)
+                 print(f"🔍 [DEBUG] daily.html start: {content}")
+        else:
+            print("⚠️ [DEBUG] daily.html NOT FOUND during startup")
+    except Exception as e:
+        print(f"⚠️ [DEBUG] Error reading daily.html: {e}")
+
     try:
         db = database.SessionOps()
         # 1. Drop Invalid Constraints
