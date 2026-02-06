@@ -11,6 +11,11 @@ export default defineConfig({
             input: {
                 daily: resolve(__dirname, 'daily.html'),
             },
+            output: {
+                entryFileNames: `assets/[name]-[hash]-v3.js`,
+                chunkFileNames: `assets/[name]-[hash]-v3.js`,
+                assetFileNames: `assets/[name]-[hash]-v3.[ext]`
+            }
         },
     },
 })
