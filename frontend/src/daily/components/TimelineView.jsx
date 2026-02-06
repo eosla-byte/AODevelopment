@@ -25,11 +25,12 @@ const TimelineView = ({ projectId }) => {
             try {
                 const res = await fetch('/auth/token');
                 const data = await res.json();
+                console.log("🔍 [TIMELINE DEBUG] Token Fetch Response:", data);
                 if (data.token) {
-                    console.log("TimelineView: Token received for Iframe");
+                    console.log("✅ [TIMELINE DEBUG] Token received:", data.token.substring(0, 10) + "...");
                     setAuthToken(data.token);
                 } else {
-                    console.warn("TimelineView: No token returned from backend");
+                    console.error("❌ [TIMELINE DEBUG] No token returned from /auth/token endpoint!");
                 }
             } catch (e) {
                 console.error("TimelineView: Failed to fetch auth token", e);

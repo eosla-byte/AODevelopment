@@ -66,9 +66,7 @@ async def get_current_user(
     # 1. Try Token from Header (OAuth2PasswordBearer) -> 2. If missing, Try Cookie
     if not token:
         cookie_token = request.cookies.get("accounts_access_token")
-        # print(f"DEBUG AUTH: Cookie Token Found: {True if cookie_token else False}")
         if cookie_token:
-            # Handle "Bearer <token>" or just "<token>"
             if cookie_token.startswith("Bearer "):
                 token = cookie_token.split(" ")[1]
             else:
@@ -77,15 +75,20 @@ async def get_current_user(
     # 3. Fallback: Query Param (Bulletproof for Iframes where cookies are blocked)
     if not token:
         token = request.query_params.get("token") or request.query_params.get("access_token")
-    
+        if token:
+            print("🔍 [DEBUG AUTH] Token found in Query Params!")
+        else:
+            print(f"⚠️ [DEBUG AUTH] No token in params. Params: {request.query_params}")
+
     if not token:
-        print("DEBUG AUTH: No token found in Header OR Cookie.")
+        print("❌ [DEBUG AUTH] FAILED: No token found in Header, Cookie, OR Query Params.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated (No Header or Cookie)",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    print(f"✅ [DEBUG AUTH] Token Found. Decoding...")
     payload = decode_access_token(token)
     if payload is None:
         print("DEBUG AUTH: Token decode failed (Invalid or Expired).")

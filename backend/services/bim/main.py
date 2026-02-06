@@ -122,6 +122,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"🔍 [BIM REQUEST] {request.method} {request.url}")
+    response = await call_next(request)
+    return response
+
 static_dir = os.path.join(BASE_DIR, "static")
 if not os.path.exists(static_dir):
     os.makedirs(static_dir)
