@@ -517,10 +517,10 @@ def create_task(
     # Logic in database.create_daily_task handles None.
     task = database.create_daily_task(project_id, column_id, title, user_id, priority=priority)
     
-    # Notify AOdev
-    aodev.send_event("TASK_CREATED", {"id": task.id, "title": task.title, "user": user_id})
+    # Notify AOdev (task is now a dict)
+    aodev.send_event("TASK_CREATED", {"id": task["id"], "title": task["title"], "user": user_id})
     
-    return {"id": task.id, "title": task.title}
+    return {"id": task["id"], "title": task["title"]}
 
 @app.put("/tasks/{task_id}/move")
 def move_task(

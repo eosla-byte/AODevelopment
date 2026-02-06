@@ -2244,7 +2244,20 @@ def create_daily_task(project_id: str, column_id: str, title: str, user_id: str,
         )
         db.add(task)
         db.commit()
-        return task
+        db.refresh(task)
+        # Convert to dict to avoid DetachedInstanceError completely in main.py
+        task_dict = {
+            "id": task.id,
+            "title": task.title,
+            "priority": task.priority,
+            "status": task.status,
+            "created_by": task.created_by,
+            "assignees": task.assignees,
+            "start_date": task.due_date, # approximate mapping
+            "column_id": task.column_id,
+            "project_id": task.project_id
+        }
+        return task_dict
     finally:
         db.close()
 
