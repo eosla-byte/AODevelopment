@@ -12,9 +12,10 @@ const __dirname = dirname(__filename)
 export default defineConfig({
     plugins: [react()],
     build: {
+        logLevel: 'info',
         rollupOptions: {
             input: {
-                daily: resolve(__dirname, 'daily.html'),
+                daily: 'daily.html',
             },
             output: {
                 entryFileNames: `assets/[name]-[hash]-v4.js`,

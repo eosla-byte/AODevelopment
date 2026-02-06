@@ -9,7 +9,7 @@ cmds = [
     "cat frontend/vite.config.js",
     "cd frontend && rm -rf dist node_modules && npm install && npm run build",
     "echo 'Build Complete. Checking files:'",
-    "ls -la frontend/dist/assets/",
+    "ls -laR frontend/dist/",
     "mkdir -p backend/static",
     "mkdir -p backend/services/daily/static",
     "rm -rf backend/services/daily/static/*", 
