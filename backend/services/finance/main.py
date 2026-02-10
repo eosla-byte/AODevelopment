@@ -11,7 +11,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from routers import projects, hr, expenses, quotes
+from .routers import projects, hr, expenses, quotes
 
 app = FastAPI(title="AO Finance & Operations")
 
@@ -19,11 +19,14 @@ app = FastAPI(title="AO Finance & Operations")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Include Routers
-app.include_router(projects.router)
-app.include_router(hr.router)
-app.include_router(expenses.router)
-app.include_router(quotes.router)
+from .common.auth import require_service
+from fastapi import Depends
+
+# Include Routers with Auth & Entitlement Check
+app.include_router(projects.router, dependencies=[Depends(require_service("finance"))])
+app.include_router(hr.router, dependencies=[Depends(require_service("finance"))])
+app.include_router(expenses.router, dependencies=[Depends(require_service("finance"))])
+app.include_router(quotes.router, dependencies=[Depends(require_service("finance"))])
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):

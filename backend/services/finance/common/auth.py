@@ -25,7 +25,12 @@ AO_JWT_KEY_ID = os.getenv("AO_JWT_KEY_ID", "ao-k1")
 
 # Use Public Key or Secret (Fallback for dev/transition if needed, but Prompt says strict RS256)
 # If no keys, warn but don't crash immediately (might be a service that doesn't sign)
-if not AO_JWT_PUBLIC_KEY_PEM and not AO_JWT_PRIVATE_KEY_PEM:
+if not AO_JWT_PUBLIC_KEY_PEM:
+     print("⚠️ [FINANCE AUTH] RS256 Public Key missing!")
+else:
+     print(f"✅ [FINANCE AUTH] RS256 Public Key loaded. Length: {len(AO_JWT_PUBLIC_KEY_PEM)}")
+
+if not AO_JWT_PRIVATE_KEY_PEM and not AO_JWT_PUBLIC_KEY_PEM:
      print("⚠️ [AUTH] RS256 Keys missing! Authentication may fail.")
 
 ALGORITHM = "RS256"

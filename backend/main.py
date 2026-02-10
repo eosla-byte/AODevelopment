@@ -167,13 +167,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         
         # 2. Block Protected Routes
-        # Implicitly allow / (landing), /assets, /static, /api, /login
+        # Implicitly allow / (landing), /assets, /static, /api/login (if exempted)
         protected_prefixes = [
             "/admin", "/estimaciones", "/cotizaciones", 
-            "/projects", "/project", "/calendar", "/hr", "/create_project", "/labs"
+            "/projects", "/project", "/calendar", "/hr", "/create_project", "/labs",
+            "/api" # Secure all API routes by default
+        ]
+        
+        # Explicit Public Allow List
+        allowed_exact_paths = [
+            "/api/login", 
+            "/api/projects/stats", # Landing Page
+            "/api/aps/token", # If used validly
+            "/api/aps/urn"
         ]
         
         is_protected = any(path.startswith(p) for p in protected_prefixes)
+        
+        # Exception for public paths
+        if path in allowed_exact_paths:
+            is_protected = False
         
         if is_protected:
             token = request.cookies.get("access_token")

@@ -2,24 +2,47 @@ import os
 import datetime
 import json
 import uuid
+import types
 from typing import List, Optional
 from sqlalchemy.orm import Session, sessionmaker, joinedload
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.sql import func
 from . import models
-from .models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard, PluginSheetSession
+from .models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard, PluginSheetSession, DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
 from sqlalchemy.orm.attributes import flag_modified
 
 # DATABASE SETUP
 # Multi-DB Configuration for Microservices/Monolith Hybrid
 
-CORE_DB_URL = os.getenv("CORE_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip()
-OPS_DB_URL = os.getenv("OPS_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip()
-PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip()
-EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip()
+# DATABASE SETUP
+# Multi-DB Configuration for Microservices/Monolith Hybrid
 
-print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'}")
-print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'}")
+# 1. Load Specific Database Configurations
+# Use 'DATABASE_URL' as a fallback ONLY if it makes sense for the primary purpose of that variable.
+# Ideally, DevOps should set each variable explicitly (CORE_DB_URL, EXT_DB_URL, etc.)
+
+# Core DB (Identity, Users, Orgs) - Primary for Accounts Service
+CORE_DB_URL = os.getenv("CORE_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+
+# Ops DB (Finance, Admin) - Primary for Finance Service
+OPS_DB_URL = os.getenv("OPS_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+
+# Plugin DB - Primary for Plugin API
+PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+
+# External DB (Daily, BIM, Portal) - Primary for Client Services
+# Note: These services ALSO need CORE_DB_URL set to authenticate users!
+EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+
+# Helper to extract host for logging
+def get_db_host(url):
+    try:
+        if "sqlite" in url: return "SQLite Local"
+        return url.split("@")[1].split("/")[0] if "@" in url else "Unknown"
+    except: return "Unknown"
+
+print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'} | Host: {get_db_host(CORE_DB_URL)}")
+print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'} | Host: {get_db_host(OPS_DB_URL)}")
 
 # Create Engines
 engine_core = create_engine(CORE_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in CORE_DB_URL else {})
@@ -1084,7 +1107,7 @@ def get_plugin_sessions():
         db.close()
 
 def get_user_plugin_stats(email):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         now = datetime.datetime.now()
         start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -1167,7 +1190,7 @@ def end_revit_session(session_id):
         db.close()
 
 def get_user_plugin_stats(email):
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         now = datetime.datetime.now()
         start_month = datetime.datetime(now.year, now.month, 1)
@@ -1199,7 +1222,7 @@ def get_user_plugin_stats(email):
         db.close()
 
 def get_plugin_sessions():
-    db = SessionLocal()
+    db = SessionPlugin()
     try:
         return db.query(models.PluginSession).all()
     except Exception as e:
@@ -2107,5 +2130,386 @@ def get_sheet_session(session_id: str):
                 "plugin_session_id": session.plugin_session_id
             }
         return None
+    finally:
+        db.close()
+
+# -----------------------------------------------------------------------------
+# DAILY APP FUNCTIONS (daily.somosao.com)
+# -----------------------------------------------------------------------------
+
+def init_user_daily_setup(user_email: str):
+    """
+    Ensures user exists and has a "My Tasks" view (not a real table, but ensures readiness).
+    If no team exists, create a default "Personal Team" for them?
+    For now, just return True.
+    """
+    return True
+
+def create_daily_team(name: str, owner_id: str, organization_id: str = None, members: List[str] = None):
+    db = SessionOps() # Using Ops DB for Daily
+    try:
+        new_id = str(uuid.uuid4())
+        
+        initial_members = [owner_id]
+        if members:
+            initial_members.extend(members)
+        # Deduplicate
+        initial_members = list(set(initial_members))
+
+        team = models.DailyTeam(
+            id=new_id, 
+            name=name, 
+            owner_id=owner_id, 
+            organization_id=organization_id,
+            members=initial_members
+        )
+        db.add(team)
+        try:
+            db.commit()
+        except Exception as e:
+            # Self-Healing Pattern: Cross-DB FK Fix
+            # If we get a ForeignKeyViolation on owner_id (which is in a DIFFERENT DB),
+            # we must drop that constraint.
+            err_str = str(e).lower()
+            print(f"⚠️ [DB DEBUG] Error detected: {err_str}")
+            if "foreignkey" in err_str or "daily_teams_owner_id_fkey" in err_str:
+                print("⚠️ [SELF-HEALING] Detected invalid Cross-DB FK. Dropping constraint...")
+                db.rollback()
+                
+                # Drop Constraint
+                db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_owner_id_fkey"))
+                db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_organization_id_fkey"))
+                db.commit()
+                
+                # Retry
+                print("🔄 [SELF-HEALING] Retrying Team Creation...")
+                db.add(team)
+                db.commit()
+            else:
+                raise e
+        
+        # Return POJO to avoid DetachedInstanceError
+        result = types.SimpleNamespace(id=team.id, name=team.name)
+        return result
+    finally:
+        db.close()
+
+def get_user_teams(user_id: str, organization_id: str = None):
+    # This requires JSON contains query or filtering in memory.
+    # SQLite JSON filtering is tricky.
+    # For MVP, get all teams and filter in python (inefficient but works for small scale)
+    db = SessionOps()
+    try:
+        query = db.query(models.DailyTeam)
+        
+        # 1. Organization Isolation (If Org Context Provided)
+        if organization_id:
+            query = query.filter(models.DailyTeam.organization_id == organization_id)
+            
+        all_teams = query.all()
+        user_teams = [t for t in all_teams if user_id in (t.members or [])]
+        return user_teams
+    finally:
+        db.close()
+
+def create_daily_project(team_id: str, name: str, user_id: str, organization_id: str = None, bim_project_id: str = None):
+    db = SessionOps()
+    try:
+        new_id = str(uuid.uuid4())
+        proj = models.DailyProject(
+            id=new_id, 
+            team_id=team_id, 
+            name=name, 
+            created_by=user_id,
+            organization_id=organization_id,
+            bim_project_id=bim_project_id,
+            settings={"background": "default"}
+        )
+        # Create Default Columns
+        cols = ["To Do", "In Progress", "Done"]
+        for idx, title in enumerate(cols):
+            c_id = str(uuid.uuid4())
+            col = models.DailyColumn(id=c_id, project_id=new_id, title=title, order_index=idx)
+            db.add(col)
+            
+        db.add(proj)
+        db.commit()
+        
+        # Return POJO
+        result = types.SimpleNamespace(id=proj.id, name=proj.name)
+        return result
+    finally:
+        db.close()
+
+def get_daily_project_board(project_id: str):
+    db = SessionOps()
+    try:
+        # Load Project + Columns + Tasks (lightweight)
+        proj = db.query(models.DailyProject).filter(models.DailyProject.id == project_id).options(
+            joinedload(models.DailyProject.columns).joinedload(models.DailyColumn.tasks)
+        ).first()
+        return proj
+    finally:
+        db.close()
+
+def create_daily_task(project_id: str, column_id: str, title: str, user_id: str, due_date=None, priority="Medium"):
+    db = SessionOps()
+    try:
+        new_id = str(uuid.uuid4())
+        # If project_id is None, it's a direct assignment (Manager Mode)? 
+        # But 'column_id' implies a board.
+        # Direct tasks might have a hidden 'Personal Board'? 
+        # Or we allow column_id=None for personal tasks?
+        
+        task = models.DailyTask(
+            id=new_id,
+            project_id=project_id,
+            column_id=column_id,
+            title=title,
+            created_by=user_id,
+            due_date=due_date,
+            priority=priority,
+            assignees=[user_id] if user_id else []
+        )
+        db.add(task)
+        db.commit()
+        return task
+    finally:
+        db.close()
+
+def update_daily_task_location(task_id: str, new_column_id: str, new_index: int = 0):
+    db = SessionOps()
+    try:
+        task = db.query(models.DailyTask).filter(models.DailyTask.id == task_id).first()
+        if task:
+            task.column_id = new_column_id
+            # Note: Index reordering isn't implemented in DB model 'DailyTask' (no order_index on task).
+            # We usually rely on a linked list or float index. 
+            # Or frontend sends full list order and we store it?
+            # Creating 'order_index' on Task would be good. 
+            # Ignoring index for MVP or handling later.
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()
+
+def get_user_daily_tasks(user_id: str):
+    """
+    Get all tasks assigned to user across all projects.
+    """
+    db = SessionOps()
+    try:
+        # Fetch all tasks and filter by assignees JSON
+        # Optimized: In Postgres we can use @> operator. In SQLite/Generic: Python filter.
+        # Assuming DB is small enough for now.
+        # TODO: Optimize with native JSON query if Postgres.
+        all_tasks = db.query(models.DailyTask).all()
+        my_tasks = [t for t in all_tasks if user_id in (t.assignees or [])]
+        return my_tasks
+    finally:
+        db.close()
+
+def add_daily_message(project_id: str, user_id: str, content: str):
+    db = SessionOps()
+    try:
+        # GT Timezone (UTC-6)
+        gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
+        msg = models.DailyMessage(
+            project_id=project_id,
+            sender_id=user_id,
+            content=content,
+            created_at=datetime.datetime.now(gt_tz)
+        )
+        db.add(msg)
+        db.commit()
+        return msg
+    finally:
+        db.close()
+
+def get_daily_messages(project_id: str, limit=50):
+    db = SessionOps()
+    try:
+        msgs = db.query(models.DailyMessage).filter(models.DailyMessage.project_id == project_id).order_by(models.DailyMessage.created_at.desc()).limit(limit).all()
+        return msgs[::-1] # Return chronological
+    finally:
+        db.close()
+
+def get_project_metrics(project_id: str):
+    db = SessionOps()
+    try:
+        tasks = db.query(models.DailyTask).filter(models.DailyTask.project_id == project_id).all()
+        total = len(tasks)
+        pending = len([t for t in tasks if t.status == "To Do"])
+        in_progress = len([t for t in tasks if t.status == "In Progress"])
+        done = len([t for t in tasks if t.status == "Done"])
+        
+        return {
+            "total_tasks": total,
+            "pending": pending,
+            "in_progress": in_progress,
+            "done": done,
+            "top_user_id": None,
+            "user_stats": {}
+        }
+    except Exception as e:
+        print(f"Error getting metrics: {e}")
+        return None
+    finally:
+        db.close()
+
+def get_org_bim_projects(organization_id: str):
+    # This queries the Core/BIM DB to get available projects for linking
+    if not organization_id:
+        return []
+        
+    db = SessionOps() # BIM tables are in Ops/Shared DB for now
+    try:
+        projects = db.query(models.BimProject).filter(models.BimProject.organization_id == organization_id).all()
+        return projects
+    finally:
+        db.close()
+
+def get_org_projects(organization_id: str):
+    """
+    Get all Core Projects ('resources_projects') associated with an organization.
+    """
+    db = SessionCore()
+    try:
+        # Filter by organization_id
+        projects = db.query(models.Project).filter(models.Project.organization_id == organization_id).all()
+        return projects
+    finally:
+        db.close()
+
+def create_org_project(organization_id: str, name: str, cost: float = 0.0, sq_meters: float = 0.0, ratio: float = 0.0, estimated_time: str = None):
+    """
+    Create a new Core Project Profile.
+    """
+    db = SessionCore()
+    try:
+        new_id = str(uuid.uuid4())
+        project = models.Project(
+            id=new_id,
+            organization_id=organization_id,
+            name=name,
+            project_cost=cost,
+            sq_meters=sq_meters,
+            ratio=ratio,
+            estimated_time=estimated_time,
+            status="Active"
+        )
+        db.add(project)
+        db.commit()
+        db.refresh(project)
+        return project
+    finally:
+        db.close()
+
+
+def get_org_users(organization_id: str):
+    """
+    Get all users belonging to an organization.
+    """
+    db = SessionCore()
+    try:
+        members = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.organization_id == organization_id
+        ).options(joinedload(models.OrganizationUser.user)).all()
+        
+        users = []
+        for m in members:
+            if m.user:
+                users.append({
+                    "id": m.user.id, # AccountUser ID
+                    "name": m.user.full_name,
+                    "email": m.user.email,
+                    "role": m.role
+                })
+        return users
+    finally:
+        db.close()
+
+def get_user_organizations(email: str):
+    """
+    Get all organizations a user belongs to, enabling the Frontend to drop Mocks.
+    """
+    db = SessionCore()
+    try:
+        print(f"🔍 [DB] Looking for user with email: {email}")
+        # Find user by email first (Case Insensitive)
+        user = db.query(models.AccountUser).filter(models.AccountUser.email.ilike(email)).first()
+        
+        if not user:
+            print(f"❌ [DB] User not found in accounts_users for email: {email}")
+            return []
+            
+        print(f"✅ [DB] Found User: {user.id} ({user.full_name})")
+            
+        memberships = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.user_id == user.id
+        ).options(joinedload(models.OrganizationUser.organization)).all()
+        
+        print(f"🔍 [DB] Found {len(memberships)} memberships for user {user.id}")
+        
+        orgs = []
+        for m in memberships:
+            if m.organization:
+                print(f"  -> Org: {m.organization.name} (ID: {m.organization.id})")
+                orgs.append({
+                    "id": m.organization.id,
+                    "name": m.organization.name,
+                    "role": m.role
+                })
+            else:
+                print(f"  -> Warning: Membership {m.id} has no linked Organization")
+                
+        return orgs
+    except Exception as e:
+        print(f"💥 [DB] Error fetching user organizations: {e}")
+        return []
+    finally:
+        db.close()
+
+def get_project_metrics(project_id: str):
+    db = SessionOps()
+    try:
+        project = db.query(models.DailyProject).filter(models.DailyProject.id == project_id).first()
+        if not project:
+            return None
+            
+        tasks = db.query(models.DailyTask).filter(models.DailyTask.project_id == project_id).all()
+        
+        total_tasks = len(tasks)
+        pending = len([t for t in tasks if t.status == "Pending"])
+        in_progress = len([t for t in tasks if t.status == "In Progress"])
+        done = len([t for t in tasks if t.status == "Done"])
+        
+        # User Stats
+        user_stats = {} # {user_id: count}
+        for t in tasks:
+            if t.assignees:
+                for uid in t.assignees:
+                    user_stats[uid] = user_stats.get(uid, 0) + 1
+                    
+        # Find top user
+        top_user_id = None
+        max_tasks = 0
+        for uid, count in user_stats.items():
+            if count > max_tasks:
+                max_tasks = count
+                top_user_id = uid
+                
+        # Resolve top user name (optional, or frontend does it with user list)
+        # For simplicity, returning ID
+        
+        return {
+            "total_tasks": total_tasks,
+            "pending": pending,
+            "in_progress": in_progress,
+            "done": done,
+            "top_user_id": top_user_id,
+            "user_stats": user_stats
+        }
     finally:
         db.close()

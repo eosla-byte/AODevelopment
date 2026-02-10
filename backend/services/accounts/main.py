@@ -28,7 +28,8 @@ from common.models import AccountUser
 app = FastAPI(title="AO Accounts Service")
 
 @app.on_event("startup")
-# ... (startup logic same)
+async def startup_event():
+    run_db_fix()
 
 # ... (version check same)
 
@@ -38,7 +39,7 @@ def get_current_admin(request: Request):
     if not token:
         return None
     try:
-        # Decode using common auth (AO_JWT_SECRET + HS256)
+        # Decode using common auth (RS256 Public Key)
         payload = decode_token(token)
         if not payload: 
             return None
@@ -590,12 +591,12 @@ async def refresh_token_endpoint(request: Request):
         if not payload or payload.get("type") != "refresh":
              return JSONResponse({"status": "error", "message": "Invalid refresh token"}, status_code=401)
              
-        email = payload.get("sub")
+        user_id = payload.get("sub")
         
         # Verify User & Context
         db = SessionCore()
         try:
-            user = db.query(AccountUser).filter(AccountUser.email == email).first()
+            user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
             if not user:
                  return JSONResponse({"status": "error", "message": "User not found"}, status_code=401)
                  
@@ -747,14 +748,14 @@ async def get_my_organizations_endpoint(request: Request):
     token = request.cookies.get("accounts_access_token")
     user_email = None
     if token:
-         payload = decode_access_token(token)
+         payload = decode_token(token)
          if payload: user_email = payload.get("sub")
          
     # Allow via Refresh token too? For the "Select Org" screen when Access is expired/missing?
     if not user_email:
         refresh = request.cookies.get("accounts_refresh_token")
         if refresh:
-            payload = decode_access_token(refresh)
+            payload = decode_token(refresh)
             if payload and payload.get("type") == "refresh":
                  user_email = payload.get("sub")
 
@@ -775,6 +776,7 @@ async def get_my_organizations_endpoint(request: Request):
         for m in memberships:
             org = m.organization
             if org:
+                # Get User Role in this Org
                 results.append({
                     "id": org.id,
                     "name": org.name,
@@ -788,12 +790,60 @@ async def get_my_organizations_endpoint(request: Request):
 @app.post("/auth/logout")
 async def logout():
     response = JSONResponse({"status": "ok", "message": "Logged out"})
-    # Clear both potential cookies
+    # Clear both access cookies
     response.delete_cookie(key="accounts_access_token", domain=".somosao.com", path="/")
     response.delete_cookie(key="access_token", domain=".somosao.com", path="/")
+    
+    # Clear Refresh Token (Critical)
+    response.delete_cookie(key="accounts_refresh_token", domain=".somosao.com", path="/", httponly=True)
     return response
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8005))
     print(f"Starting Accounts Service v2.1 (Passlib) on port {port}")
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
+# -----------------------------------------------------------------------------
+# JWKS ENDPOINT (OIDC Compliance)
+# -----------------------------------------------------------------------------
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.backends import default_backend
+import base64
+
+def _pem_to_jwk(pem_bytes):
+    try:
+        key = serialization.load_pem_public_key(pem_bytes, backend=default_backend())
+        numbers = key.public_numbers()
+        
+        def to_b64url(num):
+             # Python's int.to_bytes requires length. Bit_length // 8 + 1
+             byte_len = (num.bit_length() + 7) // 8
+             val_bytes = num.to_bytes(byte_len, byteorder="big")
+             return base64.urlsafe_b64encode(val_bytes).decode("utf-8").rstrip("=")
+
+        return {
+            "kty": "RSA",
+            "alg": "RS256",
+            "use": "sig",
+            "kid": "ao-core-key-1", # Static KID for now
+            "n": to_b64url(numbers.n),
+            "e": to_b64url(numbers.e)
+        }
+    except Exception as e:
+        print(f"JWK Conversion Error: {e}")
+        return None
+
+@app.get("/.well-known/jwks.json")
+def jwks_endpoint():
+    # Import here to avoid circularity if any, or rely on global import?
+    # Global import of common.auth might not have the key loaded if env vars not set during import time?
+    # But checking common.auth imports at top of file: yes.
+    from common.auth import AO_JWT_PUBLIC_KEY_PEM
+    
+    if not AO_JWT_PUBLIC_KEY_PEM:
+        return {"keys": []}
+        
+    jwk = _pem_to_jwk(AO_JWT_PUBLIC_KEY_PEM)
+    if jwk:
+        return {"keys": [jwk]}
+    return {"keys": []}

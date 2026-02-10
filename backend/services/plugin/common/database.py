@@ -58,7 +58,9 @@ SessionExt = sessionmaker(autocommit=False, autoflush=False, bind=engine_ext)
 
 # Universal SessionLocal for backwards compatibility (defaults to Ops for main app, or Core for Auth?)
 # Ideally we replace usage, but to avoid breaking 2000 lines, we route dynamically or default to Ops (Operations is the biggest chunk).
-SessionLocal = SessionOps 
+# Universal SessionLocal for backwards compatibility (defaults to Plugin for Plugin Service)
+# Universal SessionLocal for backwards compatibility (defaults to Plugin for Plugin Service)
+SessionLocal = SessionPlugin 
 
 def get_db():
     db = SessionLocal()
@@ -1091,7 +1093,7 @@ def toggle_project_reminder(pid, rid):
             db.commit()
     finally: db.close()
 def get_plugin_sessions():
-    db = SessionPlugin()
+    db = SessionLocal()
     try:
         # Return all sessions, ordered by start time
         sessions = db.query(models.PluginSession).order_by(models.PluginSession.start_time.desc()).limit(100).all()
@@ -2055,7 +2057,7 @@ def get_sheet_templates():
         db.close()
 
 def create_sheet_template(name: str, config: dict, user="Admin"):
-    db = SessionPlugin()
+    db = SessionLocal()
     try:
         tpl = SheetTemplate(name=name, config_json=config, created_by=user, is_global=True)
         db.add(tpl)
@@ -2066,7 +2068,7 @@ def create_sheet_template(name: str, config: dict, user="Admin"):
         db.close()
 
 def delete_sheet_template(tpl_id: int):
-    db = SessionPlugin()
+    db = SessionLocal()
     try:
         tpl = db.query(SheetTemplate).filter(SheetTemplate.id == tpl_id).first()
         if tpl:
@@ -2104,7 +2106,7 @@ def create_sheet_session(session_id: str, project_name: str, sheets: list, param
         db.close()
 
 def update_sheet_session_plugin_id(session_id: str, new_plugin_session_id: str):
-    db = SessionPlugin()
+    db = SessionLocal()
     try:
         s = db.query(PluginSheetSession).filter(PluginSheetSession.id == session_id).first()
         if s:
@@ -2119,7 +2121,7 @@ def update_sheet_session_plugin_id(session_id: str, new_plugin_session_id: str):
         db.close()
 
 def get_sheet_session(session_id: str):
-    db = SessionPlugin()
+    db = SessionLocal()
     try:
         session = db.query(PluginSheetSession).filter(PluginSheetSession.id == session_id).first()
         if session:

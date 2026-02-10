@@ -121,10 +121,10 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         )
         return payload
     except jwt.ExpiredSignatureError:
-        print("⚠️ [AUTH] Token Expired")
+        # print("⚠️ [AUTH] Token Expired")
         return None
     except jwt.InvalidTokenError as e:
-        print(f"⚠️ [AUTH] Invalid Token: {e}")
+        # print(f"⚠️ [AUTH] Invalid Token: {e}")
         return None
     except Exception as e:
         print(f"❌ [AUTH] Unexpected Decode Error: {e}")
@@ -197,3 +197,21 @@ def require_service(service_slug: str):
         return claims
         
     return _check_service
+
+# -----------------------------------------------------------------------------
+# PASSWORD UTILS (Migrated from auth_utils)
+# -----------------------------------------------------------------------------
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
+
+def verify_password(plain_password, hashed_password):
+    if not hashed_password: return False
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+

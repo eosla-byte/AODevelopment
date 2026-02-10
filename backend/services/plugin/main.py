@@ -6,7 +6,7 @@ import sys
 # Ensure backend root is in path or rely on being run from root
 # We import routers from the shared 'routers' directory for now
 # (Refactoring to move them inside services/plugin is Phase 2)
-from ...routers import plugin_api, plugin_cloud, ai, sheet_api
+from .routers import plugin_api, plugin_cloud, ai, sheet_api
 
 app = FastAPI(title="AOdev (Plugin Service)")
 
@@ -19,11 +19,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from .common.auth import require_service
+from fastapi import Depends
+
 # Include Routers
-app.include_router(plugin_api.router)
-app.include_router(plugin_cloud.router)
-app.include_router(ai.router)
-app.include_router(sheet_api.router)
+# plugin_api handles its own mixed auth (login vs protected)
+app.include_router(plugin_api.router) 
+app.include_router(plugin_cloud.router, dependencies=[Depends(require_service("plugin"))])
+# app.include_router(ai.router, dependencies=[Depends(require_service("plugin"))])
+app.include_router(sheet_api.router, dependencies=[Depends(require_service("plugin"))])
 
 @app.get("/health")
 def health_check():

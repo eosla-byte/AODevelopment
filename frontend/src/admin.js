@@ -1,4 +1,5 @@
 import './style.css';
+import { fetchWithAuth } from './common/auth.js';
 
 const API_BASE_URL = "/api";
 
@@ -78,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         try {
-            const res = await fetch(`${API_BASE_URL}/admin/users/assign`, {
+            const res = await fetchWithAuth(`${API_BASE_URL}/admin/users/assign`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -102,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function fetchUsers() {
     try {
-        const res = await fetch(`${API_BASE_URL}/users`);
+        const res = await fetchWithAuth(`${API_BASE_URL}/users`);
         const users = await res.json();
 
         const tbody = document.getElementById('user-table-body');
@@ -141,12 +142,12 @@ async function openAssignModal(userId, userName) {
 
     // Fetch Projects if not cached
     if (allProjectsCache.length === 0) {
-        const res = await fetch(`${API_BASE_URL}/projects`);
+        const res = await fetchWithAuth(`${API_BASE_URL}/projects`);
         allProjectsCache = await res.json();
     }
 
     // Fetch current user to get current assignments
-    const resUser = await fetch(`${API_BASE_URL}/users`);
+    const resUser = await fetchWithAuth(`${API_BASE_URL}/users`);
     const users = await resUser.json();
     const currentUser = users.find(u => u.id === userId);
 

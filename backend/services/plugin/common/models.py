@@ -30,6 +30,13 @@ class Project(Base):
     duration_months = Column(Float, default=0.0)
     additional_time_months = Column(Float, default=0.0)
     archived = Column(Boolean, default=False)
+
+    # Core Project Profile Fields (Added via Migration)
+    organization_id = Column(String, nullable=True)
+    project_cost = Column(Float, default=0.0)
+    sq_meters = Column(Float, default=0.0)
+    ratio = Column(Float, default=0.0)
+    estimated_time = Column(String)
     
     # Financial metrics
     projected_profit_margin = Column(Float, default=0.0)
@@ -329,6 +336,7 @@ class BimProject(Base):
     name = Column(String, nullable=False)
     description = Column(Text)
     status = Column(String, default="Active")
+    settings = Column(JSON, default={}) # Project settings (e.g. valid companies, colors)
     created_at = Column(DateTime, default=func.now())
     
     organization = relationship("BimOrganization", back_populates="projects")
@@ -367,6 +375,19 @@ class BimActivity(Base):
     
     duration = Column(Float)
     pct_complete = Column(Float, default=0.0)
+    
+    # Advanced Gantt Fields
+    contractor = Column(String) # Empresa Encargada
+    predecessors = Column(String) # JSON or String "1,2,3"
+    display_order = Column(Integer, default=0) # For manual row reordering
+    style = Column(String) # JSON: {"font": "Calibri", "fontSize": 11, "bold": true, "fill": "#ffff00", "color": "#ff0000"}
+    cell_styles = Column(JSON, default={}) # New: {"colId": {"backgroundColor": "red"}}
+    comments = Column(JSON, default=[]) # Log of delays/notes
+    
+    # New Fields for Advanced Gantt
+    extension_days = Column(Integer, default=0)
+    history = Column(JSON, default=[]) # [{date, progress, user}]
+    # Force Rebuild Check 2
     
     # Hierarchy
     parent_wbs = Column(String)
@@ -467,4 +488,150 @@ class ServicePermission(Base):
     valid_until = Column(DateTime, nullable=True)
     
     organization = relationship("Organization", back_populates="service_permissions")
+
+# -----------------------------------------------------------------------------
+# SCHEMA: DAILY APP (Daily.somosao.com) -> Prefix 'daily_'
+# -----------------------------------------------------------------------------
+
+class DailyTeam(Base):
+    __tablename__ = 'daily_teams'
+    
+    id = Column(String, primary_key=True) # UUID
+    name = Column(String, nullable=False)
+    organization_id = Column(String, nullable=True) # Multi-tenant link (Core DB)
+    owner_id = Column(String) # Maps to AccountUser (Core DB)
+    members = Column(JSON, default=[]) # List of User IDs
+    created_at = Column(DateTime, default=func.now())
+    
+    projects = relationship("DailyProject", back_populates="team")
+
+class DailyProject(Base):
+    __tablename__ = 'daily_projects'
+    
+    id = Column(String, primary_key=True) # UUID
+    organization_id = Column(String, nullable=True) # Multi-tenant link (Core DB)
+    team_id = Column(String, ForeignKey('daily_teams.id'), nullable=True) # Optional (Personal/Manager tasks might not have team?)
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    
+    # Linked Resources Project (Optional integration)
+    resources_project_id = Column(String, nullable=True) 
+    bim_project_id = Column(String, nullable=True) # Check if we want FK or loose link. Loose link is safer for microservices. 
+    
+    # Settings
+    settings = Column(JSON, default={}) # { "background": "...", "features": ["chat", "kanban"] }
+    
+    created_at = Column(DateTime, default=func.now())
+    created_by = Column(String)
+    
+    team = relationship("DailyTeam", back_populates="projects")
+    columns = relationship("DailyColumn", back_populates="project", cascade="all, delete-orphan", order_by="DailyColumn.order_index")
+    tasks = relationship("DailyTask", back_populates="project", cascade="all, delete-orphan")
+    messages = relationship("DailyMessage", back_populates="project", cascade="all, delete-orphan")
+
+class DailyColumn(Base):
+    __tablename__ = 'daily_columns'
+    
+    id = Column(String, primary_key=True) # UUID
+    project_id = Column(String, ForeignKey('daily_projects.id'))
+    title = Column(String, nullable=False)
+    order_index = Column(Integer, default=0)
+    color = Column(String, default="#e2e8f0")
+    
+    project = relationship("DailyProject", back_populates="columns")
+    tasks = relationship("DailyTask", back_populates="column")
+
+class DailyTask(Base):
+    __tablename__ = 'daily_tasks'
+    
+    id = Column(String, primary_key=True) # UUID
+    project_id = Column(String, ForeignKey('daily_projects.id'), nullable=True) # Nullable for Direct Assignments
+    column_id = Column(String, ForeignKey('daily_columns.id'), nullable=True)
+    
+    title = Column(String, nullable=False)
+    description = Column(Text)
+    
+    # Metadata
+    priority = Column(String, default="Medium") # Low, Medium, High, Urgent
+    status = Column(String, default="Pending") # Pending, In Progress, Done
+    due_date = Column(DateTime, nullable=True)
+    
+    # Assignment
+    assignees = Column(JSON, default=[]) # List of User IDs
+    created_by = Column(String)
+    
+    # Features
+    tags = Column(JSON, default=[]) # ["Frontend", "Bug"]
+    checklist = Column(JSON, default=[]) # [{text: "Step 1", done: false}]
+    attachments = Column(JSON, default=[]) # [{name: "file.png", url: "..."}]
+    
+    # Activity
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    # Manager Mode (Direct Assignment without Project)
+    is_direct_assignment = Column(Boolean, default=False)
+    
+    project = relationship("DailyProject", back_populates="tasks")
+    column = relationship("DailyColumn", back_populates="tasks")
+    comments = relationship("DailyComment", back_populates="task", cascade="all, delete-orphan")
+
+class DailyComment(Base):
+    __tablename__ = 'daily_comments'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String, ForeignKey('daily_tasks.id'))
+    user_id = Column(String) # User ID or Email
+    user_name = Column(String, nullable=True) # Cache for display (Added via migration)
+    content = Column(Text)
+    
+    # Threading
+    parent_id = Column(Integer, ForeignKey('daily_comments.id'), nullable=True)
+    
+    # Reactions
+    reactions = Column(JSON, default={}) # { "👍": ["user1", "user2"] }
+    
+    created_at = Column(DateTime, default=func.now())
+    
+    task = relationship("DailyTask", back_populates="comments")
+    replies = relationship("DailyComment", remote_side=[id]) # Self-referential
+
+class DailyChannel(Base):
+    __tablename__ = 'daily_channels'
+    
+    id = Column(String, primary_key=True) # UUID
+    project_id = Column(String, ForeignKey('daily_projects.id'))
+    name = Column(String, nullable=False) # "general", "random"
+    type = Column(String, default="text") # "text", "voice"
+    created_at = Column(DateTime, default=func.now())
+    
+    project = relationship("DailyProject", backref="channels")
+    messages = relationship("DailyMessage", back_populates="channel", cascade="all, delete-orphan")
+
+class DailyMessage(Base):
+    """
+    Chat messages for Projects or DMs.
+    """
+    __tablename__ = 'daily_messages'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # Context (Either Project OR DM)
+    channel_id = Column(String, ForeignKey('daily_channels.id'), nullable=True)
+    project_id = Column(String, ForeignKey('daily_projects.id'), nullable=True)
+    dm_room_id = Column(String, nullable=True) # UUID for 1:1 chat room
+    
+    sender_id = Column(String)
+    content = Column(Text)
+    attachments = Column(JSON, default=[])
+    mentions = Column(JSON, default=[])
+    
+    # Threading
+    thread_root_id = Column(Integer, nullable=True) # If replying to a message
+    
+    created_at = Column(DateTime, default=func.now())
+    
+    project = relationship("DailyProject", back_populates="messages")
+    channel = relationship("DailyChannel", back_populates="messages")
+
 

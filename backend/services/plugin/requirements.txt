@@ -1,13 +1,9 @@
+
 fastapi
 uvicorn
 sqlalchemy
 psycopg2-binary
-jinja2
 python-multipart
 requests
-python-jose[cryptography]
-passlib[bcrypt]
-
 PyJWT==2.9.0
-
-bcrypt==4.0.1
+python-dotenv

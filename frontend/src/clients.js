@@ -1,4 +1,5 @@
 import './style.css';
+import { fetchWithAuth, logout } from './common/auth.js';
 
 // Client Portal Javascript with Real API Integration
 
@@ -10,18 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const loginForm = document.getElementById('login-form');
     const logoutBtn = document.getElementById('logout-btn');
 
-    // 1. Check for valid token on load
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('force_login') === 'true') {
-        localStorage.removeItem('ao_token');
-        // Clear param to clean URL? Optional, but safer to keep visual confirmation.
-        // history.replaceState(null, '', 'clients.html'); 
-    }
-
-    const token = localStorage.getItem('ao_token');
-    if (token) {
-        loadDashboard(token);
-    }
+    // 1. Try to Load Dashboard immediately (Cookie Auth)
+    loadDashboard();
 
     // Custom Cursor Logic
     const cursorDot = document.querySelector('[data-cursor-dot]');
@@ -47,9 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const password = document.getElementById('password').value;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/login`, {
+                // Login via Accounts (sets cookies)
+                const response = await fetch(`https://accounts.somosao.com/auth/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ username: email, password: password })
                 });
 
@@ -57,13 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     throw new Error('Credenciales inválidas');
                 }
 
-                const data = await response.json();
-
-                // Store Token
-                localStorage.setItem('ao_token', data.access_token);
-
                 // Load Dashboard
-                loadDashboard(data.access_token);
+                loadDashboard();
 
             } catch (err) {
                 alert(err.message);
@@ -74,22 +62,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Logout Handler
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
-            localStorage.removeItem('ao_token');
-            dashboardSection.style.display = 'none';
-            loginSection.style.display = 'flex';
-            loginForm.reset();
+            logout();
         });
     }
 
-    async function loadDashboard(token) {
+    async function loadDashboard() {
         try {
-            const response = await fetch(`${API_BASE_URL}/client/dashboard`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            // fetchWithAuth handles cookies automatically
+            const response = await fetchWithAuth(`${API_BASE_URL}/client/dashboard`);
 
             if (!response.ok) {
-                // Token invalid or expired
-                localStorage.removeItem('ao_token');
+                // Token invalid or expired (and refresh failed)
+                // fetchWithAuth usually redirects, but if it returns 401/403 here:
                 loginSection.style.display = 'flex';
                 dashboardSection.style.display = 'none';
                 return;
@@ -136,9 +120,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error("Error loading dashboard", err);
             // Optional: fallback to login if fetch fails completely (e.g. server down)
-            if (confirm("No se puede conectar al servidor. ¿Cargar modo demo?")) {
-                localStorage.setItem('ao_token', 'demo_mode');
-                loadDashboard('demo_mode');
+            if (err.message !== "AUTH_EXPIRED_REDIRECTING" && confirm("No se puede conectar al servidor. ¿Cargar modo demo?")) {
+                // Demo Mode Logic (Optional, kept for resilience)
+                // loadDashboardDemo(); 
             }
         }
     }
