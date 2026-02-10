@@ -879,12 +879,10 @@ def get_task_details(task_id: str):
             
             # UTC ISO for Frontend
             created_iso = c.created_at.isoformat() if c.created_at else None
-            # If created_at is naive, assume UTC (since we are moving to that)
             if c.created_at: 
                  if c.created_at.tzinfo is None:
                      created_iso = c.created_at.replace(tzinfo=datetime.timezone.utc).isoformat()
                  else:
-                     # Convert to UTC ISO just to be standard
                      created_iso = c.created_at.astimezone(datetime.timezone.utc).isoformat()
 
             formatted_comments.append({
@@ -894,7 +892,7 @@ def get_task_details(task_id: str):
                 "author": {
                      "id": c.user_id,
                      "type": author_type,
-                     "displayName": display_name,
+                     "displayName": display_name or "Guest", # Fallback guarantee
                      "avatarUrl": None 
                 }
             })
