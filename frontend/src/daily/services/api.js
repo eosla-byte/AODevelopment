@@ -29,6 +29,40 @@ const MOCK_BOARD = {
     ]
 };
 
+// INTERCEPTOR HELPER
+async function fetchWithAuth(url, options = {}) {
+    const response = await fetch(url, options);
+
+    if (response.status === 401) {
+        // Clone response to read body
+        const body = await response.clone().json().catch(() => ({}));
+
+        if (body.detail === "token_expired" || body.detail === "token_invalid") {
+            console.error("🔒 Session Expired. Redirecting to login...");
+
+            // CLEAR SESSION
+            localStorage.removeItem("ao_user_id");
+            localStorage.removeItem("ao_user_name");
+
+            // Optional: Call logout endpoint to clear cookie
+            // await fetch("/auth/logout");
+
+            // Redirect
+            window.location.href = "https://accounts.somosao.com/login?redirect=" + encodeURIComponent(window.location.href);
+
+            // Throw error to stop flow
+            throw new Error("Session Expired");
+        }
+    }
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response;
+}
+
+
 export const api = {
     getHeaders() {
         const headers = { "Content-Type": "application/json" };
@@ -55,11 +89,10 @@ export const api = {
     async getBoard(projectId) {
         // return MOCK_BOARD;
         try {
-            const res = await fetch(`${API_BASE}/projects/${projectId}/board`, {
+            const res = await fetchWithAuth(`${API_BASE}/projects/${projectId}/board`, {
                 headers: this.getHeaders(),
                 credentials: "include"
             });
-            if (!res.ok) throw new Error("Failed to fetch");
             return await res.json();
         } catch (e) {
             console.warn("API Error, using mock", e);
@@ -69,7 +102,7 @@ export const api = {
 
     async moveTask(taskId, columnId, index) {
         try {
-            await fetch(`${API_BASE}/tasks/${taskId}/move`, {
+            await fetchWithAuth(`${API_BASE}/tasks/${taskId}/move`, {
                 method: "PUT",
                 headers: this.getHeaders(),
                 body: JSON.stringify({ column_id: columnId, index }),

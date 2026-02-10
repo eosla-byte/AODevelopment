@@ -148,16 +148,19 @@ def get_current_user_id(request: Request):
         return payload.get("sub")
     except jwt.ExpiredSignatureError:
         print("⚠️ [Auth] Token expired.")
-        return None
+        # STRICT: Expired token = 401
+        raise HTTPException(status_code=401, detail="token_expired")
     except jwt.InvalidSignatureError:
         print(f"❌ [Auth] Signature Verification Failed. Used Key: {SECRET_KEY[:4]}... Alg: {alg}")
-        return None
+        raise HTTPException(status_code=401, detail="token_invalid_signature")
     except jwt.InvalidTokenError as e:
         print(f"⚠️ [Auth] Invalid token: {e}")
-        return None
+        raise HTTPException(status_code=401, detail="token_invalid")
     except Exception as e:
         print(f"❌ [Auth] Unexpected JWT Error: {e}")
-        return None
+        # Only fallback to None if it was an internal error unrelated to token validity?
+        # No, safe default is 401 if we had a token and it failed processing.
+        raise HTTPException(status_code=401, detail="token_error")
 
 def get_current_org_id(request: Request):
     # Organization Context Header
