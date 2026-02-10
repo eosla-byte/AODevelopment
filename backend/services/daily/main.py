@@ -647,10 +647,19 @@ def add_task_comment(
         )
         db.add(comment)
         db.commit()
+        # Fetch user name for immediate display
+        user_name = "User"
+        try:
+             u_map = get_user_map([user_id])
+             user_name = u_map.get(user_id, "User")
+        except:
+             pass
+
         return {
             "id": comment.id,
             "content": comment.content,
             "user_id": comment.user_id,
+            "user_name": user_name,
             "created_at": comment.created_at.isoformat() if comment.created_at else None
         }
     finally:

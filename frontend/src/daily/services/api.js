@@ -36,6 +36,20 @@ export const api = {
         if (orgId) {
             headers["X-Organization-ID"] = orgId;
         }
+
+        // Inject User ID if available (Bypass cookie issues)
+        try {
+            const userStr = localStorage.getItem("ao_user");
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                if (user && user.id) {
+                    headers["X-User-ID"] = user.id;
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to parse ao_user for headers", e);
+        }
+
         return headers;
     },
 

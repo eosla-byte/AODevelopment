@@ -116,6 +116,19 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
         }
     };
 
+    const resolveUserName = (id, name) => {
+        if (name && name !== `User ${id}`) return name;
+        const member = members.find(m => m.id === id);
+        return member ? member.name : (id === 'demo-user-id' ? 'Demo User' : `User ${id.substring(0, 5)}...`);
+    };
+
+    const formatTime = (isoString) => {
+        if (!isoString) return 'Just now';
+        return new Date(isoString).toLocaleString('en-US', {
+            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+        });
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={onClose} />
@@ -244,23 +257,34 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                                     </div>
 
                                     {/* Stream */}
-                                    <div className="space-y-4">
-                                        {task.comments && task.comments.map((c, i) => (
-                                            <div key={i} className="flex gap-3 group">
-                                                <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold border-2 border-white shadow-sm shrink-0 mt-1">
-                                                    {(c.user_id || "U").charAt(0).toUpperCase()}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="text-sm font-semibold text-slate-800">{c.user_name || `User ${c.user_id}`}</span>
-                                                        <span className="text-[10px] text-slate-400">{c.created_at ? new Date(c.created_at).toLocaleString() : 'Just now'}</span>
+                                    <div className="space-y-6">
+                                        {task.comments && task.comments.map((c, i) => {
+                                            const displayName = resolveUserName(c.user_id, c.user_name);
+                                            return (
+                                                <div key={i} className="flex gap-4 group animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow-md shrink-0 ring-2 ring-white">
+                                                        {displayName.charAt(0).toUpperCase()}
                                                     </div>
-                                                    <div className="text-sm text-slate-600 mt-0.5 leading-relaxed bg-slate-50 p-2.5 rounded-r-xl rounded-bl-xl inline-block border border-slate-100">
-                                                        {c.content}
+                                                    <div className="flex-1">
+                                                        <div className="flex items-baseline justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-bold text-slate-800">{displayName}</span>
+                                                                <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+                                                                    {c.user_id === 'demo-user-id' ? 'Guest' : 'Member'}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                                                                <Clock size={10} />
+                                                                {formatTime(c.created_at)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="mt-1 text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm">
+                                                            {c.content}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
