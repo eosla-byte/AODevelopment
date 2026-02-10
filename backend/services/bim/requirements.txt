@@ -12,4 +12,6 @@ python-dotenv
 jpype1
 mpxj
 
+PyJWT==2.9.0
+
 bcrypt==4.0.1

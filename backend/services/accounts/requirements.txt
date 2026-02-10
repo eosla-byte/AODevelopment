@@ -12,4 +12,6 @@ python-dotenv
 jinja2
 openai
 
+PyJWT==2.9.0
+
 bcrypt==4.0.1
