@@ -20,6 +20,7 @@ from common.database import get_db, SessionCore
 from common.auth import create_access_token, create_refresh_token, decode_token
 from common.auth_utils import verify_password, get_password_hash # Keep password utils
 import common.models as models 
+from common.models import AccountUser 
 
 # ... (rest of imports)
 
@@ -70,7 +71,7 @@ def run_db_fix():
         db.close()
 
 # --- Auth Helper ---
-def get_active_org_context(db, user: AccountUser):
+def get_active_org_context(db, user: "AccountUser"):
     """
     Determines the active organization context for a user.
     Returns: (org_id, role, services_list) or (None, None, None)
