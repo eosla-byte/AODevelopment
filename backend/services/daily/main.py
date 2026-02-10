@@ -635,9 +635,21 @@ def get_user_map(user_ids: List[str]):
     if not user_ids: return {}
     db = database.SessionCore()
     try:
-        users = db.query(models.User).filter(models.User.id.in_(user_ids)).all()
-        return {u.id: f"{u.first_name} {u.last_name}" for u in users}
-    except Exception:
+        # Use AccountUser for ID-based lookup
+        users = db.query(models.AccountUser).filter(models.AccountUser.id.in_(user_ids)).all()
+        user_map = {u.id: u.full_name for u in users}
+        
+        # Fallback: check AppUser just in case some IDs are emails
+        missing_ids = [uid for uid in user_ids if uid not in user_map]
+        if missing_ids:
+             app_users = db.query(models.AppUser).filter(models.AppUser.email.in_(missing_ids)).all()
+             for au in app_users:
+                 user_map[au.email] = au.full_name
+
+        print(f"🔍 [get_user_map] Requested: {len(user_ids)}, Found: {len(user_map)}")
+        return user_map
+    except Exception as e:
+        print(f"❌ [get_user_map] Error: {e}")
         return {}
     finally:
         db.close()
@@ -654,8 +666,21 @@ def get_project_members(project_id: str):
         users_in_org = []
         
         # 2a. Try Organization ID
+        # 2a. Try Organization ID
         if project.organization_id:
-            users_in_org = db.query(models.User).filter(models.User.organization_id == project.organization_id).all()
+            try:
+                # Use AccountUser joined with OrganizationUser
+                # models.User was mapping to AppUser which has no organization_id
+                users_in_org = db.query(models.AccountUser).join(
+                    models.OrganizationUser, 
+                    models.AccountUser.id == models.OrganizationUser.user_id
+                ).filter(
+                    models.OrganizationUser.organization_id == project.organization_id
+                ).all()
+                print(f"✅ [get_project_members] Found {len(users_in_org)} users in Org {project.organization_id}")
+            except Exception as e:
+                print(f"❌ [get_project_members] Error fetching org users: {e}")
+                users_in_org = []
             
         # 2b. Fallback/Supplement: Check Assigned Collaborators (JSON)
         # assigned_collaborators is { "id": %, ... }
@@ -680,9 +705,15 @@ def get_project_members(project_id: str):
         seen_ids = set()
         
         # Add Org Users first
+        # Add Org Users first
         for u in users_in_org:
             if u.id not in seen_ids:
-                final_members.append({"id": u.id, "name": f"{u.first_name} {u.last_name}", "email": u.email, "role": u.role})
+                final_members.append({
+                    "id": u.id, 
+                    "name": u.full_name, # AccountUser has full_name
+                    "email": u.email, 
+                    "role": getattr(u, 'role', 'Member')
+                })
                 seen_ids.add(u.id)
                 
         # Add Collaborators next
