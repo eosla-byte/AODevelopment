@@ -8,10 +8,12 @@ try:
     from .common import database
     # Import specific models to ensure they are registered with Base
     from .common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
+    from .common.auth_utils import decode_access_token
 except ImportError:
     # Fallback to absolute if running from root without package context (dev)
     from common import database
     from common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
+    from common.auth_utils import decode_access_token
 
 try:
     from .aodev import connector as aodev
@@ -38,14 +40,23 @@ app.add_middleware(
 # -----------------------------------------------------------------------------
 
 def get_current_user_id(request: Request):
-    # For MVP, we accept 'X-User-Email' or 'X-User-ID' header.
-    # PROD: Verify JWT.
+    # 1. Try Header (Microservice/Gateway Internal Call)
     user_id = request.headers.get("X-User-ID")
-    if not user_id:
-        # Fallback for dev - if testing via browser without headers, maybe query param?
-        # Or hardcode a demo user if none provided?
-        return "demo-user-id" 
-    return user_id
+    if user_id:
+        return user_id
+        
+    # 2. Try Cookie (Direct Browser Access)
+    token = request.cookies.get("access_token")
+    if token:
+        payload = decode_access_token(token)
+        if payload and "sub" in payload:
+            # 'sub' usually holds the User ID in our auth_utils
+            return payload["sub"]
+            
+    # 3. Fallback (Development Only)
+    # Return None or raise 401 in Production
+    print("⚠️ [Daily] No auth found, falling back to demo-user-id")
+    return "demo-user-id"
 
 def get_current_org_id(request: Request):
     # Organization Context Header
@@ -681,6 +692,13 @@ def get_project_members(project_id: str):
             except Exception as e:
                 print(f"❌ [get_project_members] Error fetching org users: {e}")
                 users_in_org = []
+        else:
+            print(f"⚠️ [get_project_members] Project {project_id} has no organization_id. Checking if current user connects...")
+            # Fallback: If no org, at least show the creator or owner?
+            # For now, empty list is fine, but we might want to inject "admin" or current user if needed.
+            if project.team_id:
+                 # TODO: Fetch team members
+                 pass
             
         # 2b. Fallback/Supplement: Check Assigned Collaborators (JSON)
         # assigned_collaborators is { "id": %, ... }
@@ -961,6 +979,7 @@ def send_chat(project_id: str, content: str = Body(..., embed=True), user_id: st
     msg = database.add_daily_message(project_id, user_id, content)
     return {"id": msg.id, "status": "sent"}
 
+            
 @app.get("/projects/{project_id}/metrics")
 def get_project_metrics_endpoint(project_id: str):
     metrics = database.get_project_metrics(project_id)
