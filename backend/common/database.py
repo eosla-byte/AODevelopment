@@ -2313,10 +2313,13 @@ def get_user_daily_tasks(user_id: str):
 def add_daily_message(project_id: str, user_id: str, content: str):
     db = SessionOps()
     try:
+        # GT Timezone (UTC-6)
+        gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
         msg = models.DailyMessage(
             project_id=project_id,
             sender_id=user_id,
-            content=content
+            content=content,
+            created_at=datetime.datetime.now(gt_tz)
         )
         db.add(msg)
         db.commit()

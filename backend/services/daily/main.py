@@ -26,7 +26,14 @@ app = FastAPI(title="AOdailyWork")
 app = FastAPI(title="AOdailyWork")
 
 # ALLOW CORS
-origins = ["*"]
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://daily.somosao.com",
+    "https://accounts.somosao.com",
+    "https://bim.somosao.com",
+    "https://aodev.railway.internal"
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
