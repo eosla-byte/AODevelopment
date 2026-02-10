@@ -7,7 +7,7 @@ from jose import JWTError, jwt
 # Configuration
 SECRET_KEY = "AO_RESOURCES_SUPER_SECRET_KEY_CHANGE_THIS_IN_PROD"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 # 24 Hours
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 Days (Temporary Patch)
 
 from passlib.context import CryptContext
 
