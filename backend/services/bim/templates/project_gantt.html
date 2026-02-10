@@ -487,16 +487,14 @@
             console.log("AO Gantt: Starting...");
 
             // --- EMBEDDED FLAG INJECTION ---
-            window.isEmbedded = {{ 'true' if embedded else 'false' }
-        };
+            window.isEmbedded = {{ 'true' if embedded else 'false' }};
         if (window.isEmbedded) {
             document.body.classList.add('embedded-mode');
             // Hide toolbar items if needed, or CSS handles it
         }
 
         try {
-            const serverTasks = {{ tasks | tojson | safe
-        }};
+            const serverTasks = {{ tasks | tojson | safe }};
         console.log("AO Gantt: Tasks loaded:", serverTasks ? serverTasks.length : 0);
         if (serverTasks && serverTasks.length > 0) {
             // DEBUG: Extension checks removed for production
