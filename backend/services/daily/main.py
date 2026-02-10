@@ -58,8 +58,13 @@ def get_current_user_id(request: Request):
     if token:
         payload = decode_access_token(token)
         if payload and "sub" in payload:
-            # 'sub' usually holds the User ID in our auth_utils
             return payload["sub"]
+        else:
+             print(f"❌ [Daily] Token found but invalid or missing sub: {payload}")
+    else:
+        print("⚠️ [Daily] No access_token cookie found.")
+        print(f"   Cookies: {request.cookies.keys()}")
+        print(f"   Headers: {request.headers}")
             
     # 3. Fallback (Development Only)
     # Return None or raise 401 in Production

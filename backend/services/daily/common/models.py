@@ -498,7 +498,7 @@ class DailyTeam(Base):
     organization_id = Column(String, ForeignKey('accounts_organizations.id'), nullable=True) # Multi-tenant link
     owner_id = Column(String, ForeignKey('accounts_users.id')) # Maps to AccountUser
     members = Column(JSON, default=[]) # List of User IDs
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime(timezone=True), default=func.now())
     
     projects = relationship("DailyProject", back_populates="team")
 
@@ -518,7 +518,7 @@ class DailyProject(Base):
     # Settings
     settings = Column(JSON, default={}) # { "background": "...", "features": ["chat", "kanban"] }
     
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime(timezone=True), default=func.now())
     created_by = Column(String)
     
     team = relationship("DailyTeam", back_populates="projects")
@@ -552,7 +552,7 @@ class DailyTask(Base):
     # Metadata
     priority = Column(String, default="Medium") # Low, Medium, High, Urgent
     status = Column(String, default="Pending") # Pending, In Progress, Done
-    due_date = Column(DateTime, nullable=True)
+    due_date = Column(DateTime(timezone=True), nullable=True)
     
     # Assignment
     assignees = Column(JSON, default=[]) # List of User IDs
@@ -564,8 +564,8 @@ class DailyTask(Base):
     attachments = Column(JSON, default=[]) # [{name: "file.png", url: "..."}]
     
     # Activity
-    created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime(timezone=True), default=func.now())
+    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now())
     
     # Manager Mode (Direct Assignment without Project)
     is_direct_assignment = Column(Boolean, default=False)
@@ -588,7 +588,7 @@ class DailyComment(Base):
     # Reactions
     reactions = Column(JSON, default={}) # { "👍": ["user1", "user2"] }
     
-    created_at = Column(DateTime, default=func.now())
+    created_at = Column(DateTime(timezone=True), default=func.now())
     
     task = relationship("DailyTask", back_populates="comments")
     replies = relationship("DailyComment", remote_side=[id]) # Self-referential
