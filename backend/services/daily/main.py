@@ -48,6 +48,7 @@ app.add_middleware(
 # -----------------------------------------------------------------------------
 @app.on_event("startup")
 async def run_migrations():
+    print("🚀 [Daily] SERVER STARTING - DEPLOYMENT_V_FINAL_FIX")
     print("🔄 [Daily] Checking Schema Migrations...")
     try:
         from sqlalchemy import text
