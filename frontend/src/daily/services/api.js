@@ -75,35 +75,67 @@ async function fetchWithAuth(url, options = {}) {
 
 // INTERCEPTOR HELPER
 async function fetchWithAuth(url, options = {}) {
-    const response = await fetch(url, options);
+    try {
+        const response = await fetch(url, options);
 
-    if (response.status === 401) {
-        // Clone response to read body
-        const body = await response.clone().json().catch(() => ({}));
+        if (response.status === 401) {
+            // Clone to read body safely
+            const body = await response.clone().json().catch(() => ({}));
+            const error = body.detail || body.error;
 
-        if (body.detail === "token_expired" || body.detail === "token_invalid") {
-            console.error("🔒 Session Expired. Redirecting to login...");
+            // 1. ATTEMPT REFRESH (If Specific Error)
+            if (error === "token_expired") {
+                console.log("🔄 Token Expired. Attempting Refresh...");
+                try {
+                    // MUST call Accounts Service for refresh
+                    const refreshRes = await fetch("https://accounts.somosao.com/auth/refresh", {
+                        method: "POST",
+                        credentials: "include"
+                    });
 
-            // CLEAR SESSION
-            localStorage.removeItem("ao_user_id");
-            localStorage.removeItem("ao_user_name");
+                    if (refreshRes.ok) {
+                        console.log("✅ Token Refreshed. Retrying original request...");
+                        return await fetch(url, options);
+                    } else {
+                        console.error("❌ Refresh Failed.");
+                    }
+                } catch (refreshErr) {
+                    console.error("❌ Refresh Error", refreshErr);
+                }
+            }
 
-            // Optional: Call logout endpoint to clear cookie
-            // await fetch("/auth/logout");
+            // 2. FORCE LOGIN (If Refresh Failed or Other 401)
+            // Strict check for signals that mean "Log in again"
+            if (error === "token_expired" || error === "token_invalid" || error === "token_invalid_signature" || error === "UNAUTHORIZED" || response.status === 401) {
+                console.error("🔒 Session Invalid. Redirecting to login...");
 
-            // Redirect
-            window.location.href = "https://accounts.somosao.com/login?redirect=" + encodeURIComponent(window.location.href);
+                // CLEAR SESSION
+                localStorage.removeItem("ao_user_id");
+                localStorage.removeItem("ao_user_name");
+                localStorage.removeItem("ao_org_id");
 
-            // Throw error to stop flow
-            throw new Error("Session Expired");
+                // ATTEMPT SERVER LOGOUT (Best Effort)
+                try {
+                    await fetch("https://accounts.somosao.com/auth/logout");
+                } catch (e) { /* ignore */ }
+
+                // REDIRECT
+                const currentUrl = window.location.href;
+                window.location.href = "https://accounts.somosao.com/login?redirect=" + encodeURIComponent(currentUrl);
+
+                throw new Error("SESSION_EXPIRED");
+            }
         }
-    }
 
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
+        if (!response.ok) {
+            // Pass through other errors
+        }
 
-    return response;
+        return response;
+    } catch (e) {
+        if (e.message === "SESSION_EXPIRED") throw e;
+        throw e;
+    }
 }
 
 
