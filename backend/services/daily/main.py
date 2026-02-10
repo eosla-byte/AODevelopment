@@ -73,28 +73,43 @@ async def run_migrations():
 # -----------------------------------------------------------------------------
 
 def get_current_user_id(request: Request):
-    # 1. Try Header (Microservice/Gateway Internal Call)
-    user_id = request.headers.get("X-User-ID")
-    if user_id:
-        return user_id
+    """
+    Strict Auth:
+    1. Check Authorization Header (Bearer)
+    2. Check cookies (access_token or accounts_access_token)
+    3. Decode JWT to get 'sub' (User ID)
+    4. If fails/missing -> Return None (Guest Mode) - DO NOT TRUST X-User-ID
+    """
+    import jwt
+    import os
+    
+    token = None
+    
+    # 1. Bearer Header
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+         token = auth_header.split(" ")[1]
+         
+    # 2. Cookies (HttpOnly)
+    if not token:
+        token = request.cookies.get("access_token") or request.cookies.get("accounts_access_token")
         
-    # 2. Try Cookie (Direct Browser Access)
-    token = request.cookies.get("access_token")
-    if token:
-        payload = decode_access_token(token)
-        if payload and "sub" in payload:
-            return payload["sub"]
-        else:
-             print(f"❌ [Daily] Token found but invalid or missing sub: {payload}")
-    else:
-        print("⚠️ [Daily] No access_token cookie found.")
-        print(f"   Cookies: {request.cookies.keys()}")
-        print(f"   Headers: {request.headers}")
-            
-    # 3. Fallback (Development Only)
-    # Return None or raise 401 in Production
-    print("⚠️ [Daily] No auth found, falling back to demo-user-id")
-    return "demo-user-id"
+    if not token:
+        # print("⚠️ [Auth] No token found. Guest Mode.")
+        return None
+        
+    try:
+        # DECODE JWT (HS256)
+        # We need the SECRET_KEY. Ideally from env. Using the common one for now.
+        SECRET_KEY = os.getenv("SECRET_KEY", "ao_secret_key_2024")
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return payload.get("sub")
+    except jwt.ExpiredSignatureError:
+        print("⚠️ [Auth] Token expired.")
+        return None
+    except jwt.InvalidTokenError:
+        print("⚠️ [Auth] Invalid token.")
+        return None
 
 def get_current_org_id(request: Request):
     # Organization Context Header
@@ -653,9 +668,11 @@ def update_task_details(
 def add_task_comment(
     task_id: str,
     content: str = Body(..., embed=True),
+    guest_label: str = Body(None, embed=True), # Explicit guest name from UI if unauthed
     user_id: str = Depends(get_current_user_id),
     request: Request = None
 ):
+    import datetime
     db = database.SessionOps()
     try:
         # Verify task exists
@@ -663,50 +680,53 @@ def add_task_comment(
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
             
-        # GT Timezone (UTC-6)
-        gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
-        now_gt = datetime.datetime.now(gt_tz)
+        # Timezone: Store in UTC (Best Practice)
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
         
+        # DETERMINE AUTHOR
+        final_user_id = user_id
+        final_user_name = None
+        
+        if user_id:
+             # Authenticated User
+             pass
+        else:
+             # Guest
+             final_user_id = None 
+             final_user_name = guest_label or "Guest"
+
         comment = DailyComment(
             task_id=task_id,
-            user_id=user_id,
+            user_id=final_user_id, # Null if guest
+            user_name=final_user_name, # "Guest X" or Null (if user)
             content=content,
-            created_at=now_gt
+            created_at=now_utc
         )
         db.add(comment)
         db.commit()
-        # 1. OPTIMISTIC NAME RESOLUTION (Trust Header First for UI Speed)
-        header_name = request.headers.get("X-User-Name")
-        if header_name and header_name != "User":
-             user_name = header_name
-             print(f"✅ [add_comment] Using Header Name: {user_name}")
-        else:
-             # Fallback to DB
-             try:
-                 u_map = get_user_map([user_id])
-                 user_name = u_map.get(user_id, "User")
-             except:
-                 user_name = "User"
-        
-        # PERSIST NAME TO DB (Fixes Reload Issue)
-        try:
-            comment.user_name = user_name
-            db.commit()
-        except Exception as e:
-            print(f"⚠️ [add_comment] Failed to save user_name: {e}")
 
-        # 2. TIMEZONE HANDLING (Explicit)
-        # now_gt is already UTC-6. We format it as a string for the UI.
-        formatted_time = now_gt.strftime("%b %d, %I:%M %p")
-        print(f"🕒 [add_comment] Server Display Time: {formatted_time}")
+        # RETURN PAYLOAD (With Resolved Author)
+        author_data = {
+             "type": "guest" if not final_user_id else "user",
+             "id": final_user_id,
+             "displayName": final_user_name or "Unknown User", 
+             "avatarUrl": None
+        }
+        
+        # If it was a real user, try to fetch name for immediate response
+        if final_user_id:
+             try:
+                 u_map = get_user_map([final_user_id])
+                 if final_user_id in u_map:
+                      author_data["displayName"] = u_map[final_user_id]
+             except:
+                 pass
 
         return {
             "id": comment.id,
             "content": comment.content,
-            "user_id": comment.user_id,
-            "user_name": user_name,
-            "created_at": comment.created_at.isoformat() if comment.created_at else None,
-            "formatted_time": formatted_time
+            "createdAt": comment.created_at.isoformat(), # UTC with Z
+            "author": author_data
         }
     finally:
         db.close()
@@ -820,6 +840,7 @@ def get_project_members(project_id: str):
 
 @app.get("/tasks/{task_id}")
 def get_task_details(task_id: str):
+    import datetime
     db = database.SessionOps()
     try:
         task = db.query(DailyTask).filter(DailyTask.id == task_id).first()
@@ -829,39 +850,53 @@ def get_task_details(task_id: str):
         # Get Comments
         comments = db.query(DailyComment).filter(DailyComment.task_id == task_id).order_by(DailyComment.created_at.desc()).all()
         
-        # Resolve User Names
-        user_ids = list(set([c.user_id for c in comments]))
-        user_map = get_user_map(user_ids)
+        # BATCH FETCH AUTHORS
+        # Collect all non-null user_ids
+        user_ids = list(set([c.user_id for c in comments if c.user_id]))
+        
+        # Query Core DB
+        user_map = {}
+        if user_ids:
+             user_map = get_user_map(user_ids)
+             
+        # Check for missing users
+        for uid in user_ids:
+             if uid not in user_map:
+                  # print(f"⚠️ [get_task_details] User not found: {uid}")
+                  pass
         
         formatted_comments = []
         for c in comments:
-            # Server-side formatted time
-            # Check model user_name first, then map, then ID
-            stored_name = getattr(c, 'user_name', None)
-            if stored_name and stored_name != "User":
-                  u_name = stored_name
+            # Resolve Author
+            if c.user_id:
+                 # It's a User
+                 display_name = user_map.get(c.user_id, "Unknown User")
+                 author_type = "user"
             else:
-                  u_name = user_map.get(c.user_id)
-                  if not u_name:
-                       u_name = f"User {c.user_id[:5]}..." if len(c.user_id) > 5 else c.user_id
+                 # It's a Guest
+                 display_name = c.user_name or "Guest"
+                 author_type = "guest"
             
-            # Timezone logic (Naive -> UTC -> GT)
-            if c.created_at.tzinfo is None:
-                 gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
-                 c.created_at = c.created_at.replace(tzinfo=datetime.timezone.utc).astimezone(gt_tz)
-            else:
-                 gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
-                 c.created_at = c.created_at.astimezone(gt_tz)
+            # UTC ISO for Frontend
+            created_iso = c.created_at.isoformat() if c.created_at else None
+            # If created_at is naive, assume UTC (since we are moving to that)
+            if c.created_at: 
+                 if c.created_at.tzinfo is None:
+                     created_iso = c.created_at.replace(tzinfo=datetime.timezone.utc).isoformat()
+                 else:
+                     # Convert to UTC ISO just to be standard
+                     created_iso = c.created_at.astimezone(datetime.timezone.utc).isoformat()
 
-            fmt_time = c.created_at.strftime("%b %d, %I:%M %p")
-            
             formatted_comments.append({
                 "id": c.id,
                 "content": c.content,
-                "user_id": c.user_id,
-                "user_name": u_name,
-                "created_at": c.created_at.isoformat(),
-                "formatted_time": fmt_time
+                "createdAt": created_iso,
+                "author": {
+                     "id": c.user_id,
+                     "type": author_type,
+                     "displayName": display_name,
+                     "avatarUrl": None 
+                }
             })
         
         return {

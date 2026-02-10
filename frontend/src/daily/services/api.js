@@ -37,45 +37,17 @@ export const api = {
             headers["X-Organization-ID"] = orgId;
         }
 
-        // Guarantee Identity exists
-        let userStr = localStorage.getItem("ao_user");
-        if (!userStr) {
-            const genId = "guest-" + Math.random().toString(36).substr(2, 9);
-            const genUser = { id: genId, full_name: "Guest User", name: "Guest" };
-            localStorage.setItem("ao_user", JSON.stringify(genUser));
-            userStr = JSON.stringify(genUser);
-            console.log("⚠️ [Auth] Generated temporary Guest Identity:", genUser);
-        }
+        // REFACTOR: Strict Cookie Auth. 
+        // We do NOT send X-User-ID or X-User-Name from localStorage for authenticated users.
+        // The backend must rely on the httpOnly cookie.
 
-        // Inject User ID & Name
-        try {
-            const user = JSON.parse(userStr);
-            if (user && user.id) {
-                headers["X-User-ID"] = user.id;
-                // Prioritize full_name, then name, then fallback
-                const name = user.full_name || user.name || "Guest";
-                headers["X-User-Name"] = name;
-            }
-        } catch (e) {
-            console.warn("Failed to parse ao_user for headers", e);
-        }
-        try {
-            const userStr = localStorage.getItem("ao_user");
-            if (userStr) {
-                const user = JSON.parse(userStr);
-                if (user && user.id) {
-                    headers["X-User-ID"] = user.id;
-                    if (user.full_name) {
-                        // Send name to avoid "User" fallback if DB lookup fails
-                        headers["X-User-Name"] = user.full_name;
-                    } else if (user.name) {
-                        headers["X-User-Name"] = user.name;
-                    }
-                }
-            }
-        } catch (e) {
-            console.warn("Failed to parse ao_user for headers", e);
-        }
+        // GUEST HANDLING
+        // If the user explicitly wants to be a guest (no ao_user logged in),
+        // we might send a guest label.
+        // But for now, let's just NOT send false identities.
+
+        // Exception: If we want to support "Guest Mode" where the user types a name without account,
+        // that name should be passed in the BODY of the comment request, not headers.
 
         return headers;
     },

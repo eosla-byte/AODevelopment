@@ -116,19 +116,8 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
         }
     };
 
-    const resolveUserName = (id, name) => {
-        if (name && name !== `User ${id}`) return name;
-        const member = members.find(m => m.id === id);
-        return member ? member.name : (id === 'demo-user-id' ? 'Demo User' : `User ${id.substring(0, 5)}...`);
-    };
-
-    const formatTime = (isoString, backendFormatted) => {
-        if (backendFormatted) return backendFormatted;
-        if (!isoString) return 'Just now';
-        return new Date(isoString).toLocaleString('en-US', {
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-        });
-    };
+    // formatTime and resolveUserName are no longer used locally.
+    // The rendering logic was moved directly into the map loop.
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
@@ -260,23 +249,48 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                                     {/* Stream */}
                                     <div className="space-y-6">
                                         {task.comments && task.comments.map((c, i) => {
-                                            const displayName = resolveUserName(c.user_id, c.user_name);
+                                            // New Backend Logic: 'author' object + 'createdAt' (ISO UTC)
+                                            // Fallback to legacy fields if necessary
+                                            const authorName = c.author?.displayName || c.user_name || "Unknown";
+                                            const authorType = c.author?.type || (c.user_id ? "user" : "guest");
+
+                                            // Initial for Avatar
+                                            const initial = authorName.charAt(0).toUpperCase();
+
+                                            // Date Formatting (Browser Local Time)
+                                            // We prefer 'createdAt' ISO from backend.
+                                            const dateStr = c.createdAt || c.created_at;
+                                            let timeDisplay = "Just now";
+                                            if (dateStr) {
+                                                try {
+                                                    timeDisplay = new Date(dateStr).toLocaleString('es-GT', {
+                                                        month: 'short', day: 'numeric',
+                                                        hour: 'numeric', minute: '2-digit',
+                                                        hour12: true
+                                                    });
+                                                } catch (e) {
+                                                    timeDisplay = dateStr;
+                                                }
+                                            }
+
                                             return (
                                                 <div key={i} className="flex gap-4 group animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-sm font-bold shadow-md shrink-0 ring-2 ring-white">
-                                                        {displayName.charAt(0).toUpperCase()}
+                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-md shrink-0 ring-2 ring-white ${authorType === 'guest' ? 'bg-slate-400 text-white' : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
+                                                        }`}>
+                                                        {initial}
                                                     </div>
                                                     <div className="flex-1">
                                                         <div className="flex items-baseline justify-between">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-bold text-slate-800">{displayName}</span>
-                                                                <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
-                                                                    {c.user_id === 'demo-user-id' ? 'Guest' : 'Member'}
+                                                                <span className="text-sm font-bold text-slate-800">{authorName}</span>
+                                                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${authorType === 'guest' ? 'text-slate-500 bg-slate-100' : 'text-blue-600 bg-blue-50'
+                                                                    }`}>
+                                                                    {authorType === 'guest' ? 'Guest' : 'Member'}
                                                                 </span>
                                                             </div>
                                                             <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
                                                                 <Clock size={10} />
-                                                                {formatTime(c.created_at, c.formatted_time)}
+                                                                {timeDisplay}
                                                             </span>
                                                         </div>
                                                         <div className="mt-1 text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm">
