@@ -251,8 +251,9 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                                         {task.comments && task.comments.map((c, i) => {
                                             // New Backend Logic: 'author' object + 'createdAt' (ISO UTC)
                                             // Fallback to legacy fields if necessary
-                                            const authorName = c.author?.displayName || c.user_name || "Unknown";
-                                            const authorType = c.author?.type || (c.user_id ? "user" : "guest");
+                                            const authorObj = c.author || {};
+                                            const authorName = authorObj.displayName || c.user_name || "Unknown";
+                                            const authorType = authorObj.type || (c.user_id ? "user" : "guest");
 
                                             // Initial for Avatar
                                             const initial = authorName.charAt(0).toUpperCase();

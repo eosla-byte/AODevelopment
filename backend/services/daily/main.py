@@ -121,8 +121,11 @@ def get_current_user_id(request: Request):
     except jwt.ExpiredSignatureError:
         print("⚠️ [Auth] Token expired.")
         return None
-    except jwt.InvalidTokenError:
-        print("⚠️ [Auth] Invalid token.")
+    except jwt.InvalidTokenError as e:
+        print(f"⚠️ [Auth] Invalid token: {e}")
+        return None
+    except Exception as e:
+        print(f"❌ [Auth] Unexpected JWT Error: {e}")
         return None
 
 def get_current_org_id(request: Request):
@@ -698,16 +701,20 @@ def add_task_comment(
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         
         # DETERMINE AUTHOR
-        final_user_id = user_id
+        final_user_id = None
         final_user_name = None
+        author_type = "guest"
         
         if user_id:
              # Authenticated User
-             pass
+             final_user_id = user_id
+             author_type = "user"
+             # user_name left as None, to be resolved via get_user_map
         else:
              # Guest
              final_user_id = None 
              final_user_name = guest_label or "Guest"
+             author_type = "guest"
 
         comment = DailyComment(
             task_id=task_id,
@@ -720,22 +727,26 @@ def add_task_comment(
         db.commit()
 
         # RETURN PAYLOAD (With Resolved Author)
-        author_data = {
-             "type": "guest" if not final_user_id else "user",
-             "id": final_user_id,
-             "displayName": final_user_name or "Unknown User", 
-             "avatarUrl": None
-        }
-        
-        # If it was a real user, try to fetch name for immediate response
+        # Attempt immediate resolution for UX
+        display_name = final_user_name or "Guest"
         if final_user_id:
              try:
                  u_map = get_user_map([final_user_id])
                  if final_user_id in u_map:
-                      author_data["displayName"] = u_map[final_user_id]
+                      display_name = u_map[final_user_id]
+                 else:
+                      display_name = "Unknown User"
              except:
+                 display_name = "Unknown User"
                  pass
 
+        author_data = {
+             "id": final_user_id,
+             "type": author_type,
+             "displayName": display_name,
+             "avatarUrl": None
+        }
+        
         return {
             "id": comment.id,
             "content": comment.content,
@@ -882,17 +893,24 @@ def get_task_details(task_id: str):
         formatted_comments = []
         for c in comments:
             # Resolve Author
-            if c.user_id:
-                 # It's a User
-                 display_name = user_map.get(c.user_id, "Unknown User")
-                 author_type = "user"
-            else:
-                 # It's a Guest
-                 display_name = c.user_name or "Guest"
-                 author_type = "guest"
+            # Fallback logic: 
+            # 1. If user_id exists -> Try Map -> Fallback "Unknown User"
+            # 2. If guest -> Use stored name or "Guest"
             
+            display_name = "Guest"
+            author_type = "guest"
+            avatar_url = None
+            
+            if c.user_id:
+                 author_type = "user"
+                 display_name = user_map.get(c.user_id, "Unknown User")
+            else:
+                 author_type = "guest"
+                 display_name = c.user_name or "Guest"
+
             # UTC ISO for Frontend
             created_iso = c.created_at.isoformat() if c.created_at else None
+            # If created_at is naive, assume UTC (since we are moving to that)
             if c.created_at: 
                  if c.created_at.tzinfo is None:
                      created_iso = c.created_at.replace(tzinfo=datetime.timezone.utc).isoformat()
@@ -906,8 +924,8 @@ def get_task_details(task_id: str):
                 "author": {
                      "id": c.user_id,
                      "type": author_type,
-                     "displayName": display_name or "Guest", # Fallback guarantee
-                     "avatarUrl": None 
+                     "displayName": display_name,
+                     "avatarUrl": avatar_url 
                 }
             })
         
