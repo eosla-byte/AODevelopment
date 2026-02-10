@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends, HTTPException, status, Form
+from fastapi import FastAPI, Request, Depends, HTTPException, status, Form, Body
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
@@ -17,11 +17,14 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from common.database import get_db, SessionCore 
-from common.auth import create_access_token, create_refresh_token, decode_token, AO_JWT_SECRET
+from common.auth import create_access_token, create_refresh_token, decode_token
 from common.auth_utils import verify_password, get_password_hash # Keep password utils
 import common.models as models 
 
 # ... (rest of imports)
+
+
+app = FastAPI(title="AO Accounts Service")
 
 @app.on_event("startup")
 # ... (startup logic same)
@@ -187,10 +190,14 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             secure=True, 
             domain=".somosao.com"
         )
+        response.set_cookie(
+            key="accounts_refresh_token",
+            value=refresh_token,
             httponly=True,
             samesite="none",
             secure=True, 
-            domain=".somosao.com"
+            domain=".somosao.com",
+            max_age=7 * 24 * 60 * 60
         )
         
         print(f"Login Success: {user.email} (Org: {org_id})")
@@ -574,96 +581,65 @@ async def refresh_token_endpoint(request: Request):
     """
     refresh_token = request.cookies.get("accounts_refresh_token")
     if not refresh_token:
-        # Prevent loop, but maybe frontend needs a signal?
         return JSONResponse({"status": "error", "message": "No refresh token"}, status_code=401)
         
     try:
         # Validate
-        payload = decode_access_token(refresh_token)
+        payload = decode_token(refresh_token)
         if not payload or payload.get("type") != "refresh":
-             # Revocation check would go here
              return JSONResponse({"status": "error", "message": "Invalid refresh token"}, status_code=401)
              
         email = payload.get("sub")
         
         # Verify User & Context
         db = SessionCore()
-        user = db.query(AccountUser).filter(AccountUser.email == email).first()
-        if not user:
-             db.close()
-             return JSONResponse({"status": "error", "message": "User not found"}, status_code=401)
-             
-        # CONTEXT RE-EVALUATION
-        org_id, org_role, services = get_active_org_context(db, user)
-        
-        if not org_id:
-            # User has multiple orgs but no active context.
-            # We cannot issue a functional access token for services without org_id.
-            # We return 409 Conflict -> "ORG_REQUIRED"
-            db.close()
-            return JSONResponse({"status": "error", "message": "Organization selection required", "code": "ORG_REQUIRED"}, status_code=409)
+        try:
+            user = db.query(AccountUser).filter(AccountUser.email == email).first()
+            if not user:
+                 return JSONResponse({"status": "error", "message": "User not found"}, status_code=401)
+                 
+            # CONTEXT RE-EVALUATION
+            org_id, org_role, services = get_active_org_context(db, user)
+            
+            if not org_id:
+                return JSONResponse({"status": "error", "message": "Organization selection required", "code": "ORG_REQUIRED"}, status_code=409)
 
-        # Issue New Access Token
-        claims = {
-            "sub": user.email, 
-            "id": user.id,
-            "role": org_role if org_role else user.role,
-            "org_id": org_id,
-            "services": services or []
-        }
-        
-    access_token = create_access_token(data=claims)
-        
-        response = JSONResponse({"status": "ok", "token": access_token})
-        
-        # Update Cookie
-        response.set_cookie(
-            key="accounts_access_token", 
-            value=access_token, 
-            httponly=True,
-            samesite="none",
-            secure=True, 
-            domain=".somosao.com"
-        )
-        # Fallback
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            samesite="lax",
-            secure=False
-        )
-        
-        return response
-    finally:
-        db.close()
-        # If we rotate, we need to set the cookie again.
-        
-        db.close()
-        
-        response = JSONResponse({"status": "ok", "message": "Token refreshed", "org_id": org_id})
-        
-        # 1. ACCOUNTS Cookie
-        response.set_cookie(
-            key="accounts_access_token", 
-            value=access_token, 
-            httponly=True,
-            samesite="none",
-            secure=True, 
-            domain=".somosao.com"
-        )
-        
-        # 2. FALLBACK Cookie
-        response.set_cookie(
-            key="access_token", 
-            value=access_token, 
-            httponly=True,
-            samesite="lax",
-            secure=False
-        )
-        
-        return response
-        
+            # Issue New Access Token
+            claims = {
+                "sub": user.id,
+                "email": user.email,
+                "role": org_role if org_role else user.role,
+                "org_id": org_id,
+                "services": services or []
+            }
+            
+            access_token = create_access_token(data=claims)
+            
+            response = JSONResponse({"status": "ok", "message": "Token refreshed", "org_id": org_id})
+            
+            # 1. ACCOUNTS Cookie
+            response.set_cookie(
+                key="accounts_access_token", 
+                value=access_token, 
+                httponly=True,
+                samesite="none",
+                secure=True, 
+                domain=".somosao.com"
+            )
+            
+            # 2. FALLBACK Cookie
+            response.set_cookie(
+                key="access_token", 
+                value=access_token, 
+                httponly=True,
+                samesite="lax",
+                secure=False
+            )
+            
+            return response
+        finally:
+            db.close()
+            
     except Exception as e:
         print(f"Refresh Error: {e}")
         return JSONResponse({"status": "error", "message": "Refresh failed"}, status_code=401)
