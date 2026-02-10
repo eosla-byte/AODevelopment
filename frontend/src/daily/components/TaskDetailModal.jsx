@@ -122,7 +122,8 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
         return member ? member.name : (id === 'demo-user-id' ? 'Demo User' : `User ${id.substring(0, 5)}...`);
     };
 
-    const formatTime = (isoString) => {
+    const formatTime = (isoString, backendFormatted) => {
+        if (backendFormatted) return backendFormatted;
         if (!isoString) return 'Just now';
         return new Date(isoString).toLocaleString('en-US', {
             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
@@ -275,7 +276,7 @@ const TaskDetailModal = ({ task: initialTask, onClose, onUpdate }) => {
                                                             </div>
                                                             <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
                                                                 <Clock size={10} />
-                                                                {formatTime(c.created_at)}
+                                                                {formatTime(c.created_at, c.formatted_time)}
                                                             </span>
                                                         </div>
                                                         <div className="mt-1 text-sm text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-2xl rounded-tl-none border border-slate-100 shadow-sm">

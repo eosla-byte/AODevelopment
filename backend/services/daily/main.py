@@ -655,12 +655,16 @@ def add_task_comment(
         except:
              pass
 
+        # Format for Social UI
+        formatted_time = comment.created_at.strftime("%b %d, %I:%M %p")
+
         return {
             "id": comment.id,
             "content": comment.content,
             "user_id": comment.user_id,
             "user_name": user_name,
-            "created_at": comment.created_at.isoformat() if comment.created_at else None
+            "created_at": comment.created_at.isoformat() if comment.created_at else None,
+            "formatted_time": formatted_time
         }
     finally:
         db.close()
@@ -787,16 +791,34 @@ def get_task_details(task_id: str):
         user_ids = list(set([c.user_id for c in comments]))
         user_map = get_user_map(user_ids)
         
-        formatted_comments = [
-            {
+        formatted_comments = []
+        for c in comments:
+            # Server-side formatted time (Guatemala/Central)
+            # Ensure it is timezone aware before converting
+            if c.created_at.tzinfo is None:
+                 gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
+                 # If naive, assume UTC and convert? Or assume it IS UTC?
+                 # If stored as naive in broken state, it might be UTC.
+                 # Let's force it to be treated as UTC then convert to GT
+                 c.created_at = c.created_at.replace(tzinfo=datetime.timezone.utc).astimezone(gt_tz)
+            else:
+                 gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
+                 c.created_at = c.created_at.astimezone(gt_tz)
+
+            fmt_time = c.created_at.strftime("%b %d, %I:%M %p")
+            
+            u_name = user_map.get(c.user_id)
+            if not u_name:
+                 u_name = f"User {c.user_id[:5]}..." if len(c.user_id) > 5 else c.user_id
+            
+            formatted_comments.append({
                 "id": c.id,
                 "content": c.content,
                 "user_id": c.user_id,
-                "user_name": user_map.get(c.user_id, f"User {c.user_id}"),
-                "created_at": c.created_at.isoformat() if c.created_at else None
-            }
-            for c in comments
-        ]
+                "user_name": u_name,
+                "created_at": c.created_at.isoformat(),
+                "formatted_time": fmt_time
+            })
         
         return {
             "id": task.id,
