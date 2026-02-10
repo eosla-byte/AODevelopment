@@ -9,8 +9,12 @@ import uuid
 import datetime
 from typing import List, Optional
 
+
+
 # Path Setup
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 # Local imports (common is now partially vendored or in path)
 if BASE_DIR not in sys.path:
@@ -22,10 +26,20 @@ from common.auth_utils import verify_password, get_password_hash # Keep password
 import common.models as models 
 from common.models import AccountUser 
 
-# ... (rest of imports)
-
+# Initialize Templates
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 app = FastAPI(title="AO Accounts Service")
+
+# Mount Static if exists
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+else:
+    # Create it to prevent future errors? Or just don't mount.
+    # User asked to mount it.
+    os.makedirs(STATIC_DIR, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 
 @app.on_event("startup")
 async def startup_event():
