@@ -40,20 +40,40 @@ function Layout({ children, user }) {
     );
 }
 
+import { api } from './services/api';
+
 function App() {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check for existing session (Mock)
-        const savedUser = localStorage.getItem("ao_user");
+        const bootstrap = async () => {
+            try {
+                // 1. Strict Session Check
+                // If token expired, api.init() trigger fetchWithAuth -> 401 -> Redirect.
+                // We won't even reach setUser if that happens (exception thrown).
+                const data = await api.init();
 
-        setTimeout(() => {
-            if (savedUser) {
-                setUser(JSON.parse(savedUser));
+                // 2. Set User from Backend Source of Truth
+                if (data && data.user_id) {
+                    // We might want to fetch full profile or just use what we have.
+                    // For now, let's trust localStorage "cache" for name/email if backend only returns ID,
+                    // OR update logic to fetch full profile.
+                    // The /init endpoint returns { user_id, teams }.
+                    // We can keep using localStorage for display name for now, or fetch it.
+                    const stored = JSON.parse(localStorage.getItem("ao_user") || "{}");
+                    setUser({ ...stored, id: data.user_id });
+                }
+                setLoading(false);
+            } catch (e) {
+                console.error("Bootstrap Failed", e);
+                // If error wasn't a redirect (e.g. Network Error), we might show error or keep loading?
+                // But fetchWithAuth handles SESSION_EXPIRED.
+                setLoading(false);
             }
-            setLoading(false);
-        }, 500);
+        };
+
+        bootstrap();
     }, []);
 
     if (loading) return <InitLoading />;

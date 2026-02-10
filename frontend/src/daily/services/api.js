@@ -284,5 +284,28 @@ export const api = {
         });
         if (!res.ok) throw new Error("Failed to create project");
         return await res.json();
+    },
+
+    // --- Session Management ---
+    async init() {
+        // Bootstrap call. If 401, interceptor redirects.
+        const res = await fetchWithAuth(`/init`, {
+            headers: this.getHeaders(),
+            credentials: "include"
+        });
+        return await res.json();
+    },
+
+    async logout() {
+        try {
+            await fetch("https://accounts.somosao.com/auth/logout", {
+                method: "POST",
+                credentials: "include"
+            });
+        } catch (e) { console.error("Logout error", e); }
+
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.href = "https://accounts.somosao.com/login";
     }
 };

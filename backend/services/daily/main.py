@@ -516,34 +516,40 @@ def create_project(
 
 
 @app.get("/org-users")
-def get_organization_users(org_id: str = Depends(get_current_org_id)):
+def get_organization_users(
+    org_id: str = Depends(get_current_org_id),
+    user_id: str = Depends(get_current_user_id) # Strict Auth Gate
+):
     if not org_id:
         return []
-    print(f"🔍 [API] /org-users requested for Org: {org_id}")
+    print(f"🔍 [API] /org-users requested for Org: {org_id} by User: {user_id}")
     users = database.get_org_users(org_id)
     print(f"✅ [API] Found {len(users)} users")
     return users
 
 @app.get("/my-organizations")
-def get_my_organizations(email: str):
-    print(f"🔍 [API] /my-organizations requested for: {email}")
+def get_my_organizations(email: str, user_id: str = Depends(get_current_user_id)):
+    print(f"🔍 [API] /my-organizations requested for: {email} (Auth: {user_id})")
     orgs = database.get_user_organizations(email)
     print(f"✅ [API] Found {len(orgs)} orgs")
     return orgs
 
 @app.get("/bim-projects")
-def get_available_bim_projects(org_id: str = Depends(get_current_org_id)):
+def get_available_bim_projects(
+    org_id: str = Depends(get_current_org_id),
+    user_id: str = Depends(get_current_user_id) # Strict Auth Gate
+):
     if not org_id:
         return []
     # Fetching Project Profiles (resources_projects) instead of bim_projects
     # because that is what the user understands as "Projects" to link.
-    print(f"🔍 [API] /bim-projects requested for Org: {org_id}")
+    print(f"🔍 [API] /bim-projects requested for Org: {org_id} by User: {user_id}")
     projects = database.get_org_projects(org_id)
     print(f"✅ [API] Found {len(projects)} projects")
     return [{"id": p.id, "name": p.name} for p in projects]
 
 @app.get("/projects/{project_id}/board")
-def get_project_board_view(project_id: str):
+def get_project_board_view(project_id: str, user_id: str = Depends(get_current_user_id)):
     proj = database.get_daily_project_board(project_id)
     if not proj:
         raise HTTPException(status_code=404, detail="Project not found")
