@@ -31,8 +31,8 @@ class Project(Base):
     additional_time_months = Column(Float, default=0.0)
     archived = Column(Boolean, default=False)
 
-    # Core Project Profile Fields (Added via Migration)
-    organization_id = Column(String, nullable=True)
+    # Core Project Profile Fields
+    organization_id = Column(String, ForeignKey('accounts_organizations.id', ondelete="CASCADE"), nullable=False, index=True)
     project_cost = Column(Float, default=0.0)
     sq_meters = Column(Float, default=0.0)
     ratio = Column(Float, default=0.0)
@@ -54,6 +54,26 @@ class Project(Base):
     
     # Relationships
     timeline_events = relationship("TimelineEvent", back_populates="project")
+    organization = relationship("Organization", back_populates="projects")
+
+class TimelineEvent(Base):
+    __tablename__ = 'resources_timeline_events'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(String, ForeignKey('resources_projects.id'))
+    type = Column(String)
+    date = Column(String)
+    filename = Column(String)
+    category = Column(String)
+    
+    project = relationship("Project", back_populates="timeline_events")
+
+# ... (rest of models) ...
+
+# UPDATE ORGANIZATION with relationship (at the end of file or wherever Organization is defined)
+# I need to find Organization definition to update it.
+# It was around line 435 in previous view.
+
 
 class TimelineEvent(Base):
     __tablename__ = 'resources_timeline_events'
@@ -446,6 +466,7 @@ class Organization(Base):
     
     users = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
     service_permissions = relationship("ServicePermission", back_populates="organization", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="organization", cascade="all, delete-orphan")
 
 class OrganizationUser(Base):
     """

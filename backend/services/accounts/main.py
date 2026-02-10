@@ -324,7 +324,7 @@ def get_org_projects(org_id: str, user = Depends(get_current_active_user)):
         
     except Exception as e:
         print(f"PROJECTS ERROR: {e}")
-        return [] # Fallback to empty list on error
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
     finally:
         db.close()
 
@@ -361,9 +361,11 @@ def create_org_project(
              raise HTTPException(status_code=403, detail="Only Admins can create projects")
         
         # 2. Create
+        # Explicitly use organization_id. 
+        # The model now has a relationship 'organization', but setting the ID is sufficient.
         new_project = models.Project(
             id=str(uuid.uuid4()),
-            organization_id=org_id,
+            organization_id=org_id, # Enforced from URL path
             name=project_data.name,
             status=project_data.status,
             project_cost=project_data.project_cost,
@@ -378,8 +380,8 @@ def create_org_project(
         return JSONResponse({"status": "ok", "project_id": new_project.id}, status_code=201)
     except Exception as e:
         db.rollback()
-        print(f"Error creating project: {e}")
-        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+        print(f"create_org_project ERROR: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
     finally:
         db.close()
 
