@@ -650,24 +650,23 @@ def add_task_comment(
         )
         db.add(comment)
         db.commit()
-        # Fetch user name for immediate display
-        user_name = "User"
-        try:
-             u_map = get_user_map([user_id])
-             user_name = u_map.get(user_id)
-        except:
-             pass
-        
-        # Fallback to Header if DB lookup failed (optimistic name)
-        if not user_name or user_name == "User":
-             header_name = request.headers.get("X-User-Name")
-             if header_name:
-                 user_name = header_name
-             else:
+        # 1. OPTIMISTIC NAME RESOLUTION (Trust Header First for UI Speed)
+        header_name = request.headers.get("X-User-Name")
+        if header_name and header_name != "User":
+             user_name = header_name
+             print(f"✅ [add_comment] Using Header Name: {user_name}")
+        else:
+             # Fallback to DB
+             try:
+                 u_map = get_user_map([user_id])
+                 user_name = u_map.get(user_id, "User")
+             except:
                  user_name = "User"
 
-        # Format for Social UI - USE LOCAL VARIABLE to avoid DB refresh corruption
+        # 2. TIMEZONE HANDLING (Explicit)
+        # now_gt is already UTC-6. We format it as a string for the UI.
         formatted_time = now_gt.strftime("%b %d, %I:%M %p")
+        print(f"🕒 [add_comment] Server Display Time: {formatted_time}")
 
         return {
             "id": comment.id,

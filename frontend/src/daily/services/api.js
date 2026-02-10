@@ -37,7 +37,28 @@ export const api = {
             headers["X-Organization-ID"] = orgId;
         }
 
-        // Inject User ID if available (Bypass cookie issues)
+        // Guarantee Identity exists
+        let userStr = localStorage.getItem("ao_user");
+        if (!userStr) {
+            const genId = "guest-" + Math.random().toString(36).substr(2, 9);
+            const genUser = { id: genId, full_name: "Guest User", name: "Guest" };
+            localStorage.setItem("ao_user", JSON.stringify(genUser));
+            userStr = JSON.stringify(genUser);
+            console.log("⚠️ [Auth] Generated temporary Guest Identity:", genUser);
+        }
+
+        // Inject User ID & Name
+        try {
+            const user = JSON.parse(userStr);
+            if (user && user.id) {
+                headers["X-User-ID"] = user.id;
+                // Prioritize full_name, then name, then fallback
+                const name = user.full_name || user.name || "Guest";
+                headers["X-User-Name"] = name;
+            }
+        } catch (e) {
+            console.warn("Failed to parse ao_user for headers", e);
+        }
         try {
             const userStr = localStorage.getItem("ao_user");
             if (userStr) {
