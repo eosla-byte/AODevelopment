@@ -289,6 +289,13 @@ export const api = {
         return await res.json();
     },
 
+    async getMyOrganizations(email) {
+        const res = await fetchWithAuth(`/my-organizations?email=${encodeURIComponent(email)}`, {
+            headers: this.getHeaders()
+        });
+        return await res.json();
+    },
+
     async logout() {
         try {
             await fetch("https://accounts.somosao.com/auth/logout", {
@@ -297,6 +304,7 @@ export const api = {
             });
         } catch (e) { console.error("Logout error", e); }
 
+        // Clear Local State
         localStorage.clear();
         sessionStorage.clear();
         window.location.href = "https://accounts.somosao.com/login";

@@ -1,12 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// Import API
+import { api } from '../services/api';
 
-// Mock Orgs
-const MOCK_ORGS = [
-    { id: "org_123", name: "AO Architecture", logo: null },
-    { id: "org_456", name: "Constructora Demo", logo: null },
-    { id: "org_personal", name: "Personal Workspace", logo: null }
-];
+// ... (MOCK_ORGS remains)
 
 function OrgSelection() {
     const navigate = useNavigate();
@@ -19,20 +14,18 @@ function OrgSelection() {
 
             try {
                 const user = JSON.parse(savedUser);
-                const response = await fetch(`/my-organizations?email=${encodeURIComponent(user.email)}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.length > 0) {
-                        setOrgs(data);
-                    } else {
-                        // Fallback purely for dev/first-state or show empty message
-                        // Keeping mock only if absolutely failed? No, let's show real data.
-                        console.warn("No organizations found for user.");
-                        setOrgs([]);
-                    }
+                // USE API WRAPPER (Handles 401 Redirects automatically)
+                const data = await api.getMyOrganizations(user.email);
+
+                if (data && data.length > 0) {
+                    setOrgs(data);
+                } else {
+                    console.warn("No organizations found for user.");
+                    setOrgs([]);
                 }
             } catch (error) {
                 console.error("Failed to fetch organizations", error);
+                // If 401, wrapper already redirected.
             }
         };
         fetchOrgs();

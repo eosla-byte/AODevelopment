@@ -641,9 +641,19 @@ async def refresh_token_endpoint(request: Request):
         
         return response
         
+        return response
+        
     except Exception as e:
         print(f"Refresh Error: {e}")
         return JSONResponse({"status": "error", "message": "Refresh failed"}, status_code=401)
+
+@app.post("/auth/logout")
+async def logout():
+    response = JSONResponse({"status": "ok", "message": "Logged out"})
+    # Clear both potential cookies
+    response.delete_cookie(key="accounts_access_token", domain=".somosao.com", path="/")
+    response.delete_cookie(key="access_token", domain=".somosao.com", path="/")
+    return response
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8005))
