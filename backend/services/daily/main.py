@@ -112,6 +112,10 @@ def get_current_user_id(request: Request):
         if token:
             token_source = "Cookie"
         
+    # HOTFIX: Strip 'Bearer ' prefix if present in cookie (or header)
+    if token and token.startswith("Bearer "):
+        token = token.split(" ")[1].strip()
+        
     if not token:
         # print("⚠️ [Auth] No token found. Guest Mode.")
         return None

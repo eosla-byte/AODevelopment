@@ -192,7 +192,7 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         # Use Lax for standard navigation
         response.set_cookie(
             key="accounts_access_token", 
-            value=f"Bearer {access_token}", 
+            value=access_token, # RAW JWT (No Bearer prefix in Cookie)
             httponly=True,
 
             samesite="none",
