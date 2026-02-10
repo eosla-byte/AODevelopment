@@ -51,6 +51,13 @@ from common.auth import create_access_token, create_refresh_token, decode_token,
 from common.auth_utils import verify_password, get_password_hash 
 import common.models as models 
 from common.models import AccountUser 
+from common.auth_constants import (
+    ACCESS_COOKIE_NAME, 
+    REFRESH_COOKIE_NAME, 
+    COOKIE_DOMAIN, 
+    COOKIE_SAMESITE, 
+    COOKIE_SECURE
+) 
 
 # Initialize Templates
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -63,6 +70,8 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 async def lifespan(app: FastAPI):
     # 1. Startup: Verify Project Model & Schema
     print("🔍 [STARTUP] Verifying Project Model & Schema...")
+    print(f"🍪 [CONFIG] Cookies: Access='{ACCESS_COOKIE_NAME}', Refresh='{REFRESH_COOKIE_NAME}'")
+    print(f"🍪 [CONFIG] Domain='{COOKIE_DOMAIN}', Secure={COOKIE_SECURE}, SameSite='{COOKIE_SAMESITE}'")
     try:
         # Check ORM Model
         # Note: models imported from common.models
@@ -1070,14 +1079,14 @@ async def get_my_organizations_endpoint(request: Request):
         db.close()
 
 @app.post("/auth/logout")
-async def logout():
+async def logout_endpoint():
     response = JSONResponse({"status": "ok", "message": "Logged out"})
     # Clear both access cookies
-    response.delete_cookie(key="accounts_access_token", domain=".somosao.com", path="/")
-    response.delete_cookie(key="access_token", domain=".somosao.com", path="/")
+    response.delete_cookie(key=ACCESS_COOKIE_NAME, domain=COOKIE_DOMAIN, path="/")
+    response.delete_cookie(key="access_token", domain=COOKIE_DOMAIN, path="/")
     
     # Clear Refresh Token (Critical)
-    response.delete_cookie(key="accounts_refresh_token", domain=".somosao.com", path="/", httponly=True)
+    response.delete_cookie(key=REFRESH_COOKIE_NAME, domain=COOKIE_DOMAIN, path="/", httponly=True)
     return response
 
 if __name__ == "__main__":
