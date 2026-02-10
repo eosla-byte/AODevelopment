@@ -852,12 +852,12 @@ def jwks_endpoint():
     # Import here to avoid circularity if any, or rely on global import?
     # Global import of common.auth might not have the key loaded if env vars not set during import time?
     # But checking common.auth imports at top of file: yes.
-    from common.auth import AO_JWT_PUBLIC_KEY_PEM
+    from common.auth import JWT_PUBLIC_KEY_PEM
     
-    if not AO_JWT_PUBLIC_KEY_PEM:
+    if not JWT_PUBLIC_KEY_PEM:
         return {"keys": []}
         
-    jwk = _pem_to_jwk(AO_JWT_PUBLIC_KEY_PEM)
+    jwk = _pem_to_jwk(JWT_PUBLIC_KEY_PEM)
     if jwk:
         return {"keys": [jwk]}
     return {"keys": []}
