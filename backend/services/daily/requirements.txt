@@ -11,4 +11,6 @@ python-dotenv
 
 bcrypt==4.0.1
 
-# CACHE_BUST_V7_5_FORCE_REBUILD
+
+PyJWT==2.9.0
+

@@ -47,8 +47,18 @@ app.add_middleware(
 # STARTUP MIGRATION
 # -----------------------------------------------------------------------------
 @app.on_event("startup")
+async def startup_check():
+    print("🚀 [Daily] SERVER STARTING - DEPLOYMENT_V_FINAL_FIX_JWT")
+    try:
+        import jwt
+        print(f"✅ [Daily] JWT Module Loaded: {jwt.__file__}")
+    except ImportError as e:
+        print(f"❌ [Daily] JWT Module NOT FOUND: {e}")
+    except Exception as e:
+        print(f"❌ [Daily] JWT Import Error: {e}")
+
+@app.on_event("startup")
 async def run_migrations():
-    print("🚀 [Daily] SERVER STARTING - DEPLOYMENT_V_FINAL_FIX")
     print("🔄 [Daily] Checking Schema Migrations...")
     try:
         from sqlalchemy import text
@@ -60,8 +70,6 @@ async def run_migrations():
             print("✅ [Daily] Migration: Added 'user_name' to daily_comments")
         except Exception as e:
             db.rollback()
-            # If "duplicate column" or "exists", we ignore. SQLite vs Postgres syntax is similar for ADD COLUMN
-            # print(f"ℹ️ [Daily] Migration note: {e}") 
             pass
         finally:
             db.close()
@@ -80,8 +88,14 @@ def get_current_user_id(request: Request):
     3. Decode JWT to get 'sub' (User ID)
     4. If fails/missing -> Return None (Guest Mode) - DO NOT TRUST X-User-ID
     """
-    import jwt
     import os
+    
+    # SAFE IMPORT JWT
+    try:
+        import jwt
+    except ImportError:
+        print("❌ [Auth] CRITICAL: PyJWT not installed. Authentication disabled (Guest only).")
+        return None
     
     token = None
     
