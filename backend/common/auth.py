@@ -111,10 +111,10 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     )
     return encoded_jwt
 
-def decode_token(token: str, audience: str = "somosao") -> Optional[Dict[str, Any]]:
+def decode_token(token: str, audience: Any = ["somosao", "ao-platform"]) -> Optional[Dict[str, Any]]:
     """
     Decodes and validates a JWT using RS256 Public Key.
-    Available to all services with Public Key configured.
+    Supports list or string audience.
     """
     if not AO_JWT_PUBLIC_KEY_PEM:
         print("❌ [AUTH] Verification Failed: AO_JWT_PUBLIC_KEY_PEM is missing.")
@@ -125,6 +125,10 @@ def decode_token(token: str, audience: str = "somosao") -> Optional[Dict[str, An
         if token.startswith("Bearer "):
             token = token.split(" ")[1]
 
+        # Ensure audience is a list for jwt.decode if multiple needed, 
+        # or jwt library handles it if we pass "audience" parameter.
+        # PyJWT supports 'audience' as string or list/iterable.
+        
         # Verify Signature using Public Key
         payload = jwt.decode(
             token, 
@@ -154,11 +158,12 @@ async def get_current_user_claims(request: Request) -> Dict[str, Any]:
     Dependency to validate Request Auth.
     Strategies:
     1. Header: Authorization: Bearer <token>
-    2. Cookie: accounts_access_token
+    2. Cookie: accounts_access_token (Unified)
+    3. Cookie: access_token (Legacy/Fallback)
     """
     token = None
     
-    # 1. Header Authorization
+    # 1. Header Authorization (High Priority for API calls)
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
@@ -181,7 +186,6 @@ async def get_current_user_claims(request: Request) -> Dict[str, Any]:
     payload = decode_token(token)
     if not payload:
         # print("Auth Failed: Token Expired or Invalid")
-        # Strict 401 triggers frontend refresh flow
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="token_expired",
@@ -193,6 +197,13 @@ async def get_current_user_claims(request: Request) -> Dict[str, Any]:
     
     return payload
 
+def get_current_user(claims: Dict[str, Any] = Depends(get_current_user_claims)) -> Dict[str, Any]:
+    """
+    Alias for get_current_user_claims to match naming conventions in other services.
+    Returns the decoded JWT payload (dict).
+    """
+    return claims
+
 def require_service(service_slug: str):
     """
     Dependency factory to enforce service entitlement.
@@ -202,15 +213,21 @@ def require_service(service_slug: str):
         # SuperAdmin/Admin Bypass
         role = claims.get("role")
         if role in ["SuperAdmin", "Admin"]:
-            return True
+            return claims
             
         services = claims.get("services", [])
         
         # Check if service is enabled
-        # Normalize? slugs should be lowercase in claims
-        if service_slug not in services:
-             # print(f"⛔ [Auth] Access Denied: User {claims.get('sub')} lacks '{service_slug}' entitlement.")
-             raise HTTPException(status_code=403, detail="service_not_enabled")
+        # Normalize slugs (lowercase)
+        # Handle cases where services might be a dict or list
+        if isinstance(services, list):
+             if service_slug.lower() not in [s.lower() for s in services]:
+                 raise HTTPException(status_code=403, detail="service_not_enabled")
+        elif isinstance(services, dict):
+             if not services.get(service_slug, False):
+                 raise HTTPException(status_code=403, detail="service_not_enabled")
+                 
         return claims
         
     return _check_service
+

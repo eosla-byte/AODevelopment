@@ -37,7 +37,7 @@ elif sys.path[0] != BASE_DIR:
 
 from common.database import get_db, SessionExt, SessionCore, SessionOps 
 # Note: For this service, get_db should ideally point to SessionExt or we explicitely use SessionExt
-from common.auth_utils import decode_access_token, require_org_access, get_current_user
+from common.auth import get_current_user, require_service, decode_token
 from common.models import BimUser, BimOrganization, BimProject, BimScheduleVersion, BimActivity
 try:
     from schedule_parser import parse_schedule
@@ -116,7 +116,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"], # TODO: Restrict for Production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -124,7 +124,7 @@ app.add_middleware(
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    print(f"🔍 [BIM REQUEST] {request.method} {request.url}")
+    # print(f"🔍 [BIM REQUEST] {request.method} {request.url}")
     response = await call_next(request)
     return response
 
@@ -133,16 +133,16 @@ if not os.path.exists(static_dir):
     os.makedirs(static_dir)
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 @app.on_event("startup")
 def ensure_schema_updates():
     print(">>> Startup: Checking BIM Schema...")
-    print("🚀 [STARTUP] Auth Patch Applied - Force Redeploy V2")
+    print("🚀 [STARTUP] BIM Service V_SSO_UNIFIED")
     try:
         # Use SessionExt to get engine
         db = SessionExt()
+
         engine = db.get_bind()
         insp = inspect(engine)
         
@@ -209,8 +209,7 @@ def ensure_schema_updates():
 # --- ENDPOINTS ---
 
 @app.get("/api/projects/{project_id}/activities")
-async def get_project_activities(project_id: str, versions: str = "", user = Depends(get_current_user)):
-    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+async def get_project_activities(project_id: str, versions: str = "", user = Depends(require_service("bim"))):
     
     version_ids = [v.strip() for v in versions.split(",") if v.strip()]
     if not version_ids: return []
@@ -257,8 +256,7 @@ async def get_project_activities(project_id: str, versions: str = "", user = Dep
 # ... (ActivityUpdateRequest defined later)
 
 @app.post("/api/projects/{project_id}/schedule")
-async def upload_schedule(project_id: str, file: UploadFile = File(...), user = Depends(get_current_user)):
-    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+async def upload_schedule(project_id: str, file: UploadFile = File(...), user = Depends(require_service("bim"))):
     
     # 1. Read File
     content = await file.read()
@@ -268,6 +266,8 @@ async def upload_schedule(project_id: str, file: UploadFile = File(...), user = 
         schedule_data = parse_schedule(content, file.filename)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error parsing file: {e}")
+    
+    user_id = user["sub"]
 
     db = SessionExt()
     core_db = SessionCore()
@@ -343,21 +343,20 @@ app = FastAPI(title="AO PlanSystem (BIM Portal)")
 
 @app.get("/api/context-debug")
 def debug_context(
-    ctx: dict = Depends(require_org_access("bim"))
+    ctx: dict = Depends(require_service("bim"))
 ):
     """
     Debug Endpoint to verify Multi-Tenant Isolation.
-    Requires header X-Organization-ID and active service permission.
     """
     return {
         "status": "authorized", 
         "context": ctx,
-        "message": f"Welcome to BIM Workspace for Org {ctx['org_id']}"
+        "message": f"Welcome to BIM Workspace for Org {ctx.get('org_id')}"
     }
 
 # Mount Static if needed (Shared assets or dedicated?)
 from common.models import Organization, OrganizationUser, ServicePermission, AccountUser
-from common.auth_utils import get_current_user
+from common.auth import get_current_user
 
 from common.database import get_core_db
 
@@ -369,7 +368,7 @@ def get_my_organizations(
     """
     Get list of organizations the user belongs to THAT HAVE BIM ENABLED.
     """
-    user_id = current_user.get("id")
+    user_id = current_user.get("sub")
     
     # 1. Get Memberships
     memberships = db.query(OrganizationUser).filter(OrganizationUser.user_id == user_id).all()
@@ -387,11 +386,7 @@ def get_my_organizations(
     
     valid_org_ids = [p.organization_id for p in valid_perms]
     
-    # 3. Fetch Organization Details
-    # Also check USER specific permission per org? 
-    # Logic in require_org_access: "if not is_org_admin and not user_perms.get(service_slug)"
-    # We should replicate that logic to NOT show orgs where user is restricted.
-    
+    # 3. Fetch Organization details
     final_orgs = []
     
     valid_orgs_db = db.query(Organization).filter(Organization.id.in_(valid_org_ids)).all()
@@ -399,11 +394,10 @@ def get_my_organizations(
     
     for m in memberships:
         if m.organization_id in valid_org_ids:
-            # Check User Perms
-            if m.role != "Admin":
-                perms = m.permissions or {}
-                if not perms.get("bim"):
-                    continue # Skip this org, user doesn't have access
+            # Check User Perms logic removed for simplification (If org has it, and user is in org, show it)
+            # Or replicate require_service logic?
+            # Services are now in the Token.
+            # But here we are listing ALL available, even if not currently active in context.
             
             org = org_map.get(m.organization_id)
             if org:
@@ -431,26 +425,7 @@ app.include_router(auth.router)
 async def root(request: Request):
     """
     Root Entry Point.
-    - If not logged in -> Login.
-    - If logged in -> Show Organization Selector.
     """
-    # Note: get_current_user raises 401 if missing, but for HTML routes we often want Redirect.
-    # But since we use Depends(get_current_user) which raises HTTPException, 
-    # we might need a "soft" dependency or handle exception globally.
-    # For now, if get_current_user fails, it shows JSON error. 
-    # BETTER: Use a try/except helper or allow optional.
-    # Let's rely on the frontend redirecting if 401?
-    # Actually, common.auth_utils.get_current_user logic raises 401.
-    # To prevent JSON 401 on homepage, we should accept it might fail?
-    # But Depends() execution happens before function body.
-    # I'll let it raise 401 and let browser show raw error? No user experience bad.
-    # I will modify this to use a "get_optional_user" logic? 
-    # Or just assume if they hit / they might be redirected by JS in org_selector.
-    
-    # Wait, if I use the template org_selector, it does a fetch("/api/me/organizations").
-    # If THAT returns 401, the JS redirects to login.
-    # So I can just return the HTML without enforcing user check here?
-    # Yes, serve the shell, let the shell authenticate.
     return templates.TemplateResponse("org_selector.html", {"request": request})
 
 @app.get("/auth/login", response_class=HTMLResponse)
@@ -460,7 +435,7 @@ async def login_page(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(
     request: Request, 
-    user = Depends(get_current_user),
+    user = Depends(require_service("bim")), # Enforce BIM entitlement even for dashboard
     org_id: str = None # Optional
 ):
     """
@@ -469,18 +444,20 @@ async def dashboard(
     """
     db = SessionCore()
     try:
-         user_id = user['id']
+         user_id = user['sub']
          
          # 1. Handle Missing Org ID (Auto-Select)
          if not org_id:
-             # Fetch valid memberships
+             # Just use the one in valid token if exists?
+             if user.get("org_id"):
+                 return RedirectResponse(f"/dashboard?org_id={user.get('org_id')}")
+                 
+             # Else fetch
              memberships = db.query(OrganizationUser).filter(
                  OrganizationUser.user_id == user_id
              ).all()
              
              valid_slugs = ["plans", "bim", "AOPlanSystem", "PLANS", "BIM", "PlanSystem"]
-             
-             print(f"DEBUG: Checking {len(memberships)} memberships for user {user_id}")
              
              for m in memberships:
                  # Check Service Perm for this Org (Defensive Check)
@@ -490,33 +467,8 @@ async def dashboard(
                     ServicePermission.is_active == True
                  ).first()
                  
-                 print(f"DEBUG: Org {m.organization_id} | Role {m.role} | ServiceFound: {True if op else False} ({op.service_slug if op else 'None'})")
-                 
-                 # Check User Perm (Defensive Check)
                  if op:
-                     user_has_perm = False
-                     if m.role == "Admin":
-                         user_has_perm = True
-                     else:
-                         # 1. Check Org-Specific Perms
-                         if m.permissions:
-                             for key in valid_slugs:
-                                 if m.permissions.get(key):
-                                     user_has_perm = True
-                                     break
-                         
-                         # 2. Check Global User License (AccountUser)
-                         # If not found in Org Perms, check if they have a global license
-                         if not user_has_perm and m.user and m.user.services_access:
-                             for key in valid_slugs:
-                                 if m.user.services_access.get(key):
-                                     user_has_perm = True
-                                     break
-                     
-                     print(f"DEBUG: User Has Perm: {user_has_perm}")
-
-                     if user_has_perm:
-                         return RedirectResponse(f"/dashboard?org_id={m.organization_id}")
+                     return RedirectResponse(f"/dashboard?org_id={m.organization_id}")
              
              # If no valid orgs found
              return HTMLResponse("<h1>No accessible BIM Organizations found. Contact your Admin.</h1>", status_code=403)
@@ -531,26 +483,15 @@ async def dashboard(
              # Redirect to selector if invalid
              return RedirectResponse("/")
              
-         # Check Service Perm
-         valid_slugs = ["plans", "bim", "AOPlanSystem", "PLANS", "BIM", "PlanSystem"]
-         org_perm = db.query(ServicePermission).filter(
-            ServicePermission.organization_id == org_id,
-            ServicePermission.service_slug.in_(valid_slugs),
-            ServicePermission.is_active == True
-         ).first()
-         
-         if not org_perm:
-             return HTMLResponse("<h1>Organization has no access to BIM</h1>", status_code=403)
-             
          org = membership.organization
          
          # 3. FETCH PROJECTS
          ext_db = SessionExt()
          projects = []
          try:
-             print(f"DEBUG: Fetching Projects for Org {org_id}")
+             # print(f"DEBUG: Fetching Projects for Org {org_id}")
              projects = ext_db.query(BimProject).filter(BimProject.organization_id == org_id).all()
-             print(f"DEBUG: Found {len(projects)} projects")
+             # print(f"DEBUG: Found {len(projects)} projects")
          except Exception as e:
              print(f"ERROR fetching projects: {e}")
          finally:
@@ -588,13 +529,12 @@ class ProjectCreateRequest(pydantic.BaseModel):
 @app.get("/api/accounts/projects")
 def get_accounts_projects(
     organization_id: str,
-    user = Depends(get_current_user)
+    user = Depends(require_service("bim"))
 ):
     """
     Fetch accessible Project Profiles from Accounts DB for linking.
     Includes projects belonging to the org OR unassigned (legacy) projects.
     """
-    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
     
     db_core = SessionCore()
     db_ops = SessionOps()
@@ -602,7 +542,7 @@ def get_accounts_projects(
         # Verify Org Access (Identity)
         membership = db_core.query(OrganizationUser).filter(
             OrganizationUser.organization_id == organization_id,
-            OrganizationUser.user_id == user["id"]
+            OrganizationUser.user_id == user["sub"]
         ).first()
         
         if not membership:
@@ -646,13 +586,11 @@ def get_accounts_projects(
 @app.post("/api/projects")
 async def create_project(
     data: ProjectCreateRequest,
-    user = Depends(get_current_user)
+    user = Depends(require_service("bim"))
 ):
     """
     Create a new project or link to existing Account Profile.
     """
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
 
     db = SessionExt() # BIM DB
     accounts_db = SessionCore() # Accounts Identity
@@ -661,7 +599,7 @@ async def create_project(
         # 1. Validate Access to Org
         membership = accounts_db.query(OrganizationUser).filter(
             OrganizationUser.organization_id == data.organization_id,
-            OrganizationUser.user_id == user["id"]
+            OrganizationUser.user_id == user["sub"]
         ).first()
 
         if not membership:
@@ -741,8 +679,7 @@ async def create_project(
         ops_db.close()
 
 @app.delete("/api/projects/{project_id}")
-async def delete_project(project_id: str, user = Depends(get_current_user)):
-    if not user: raise HTTPException(status_code=401, detail="Not authenticated")
+async def delete_project(project_id: str, user = Depends(require_service("bim"))):
     
     db = SessionExt()
     try:
@@ -781,16 +718,14 @@ async def delete_project(project_id: str, user = Depends(get_current_user)):
 
 
 @app.get("/projects", response_class=HTMLResponse)
-async def projects_list(request: Request, user = Depends(get_current_user)):
-    if not user: return RedirectResponse("/auth/login")
+async def projects_list(request: Request, user = Depends(require_service("bim"))):
     return templates.TemplateResponse("dashboard.html", {
         "request": request, "user_name": user.get("sub"), "user_initials": user.get("sub")[:2], "org_name": "TBD"
     })
 
 # --- DASHBOARD ROUTE ---
 @app.get("/projects/{project_id}/dashboard", response_class=HTMLResponse)
-async def view_project_dashboard(request: Request, project_id: str, user = Depends(get_current_user)):
-    if not user: return RedirectResponse("/auth/login")
+async def view_project_dashboard(request: Request, project_id: str, user = Depends(require_service("bim"))):
     
     db = SessionExt()
     try:
@@ -798,6 +733,7 @@ async def view_project_dashboard(request: Request, project_id: str, user = Depen
             .filter(BimScheduleVersion.project_id == project_id)\
             .order_by(BimScheduleVersion.imported_at.desc())\
             .first()
+
             
         if not latest_version:
             return HTMLResponse("<h1>Proyecto no encontrado o sin versiones</h1>")

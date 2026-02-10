@@ -9,14 +9,13 @@ try:
     from .common import database
     # Import specific models to ensure they are registered with Base
     from .common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
-    from .common.auth_utils import decode_access_token
-    from .common.auth import get_current_user_claims, require_service
+    # UNIFIED AUTH IMPORT
+    from common.auth import get_current_user, require_service, decode_token
 except ImportError:
     # Fallback to absolute if running from root without package context (dev)
     from common import database, models
     from common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
-    from common.auth_utils import decode_access_token
-    from common.auth import get_current_user_claims, require_service
+    from common.auth import get_current_user, require_service, decode_token
 
 try:
     from .aodev import connector as aodev
@@ -26,16 +25,17 @@ except ImportError:
 
 app = FastAPI(title="AOdailyWork")
 
-app = FastAPI(title="AOdailyWork")
-
 # ALLOW CORS
+# Update to allow specific credentialed origins
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "https://daily.somosao.com",
     "https://accounts.somosao.com",
     "https://bim.somosao.com",
-    "https://aodev.railway.internal"
+    "https://aodev.railway.internal",
+    "https://somosao.com",
+    "https://www.somosao.com"
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -50,15 +50,8 @@ app.add_middleware(
 # -----------------------------------------------------------------------------
 @app.on_event("startup")
 async def startup_check():
-    print("🚀 [Daily] SERVER STARTING - DEPLOYMENT_V_FINAL_FIX_JWT")
-    try:
-        import jwt
-        print(f"✅ [Daily] JWT Module Loaded: {jwt.__file__}")
-    except ImportError as e:
-        print(f"❌ [Daily] JWT Module NOT FOUND: {e}")
-    except Exception as e:
-        print(f"❌ [Daily] JWT Import Error: {e}")
-
+    print("🚀 [Daily] SERVER STARTING - V_SSO_UNIFIED")
+    
 @app.on_event("startup")
 async def run_migrations():
     print("🔄 [Daily] Checking Schema Migrations...")
@@ -82,6 +75,9 @@ async def run_migrations():
 # DEPENDENCIES
 # -----------------------------------------------------------------------------
 
+# Use the unified require_service factory
+# This ensures only users with 'daily' (or 'AOdailyWork') access can use this service.
+    
 async def get_current_user_id(claims: dict = Depends(require_service("daily"))):
     """
     Returns the user ID (sub) from valid JWT claims.
@@ -89,12 +85,12 @@ async def get_current_user_id(claims: dict = Depends(require_service("daily"))):
     """
     return claims["sub"]
 
-async def get_current_org_id(claims: dict = Depends(get_current_user_claims)):
+async def get_current_org_id(claims: dict = Depends(require_service("daily"))):
     """
     Retrieves Organization ID from the Authenticated User Context.
-    Replaces insecure X-Organization-ID header.
     """
     return claims.get("org_id")
+
 
 # -----------------------------------------------------------------------------
 # ROUTES
@@ -279,6 +275,7 @@ def init_app(user_id: str = Depends(get_current_user_id), org_id: str = Depends(
         
     return {
         "user_id": user_id,
+        "org_id": org_id,
         "teams": teams_data
     }
 

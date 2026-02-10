@@ -173,7 +173,7 @@ def _build_context(db, membership):
             "AOPlanSystem": "bim",
             "AOBuild": "build",
             "AO Clients": "portal",
-            "AOdev": "api",
+            "AOdev": "plugin",
             "AO HR & Finance": "finance"
         }
         services = [slug_map.get(s, s.lower()) for s in services]
@@ -274,7 +274,139 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
     finally:
         db.close()
 
-@app.get("/auth/logout")
+# --- Organization Projects API ---
+
+class ProjectCreateSchema(pydantic.BaseModel):
+    name: str
+    project_cost: float = 0.0
+    sq_meters: float = 0.0
+    ratio: float = 0.0
+    estimated_time: Optional[str] = None
+    status: str = "Active"
+
+@app.get("/api/organizations/{org_id}/projects")
+def get_org_projects(org_id: str, user = Depends(get_current_active_user)):
+    if not user: raise HTTPException(status_code=401)
+    
+    db = SessionCore() # Projects are in Core DB (resources_projects)
+    try:
+        # 1. Verify Member Access
+        # Allow any member to VIEW projects? Yes for now.
+        membership = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.organization_id == org_id,
+            models.OrganizationUser.user_id == user["sub"]
+        ).first()
+        
+        if not membership and user.get("role") != "SuperAdmin":
+             raise HTTPException(status_code=403, detail="Not a member")
+             
+        # 2. Fetch Projects
+        # Using the SQLALchemy model 'Project' which maps to 'resources_projects'
+        projects = db.query(models.Project).filter(
+            models.Project.organization_id == org_id,
+            models.Project.archived == False
+        ).all()
+        
+        return [{
+            "id": p.id,
+            "name": p.name,
+            "status": p.status,
+            "project_cost": p.project_cost,
+            "sq_meters": p.sq_meters,
+            "ratio": p.ratio,
+            "estimated_time": p.estimated_time,
+            "created_at": p.created_at.isoformat() if p.created_at else None
+        } for p in projects]
+    finally:
+        db.close()
+
+@app.post("/api/organizations/{org_id}/projects")
+def create_org_project(
+    org_id: str, 
+    project_data: ProjectCreateSchema, 
+    user = Depends(get_current_active_user)
+):
+    if not user: raise HTTPException(status_code=401)
+    
+    db = SessionCore()
+    try:
+        # 1. Access Check (Admin only?)
+        # For now, allow Admins AND Members to create projects? 
+        # Requirement: "Manage High-Level Project Definitions" -> Likely Admin.
+        membership = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.organization_id == org_id,
+            models.OrganizationUser.user_id == user["sub"]
+        ).first()
+        
+        if not membership:
+             raise HTTPException(status_code=403, detail="Not a member")
+             
+        # Optional: Restrict to Admin
+        if membership.role != "Admin" and user.get("role") != "SuperAdmin":
+             raise HTTPException(status_code=403, detail="Only Admins can create projects")
+        
+        # 2. Create
+        new_project = models.Project(
+            id=str(uuid.uuid4()),
+            organization_id=org_id,
+            name=project_data.name,
+            status=project_data.status,
+            project_cost=project_data.project_cost,
+            sq_meters=project_data.sq_meters,
+            ratio=project_data.ratio,
+            estimated_time=project_data.estimated_time,
+            created_by=user["sub"]
+        )
+        db.add(new_project)
+        db.commit()
+        
+        return JSONResponse({"status": "ok", "project_id": new_project.id}, status_code=201)
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating project: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+class ServiceToggleSchema(pydantic.BaseModel):
+    service_slug: str
+    is_active: bool
+
+@app.post("/api/organizations/{org_id}/services")
+def toggle_org_service(
+    org_id: str, 
+    data: ServiceToggleSchema,
+    user = Depends(get_current_active_user)
+):
+    # Only SuperAdmin (or maybe Org Admin?)
+    if user.get("role") != "SuperAdmin":
+         raise HTTPException(status_code=403, detail="SuperAdmin only")
+         
+    db = SessionCore()
+    try:
+        perm = db.query(models.ServicePermission).filter(
+            models.ServicePermission.organization_id == org_id,
+            models.ServicePermission.service_slug == data.service_slug
+        ).first()
+        
+        if perm:
+            perm.is_active = data.is_active
+        else:
+            perm = models.ServicePermission(
+                id=str(uuid.uuid4()),
+                organization_id=org_id,
+                service_slug=data.service_slug,
+                is_active=data.is_active
+            )
+            db.add(perm)
+            
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+# --- Helpers ---
+
 async def logout():
     response = RedirectResponse("/login")
     response.delete_cookie(ACCESS_COOKIE_NAME, domain=COOKIE_DOMAIN)

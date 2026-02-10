@@ -39,11 +39,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Login via Accounts (sets cookies)
+                // Use URLSearchParams for application/x-www-form-urlencoded
+                const formData = new URLSearchParams();
+                formData.append('email', email);
+                formData.append('password', password);
+
                 const response = await fetch(`https://accounts.somosao.com/auth/login`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     credentials: 'include',
-                    body: JSON.stringify({ username: email, password: password })
+                    body: formData
                 });
 
                 if (!response.ok) {

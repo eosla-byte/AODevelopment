@@ -59,13 +59,18 @@ function App() {
 
                 // 2. Set User from Backend Source of Truth
                 if (data && data.user_id) {
+                    // Sync Org ID if returned (SSO Source of Truth)
+                    if (data.org_id) {
+                        localStorage.setItem("ao_org_id", data.org_id);
+                    }
+
                     // We might want to fetch full profile or just use what we have.
                     // For now, let's trust localStorage "cache" for name/email if backend only returns ID,
                     // OR update logic to fetch full profile.
                     // The /init endpoint returns { user_id, teams }.
                     // We can keep using localStorage for display name for now, or fetch it.
                     const stored = JSON.parse(localStorage.getItem("ao_user") || "{}");
-                    setUser({ ...stored, id: data.user_id });
+                    setUser({ ...stored, id: data.user_id, org_id: data.org_id });
                 }
                 setLoading(false);
             } catch (e) {
