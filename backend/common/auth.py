@@ -13,6 +13,8 @@ from typing import Optional, Dict, Any
 # Keys: AO_JWT_PRIVATE_KEY_PEM / AO_JWT_PUBLIC_KEY_PEM
 # Exact names required.
 
+print("✅ [AUTH] Loading ROOT auth.py")
+
 def load_key_strict(env_name, required=False):
     val = os.getenv(env_name)
     if not val:

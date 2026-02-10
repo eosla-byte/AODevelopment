@@ -59,44 +59,51 @@ async def startup_event():
 # ... (version check same)
 
 # ... (dependencies)
-def get_current_admin(request: Request):
+def get_current_active_user(request: Request):
     # 1. Read Valid Cookie (Prioritize Unified Name)
     token = request.cookies.get(ACCESS_COOKIE_NAME)
     if not token:
-        # Fallback for legacy dev
+        print(f"DEBUG: Cookie '{ACCESS_COOKIE_NAME}' missing. Checking fallback...")
         token = request.cookies.get("access_token")
         
     if token:
-         # print(f"DEBUG: Found access_token in cookie (Length: {len(token)})")
-         pass
+         print(f"DEBUG: Found token in cookie (Length: {len(token)})")
     else:
-         print("DEBUG: No access_token found in cookies.")
-        
-    # 2. Header Fallback
-    if not token:
-        auth = request.headers.get("Authorization")
-        if auth and auth.startswith("Bearer "):
-            print("DEBUG: Found token in Authorization header")
-            token = auth.split(" ")[1]
+         print(f"DEBUG: No token found in any cookie. Cookies keys: {list(request.cookies.keys())}")
+         # Attempt Header
+         auth = request.headers.get("Authorization")
+         if auth and auth.startswith("Bearer "):
+             print("DEBUG: Found token in Authorization header")
+             token = auth.split(" ")[1]
 
     if not token:
         return None
+
     try:
         # Decode ensuring audience includes 'ao-platform'
-        # Pass audience explicitly to enforce check
+        # verify_exp=True by default
+        print("DEBUG: Verifying token with audience='ao-platform'...")
         payload = decode_token(token, audience="ao-platform")
         if not payload: 
+            print("DEBUG: decode_token returned None (Verification Failed)")
             return None
             
-        # Check if role is Admin (or sufficient privilege)
-        if payload.get("role") not in ["Admin", "SuperAdmin"]:
-            print(f"DEBUG: Role {payload.get('role')} denied admin access")
-            return None
         print(f"DEBUG: Token verified for user {payload.get('sub')} (Role: {payload.get('role')})")
         return payload 
     except Exception as e:
-        print(f"Auth Debug: {e}")
+        print(f"DEBUG: Auth Exception: {e}")
         return None
+
+def get_current_admin(user = Depends(get_current_active_user)):
+    if not user:
+        return None
+    # Check Role
+    role = user.get("role")
+    if role not in ["Admin", "SuperAdmin"]:
+         print(f"DEBUG: Role '{role}' denied admin access.")
+         # Return None to trigger 401/Redirect in caller
+         return None
+    return user
 
 # --- DB Migration Helper ---
 def run_db_fix():
@@ -276,8 +283,12 @@ async def logout():
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = Depends(get_current_admin)):
-    if not user_jwt: return RedirectResponse("/login")
+async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = Depends(get_current_active_user)):
+    if not user_jwt: 
+        print("DEBUG: Dashboard Redirecting to /login (No active user)")
+        return RedirectResponse("/login")
+    
+    print(f"DEBUG: Dashboard Access Granted for {user_jwt.get('email')}")
     
     db = SessionCore()
     user_db = db.query(AccountUser).filter(AccountUser.email == user_jwt["sub"]).first()
