@@ -43,7 +43,8 @@ export const api = {
         // return MOCK_BOARD;
         try {
             const res = await fetch(`${API_BASE}/projects/${projectId}/board`, {
-                headers: this.getHeaders()
+                headers: this.getHeaders(),
+                credentials: "include"
             });
             if (!res.ok) throw new Error("Failed to fetch");
             return await res.json();
@@ -58,7 +59,8 @@ export const api = {
             await fetch(`${API_BASE}/tasks/${taskId}/move`, {
                 method: "PUT",
                 headers: this.getHeaders(),
-                body: JSON.stringify({ column_id: columnId, index })
+                body: JSON.stringify({ column_id: columnId, index }),
+                credentials: "include"
             });
         } catch (e) {
             console.error(e);
@@ -67,7 +69,8 @@ export const api = {
 
     async getTask(taskId) {
         const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
-            headers: this.getHeaders()
+            headers: this.getHeaders(),
+            credentials: "include"
         });
         if (!res.ok) throw new Error("Failed to fetch task");
         return await res.json();
@@ -77,7 +80,8 @@ export const api = {
         const res = await fetch(`${API_BASE}/tasks/${taskId}`, {
             method: "PATCH",
             headers: this.getHeaders(),
-            body: JSON.stringify(updates)
+            body: JSON.stringify(updates),
+            credentials: "include"
         });
         if (!res.ok) throw new Error("Failed to update task");
         return await res.json();
@@ -87,7 +91,8 @@ export const api = {
         const res = await fetch(`${API_BASE}/tasks/${taskId}/comments`, {
             method: "POST",
             headers: this.getHeaders(),
-            body: JSON.stringify({ content })
+            body: JSON.stringify({ content }),
+            credentials: "include"
         });
         if (!res.ok) throw new Error("Failed to add comment");
         return await res.json();
@@ -96,7 +101,8 @@ export const api = {
     async getProjectMembers(projectId) {
         try {
             const res = await fetch(`${API_BASE}/projects/${projectId}/members`, {
-                headers: this.getHeaders()
+                headers: this.getHeaders(),
+                credentials: "include"
             });
             if (!res.ok) throw new Error("Failed to fetch members");
             return await res.json();
@@ -110,7 +116,8 @@ export const api = {
         const res = await fetch(`${API_BASE}/tasks`, {
             method: "POST",
             headers: this.getHeaders(),
-            body: JSON.stringify({ column_id: columnId, title, priority: "Medium" })
+            body: JSON.stringify({ column_id: columnId, title, priority: "Medium" }),
+            credentials: "include"
         });
         if (!res.ok) throw new Error("Failed to create task");
         return await res.json();
@@ -127,7 +134,8 @@ export const api = {
         const res = await fetch(`${API_BASE}/tasks/${taskId}/attachments`, {
             method: "POST",
             headers: headers,
-            body: formData
+            body: formData,
+            credentials: "include"
         });
         if (!res.ok) throw new Error("Failed to upload attachment");
         return await res.json();
