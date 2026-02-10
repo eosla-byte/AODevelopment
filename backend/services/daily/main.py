@@ -122,20 +122,35 @@ def get_current_user_id(request: Request):
 
     # DEBUG: Token Structure
     dot_count = token.count('.')
-    print(f"🔐 [Auth] Token Source: {token_source} | Dots: {dot_count} | Partial: {token[:10]}...")
+    # print(f"🔐 [Auth] Token Source: {token_source} | Dots: {dot_count} | Partial: {token[:10]}...")
     
     if dot_count != 2:
         print(f"❌ [Auth] Invalid JWT Structure (Dots: {dot_count}). Token: {token[:20]}...")
         return None
         
     try:
+        # DEBUG: Unverified Inspection
+        unverified_header = jwt.get_unverified_header(token)
+        # print(f"🕵️ [Auth Debug] Header: {unverified_header}")
+        
+        # Verify Algorithm
+        alg = unverified_header.get('alg')
+        if alg != 'HS256':
+             print(f"⚠️ [Auth] Unexpected Algorithm: {alg}. Expected HS256.")
+
+        # SECRET KEY ALIGNMENT
+        # Accounts service uses: os.getenv("SECRET_KEY", "AO_RESOURCES_SUPER_SECRET_KEY_CHANGE_THIS_IN_PROD")
+        # specific hardcoded fallback to match Accounts if env is missing
+        SECRET_KEY = os.getenv("SECRET_KEY", "AO_RESOURCES_SUPER_SECRET_KEY_CHANGE_THIS_IN_PROD")
+        
         # DECODE JWT (HS256)
-        # We need the SECRET_KEY. Ideally from env. Using the common one for now.
-        SECRET_KEY = os.getenv("SECRET_KEY", "ao_secret_key_2024")
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         return payload.get("sub")
     except jwt.ExpiredSignatureError:
         print("⚠️ [Auth] Token expired.")
+        return None
+    except jwt.InvalidSignatureError:
+        print(f"❌ [Auth] Signature Verification Failed. Used Key: {SECRET_KEY[:4]}... Alg: {alg}")
         return None
     except jwt.InvalidTokenError as e:
         print(f"⚠️ [Auth] Invalid token: {e}")
