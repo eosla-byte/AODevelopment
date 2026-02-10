@@ -42,6 +42,16 @@ else:
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+# -----------------------------------------------------------------------------
+# CONSTANTS & CONFIGURATION
+# -----------------------------------------------------------------------------
+ACCESS_COOKIE_NAME = "accounts_access_token"
+REFRESH_COOKIE_NAME = "accounts_refresh_token"
+# Shared Session Config (for Daily/BIM)
+COOKIE_DOMAIN = ".somosao.com"
+COOKIE_SAMESITE = "none"
+COOKIE_SECURE = True
+
 @app.on_event("startup")
 async def startup_event():
     run_db_fix()
@@ -50,13 +60,17 @@ async def startup_event():
 
 # ... (dependencies)
 def get_current_admin(request: Request):
-    # 1. Read access_token (Lax) or accounts_access_token (Fallback)
-    token = request.cookies.get("access_token")
+    # 1. Read Valid Cookie (Prioritize Unified Name)
+    token = request.cookies.get(ACCESS_COOKIE_NAME)
+    if not token:
+        # Fallback for legacy dev
+        token = request.cookies.get("access_token")
+        
     if token:
-         print(f"DEBUG: Found access_token in cookie (Length: {len(token)})")
+         # print(f"DEBUG: Found access_token in cookie (Length: {len(token)})")
+         pass
     else:
-         print("DEBUG: No access_token in cookie, checking fallback...")
-         token = request.cookies.get("accounts_access_token")
+         print("DEBUG: No access_token found in cookies.")
         
     # 2. Header Fallback
     if not token:
@@ -216,35 +230,35 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         
         response = JSONResponse({"status": status_response, "redirect": redirect_url, "user": {"id": user.id, "email": user.email}})
         
-        # COOKIE 1: access_token (Main, Lax, HttpOnly)
-        print(f"DEBUG: Setting access_token cookie for {user.email}")
+        # COOKIE 1: Unified Access Token (accounts_access_token)
+        response.set_cookie(
+            key=ACCESS_COOKIE_NAME, 
+            value=access_token, 
+            httponly=True,
+            samesite=COOKIE_SAMESITE,
+            secure=COOKIE_SECURE, 
+            domain=COOKIE_DOMAIN
+        )
+
+        # COOKIE 2: Legacy/Compat (access_token) - Share config
         response.set_cookie(
             key="access_token", 
             value=access_token, 
             httponly=True,
-            samesite="lax",
-            secure=True, 
-            domain=".somosao.com",
+            samesite=COOKIE_SAMESITE,
+            secure=COOKIE_SECURE, 
+            domain=COOKIE_DOMAIN,
             path="/"
         )
 
-        # COOKIE 2: accounts_access_token (Legacy/Global, None, HttpOnly)
+        # COOKIE 3: Refresh Token
         response.set_cookie(
-            key="accounts_access_token", 
-            value=access_token, 
-            httponly=True,
-            samesite="none",
-            secure=True, 
-            domain=".somosao.com"
-        )
-
-        response.set_cookie(
-            key="accounts_refresh_token",
+            key=REFRESH_COOKIE_NAME,
             value=refresh_token,
             httponly=True,
-            samesite="none",
-            secure=True, 
-            domain=".somosao.com",
+            samesite=COOKIE_SAMESITE,
+            secure=COOKIE_SECURE, 
+            domain=COOKIE_DOMAIN,
             max_age=7 * 24 * 60 * 60
         )
         
@@ -256,10 +270,9 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
 @app.get("/auth/logout")
 async def logout():
     response = RedirectResponse("/login")
-    response.delete_cookie("accounts_access_token", domain=".somosao.com")
-    # Also delete for host only just in case
-    response.delete_cookie("accounts_access_token")
-    response.delete_cookie("refresh_token", domain=".somosao.com")
+    response.delete_cookie(ACCESS_COOKIE_NAME, domain=COOKIE_DOMAIN)
+    response.delete_cookie("access_token", domain=COOKIE_DOMAIN)
+    response.delete_cookie(REFRESH_COOKIE_NAME, domain=COOKIE_DOMAIN)
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -627,7 +640,7 @@ async def refresh_token_endpoint(request: Request):
     Refreshes the access_token using the HttpOnly refresh_token cookie.
     Re-evaluates Org Context from DB (last_active_org_id).
     """
-    refresh_token = request.cookies.get("accounts_refresh_token")
+    refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
     if not refresh_token:
         return JSONResponse({"status": "error", "message": "No refresh token"}, status_code=401)
         
@@ -665,25 +678,25 @@ async def refresh_token_endpoint(request: Request):
             
             response = JSONResponse({"status": "ok", "message": "Token refreshed", "org_id": org_id})
             
-            # 1. access_token
+            # 1. ACCESS_COOKIE_NAME
+            response.set_cookie(
+                key=ACCESS_COOKIE_NAME, 
+                value=access_token, 
+                httponly=True,
+                samesite=COOKIE_SAMESITE,
+                secure=COOKIE_SECURE, 
+                domain=COOKIE_DOMAIN
+            )
+            
+            # 2. Legacy access_token
             response.set_cookie(
                 key="access_token", 
                 value=access_token, 
                 httponly=True,
-                samesite="lax",
-                secure=True,
-                domain=".somosao.com",
+                samesite=COOKIE_SAMESITE,
+                secure=COOKIE_SECURE,
+                domain=COOKIE_DOMAIN,
                 path="/"
-            )
-            
-            # 2. accounts_access_token
-            response.set_cookie(
-                key="accounts_access_token", 
-                value=access_token, 
-                httponly=True,
-                samesite="none",
-                secure=True, 
-                domain=".somosao.com"
             )
             
             return response
@@ -708,8 +721,8 @@ async def select_organization(
         raise HTTPException(status_code=400, detail="Missing org_id")
 
     # 1. AUTHENTICATE (Try Access, then Refresh)
-    token = request.cookies.get("accounts_access_token") 
-    refresh = request.cookies.get("accounts_refresh_token")
+    token = request.cookies.get(ACCESS_COOKIE_NAME) 
+    refresh = request.cookies.get(REFRESH_COOKIE_NAME)
     
     user_email = None
     user_id = None
@@ -772,22 +785,22 @@ async def select_organization(
         response = JSONResponse({"status": "ok", "message": "Organization selected"})
         
         response.set_cookie(
-            key="access_token", 
+            key=ACCESS_COOKIE_NAME, 
             value=access_token, 
             httponly=True,
-            samesite="lax",
-            secure=True,
-            domain=".somosao.com",
-            path="/" 
+            samesite=COOKIE_SAMESITE,
+            secure=COOKIE_SECURE, 
+            domain=COOKIE_DOMAIN
         )
         
         response.set_cookie(
-            key="accounts_access_token", 
-            value=access_token, 
+            key="access_token",
+            value=access_token,
             httponly=True,
-            samesite="none",
-            secure=True, 
-            domain=".somosao.com"
+            samesite=COOKIE_SAMESITE,
+            secure=COOKIE_SECURE,
+            domain=COOKIE_DOMAIN,
+            path="/" 
         )
         return response
     finally:
@@ -796,7 +809,7 @@ async def select_organization(
 @app.get("/api/my-organizations")
 async def get_my_organizations_endpoint(request: Request):
     # Manual Auth Check (User level)
-    token = request.cookies.get("accounts_access_token")
+    token = request.cookies.get(ACCESS_COOKIE_NAME)
     user_email = None
     if token:
          payload = decode_token(token)
@@ -804,7 +817,7 @@ async def get_my_organizations_endpoint(request: Request):
          
     # Allow via Refresh token too? For the "Select Org" screen when Access is expired/missing?
     if not user_email:
-        refresh = request.cookies.get("accounts_refresh_token")
+        refresh = request.cookies.get(REFRESH_COOKIE_NAME)
         if refresh:
             payload = decode_token(refresh)
             if payload and payload.get("type") == "refresh":

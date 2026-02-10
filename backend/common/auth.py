@@ -161,9 +161,11 @@ async def get_current_user_claims(request: Request) -> Dict[str, Any]:
     if auth_header and auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
         
-    # 2. Cookie (HttpOnly)
+    # 2. Cookie (HttpOnly) - Unified check
     if not token:
         token = request.cookies.get("accounts_access_token")
+    if not token:
+        token = request.cookies.get("access_token")
     
     # 3. Validation
     if not token:
