@@ -628,7 +628,9 @@ def update_task_details(
 def add_task_comment(
     task_id: str,
     content: str = Body(..., embed=True),
-    user_id: str = Depends(get_current_user_id)
+    content: str = Body(..., embed=True),
+    user_id: str = Depends(get_current_user_id),
+    request: Request = None
 ):
     db = database.SessionOps()
     try:
@@ -639,11 +641,13 @@ def add_task_comment(
             
         # GT Timezone (UTC-6)
         gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
+        now_gt = datetime.datetime.now(gt_tz)
+        
         comment = DailyComment(
             task_id=task_id,
             user_id=user_id,
             content=content,
-            created_at=datetime.datetime.now(gt_tz)
+            created_at=now_gt
         )
         db.add(comment)
         db.commit()
@@ -651,12 +655,20 @@ def add_task_comment(
         user_name = "User"
         try:
              u_map = get_user_map([user_id])
-             user_name = u_map.get(user_id, "User")
+             user_name = u_map.get(user_id)
         except:
              pass
+        
+        # Fallback to Header if DB lookup failed (optimistic name)
+        if not user_name or user_name == "User":
+             header_name = request.headers.get("X-User-Name")
+             if header_name:
+                 user_name = header_name
+             else:
+                 user_name = "User"
 
-        # Format for Social UI
-        formatted_time = comment.created_at.strftime("%b %d, %I:%M %p")
+        # Format for Social UI - USE LOCAL VARIABLE to avoid DB refresh corruption
+        formatted_time = now_gt.strftime("%b %d, %I:%M %p")
 
         return {
             "id": comment.id,

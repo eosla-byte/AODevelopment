@@ -44,6 +44,12 @@ export const api = {
                 const user = JSON.parse(userStr);
                 if (user && user.id) {
                     headers["X-User-ID"] = user.id;
+                    if (user.full_name) {
+                        // Send name to avoid "User" fallback if DB lookup fails
+                        headers["X-User-Name"] = user.full_name;
+                    } else if (user.name) {
+                        headers["X-User-Name"] = user.name;
+                    }
                 }
             }
         } catch (e) {
