@@ -31,14 +31,22 @@ function OrgSelection() {
         fetchOrgs();
     }, []);
 
-    const handleSelectOrg = (orgId) => {
+    const handleSelectOrg = async (orgId) => {
         console.log("AO Daily: Selected Org", orgId);
-        localStorage.setItem("ao_org_id", orgId);
-        // Refresh page or navigate effectively to trigger App.jsx context reload
-        // For SPA, we can just navigate, but App.jsx might need to listen to storage or we pass a callback.
-        // A full reload ensures clean state for now.
-        window.location.href = "/#/dashboard";
-        window.location.reload();
+        try {
+            // 1. Tell Backend to switch context (Update Token)
+            await api.selectOrganization(orgId);
+
+            // 2. Update Local State (Optional, for UI cache)
+            localStorage.setItem("ao_org_id", orgId);
+
+            // 3. Navigate
+            window.location.href = "/#/dashboard";
+            window.location.reload();
+        } catch (e) {
+            console.error("Failed to select org", e);
+            alert("Failed to switch organization. Please try again.");
+        }
     };
 
     return (

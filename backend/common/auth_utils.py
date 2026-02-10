@@ -2,12 +2,18 @@
 import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
-from jose import JWTError, jwt
 
-# Configuration
-SECRET_KEY = "AO_RESOURCES_SUPER_SECRET_KEY_CHANGE_THIS_IN_PROD"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # 7 Days (Temporary Patch)
+# -----------------------------------------------------------------------------
+# ADAPTER FOR RS256 MIGRATION
+# -----------------------------------------------------------------------------
+# We proxy calls to the new common.auth module to ensure consistency.
+# This file is kept for backward compatibility with existing imports.
+
+from .auth import (
+    create_access_token as _create_access_token_rs256,
+    decode_token as _decode_token_rs256,
+    oauth2_scheme
+)
 
 from passlib.context import CryptContext
 
@@ -24,27 +30,22 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    """
+    Proxy to common.auth.create_access_token (RS256).
+    """
+    return _create_access_token_rs256(data, expires_delta)
 
 def decode_access_token(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except JWTError:
-        return None
+    """
+    Proxy to common.auth.decode_token (RS256).
+    """
+    return _decode_token_rs256(token)
 
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token", auto_error=False)
+# Reuse scheme from common.auth
+# oauth2_scheme is imported above
 
 def verify_token_dep(token: str = Depends(oauth2_scheme)):
     payload = decode_access_token(token)
@@ -75,23 +76,19 @@ async def get_current_user(
     # 3. Fallback: Query Param (Bulletproof for Iframes where cookies are blocked)
     if not token:
         token = request.query_params.get("token") or request.query_params.get("access_token")
-        if token:
-            print("🔍 [DEBUG AUTH] Token found in Query Params!")
-        else:
-            print(f"⚠️ [DEBUG AUTH] No token in params. Params: {request.query_params}")
 
     if not token:
-        print("❌ [DEBUG AUTH] FAILED: No token found in Header, Cookie, OR Query Params.")
+        # print("❌ [DEBUG AUTH] FAILED: No token found in Header, Cookie, OR Query Params.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated (No Header or Cookie)",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    print(f"✅ [DEBUG AUTH] Token Found. Decoding...")
+    # print(f"✅ [DEBUG AUTH] Token Found. Decoding...")
     payload = decode_access_token(token)
     if payload is None:
-        print("DEBUG AUTH: Token decode failed (Invalid or Expired).")
+        # print("DEBUG AUTH: Token decode failed (Invalid or Expired).")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",

@@ -10,11 +10,13 @@ try:
     # Import specific models to ensure they are registered with Base
     from .common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
     from .common.auth_utils import decode_access_token
+    from .common.auth import get_current_user_claims, require_service
 except ImportError:
     # Fallback to absolute if running from root without package context (dev)
     from common import database, models
     from common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
     from common.auth_utils import decode_access_token
+    from common.auth import get_current_user_claims, require_service
 
 try:
     from .aodev import connector as aodev
@@ -80,94 +82,19 @@ async def run_migrations():
 # DEPENDENCIES
 # -----------------------------------------------------------------------------
 
-def get_current_user_id(request: Request):
+async def get_current_user_id(claims: dict = Depends(require_service("daily"))):
     """
-    Strict Auth:
-    1. Check Authorization Header (Bearer)
-    2. Check cookies (access_token or accounts_access_token)
-    3. Decode JWT to get 'sub' (User ID)
-    4. If fails/missing -> Return None (Guest Mode) - DO NOT TRUST X-User-ID
+    Returns the user ID (sub) from valid JWT claims.
+    Enforces 'daily' service entitlement via require_service.
     """
-    import os
-    
-    # SAFE IMPORT JWT
-    try:
-        import jwt
-    except ImportError:
-        print("❌ [Auth] CRITICAL: PyJWT not installed. Authentication disabled (Guest only).")
-        return None
-    
-    token = None
-    token_source = "None"
-    
-    # 1. Bearer Header
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-         token = auth_header.split(" ")[1]
-         token_source = "Header"
-         
-    # 2. Cookies (HttpOnly)
-    if not token:
-        token = request.cookies.get("access_token") or request.cookies.get("accounts_access_token")
-        if token:
-            token_source = "Cookie"
-        
-    # HOTFIX: Strip 'Bearer ' prefix if present in cookie (or header)
-    if token and token.startswith("Bearer "):
-        token = token.split(" ")[1].strip()
-        
-    if not token:
-        # print("⚠️ [Auth] No token found. Guest Mode.")
-        return None
+    return claims["sub"]
 
-    # DEBUG: Token Structure
-    dot_count = token.count('.')
-    # print(f"🔐 [Auth] Token Source: {token_source} | Dots: {dot_count} | Partial: {token[:10]}...")
-    
-    if dot_count != 2:
-        print(f"❌ [Auth] Invalid JWT Structure (Dots: {dot_count}). Token: {token[:20]}...")
-        return None
-        
-    try:
-        # DEBUG: Unverified Inspection
-        unverified_header = jwt.get_unverified_header(token)
-        # print(f"🕵️ [Auth Debug] Header: {unverified_header}")
-        
-        # Verify Algorithm
-        alg = unverified_header.get('alg')
-        if alg != 'HS256':
-             print(f"⚠️ [Auth] Unexpected Algorithm: {alg}. Expected HS256.")
-
-        # SECRET KEY ALIGNMENT
-        # Accounts service uses: os.getenv("SECRET_KEY", "AO_RESOURCES_SUPER_SECRET_KEY_CHANGE_THIS_IN_PROD")
-        # specific hardcoded fallback to match Accounts if env is missing
-        SECRET_KEY = os.getenv("SECRET_KEY", "AO_RESOURCES_SUPER_SECRET_KEY_CHANGE_THIS_IN_PROD")
-        
-        # DECODE JWT (HS256)
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return payload.get("sub")
-    except jwt.ExpiredSignatureError:
-        print("⚠️ [Auth] Token expired.")
-        # STRICT: Expired token = 401
-        raise HTTPException(status_code=401, detail="token_expired")
-    except jwt.InvalidSignatureError:
-        print(f"❌ [Auth] Signature Verification Failed. Used Key: {SECRET_KEY[:4]}... Alg: {alg}")
-        raise HTTPException(status_code=401, detail="token_invalid_signature")
-    except jwt.InvalidTokenError as e:
-        print(f"⚠️ [Auth] Invalid token: {e}")
-        raise HTTPException(status_code=401, detail="token_invalid")
-    except Exception as e:
-        print(f"❌ [Auth] Unexpected JWT Error: {e}")
-        # Only fallback to None if it was an internal error unrelated to token validity?
-        # No, safe default is 401 if we had a token and it failed processing.
-        raise HTTPException(status_code=401, detail="token_error")
-
-def get_current_org_id(request: Request):
-    # Organization Context Header
-    # If missing, we might default to None (Global/Personal) or Error depending on strictness.
-    # For alignment, we prefer it to be present for "Company" views.
-    org_id = request.headers.get("X-Organization-ID")
-    return org_id
+async def get_current_org_id(claims: dict = Depends(get_current_user_claims)):
+    """
+    Retrieves Organization ID from the Authenticated User Context.
+    Replaces insecure X-Organization-ID header.
+    """
+    return claims.get("org_id")
 
 # -----------------------------------------------------------------------------
 # ROUTES
@@ -542,7 +469,23 @@ def get_organization_users(
     return users
 
 @app.get("/my-organizations")
-def get_my_organizations(email: str, user_id: str = Depends(get_current_user_id)):
+def get_my_organizations(request: Request, user_id: str = Depends(get_current_user_id)):
+    """
+    Returns the organizations the user is a member of.
+    """
+    # Fix: User ID is enough, but we should probably use email from claims?
+    # db.get_user_organizations uses email. 
+    # Let's get email from state or claims.
+    # The get_current_user_id returns 'sub' (which was ID in Accounts refactor, but might be email in some old logic?)
+    # In Accounts Refactor: "sub": user.id.
+    # DB logic uses email.
+    
+    # We need the user EMAIL.
+    user_claims = request.state.user
+    email = user_claims.get("email")
+    if not email:
+         return []
+         
     orgs = database.get_user_organizations(email)
     return orgs
 
@@ -667,7 +610,11 @@ def move_task(
     return {"status": "moved"}
 
 @app.get("/my-tasks")
-def get_my_tasks(user_id: str = Depends(get_current_user_id)):
+def get_my_tasks(claims: dict = Depends(get_current_user_id)): # Dependency returns claims["sub"] now?
+    # WAIT. My refactor of get_current_user_id returns claims["sub"] (a string).
+    # So 'claims' variable name is misleading, it should be 'user_id'.
+    # Let's fix the variable name to avoid confusion.
+    user_id = claims
     tasks = database.get_user_daily_tasks(user_id)
     return [
         {
@@ -675,7 +622,7 @@ def get_my_tasks(user_id: str = Depends(get_current_user_id)):
             "title": t.title,
             "priority": t.priority,
             "status": t.status,
-            "project_id": t.project_id # Frontend can fetch Project Name if needed
+            "project_id": t.project_id
         }
     ]
 

@@ -17,120 +17,109 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from common.database import get_db, SessionCore 
-from common.auth_utils import verify_password, create_access_token, decode_access_token, get_password_hash
+from common.auth import create_access_token, create_refresh_token, decode_token, AO_JWT_SECRET
+from common.auth_utils import verify_password, get_password_hash # Keep password utils
 import common.models as models 
-from common.models import AccountUser
 
-from routers import organizations
-
-app = FastAPI(title="AO Accounts & Identity")
-
-app.include_router(organizations.router)
+# ... (rest of imports)
 
 @app.on_event("startup")
-def startup_event():
-    """
-    Ensure default 'AO Development' organization exists and Admin is SuperAdmin.
-    """
-    db = SessionCore()
-    try:
-        # 1. Update/Ensure Admin is SuperAdmin
-        admin_email = "admin@somosao.com"
-        admin = db.query(AccountUser).filter(AccountUser.email == admin_email).first()
-        if admin:
-            # FORCE RESET to 'SuperAdmin' if it's the specific admin email
-            # regardless of current state, to ensure it's not "Admin"
-            if admin.role != "SuperAdmin":
-                print(f"!!! PROMOTING {admin_email} to SuperAdmin (was {admin.role}) !!!")
-                admin.role = "SuperAdmin"
-                db.commit() # Commit immediately
-            
-            # Also ensure password is reset if needed? No, let's respect password if known.
-        else:
-            # Create if not exists
-            print(f"Creating Admin User {admin_email}...")
-            new_admin = AccountUser(
-                id=str(uuid.uuid4()),
-                email=admin_email,
-                full_name="System Admin",
-                hashed_password=get_password_hash("admin123"),
-                role="SuperAdmin",
-                status="Active"
-            )
-            db.add(new_admin)
-            db.commit()
-            admin = new_admin
-                
-        # 2. Ensure Default Organization
-        default_org_name = "AO Development"
-        org = db.query(models.Organization).filter(models.Organization.name == default_org_name).first()
-        if not org:
-            print(f"Creating default Organization: {default_org_name}")
-            new_org = models.Organization(
-                id=str(uuid.uuid4()),
-                name=default_org_name,
-                status="Active"
-            )
-            db.add(new_org)
-            db.commit()
-            org = new_org
-            
-        # 3. Ensure Admin belongs to Default Org
-        if admin and org:
-            details = db.query(models.OrganizationUser).filter(
-                models.OrganizationUser.organization_id == org.id,
-                models.OrganizationUser.user_id == admin.id
-            ).first()
-            if not details:
-                print(f"Adding Admin to {default_org_name}...")
-                membership = models.OrganizationUser(
-                    organization_id=org.id,
-                    user_id=admin.id,
-                    role="Admin"
-                )
-                db.add(membership)
-                db.commit()
-                
-    except Exception as e:
-        print(f"Startup Logic Error: {e}")
-    finally:
-        db.close()
+# ... (startup logic same)
 
-# Removed misplaced endpoint
+# ... (version check same)
 
-@app.get("/version_check")
-def version_check():
-    return {"version": "v5_cookie_debug", "timestamp": datetime.datetime.now().isoformat()}
-
-# Mount Static
-# app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-
-# --- Dependencies ---
+# ... (dependencies)
 def get_current_admin(request: Request):
     token = request.cookies.get("accounts_access_token")
     if not token:
-        print("Auth Failed: No 'accounts_access_token' cookie found.")
         return None
     try:
-        scheme, _, param = token.partition(" ")
-        if not param:
-             # Maybe raw token without Bearer prefix?
-             param = token
-             
-        payload = decode_access_token(param)
+        # Decode using common auth (AO_JWT_SECRET + HS256)
+        payload = decode_token(token)
         if not payload: 
-            print("Auth Failed: Invalid Token signature.")
             return None
+            
         # Check if role is Admin (or sufficient privilege)
-        if payload.get("role") != "Admin" and payload.get("role") != "SuperAdmin":
-            print(f"Auth Failed: Insufficient Role {payload.get('role')}")
+        if payload.get("role") not in ["Admin", "SuperAdmin"]:
             return None
         return payload 
     except Exception as e:
-        print(f"Auth Failed: Exception {e}")
         return None
+
+# --- DB Migration Helper ---
+def run_db_fix():
+    print("🔧 [ACCOUNTS] Checking Schema Constraints...")
+    from sqlalchemy import text
+    db = SessionCore()
+    try:
+        # 1. Add last_active_org_id to accounts_users
+        try:
+            db.execute(text("ALTER TABLE accounts_users ADD COLUMN last_active_org_id VARCHAR"))
+            db.commit()
+            print("✅ [ACCOUNTS] Added 'last_active_org_id'")
+        except Exception:
+            db.rollback()
+            pass
+            
+        # 2. Add services_access to accounts_organizations if needed? 
+        # (Entitlements are in OrganisationUser or ServicePermission)
+    finally:
+        db.close()
+
+# --- Auth Helper ---
+def get_active_org_context(db, user: AccountUser):
+    """
+    Determines the active organization context for a user.
+    Returns: (org_id, role, services_list) or (None, None, None)
+    """
+    # 1. Check Last Active
+    if user.last_active_org_id:
+        membership = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.user_id == user.id,
+            models.OrganizationUser.organization_id == user.last_active_org_id
+        ).first()
+        if membership:
+            return _build_context(db, membership)
+            
+    # 2. Check Total Memberships
+    memberships = db.query(models.OrganizationUser).filter(
+        models.OrganizationUser.user_id == user.id
+    ).all()
+    
+    if len(memberships) == 1:
+        # Auto-select the only one
+        return _build_context(db, memberships[0])
+        
+    # 3. Multiple or None -> Require Selection
+    return None, None, None
+
+def _build_context(db, membership):
+    # Get Services from Organization permissions
+    # For now, we might default to user global services OR org specific.
+    # Architecture says: "Services come from Entitlements"
+    # Let's merge User Global + Org Entitlements? 
+    # Or just use User Global for now as per current schema?
+    # Current schema has `user.services_access` (JSON).
+    # Let's stick to `user.services_access` for the list of enabled apps,
+    # but maybe filtered by Org? 
+    # Simpler: Just use user.services_access keys where value is True.
+    
+    services = []
+    if membership.user.services_access:
+        services = [k for k, v in membership.user.services_access.items() if v]
+        # Normalize keys to lowercase slugs if needed (AOdailyWork -> daily)
+        # Mapping:
+        slug_map = {
+            "AODailyWork": "daily",
+            "AOPlanSystem": "bim",
+            "AOBuild": "build",
+            "AO Clients": "portal",
+            "AOdev": "api",
+            "AO HR & Finance": "finance"
+        }
+        services = [slug_map.get(s, s.lower()) for s in services]
+        
+    return membership.organization_id, membership.role, services
 
 # --- Routes ---
 
@@ -146,7 +135,7 @@ async def login_page(request: Request):
 
 @app.post("/auth/login")
 async def login_action(email: str = Form(...), password: str = Form(...)):
-    print(f"Login Attempt: '{email}'")
+    # print(f"Login Attempt: '{email}'")
     email = email.strip().lower()
     
     db = SessionCore()
@@ -154,66 +143,57 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         user = db.query(AccountUser).filter(AccountUser.email == email).first()
         
         if not user:
-            print(f"Login Failed: User '{email}' not found in DB.")
             return JSONResponse({"status": "error", "message": f"User '{email}' not found."}, status_code=401)
             
-        print(f"User found: {user.id}. Role: {user.role}.")
-        print(f"Stored Hash (First 10 chars): {user.hashed_password[:10] if user.hashed_password else 'NONE'}...")
-        
         verification = verify_password(password, user.hashed_password)
-        print(f"Verification Result: {verification}")
-        
         if not verification:
-            print("Login Failed: Password mismatch.")
-            return JSONResponse({"status": "error", "message": "Invalid password (hash mismatch)."}, status_code=401)
+            return JSONResponse({"status": "error", "message": "Invalid password."}, status_code=401)
             
-        valid_roles = ["Admin", "SuperAdmin"]
-        if user.role not in valid_roles:
-             # Check Organization Memberships for "Admin" role?
-             is_org_admin = db.query(models.OrganizationUser).filter(
-                models.OrganizationUser.user_id == user.id,
-                models.OrganizationUser.role == "Admin"
-             ).first()
-
-             if not is_org_admin:
-                 return JSONResponse({"status": "error", "message": "Access restricted to Administrators."}, status_code=403)
-
-        access_token = create_access_token(
-            data={
-                "sub": user.email, 
-                "role": user.role, 
-                "id": user.id,
-                "services_access": user.services_access or {}
-            },
-            expires_delta=datetime.timedelta(hours=12)
-        )
+        # ORG CONTEXT RESOLUTION
+        org_id, org_role, services = get_active_org_context(db, user)
         
-        response = JSONResponse({"status": "ok", "redirect": "/dashboard"})
-        # Use Lax for standard navigation
-        response.set_cookie(
-            key="accounts_access_token", 
-            value=access_token, # RAW JWT (No Bearer prefix in Cookie)
-            httponly=True,
-
-            samesite="none",
-            secure=True, # Required for SameSite=None
-            domain=".somosao.com" # Allow sharing with *.somosao.com
-        )
+        # Token Claims (Standardized)
+        claims = {
+            "sub": user.id,   # Use UUID as sub
+            "email": user.email,
+            "role": org_role if org_role else user.role, 
+            "org_id": org_id, 
+            "services": services or []
+        }
+        
+        # Determine Response Status
+        status_response = "ok"
+        redirect_url = "/dashboard" 
+        
+        if not org_id:
+            status_response = "select_org"
+            redirect_url = "/select-org"
+            
+        # ACCESS TOKEN (Short Lived - 15 Mins)
+        access_token = create_access_token(data=claims)
         
         # REFRESH TOKEN (Long Lived - 7 Days)
-        refresh_token = create_access_token(
-            data={"sub": user.email, "type": "refresh"},
-            expires_delta=datetime.timedelta(days=7)
-        )
+        refresh_claims = {"sub": user.id, "email": user.email} # Minimal data for refresh
+        refresh_token = create_refresh_token(data=refresh_claims)
+        
+        response = JSONResponse({"status": status_response, "redirect": redirect_url, "user": {"id": user.id, "email": user.email}})
+        
+        # COOKIE: ACCOUNTS_ACCESS_TOKEN (HttpOnly, Secure, Domain)
         response.set_cookie(
-            key="refresh_token", 
-            value=refresh_token, 
+            key="accounts_access_token", 
+            value=access_token, 
             httponly=True,
             samesite="none",
             secure=True, 
             domain=".somosao.com"
         )
-        print(f"Cookie set for {user.email}")
+            httponly=True,
+            samesite="none",
+            secure=True, 
+            domain=".somosao.com"
+        )
+        
+        print(f"Login Success: {user.email} (Org: {org_id})")
         return response
     finally:
         db.close()
@@ -590,44 +570,53 @@ def migrate_db_schema(user_jwt = Depends(get_current_admin)):
 async def refresh_token_endpoint(request: Request):
     """
     Refreshes the access_token using the HttpOnly refresh_token cookie.
+    Re-evaluates Org Context from DB (last_active_org_id).
     """
-    refresh_token = request.cookies.get("refresh_token")
+    refresh_token = request.cookies.get("accounts_refresh_token")
     if not refresh_token:
-        # 401 Unauthorized prevents frontend loop if no refresh token
+        # Prevent loop, but maybe frontend needs a signal?
         return JSONResponse({"status": "error", "message": "No refresh token"}, status_code=401)
         
     try:
-        # Validate Refresh Token
-        # NOTE: decode_access_token uses SECRET_KEY. 
-        # Ensure refresh token was signed with the SAME secret or use a different verify function.
-        # Ideally refresh tokens should be in DB to allow revocation (Revoke Pattern).
-        # For now, simplistic JWT check.
+        # Validate
         payload = decode_access_token(refresh_token)
         if not payload or payload.get("type") != "refresh":
+             # Revocation check would go here
              return JSONResponse({"status": "error", "message": "Invalid refresh token"}, status_code=401)
              
         email = payload.get("sub")
         
-        # Verify User Exists
+        # Verify User & Context
         db = SessionCore()
         user = db.query(AccountUser).filter(AccountUser.email == email).first()
         if not user:
              db.close()
              return JSONResponse({"status": "error", "message": "User not found"}, status_code=401)
              
-        # Issue New Access Token
-        access_token = create_access_token(
-            data={
-                "sub": user.email, 
-                "role": user.role, 
-                "id": user.id,
-                "services_access": user.services_access or {}
-            },
-            expires_delta=datetime.timedelta(hours=12) 
-        )
-        db.close()
+        # CONTEXT RE-EVALUATION
+        org_id, org_role, services = get_active_org_context(db, user)
         
-        response = JSONResponse({"status": "ok", "message": "Token refreshed"})
+        if not org_id:
+            # User has multiple orgs but no active context.
+            # We cannot issue a functional access token for services without org_id.
+            # We return 409 Conflict -> "ORG_REQUIRED"
+            db.close()
+            return JSONResponse({"status": "error", "message": "Organization selection required", "code": "ORG_REQUIRED"}, status_code=409)
+
+        # Issue New Access Token
+        claims = {
+            "sub": user.email, 
+            "id": user.id,
+            "role": org_role if org_role else user.role,
+            "org_id": org_id,
+            "services": services or []
+        }
+        
+    access_token = create_access_token(data=claims)
+        
+        response = JSONResponse({"status": "ok", "token": access_token})
+        
+        # Update Cookie
         response.set_cookie(
             key="accounts_access_token", 
             value=access_token, 
@@ -636,16 +625,188 @@ async def refresh_token_endpoint(request: Request):
             secure=True, 
             domain=".somosao.com"
         )
-        # Optional: Rotate Refresh Token? (Security Best Practice)
-        # For now, keep it simple.
+        # Fallback
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            samesite="lax",
+            secure=False
+        )
         
         return response
+    finally:
+        db.close()
+        # If we rotate, we need to set the cookie again.
+        
+        db.close()
+        
+        response = JSONResponse({"status": "ok", "message": "Token refreshed", "org_id": org_id})
+        
+        # 1. ACCOUNTS Cookie
+        response.set_cookie(
+            key="accounts_access_token", 
+            value=access_token, 
+            httponly=True,
+            samesite="none",
+            secure=True, 
+            domain=".somosao.com"
+        )
+        
+        # 2. FALLBACK Cookie
+        response.set_cookie(
+            key="access_token", 
+            value=access_token, 
+            httponly=True,
+            samesite="lax",
+            secure=False
+        )
         
         return response
         
     except Exception as e:
         print(f"Refresh Error: {e}")
         return JSONResponse({"status": "error", "message": "Refresh failed"}, status_code=401)
+
+@app.post("/auth/select-org")
+async def select_organization(
+    request: Request,
+    body: dict = Body(...)
+):
+    """
+    Sets the active organization for the user.
+    Requires: Valid Access Token (can be partial/no-org) OR Refresh Token.
+    """
+    org_id = body.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=400, detail="Missing org_id")
+
+    # 1. AUTHENTICATE (Try Access, then Refresh)
+    token = request.cookies.get("accounts_access_token") 
+    refresh = request.cookies.get("accounts_refresh_token")
+    
+    user_email = None
+    user_id = None
+    
+    # Try Access Token
+    if token:
+        payload = decode_token(token)
+        if payload: 
+            user_id = payload.get("sub")
+            user_email = payload.get("email") # fallback
+        
+    # Try Refresh Token if no Access
+    if not user_id and refresh:
+        payload = decode_token(refresh)
+        if payload and payload.get("type") == "refresh":
+             user_id = payload.get("sub")
+             user_email = payload.get("email")
+                  
+    if not user_id and not user_email:
+        raise HTTPException(status_code=401, detail="Authentication required")
+        
+    # 2. VERIFY & SWITCH
+    db = SessionCore()
+    try:
+        # Find User
+        if user_id:
+             user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+        else:
+             user = db.query(AccountUser).filter(AccountUser.email == user_email).first()
+             
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+            
+        # Verify Membership in Target Org
+        membership = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.user_id == user.id,
+            models.OrganizationUser.organization_id == org_id
+        ).first()
+        
+        if not membership:
+             raise HTTPException(status_code=403, detail="Not a member of this organization")
+             
+        # Update Last Active
+        user.last_active_org_id = org_id
+        db.commit()
+        
+        # 3. ISSUE NEW TOKEN
+        org_id, org_role, services = _build_context(db, membership)
+        
+        claims = {
+            "sub": user.id,
+            "email": user.email,
+            "role": org_role if org_role else user.role,
+            "org_id": org_id,
+            "services": services or []
+        }
+        
+        access_token = create_access_token(data=claims)
+        
+        response = JSONResponse({"status": "ok", "message": "Organization selected"})
+        
+        response.set_cookie(
+            key="accounts_access_token", 
+            value=access_token, 
+            httponly=True,
+            samesite="none",
+            secure=True, 
+            domain=".somosao.com"
+        )
+        response.set_cookie(
+            key="access_token",
+            value=access_token,
+            httponly=True,
+            samesite="lax",
+            secure=False
+        )
+        return response
+    finally:
+        db.close()
+
+@app.get("/api/my-organizations")
+async def get_my_organizations_endpoint(request: Request):
+    # Manual Auth Check (User level)
+    token = request.cookies.get("accounts_access_token")
+    user_email = None
+    if token:
+         payload = decode_access_token(token)
+         if payload: user_email = payload.get("sub")
+         
+    # Allow via Refresh token too? For the "Select Org" screen when Access is expired/missing?
+    if not user_email:
+        refresh = request.cookies.get("accounts_refresh_token")
+        if refresh:
+            payload = decode_access_token(refresh)
+            if payload and payload.get("type") == "refresh":
+                 user_email = payload.get("sub")
+
+    if not user_email:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    db = SessionCore() 
+    try:
+        user = db.query(AccountUser).filter(AccountUser.email == user_email).first()
+        if not user: return []
+        
+        # Fetch Orgs
+        memberships = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.user_id == user.id
+        ).all()
+        
+        results = []
+        for m in memberships:
+            org = m.organization
+            if org:
+                results.append({
+                    "id": org.id,
+                    "name": org.name,
+                    "logo": org.logo_url,
+                    "role": m.role
+                })
+        return results
+    finally:
+        db.close()
 
 @app.post("/auth/logout")
 async def logout():

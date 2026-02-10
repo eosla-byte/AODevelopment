@@ -1,152 +1,102 @@
 
 const API_BASE = ""; // Relative path for production
 
-// Mock Data
-const MOCK_BOARD = {
-    id: "demo",
-    name: "Demo Project",
-    columns: [
-        {
-            id: "col-1",
-            title: "To Do",
-            tasks: [
-                { id: "t-1", title: "Research Competitors", priority: "Low", assignees: ["u1"] },
-                { id: "t-2", title: "Design Homepage", priority: "High", assignees: ["u1"] }
-            ]
-        },
-        {
-            id: "col-2",
-            title: "In Progress",
-            tasks: [
-                { id: "t-3", title: "Setup Database", priority: "Urgent", assignees: ["u1"] }
-            ]
-        },
-        {
-            id: "col-3",
-            title: "Done",
-            tasks: []
-        }
-    ]
-};
+// Refresh Lock Mechanism
+let isRefreshing = false;
+let refreshSubscribers = [];
 
-// INTERCEPTOR HELPER
-async function fetchWithAuth(url, options = {}) {
-    try {
-        const response = await fetch(url, options);
-
-        if (response.status === 401) {
-            // Clone to read body safely
-            const body = await response.clone().json().catch(() => ({}));
-            const error = body.detail || body.error; // Support both FastAPI default and custom
-
-            if (error === "token_expired" || error === "token_invalid" || error === "token_invalid_signature") {
-                console.error("🔒 Session Expired/Invalid. Reprompting login...");
-
-                // 1. CLEAR SESSION
-                localStorage.removeItem("ao_user_id");
-                localStorage.removeItem("ao_user_name");
-                localStorage.removeItem("ao_org_id"); // Optional: clear org context too? Maybe keep it.
-
-                // 2. REDIRECT
-                // Encode current URL to return after login
-                const currentUrl = window.location.href;
-                window.location.href = "https://accounts.somosao.com/login?redirect=" + encodeURIComponent(currentUrl);
-
-                // 3. THROW to stop downstream logic
-                throw new Error("SESSION_EXPIRED");
-            }
-        }
-
-        if (!response.ok) {
-            // Pass through other errors normally
-            // Maybe parse body to throw better error message?
-            // const errBody = await response.clone().json().catch(() => ({}));
-            // throw new Error(errBody.detail || response.statusText);
-            // detailed handling left to caller or generic error
-        }
-
-        return response;
-    } catch (e) {
-        if (e.message === "SESSION_EXPIRED") throw e; // Propagate redirect break
-        throw e;
-    }
+function onRefreshed() {
+    refreshSubscribers.forEach(cb => cb());
+    refreshSubscribers = [];
 }
 
+function subscribeTokenRefresh(cb) {
+    refreshSubscribers.push(cb);
+}
 
 // INTERCEPTOR HELPER
 async function fetchWithAuth(url, options = {}) {
-    try {
-        // Ensure credentials are included for cookies
-        options.credentials = "include";
+    options.credentials = "include";
 
-        const response = await fetch(url, options);
+    // Ensure Headers exist
+    if (!options.headers) options.headers = {};
 
-        if (response.status === 401) {
-            console.error("🔒 [Auth] 401 Unauthorized. Session Expired. Creating Redirect...");
+    // Clean up headers (No X-Org)
+    // delete options.headers["X-Organization-ID"]; // If passed explicitly
 
-            // 1. CLEAR SESSION (Frontend Clean)
-            localStorage.removeItem("ao_user_id");
-            localStorage.removeItem("ao_user_name");
-            localStorage.removeItem("ao_org_id");
-            localStorage.removeItem("ao_user"); // Also clear full user object
+    let response = await fetch(url, options);
 
-            // 2. ATTEMPT SERVER LOGOUT (Best Effort, don't await blocking)
-            fetch("https://accounts.somosao.com/auth/logout", { method: "POST", credentials: "include" })
-                .catch(err => console.warn("Logout ping failed", err));
+    if (response.status === 401) {
+        console.warn("🔒 [Auth] 401 Detected. Attempting Refresh...");
 
-            // 3. IMMEDIATE REDIRECT
-            // Force reload to clear memory state too? No, href is enough.
-            const currentUrl = window.location.href;
-            // Prevent redirect loop if already on login
-            if (!currentUrl.includes("/login")) {
-                window.location.href = "https://accounts.somosao.com/login?redirect=" + encodeURIComponent(currentUrl);
+        if (isRefreshing) {
+            // Wait for the pending refresh
+            return new Promise(resolve => {
+                subscribeTokenRefresh(async () => {
+                    // Retry the original request
+                    resolve(await fetch(url, options));
+                });
+            });
+        }
+
+        isRefreshing = true;
+
+        try {
+            // Attempt Refresh against Accounts Service
+            const refreshRes = await fetch("https://accounts.somosao.com/auth/refresh", {
+                method: "POST",
+                credentials: "include"
+            });
+
+            if (refreshRes.ok) {
+                console.log("✅ [Auth] Refresh Successful. Retrying...");
+                isRefreshing = false;
+                onRefreshed();
+                // Retry original
+                return await fetch(url, options);
             }
 
-            // 4. BREAK FLOW
-            // This error must NOT be caught by normal try/catch blocks that continue execution.
-            // We throw a specific fatal error.
+            // Handle 409 ORG_REQUIRED
+            if (refreshRes.status === 409) {
+                console.warn("⚠️ [Auth] Org Selection Required.");
+                window.location.href = "https://accounts.somosao.com/select-org"; // Or local page?
+                // Ideally redirect to Accounts select-org which then redirects back? 
+                // Or we implement a local Select Org page provided by Accounts?
+                // The plan implies Accounts has /select-org.
+                throw new Error("ORG_SELECTION_REQUIRED");
+            }
+
+            // Handle 401/403 -> Login
+            throw new Error("SESSION_EXPIRED");
+
+        } catch (err) {
+            console.error("❌ [Auth] Refresh Failed:", err);
+            isRefreshing = false;
+
+            // Complete Logout Logic
+            localStorage.clear();
+            sessionStorage.clear();
+
+            const currentUrl = encodeURIComponent(window.location.href);
+            // Verify we aren't already on login
+            if (!window.location.href.includes("accounts.somosao.com/login")) {
+                window.location.href = `https://accounts.somosao.com/login?redirect=${currentUrl}`;
+            }
+
+            // Block downstream
             throw new Error("AUTH_EXPIRED_REDIRECTING");
         }
-
-        if (!response.ok) {
-            // Pass through other errors (403, 404, 500)
-            // Optional: Parse body for detail
-            // const body = await response.clone().json().catch(() => ({}));
-            // const detail = body.detail || response.statusText;
-            // throw new Error(detail); 
-        }
-
-        return response;
-    } catch (e) {
-        if (e.message === "AUTH_EXPIRED_REDIRECTING") {
-            // Stop execution of caller
-            throw e;
-        }
-        throw e;
     }
+
+    return response;
 }
 
 
 export const api = {
     getHeaders() {
         const headers = { "Content-Type": "application/json" };
-        const orgId = localStorage.getItem("ao_org_id");
-        if (orgId) {
-            headers["X-Organization-ID"] = orgId;
-        }
-
-        // REFACTOR: Strict Cookie Auth. 
-        // We do NOT send X-User-ID or X-User-Name from localStorage for authenticated users.
-        // The backend must rely on the httpOnly cookie.
-
-        // GUEST HANDLING
-        // If the user explicitly wants to be a guest (no ao_user logged in),
-        // we might send a guest label.
-        // But for now, let's just NOT send false identities.
-
-        // Exception: If we want to support "Guest Mode" where the user types a name without account,
-        // that name should be passed in the BODY of the comment request, not headers.
-
+        // Strict Auth: No X-Organization-ID header.
+        // Context is in the Cookie.
         return headers;
     },
 
@@ -154,12 +104,19 @@ export const api = {
         // return MOCK_BOARD;
         try {
             const res = await fetchWithAuth(`${API_BASE}/projects/${projectId}/board`, {
-                headers: this.getHeaders(),
-                credentials: "include"
+                headers: this.getHeaders()
             });
             return await res.json();
         } catch (e) {
             console.warn("API Error, using mock", e);
+            // Only use mock if not an auth error
+            if (e.message === "AUTH_EXPIRED_REDIRECTING") throw e;
+
+            const MOCK_BOARD = {
+                id: "demo",
+                name: "Demo Project (Offline)",
+                columns: []
+            };
             return MOCK_BOARD;
         }
     },
@@ -169,8 +126,7 @@ export const api = {
             await fetchWithAuth(`${API_BASE}/tasks/${taskId}/move`, {
                 method: "PUT",
                 headers: this.getHeaders(),
-                body: JSON.stringify({ column_id: columnId, index }),
-                credentials: "include"
+                body: JSON.stringify({ column_id: columnId, index })
             });
         } catch (e) {
             console.error(e);
@@ -179,8 +135,7 @@ export const api = {
 
     async getTask(taskId) {
         const res = await fetchWithAuth(`${API_BASE}/tasks/${taskId}`, {
-            headers: this.getHeaders(),
-            credentials: "include"
+            headers: this.getHeaders()
         });
         return await res.json();
     },
@@ -189,8 +144,7 @@ export const api = {
         const res = await fetchWithAuth(`${API_BASE}/tasks/${taskId}`, {
             method: "PATCH",
             headers: this.getHeaders(),
-            body: JSON.stringify(updates),
-            credentials: "include"
+            body: JSON.stringify(updates)
         });
         return await res.json();
     },
@@ -199,8 +153,7 @@ export const api = {
         const res = await fetchWithAuth(`${API_BASE}/tasks/${taskId}/comments`, {
             method: "POST",
             headers: this.getHeaders(),
-            body: JSON.stringify({ content }),
-            credentials: "include"
+            body: JSON.stringify({ content })
         });
         return await res.json();
     },
@@ -208,8 +161,7 @@ export const api = {
     async getProjectMembers(projectId) {
         try {
             const res = await fetchWithAuth(`${API_BASE}/projects/${projectId}/members`, {
-                headers: this.getHeaders(),
-                credentials: "include"
+                headers: this.getHeaders()
             });
             return await res.json();
         } catch (e) {
@@ -222,8 +174,7 @@ export const api = {
         const res = await fetchWithAuth(`${API_BASE}/tasks`, {
             method: "POST",
             headers: this.getHeaders(),
-            body: JSON.stringify({ column_id: columnId, title, priority: "Medium" }),
-            credentials: "include"
+            body: JSON.stringify({ column_id: columnId, title, priority: "Medium" })
         });
         return await res.json();
     },
@@ -232,15 +183,14 @@ export const api = {
         const formData = new FormData();
         formData.append("file", file);
 
-        // Note: Do NOT set Content-Type header for FormData, browser does it with boundary
+        // Note: Do NOT set Content-Type header for FormData
         const headers = this.getHeaders();
         delete headers["Content-Type"];
 
         const res = await fetchWithAuth(`${API_BASE}/tasks/${taskId}/attachments`, {
             method: "POST",
             headers: headers,
-            body: formData,
-            credentials: "include"
+            body: formData
         });
         return await res.json();
     },
@@ -261,7 +211,6 @@ export const api = {
     },
 
     async createProject(payload) {
-        // payload includes name, team info, etc.
         const res = await fetchWithAuth(`/projects`, {
             method: 'POST',
             headers: this.getHeaders(),
@@ -274,24 +223,32 @@ export const api = {
     // --- Session Management ---
 
     async ping() {
-        // Lightweight check
         const res = await fetchWithAuth(`/auth/ping`, {
             headers: this.getHeaders()
         });
         return await res.json();
     },
     async init() {
-        // Bootstrap call. If 401, interceptor redirects.
         const res = await fetchWithAuth(`/init`, {
-            headers: this.getHeaders(),
-            credentials: "include"
+            headers: this.getHeaders()
         });
         return await res.json();
     },
 
     async getMyOrganizations(email) {
-        const res = await fetchWithAuth(`/my-organizations?email=${encodeURIComponent(email)}`, {
+        // CHANGED: Call Accounts Service directly for global orgs
+        // Using credentials: include to pass the HttpOnly cookie
+        const res = await fetchWithAuth(`https://accounts.somosao.com/api/my-organizations`, {
             headers: this.getHeaders()
+        });
+        return await res.json();
+    },
+
+    async selectOrganization(orgId) {
+        const res = await fetchWithAuth(`https://accounts.somosao.com/auth/select-org`, {
+            method: "POST",
+            headers: this.getHeaders(),
+            body: JSON.stringify({ org_id: orgId })
         });
         return await res.json();
     },
@@ -304,7 +261,6 @@ export const api = {
             });
         } catch (e) { console.error("Logout error", e); }
 
-        // Clear Local State
         localStorage.clear();
         sessionStorage.clear();
         window.location.href = "https://accounts.somosao.com/login";
