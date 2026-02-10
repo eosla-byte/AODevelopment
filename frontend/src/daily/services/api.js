@@ -223,5 +223,34 @@ export const api = {
             credentials: "include"
         });
         return await res.json();
+    },
+
+    // --- Project Creation ---
+    async getBimProjects() {
+        const res = await fetchWithAuth(`/bim-projects`, { // Relative to API_BASE? No, these seem to be root relative in Modal
+            headers: this.getHeaders(),
+            credentials: "include"
+        });
+        return await res.json();
+    },
+
+    async getOrgUsers() {
+        const res = await fetchWithAuth(`/org-users`, {
+            headers: this.getHeaders(),
+            credentials: "include"
+        });
+        return await res.json();
+    },
+
+    async createProject(payload) {
+        // payload includes name, team info, etc.
+        const res = await fetchWithAuth(`/projects`, {
+            method: 'POST',
+            headers: this.getHeaders(),
+            body: JSON.stringify(payload),
+            credentials: "include"
+        });
+        if (!res.ok) throw new Error("Failed to create project");
+        return await res.json();
     }
 };

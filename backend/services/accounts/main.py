@@ -199,6 +199,20 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             secure=True, # Required for SameSite=None
             domain=".somosao.com" # Allow sharing with *.somosao.com
         )
+        
+        # REFRESH TOKEN (Long Lived - 7 Days)
+        refresh_token = create_access_token(
+            data={"sub": user.email, "type": "refresh"},
+            expires_delta=datetime.timedelta(days=7)
+        )
+        response.set_cookie(
+            key="refresh_token", 
+            value=refresh_token, 
+            httponly=True,
+            samesite="none",
+            secure=True, 
+            domain=".somosao.com"
+        )
         print(f"Cookie set for {user.email}")
         return response
     finally:
@@ -210,6 +224,7 @@ async def logout():
     response.delete_cookie("accounts_access_token", domain=".somosao.com")
     # Also delete for host only just in case
     response.delete_cookie("accounts_access_token")
+    response.delete_cookie("refresh_token", domain=".somosao.com")
     return response
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -570,6 +585,65 @@ def migrate_db_schema(user_jwt = Depends(get_current_admin)):
     db_ops.close()
 
     return {"status": "done", "log": messages}
+
+@app.post("/auth/refresh")
+async def refresh_token_endpoint(request: Request):
+    """
+    Refreshes the access_token using the HttpOnly refresh_token cookie.
+    """
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        # 401 Unauthorized prevents frontend loop if no refresh token
+        return JSONResponse({"status": "error", "message": "No refresh token"}, status_code=401)
+        
+    try:
+        # Validate Refresh Token
+        # NOTE: decode_access_token uses SECRET_KEY. 
+        # Ensure refresh token was signed with the SAME secret or use a different verify function.
+        # Ideally refresh tokens should be in DB to allow revocation (Revoke Pattern).
+        # For now, simplistic JWT check.
+        payload = decode_access_token(refresh_token)
+        if not payload or payload.get("type") != "refresh":
+             return JSONResponse({"status": "error", "message": "Invalid refresh token"}, status_code=401)
+             
+        email = payload.get("sub")
+        
+        # Verify User Exists
+        db = SessionCore()
+        user = db.query(AccountUser).filter(AccountUser.email == email).first()
+        if not user:
+             db.close()
+             return JSONResponse({"status": "error", "message": "User not found"}, status_code=401)
+             
+        # Issue New Access Token
+        access_token = create_access_token(
+            data={
+                "sub": user.email, 
+                "role": user.role, 
+                "id": user.id,
+                "services_access": user.services_access or {}
+            },
+            expires_delta=datetime.timedelta(hours=12) 
+        )
+        db.close()
+        
+        response = JSONResponse({"status": "ok", "message": "Token refreshed"})
+        response.set_cookie(
+            key="accounts_access_token", 
+            value=access_token, 
+            httponly=True,
+            samesite="none",
+            secure=True, 
+            domain=".somosao.com"
+        )
+        # Optional: Rotate Refresh Token? (Security Best Practice)
+        # For now, keep it simple.
+        
+        return response
+        
+    except Exception as e:
+        print(f"Refresh Error: {e}")
+        return JSONResponse({"status": "error", "message": "Refresh failed"}, status_code=401)
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8005))
