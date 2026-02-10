@@ -10,8 +10,8 @@ from typing import Optional, Dict, Any
 # -----------------------------------------------------------------------------
 # CONFIGURATION (RS256 Strict)
 # -----------------------------------------------------------------------------
-# Keys: JWT_PRIVATE_KEY_PEM / JWT_PUBLIC_KEY_PEM
-# No backups, no "AO_" prefix for keys.
+# Keys: AO_JWT_PRIVATE_KEY_PEM / AO_JWT_PUBLIC_KEY_PEM
+# Exact names required.
 
 def load_key_strict(env_name, required=False):
     val = os.getenv(env_name)
@@ -20,7 +20,7 @@ def load_key_strict(env_name, required=False):
             raise ValueError(f"❌ [AUTH] CRITICAL ERROR: Environment variable '{env_name}' is missing.")
         return None
     
-    # Secure Log
+    # Secure Log (Length only)
     print(f"✅ [AUTH] Loaded {env_name} (Length: {len(val)})")
     
     # Handle Newline Escaping
@@ -28,24 +28,9 @@ def load_key_strict(env_name, required=False):
 
 # Load Keys
 try:
-    # Private Key is required for Signing (Accounts) but maybe not for purely verifying services?
-    # User said "Si falta alguna, lanzar error claro".
-    # But common.auth is shared. 
-    # If I am a verifying service, I don't need Private.
-    # But if I am Accounts, I need both.
-    # Let's verify usage context? Or just warn if missing but crash on use?
-    # The prompt implies "Si falta alguna [de las configuradas/necesarias?]" or "Si faltan las definidas"?
-    # "Si falta alguna, lanzar error claro indicando el nombre exacto faltante."
-    # I will stick to: Load what is there, but strict error on USE if missing. 
-    # OR if the user means "Env Vars must be present", I should fail at startup.
-    # The request says "En el servicio Accounts...". 
-    # So I will enforce STRICT loading for both in common? 
-    # No, that breaks other services that only have Public.
-    # I will strict load PUBLIC (needed everywhere) and PRIVATE (needed for signing).
-    
-    # Actually, safely:
-    JWT_PRIVATE_KEY_PEM = load_key_strict("JWT_PRIVATE_KEY_PEM", required=False)
-    JWT_PUBLIC_KEY_PEM = load_key_strict("JWT_PUBLIC_KEY_PEM", required=False)
+    # Strict loading for Accounts (Private) and Verification (Public)
+    AO_JWT_PRIVATE_KEY_PEM = load_key_strict("AO_JWT_PRIVATE_KEY_PEM", required=False)
+    AO_JWT_PUBLIC_KEY_PEM = load_key_strict("AO_JWT_PUBLIC_KEY_PEM", required=False)
     
 except Exception as e:
     print(f"❌ [AUTH] Configuration Error: {e}")
@@ -67,13 +52,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 # CORE FUNCTIONS
 # -----------------------------------------------------------------------------
 
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None, audience: str = "somosao") -> str:
     """
     Creates a standardized JWT Access Token using RS256 Private Key.
     Only available if AO_JWT_PRIVATE_KEY_PEM is set (Accounts Service).
     """
-    if not JWT_PRIVATE_KEY_PEM:
-        raise RuntimeError("❌ [AUTH] Signing Failed: JWT_PRIVATE_KEY_PEM is missing.")
+    if not AO_JWT_PRIVATE_KEY_PEM:
+        raise RuntimeError("❌ [AUTH] Signing Failed: AO_JWT_PRIVATE_KEY_PEM is missing.")
         
     to_encode = data.copy()
     
@@ -86,13 +71,13 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     to_encode.update({
         "exp": expire,
         "iss": "accounts.somosao.com",
-        "aud": "somosao"
+        "aud": audience
     })
     
     # Sign with Private Key
     encoded_jwt = jwt.encode(
         to_encode, 
-        JWT_PRIVATE_KEY_PEM, 
+        AO_JWT_PRIVATE_KEY_PEM, 
         algorithm=ALGORITHM,
         headers={"kid": AO_JWT_KEY_ID}
     )
@@ -103,8 +88,8 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     Creates a long-lived Refresh Token using RS256 Private Key.
     Only available if AO_JWT_PRIVATE_KEY_PEM is set (Accounts Service).
     """
-    if not JWT_PRIVATE_KEY_PEM:
-        raise RuntimeError("❌ [AUTH] Signing Failed: JWT_PRIVATE_KEY_PEM is missing.")
+    if not AO_JWT_PRIVATE_KEY_PEM:
+        raise RuntimeError("❌ [AUTH] Signing Failed: AO_JWT_PRIVATE_KEY_PEM is missing.")
         
     to_encode = data.copy()
     expire = datetime.datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
@@ -118,19 +103,19 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     
     encoded_jwt = jwt.encode(
         to_encode, 
-        JWT_PRIVATE_KEY_PEM, 
+        AO_JWT_PRIVATE_KEY_PEM, 
         algorithm=ALGORITHM,
         headers={"kid": AO_JWT_KEY_ID}
     )
     return encoded_jwt
 
-def decode_token(token: str) -> Optional[Dict[str, Any]]:
+def decode_token(token: str, audience: str = "somosao") -> Optional[Dict[str, Any]]:
     """
     Decodes and validates a JWT using RS256 Public Key.
     Available to all services with Public Key configured.
     """
-    if not JWT_PUBLIC_KEY_PEM:
-        print("❌ [AUTH] Verification Failed: JWT_PUBLIC_KEY_PEM is missing.")
+    if not AO_JWT_PUBLIC_KEY_PEM:
+        print("❌ [AUTH] Verification Failed: AO_JWT_PUBLIC_KEY_PEM is missing.")
         return None
         
     try:
@@ -141,9 +126,9 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         # Verify Signature using Public Key
         payload = jwt.decode(
             token, 
-            JWT_PUBLIC_KEY_PEM, 
+            AO_JWT_PUBLIC_KEY_PEM, 
             algorithms=[ALGORITHM],
-            audience="somosao",
+            audience=audience,
             issuer="accounts.somosao.com",
             options={"require": ["exp", "iss", "aud", "sub"]}
         )

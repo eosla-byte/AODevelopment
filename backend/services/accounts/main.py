@@ -21,7 +21,8 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from common.database import get_db, SessionCore 
-from common.auth import create_access_token, create_refresh_token, decode_token
+from common.database import get_db, SessionCore 
+from common.auth import create_access_token, create_refresh_token, decode_token, AO_JWT_PUBLIC_KEY_PEM
 from common.auth_utils import verify_password, get_password_hash # Keep password utils
 import common.models as models 
 from common.models import AccountUser 
@@ -49,20 +50,38 @@ async def startup_event():
 
 # ... (dependencies)
 def get_current_admin(request: Request):
-    token = request.cookies.get("accounts_access_token")
+    # 1. Read access_token (Lax) or accounts_access_token (Fallback)
+    token = request.cookies.get("access_token")
+    if token:
+         print(f"DEBUG: Found access_token in cookie (Length: {len(token)})")
+    else:
+         print("DEBUG: No access_token in cookie, checking fallback...")
+         token = request.cookies.get("accounts_access_token")
+        
+    # 2. Header Fallback
+    if not token:
+        auth = request.headers.get("Authorization")
+        if auth and auth.startswith("Bearer "):
+            print("DEBUG: Found token in Authorization header")
+            token = auth.split(" ")[1]
+
     if not token:
         return None
     try:
-        # Decode using common auth (RS256 Public Key)
-        payload = decode_token(token)
+        # Decode ensuring audience includes 'ao-platform'
+        # Pass audience explicitly to enforce check
+        payload = decode_token(token, audience="ao-platform")
         if not payload: 
             return None
             
         # Check if role is Admin (or sufficient privilege)
         if payload.get("role") not in ["Admin", "SuperAdmin"]:
+            print(f"DEBUG: Role {payload.get('role')} denied admin access")
             return None
+        print(f"DEBUG: Token verified for user {payload.get('sub')} (Role: {payload.get('role')})")
         return payload 
     except Exception as e:
+        print(f"Auth Debug: {e}")
         return None
 
 # --- DB Migration Helper ---
@@ -188,16 +207,28 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             status_response = "select_org"
             redirect_url = "/select-org"
             
-        # ACCESS TOKEN (Short Lived - 15 Mins)
-        access_token = create_access_token(data=claims)
+        # ACCESS TOKEN (Dual Audience for compatibility)
+        access_token = create_access_token(data=claims, audience=["somosao", "ao-platform"])
         
-        # REFRESH TOKEN (Long Lived - 7 Days)
-        refresh_claims = {"sub": user.id, "email": user.email} # Minimal data for refresh
+        # REFRESH TOKEN
+        refresh_claims = {"sub": user.id, "email": user.email}
         refresh_token = create_refresh_token(data=refresh_claims)
         
         response = JSONResponse({"status": status_response, "redirect": redirect_url, "user": {"id": user.id, "email": user.email}})
         
-        # COOKIE: ACCOUNTS_ACCESS_TOKEN (HttpOnly, Secure, Domain)
+        # COOKIE 1: access_token (Main, Lax, HttpOnly)
+        print(f"DEBUG: Setting access_token cookie for {user.email}")
+        response.set_cookie(
+            key="access_token", 
+            value=access_token, 
+            httponly=True,
+            samesite="lax",
+            secure=True, 
+            domain=".somosao.com",
+            path="/"
+        )
+
+        # COOKIE 2: accounts_access_token (Legacy/Global, None, HttpOnly)
         response.set_cookie(
             key="accounts_access_token", 
             value=access_token, 
@@ -206,6 +237,7 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             secure=True, 
             domain=".somosao.com"
         )
+
         response.set_cookie(
             key="accounts_refresh_token",
             value=refresh_token,
@@ -629,11 +661,22 @@ async def refresh_token_endpoint(request: Request):
                 "services": services or []
             }
             
-            access_token = create_access_token(data=claims)
+            access_token = create_access_token(data=claims, audience=["somosao", "ao-platform"])
             
             response = JSONResponse({"status": "ok", "message": "Token refreshed", "org_id": org_id})
             
-            # 1. ACCOUNTS Cookie
+            # 1. access_token
+            response.set_cookie(
+                key="access_token", 
+                value=access_token, 
+                httponly=True,
+                samesite="lax",
+                secure=True,
+                domain=".somosao.com",
+                path="/"
+            )
+            
+            # 2. accounts_access_token
             response.set_cookie(
                 key="accounts_access_token", 
                 value=access_token, 
@@ -641,15 +684,6 @@ async def refresh_token_endpoint(request: Request):
                 samesite="none",
                 secure=True, 
                 domain=".somosao.com"
-            )
-            
-            # 2. FALLBACK Cookie
-            response.set_cookie(
-                key="access_token", 
-                value=access_token, 
-                httponly=True,
-                samesite="lax",
-                secure=False
             )
             
             return response
@@ -733,9 +767,19 @@ async def select_organization(
             "services": services or []
         }
         
-        access_token = create_access_token(data=claims)
+        access_token = create_access_token(data=claims, audience=["somosao", "ao-platform"])
         
         response = JSONResponse({"status": "ok", "message": "Organization selected"})
+        
+        response.set_cookie(
+            key="access_token", 
+            value=access_token, 
+            httponly=True,
+            samesite="lax",
+            secure=True,
+            domain=".somosao.com",
+            path="/" 
+        )
         
         response.set_cookie(
             key="accounts_access_token", 
@@ -744,13 +788,6 @@ async def select_organization(
             samesite="none",
             secure=True, 
             domain=".somosao.com"
-        )
-        response.set_cookie(
-            key="access_token",
-            value=access_token,
-            httponly=True,
-            samesite="lax",
-            secure=False
         )
         return response
     finally:
@@ -852,12 +889,11 @@ def jwks_endpoint():
     # Import here to avoid circularity if any, or rely on global import?
     # Global import of common.auth might not have the key loaded if env vars not set during import time?
     # But checking common.auth imports at top of file: yes.
-    from common.auth import JWT_PUBLIC_KEY_PEM
     
-    if not JWT_PUBLIC_KEY_PEM:
+    if not AO_JWT_PUBLIC_KEY_PEM:
         return {"keys": []}
         
-    jwk = _pem_to_jwk(JWT_PUBLIC_KEY_PEM)
+    jwk = _pem_to_jwk(AO_JWT_PUBLIC_KEY_PEM)
     if jwk:
         return {"keys": [jwk]}
     return {"keys": []}
