@@ -2145,7 +2145,7 @@ def init_user_daily_setup(user_email: str):
     return True
 
 def create_daily_team(name: str, owner_id: str, organization_id: str = None, members: List[str] = None):
-    db = SessionOps() # Using Ops DB for Daily
+    db = SessionCore() # Daily Data -> Core
     try:
         new_id = str(uuid.uuid4())
         
@@ -2172,7 +2172,7 @@ def get_user_teams(user_id: str, organization_id: str = None):
     # This requires JSON contains query or filtering in memory.
     # SQLite JSON filtering is tricky.
     # For MVP, get all teams and filter in python (inefficient but works for small scale)
-    db = SessionOps()
+    db = SessionCore()
     try:
         query = db.query(models.DailyTeam)
         
@@ -2187,7 +2187,7 @@ def get_user_teams(user_id: str, organization_id: str = None):
         db.close()
 
 def create_daily_project(team_id: str, name: str, user_id: str, organization_id: str = None, bim_project_id: str = None):
-    db = SessionOps()
+    db = SessionCore()
     try:
         new_id = str(uuid.uuid4())
         proj = models.DailyProject(
@@ -2213,7 +2213,7 @@ def create_daily_project(team_id: str, name: str, user_id: str, organization_id:
         db.close()
 
 def get_daily_project_board(project_id: str):
-    db = SessionOps()
+    db = SessionCore()
     try:
         # Load Project + Columns + Tasks (lightweight)
         proj = db.query(models.DailyProject).filter(models.DailyProject.id == project_id).options(
@@ -2226,7 +2226,7 @@ def get_daily_project_board(project_id: str):
         db.close()
 
 def create_daily_task(project_id: str, column_id: str, title: str, user_id: str, due_date=None, priority="Medium"):
-    db = SessionOps()
+    db = SessionCore()
     try:
         new_id = str(uuid.uuid4())
         # If project_id is None, it's a direct assignment (Manager Mode)? 
@@ -2264,7 +2264,7 @@ def create_daily_task(project_id: str, column_id: str, title: str, user_id: str,
         db.close()
 
 def update_daily_task_location(task_id: str, new_column_id: str, new_index: int = 0):
-    db = SessionOps()
+    db = SessionCore()
     try:
         task = db.query(models.DailyTask).filter(models.DailyTask.id == task_id).first()
         if task:
@@ -2284,7 +2284,7 @@ def get_user_daily_tasks(user_id: str):
     """
     Get all tasks assigned to user across all projects.
     """
-    db = SessionOps()
+    db = SessionCore()
     try:
         # Fetch all tasks and filter by assignees JSON
         # Optimized: In Postgres we can use @> operator. In SQLite/Generic: Python filter.
@@ -2297,7 +2297,7 @@ def get_user_daily_tasks(user_id: str):
         db.close()
 
 def add_daily_message(project_id: str, user_id: str, content: str):
-    db = SessionOps()
+    db = SessionCore()
     try:
         # GT Timezone (UTC-6)
         gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
@@ -2314,7 +2314,7 @@ def add_daily_message(project_id: str, user_id: str, content: str):
         db.close()
 
 def get_daily_messages(project_id: str, limit=50):
-    db = SessionOps()
+    db = SessionCore()
     try:
         msgs = db.query(models.DailyMessage).filter(models.DailyMessage.project_id == project_id).order_by(models.DailyMessage.created_at.desc()).limit(limit).all()
         return msgs[::-1] # Return chronological
@@ -2337,7 +2337,7 @@ def get_org_projects(organization_id: str):
     """
     Get all Core Projects ('resources_projects') associated with an organization.
     """
-    db = SessionCore()
+    db = SessionOps()
     try:
         # Filter by organization_id
         projects = db.query(models.Project).filter(models.Project.organization_id == organization_id).all()
@@ -2349,7 +2349,7 @@ def create_org_project(organization_id: str, name: str, cost: float = 0.0, sq_me
     """
     Create a new Core Project Profile.
     """
-    db = SessionCore()
+    db = SessionOps()
     try:
         new_id = str(uuid.uuid4())
         project = models.Project(
@@ -2374,7 +2374,7 @@ def get_org_users(organization_id: str):
     """
     Get all users belonging to an organization.
     """
-    db = SessionCore()
+    db = SessionOps()
     try:
         members = db.query(models.OrganizationUser).filter(
             models.OrganizationUser.organization_id == organization_id
@@ -2397,7 +2397,7 @@ def get_user_organizations(email: str):
     """
     Get all organizations a user belongs to, enabling the Frontend to drop Mocks.
     """
-    db = SessionCore()
+    db = SessionOps()
     try:
         print(f"🔍 [DB] Looking for user with email: {email}")
         # Find user by email first (Case Insensitive)
@@ -2435,7 +2435,7 @@ def get_user_organizations(email: str):
         db.close()
 
 def get_project_metrics(project_id: str):
-    db = SessionOps()
+    db = SessionCore()
     try:
         project = db.query(models.DailyProject).filter(models.DailyProject.id == project_id).first()
         if not project:

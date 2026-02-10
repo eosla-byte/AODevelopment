@@ -579,6 +579,7 @@ class DailyComment(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     task_id = Column(String, ForeignKey('daily_tasks.id'))
     user_id = Column(String) # User ID or Email
+    user_name = Column(String, nullable=True) # Cache for display (Added via migration)
     content = Column(Text)
     
     # Threading

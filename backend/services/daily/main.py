@@ -363,7 +363,7 @@ def create_daily_team_safe(name: str, owner_id: str, organization_id: str = None
     import types
     from sqlalchemy import text
     
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         new_id = str(uuid.uuid4())
         initial_members = [owner_id]
@@ -403,7 +403,7 @@ def create_daily_project_safe(team_id: str, name: str, user_id: str, organizatio
     import uuid
     import types
     
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         new_id = str(uuid.uuid4())
         proj = DailyProject(
@@ -439,7 +439,7 @@ def create_daily_project_safe(team_id: str, name: str, user_id: str, organizatio
 def get_user_teams_safe(user_id: str, organization_id: str = None):
     import types
     # Ensure fresh session
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         # We need to filter manually because JSON query in SQLite/Postgres differs and we want safety
         query = db.query(DailyTeam)
@@ -480,7 +480,7 @@ def get_user_teams_safe(user_id: str, organization_id: str = None):
             )
             result.append(safe_team)
             
-        print(f"✅ [INLINED RETRIEVAL] Found {len(result)} teams for user {user_id}")
+# result log removed
         return result
     finally:
         db.close()
@@ -495,7 +495,11 @@ def create_project(
     user_id: str = Depends(get_current_user_id),
     org_id: str = Depends(get_current_org_id)
 ):
-    print(f"🚀 [API] Creating Project: {name} (User: {user_id}, Org: {org_id})")
+    # STRICT AUTH
+    if not user_id:
+        raise HTTPException(status_code=401, detail="token_expired")
+
+# log removed
     try:
         final_team_id = team_id
         
@@ -503,11 +507,11 @@ def create_project(
             # Use SAFE inlined function
             team = create_daily_team_safe(new_team_name, user_id, organization_id=org_id, members=members)
             final_team_id = team.id
-            print(f"✅ Team Created Safe: {final_team_id}")
+            # log removed
 
         # Use SAFE inlined function
         proj = create_daily_project_safe(final_team_id, name, user_id, organization_id=org_id, bim_project_id=bim_project_id)
-        print(f"✅ Project Created Safe: {proj.id}")
+        # log removed
         return {"id": proj.id, "name": proj.name}
     except Exception as e:
         import traceback
@@ -522,16 +526,12 @@ def get_organization_users(
 ):
     if not org_id:
         return []
-    print(f"🔍 [API] /org-users requested for Org: {org_id} by User: {user_id}")
     users = database.get_org_users(org_id)
-    print(f"✅ [API] Found {len(users)} users")
     return users
 
 @app.get("/my-organizations")
 def get_my_organizations(email: str, user_id: str = Depends(get_current_user_id)):
-    print(f"🔍 [API] /my-organizations requested for: {email} (Auth: {user_id})")
     orgs = database.get_user_organizations(email)
-    print(f"✅ [API] Found {len(orgs)} orgs")
     return orgs
 
 @app.get("/bim-projects")
@@ -543,9 +543,7 @@ def get_available_bim_projects(
         return []
     # Fetching Project Profiles (resources_projects) instead of bim_projects
     # because that is what the user understands as "Projects" to link.
-    print(f"🔍 [API] /bim-projects requested for Org: {org_id} by User: {user_id}")
     projects = database.get_org_projects(org_id)
-    print(f"✅ [API] Found {len(projects)} projects")
     return [{"id": p.id, "name": p.name} for p in projects]
 
 @app.get("/projects/{project_id}/board")
@@ -578,7 +576,7 @@ def get_project_board_view(project_id: str, user_id: str = Depends(get_current_u
     }
 
 def delete_daily_project_safe(project_id: str, user_id: str):
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         # Check permissions (simple check: if user created it or is in the team)
         # For now, allow deletion if user has access.
@@ -679,7 +677,7 @@ def update_task_details(
     user_id: str = Depends(get_current_user_id)
 ):
     import datetime
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         task = db.query(DailyTask).filter(DailyTask.id == task_id).first()
         if not task:
@@ -725,82 +723,69 @@ def update_task_details(
 def add_task_comment(
     task_id: str,
     content: str = Body(..., embed=True),
-    guest_label: str = Body(None, embed=True), # Explicit guest name from UI if unauthed
-    user_id: str = Depends(get_current_user_id),
-    request: Request = None
+    user_id: str = Depends(get_current_user_id)
 ):
     import datetime
-    db = database.SessionOps()
+    
+    # STRICT AUTH
+    if not user_id:
+        raise HTTPException(status_code=401, detail="token_expired")
+
+    db = database.SessionCore()
+    db_user = database.SessionOps()
     try:
         # Verify task exists
         task = db.query(DailyTask).filter(DailyTask.id == task_id).first()
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
             
-        # Timezone: Store in UTC (Best Practice)
+        # RESOLVE AUTHOR NAME (Source of Truth: Ops DB for Users)
+        author_name = "Unknown User"
+        try:
+            user = db_user.query(models.AccountUser).filter(models.AccountUser.id == user_id).first()
+            if user:
+                author_name = user.full_name
+            else:
+                # Fallback: Check AppUser (Legacy)
+                app_user = db_user.query(models.AppUser).filter(models.AppUser.email == user_id).first()
+                if app_user:
+                    author_name = app_user.full_name
+        except Exception as e:
+            print(f"⚠️ [Comment] Name resolution failed: {e}")
+            
+        # Timezone: Store in UTC
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         
-        # DETERMINE AUTHOR
-        final_user_id = None
-        final_user_name = None
-        author_type = "guest"
-        
-        if user_id:
-             # Authenticated User
-             final_user_id = user_id
-             author_type = "user"
-             # user_name left as None, to be resolved via get_user_map
-        else:
-             # Guest
-             final_user_id = None 
-             final_user_name = guest_label or "Guest"
-             author_type = "guest"
-
         comment = DailyComment(
             task_id=task_id,
-            user_id=final_user_id, # Null if guest
-            user_name=final_user_name, # "Guest X" or Null (if user)
+            user_id=user_id,
+            user_name=author_name, # Persist for fast read
             content=content,
             created_at=now_utc
         )
         db.add(comment)
         db.commit()
 
-        # RETURN PAYLOAD (With Resolved Author)
-        # Attempt immediate resolution for UX
-        display_name = final_user_name or "Guest"
-        if final_user_id:
-             try:
-                 u_map = get_user_map([final_user_id])
-                 if final_user_id in u_map:
-                      display_name = u_map[final_user_id]
-                 else:
-                      display_name = "Unknown User"
-             except:
-                 display_name = "Unknown User"
-                 pass
-
-        author_data = {
-             "id": final_user_id,
-             "type": author_type,
-             "displayName": display_name,
-             "avatarUrl": None
-        }
-        
         return {
             "id": comment.id,
             "content": comment.content,
-            "createdAt": comment.created_at.isoformat(), # UTC with Z
-            "author": author_data
+            "createdAt": comment.created_at.isoformat(),
+            "author": {
+                 "id": user_id,
+                 "type": "user",
+                 "displayName": author_name,
+                 "avatarUrl": None
+            }
         }
     finally:
         db.close()
+        db_user.close()
         
 
 def get_user_map(user_ids: List[str]):
-    """Helper to fetch user names from Core DB"""
+    """Helper to fetch user names from Ops DB (Users)"""
     if not user_ids: return {}
-    db = database.SessionCore()
+    db = database.SessionOps()
     try:
         # Use AccountUser for ID-based lookup
         users = db.query(models.AccountUser).filter(models.AccountUser.id.in_(user_ids)).all()
@@ -824,7 +809,7 @@ def get_user_map(user_ids: List[str]):
 @app.get("/projects/{project_id}/members")
 def get_project_members(project_id: str):
     """Get all members associated with this project's organization/team"""
-    db = database.SessionCore()
+    db = database.SessionOps()
     try:
         # 1. Get Project
         project = db.query(models.Project).filter(models.Project.id == project_id).first()
@@ -904,9 +889,9 @@ def get_project_members(project_id: str):
         db.close()
 
 @app.get("/tasks/{task_id}")
-def get_task_details(task_id: str):
+def get_task_details(task_id: str, user_id: str = Depends(get_current_user_id)):
     import datetime
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         task = db.query(DailyTask).filter(DailyTask.id == task_id).first()
         if not task:
@@ -915,47 +900,38 @@ def get_task_details(task_id: str):
         # Get Comments
         comments = db.query(DailyComment).filter(DailyComment.task_id == task_id).order_by(DailyComment.created_at.desc()).all()
         
-        # BATCH FETCH AUTHORS
-        # Collect all non-null user_ids
-        user_ids = list(set([c.user_id for c in comments if c.user_id]))
+        # BATCH FETCH AUTHORS (Legacy Fallback)
+        # Only needed if user_name is NULL in DB (Legacy comments)
+        missing_name_ids = list(set([c.user_id for c in comments if c.user_id and not c.user_name]))
         
-        # Query Core DB
         user_map = {}
-        if user_ids:
-             user_map = get_user_map(user_ids)
-             
-        # Check for missing users
-        for uid in user_ids:
-             if uid not in user_map:
-                  # print(f"⚠️ [get_task_details] User not found: {uid}")
-                  pass
+        if missing_name_ids:
+             user_map = get_user_map(missing_name_ids)
         
         formatted_comments = []
         for c in comments:
-            # Resolve Author
-            # Fallback logic: 
-            # 1. If user_id exists -> Try Map -> Fallback "Unknown User"
-            # 2. If guest -> Use stored name or "Guest"
-            
-            display_name = "Guest"
+            # Resolve Author Name
+            display_name = "Unknown User"
             author_type = "guest"
-            avatar_url = None
             
             if c.user_id:
                  author_type = "user"
-                 display_name = user_map.get(c.user_id, "Unknown User")
+                 if c.user_name:
+                     display_name = c.user_name
+                 else:
+                     display_name = user_map.get(c.user_id, "Unknown User")
             else:
                  author_type = "guest"
                  display_name = c.user_name or "Guest"
 
             # UTC ISO for Frontend
-            created_iso = c.created_at.isoformat() if c.created_at else None
-            # If created_at is naive, assume UTC (since we are moving to that)
+            created_iso = None
             if c.created_at: 
-                 if c.created_at.tzinfo is None:
-                     created_iso = c.created_at.replace(tzinfo=datetime.timezone.utc).isoformat()
-                 else:
-                     created_iso = c.created_at.astimezone(datetime.timezone.utc).isoformat()
+                 # Ensure UTC
+                 dt = c.created_at
+                 if dt.tzinfo is None:
+                     dt = dt.replace(tzinfo=datetime.timezone.utc)
+                 created_iso = dt.isoformat()
 
             formatted_comments.append({
                 "id": c.id,
@@ -965,7 +941,7 @@ def get_task_details(task_id: str):
                      "id": c.user_id,
                      "type": author_type,
                      "displayName": display_name,
-                     "avatarUrl": avatar_url 
+                     "avatarUrl": None 
                 }
             })
         
@@ -1042,7 +1018,7 @@ async def upload_task_attachment(
 
 def get_project_channels_safe(project_id: str):
     import types
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         channels = db.query(DailyChannel).filter(DailyChannel.project_id == project_id).all()
         # If no channels, create default 'general'
@@ -1058,7 +1034,7 @@ def get_project_channels_safe(project_id: str):
 
 def create_channel_safe(project_id: str, name: str, type: str = "text"):
     import types
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         new_id = str(uuid.uuid4())
         chan = DailyChannel(id=new_id, project_id=project_id, name=name, type=type)
@@ -1070,7 +1046,7 @@ def create_channel_safe(project_id: str, name: str, type: str = "text"):
 
 def get_channel_messages_safe(channel_id: str, limit: int = 50):
     import types
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         # Fetch with attachments and threading info
         # Order by created_at DESC for pagination, then flip
@@ -1091,7 +1067,7 @@ def get_channel_messages_safe(channel_id: str, limit: int = 50):
         db.close()
 
 def create_message_safe(channel_id: str, user_id: str, content: str, parent_id: int = None, attachments: list = None):
-    db = database.SessionOps()
+    db = database.SessionCore()
     try:
         msg = DailyMessage(
             channel_id=channel_id,
