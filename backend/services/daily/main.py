@@ -11,8 +11,7 @@ try:
     from .common.auth_utils import decode_access_token
 except ImportError:
     # Fallback to absolute if running from root without package context (dev)
-    from common import database
-    from common.models import DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
+    from common import database, models
     from common.auth_utils import decode_access_token
 
 try:
