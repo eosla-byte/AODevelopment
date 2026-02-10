@@ -580,6 +580,7 @@ class DailyComment(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     task_id = Column(String, ForeignKey('daily_tasks.id'))
     user_id = Column(String) # User ID or Email
+    user_name = Column(String) # Snapshot of display name for Guest/Persistence
     content = Column(Text)
     
     # Threading

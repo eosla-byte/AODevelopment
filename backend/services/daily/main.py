@@ -35,13 +35,32 @@ origins = [
     "https://bim.somosao.com",
     "https://aodev.railway.internal"
 ]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# -----------------------------------------------------------------------------
+# STARTUP MIGRATION
+# -----------------------------------------------------------------------------
+@app.on_event("startup")
+async def run_migrations():
+    print("🔄 [Daily] Checking Schema Migrations...")
+    try:
+        from sqlalchemy import text
+        db = database.SessionOps()
+        # Auto-add user_name to daily_comments if missing
+        try:
+            db.execute(text("ALTER TABLE daily_comments ADD COLUMN user_name VARCHAR"))
+            db.commit()
+            print("✅ [Daily] Migration: Added 'user_name' to daily_comments")
+        except Exception as e:
+            db.rollback()
+            # If "duplicate column" or "exists", we ignore. SQLite vs Postgres syntax is similar for ADD COLUMN
+            # print(f"ℹ️ [Daily] Migration note: {e}") 
+            pass
+        finally:
+            db.close()
+    except Exception as outer:
+        print(f"⚠️ [Daily] Migration check failed: {outer}")
 
 # -----------------------------------------------------------------------------
 # DEPENDENCIES
@@ -662,6 +681,13 @@ def add_task_comment(
                  user_name = u_map.get(user_id, "User")
              except:
                  user_name = "User"
+        
+        # PERSIST NAME TO DB (Fixes Reload Issue)
+        try:
+            comment.user_name = user_name
+            db.commit()
+        except Exception as e:
+            print(f"⚠️ [add_comment] Failed to save user_name: {e}")
 
         # 2. TIMEZONE HANDLING (Explicit)
         # now_gt is already UTC-6. We format it as a string for the UI.
@@ -803,23 +829,25 @@ def get_task_details(task_id: str):
         
         formatted_comments = []
         for c in comments:
-            # Server-side formatted time (Guatemala/Central)
-            # Ensure it is timezone aware before converting
+            # Server-side formatted time
+            # Check model user_name first, then map, then ID
+            stored_name = getattr(c, 'user_name', None)
+            if stored_name and stored_name != "User":
+                  u_name = stored_name
+            else:
+                  u_name = user_map.get(c.user_id)
+                  if not u_name:
+                       u_name = f"User {c.user_id[:5]}..." if len(c.user_id) > 5 else c.user_id
+            
+            # Timezone logic (Naive -> UTC -> GT)
             if c.created_at.tzinfo is None:
                  gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
-                 # If naive, assume UTC and convert? Or assume it IS UTC?
-                 # If stored as naive in broken state, it might be UTC.
-                 # Let's force it to be treated as UTC then convert to GT
                  c.created_at = c.created_at.replace(tzinfo=datetime.timezone.utc).astimezone(gt_tz)
             else:
                  gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
                  c.created_at = c.created_at.astimezone(gt_tz)
 
             fmt_time = c.created_at.strftime("%b %d, %I:%M %p")
-            
-            u_name = user_map.get(c.user_id)
-            if not u_name:
-                 u_name = f"User {c.user_id[:5]}..." if len(c.user_id) > 5 else c.user_id
             
             formatted_comments.append({
                 "id": c.id,
