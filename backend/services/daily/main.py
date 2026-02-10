@@ -631,10 +631,13 @@ def add_task_comment(
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
             
+        # GT Timezone (UTC-6)
+        gt_tz = datetime.timezone(datetime.timedelta(hours=-6))
         comment = DailyComment(
             task_id=task_id,
             user_id=user_id,
-            content=content
+            content=content,
+            created_at=datetime.datetime.now(gt_tz)
         )
         db.add(comment)
         db.commit()

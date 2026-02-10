@@ -2335,6 +2335,29 @@ def get_daily_messages(project_id: str, limit=50):
     finally:
         db.close()
 
+def get_project_metrics(project_id: str):
+    db = SessionOps()
+    try:
+        tasks = db.query(models.DailyTask).filter(models.DailyTask.project_id == project_id).all()
+        total = len(tasks)
+        pending = len([t for t in tasks if t.status == "To Do"])
+        in_progress = len([t for t in tasks if t.status == "In Progress"])
+        done = len([t for t in tasks if t.status == "Done"])
+        
+        return {
+            "total_tasks": total,
+            "pending": pending,
+            "in_progress": in_progress,
+            "done": done,
+            "top_user_id": None,
+            "user_stats": {}
+        }
+    except Exception as e:
+        print(f"Error getting metrics: {e}")
+        return None
+    finally:
+        db.close()
+
 def get_org_bim_projects(organization_id: str):
     # This queries the Core/BIM DB to get available projects for linking
     if not organization_id:
