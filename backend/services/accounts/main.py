@@ -36,10 +36,15 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 # Let's guess: AODevelopment/backend is the root for imports?
 # If we add os.path.join(BASE_DIR, "../../../") to sys.path?
 # Let's try to be standard:
-import sys
-BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-if BACKEND_ROOT not in sys.path:
-    sys.path.append(BACKEND_ROOT)
+# Local imports (common is now partially vendored or in path)
+# In container, if running from /app (accounts service dir), direct import should work 
+# provided common/ has __init__.py or is namespace.
+# It seems 'common' is a subdirectory here.
+
+# Ideally we do relative imports or rely on python path.
+# If running as pkg: from .common import ...
+# If running as script: import common ...
+
 
 from common.database import get_db, SessionCore 
 from common.auth import create_access_token, create_refresh_token, decode_token, AO_JWT_PUBLIC_KEY_PEM
@@ -64,7 +69,7 @@ async def lifespan(app: FastAPI):
         if not hasattr(models.Project, "organization_id"):
             print(f"❌ [CRITICAL] Project model matches: {models.Project.__module__}")
             print(f"❌ [CRITICAL] Attributes: {dir(models.Project)}")
-            raise RuntimeError("Project model MUST have 'organization_id'. Valid 'backend.common.models' not loaded?")
+            raise RuntimeError("Project model MUST have 'organization_id'.")
         else:
             print(f"✅ [STARTUP] Project model has 'organization_id' (Module: {models.Project.__module__})")
 
