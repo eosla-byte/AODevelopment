@@ -10,51 +10,18 @@ Base = declarative_base()
 # SCHEMA: RESOURCES (Gestion Interna) -> Prefix 'resources_'
 # -----------------------------------------------------------------------------
 
-class Project(Base):
-    __tablename__ = 'resources_projects'
-    # __table_args__ = {'schema': 'resources'} # Commented for SQLite compatibility
+# -----------------------------------------------------------------------------
+# SCHEMA: RESOURCES (Gestion Interna) -> Prefix 'resources_'
+# -----------------------------------------------------------------------------
 
-    id = Column(String, primary_key=True) # Custom ID or UUID
-    name = Column(String, nullable=False)
-    client = Column(String)
-    status = Column(String, default="Activo")
-    nit = Column(String)
-    legal_name = Column(String)
-    po_number = Column(String)
-    amount = Column(Float, default=0.0)
-    paid_amount = Column(Float, default=0.0)
-    emoji = Column(String, default="📁")
-    category = Column(String, default="Residencial")
-    square_meters = Column(Float, default=0.0)
-    start_date = Column(String) # ISO String
-    duration_months = Column(Float, default=0.0)
-    additional_time_months = Column(Float, default=0.0)
-    archived = Column(Boolean, default=False)
-    
-    # Core Project Profile Fields
-    organization_id = Column(String, ForeignKey('accounts_organizations.id', ondelete="CASCADE"), nullable=False, index=True)
-    project_cost = Column(Float, default=0.0)
-    sq_meters = Column(Float, default=0.0)
-    ratio = Column(Float, default=0.0)
-    estimated_time = Column(String)
-    
-    # Financial metrics
-    projected_profit_margin = Column(Float, default=0.0)
-    real_profit_margin = Column(Float, default=0.0)
-    
-    # JSON Fields for flexible data
-    acc_config = Column(JSON, default={})
-    partners_config = Column(JSON, default={})
-    files_meta = Column(JSON, default={})
-    reminders = Column(JSON, default=[])   
-    assigned_collaborators = Column(JSON, default={}) # {collab_id: percentage}
-    
-    # Estimation Data (Resources, Financial Config)
-    estimation_data = Column(JSON, default={})
-    
-    # Relationships
-    timeline_events = relationship("TimelineEvent", back_populates="project")
-    organization = relationship("Organization", back_populates="projects")
+# [REMOVED] Project model definition. 
+# Canonical definition is in backend/common/models.py
+# This file should only contain service-specific models if any, or just import canonicals.
+
+# For backwards compatibility if other files import from here:
+from backend.common.models import Project
+
+# -----------------------------------------------------------------------------
 
 class TimelineEvent(Base):
     __tablename__ = 'resources_timeline_events'

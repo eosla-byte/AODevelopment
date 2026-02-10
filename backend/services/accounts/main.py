@@ -19,13 +19,31 @@ TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 # Local imports (common is now partially vendored or in path)
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
+# REMOVED: sys.path.insert(0, BASE_DIR) - This caused local common/ shadowing!
+
+# Correct Canonical Import
+# We assume the service is run from root (python backend/services/accounts/main.py)
+# OR we use relative if package.
+# Given monorepo structure, 'common' is at 'backend/common'.
+# But if running as 'python main.py' inside accounts/, then 'common' is sibling?
+# The prompt says: "Ensure imports reference the canonical module... backend.common"
+# To fix this reliably without sys.path hacks, we need to know how it's run.
+# "python -m uvicorn main:app" inside accounts/
+# If we want to import backend.common, we need backend/ in sys.path
+# Let's add backend root to sys.path properly IF needed, but prefer absolute imports if possible.
+# Actually, the user instruction is: "Remove sys.path insertion that forces service-local common/ to win."
+# So we should probably add the ROOT (AODevelopment) or Backend Root.
+# Let's guess: AODevelopment/backend is the root for imports?
+# If we add os.path.join(BASE_DIR, "../../../") to sys.path?
+# Let's try to be standard:
+import sys
+BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if BACKEND_ROOT not in sys.path:
+    sys.path.append(BACKEND_ROOT)
 
 from common.database import get_db, SessionCore 
-from common.database import get_db, SessionCore 
 from common.auth import create_access_token, create_refresh_token, decode_token, AO_JWT_PUBLIC_KEY_PEM
-from common.auth_utils import verify_password, get_password_hash # Keep password utils
+from common.auth_utils import verify_password, get_password_hash 
 import common.models as models 
 from common.models import AccountUser 
 
@@ -42,12 +60,13 @@ async def lifespan(app: FastAPI):
     print("🔍 [STARTUP] Verifying Project Model & Schema...")
     try:
         # Check ORM Model
+        # Note: models imported from common.models
         if not hasattr(models.Project, "organization_id"):
             print(f"❌ [CRITICAL] Project model matches: {models.Project.__module__}")
             print(f"❌ [CRITICAL] Attributes: {dir(models.Project)}")
-            raise RuntimeError("Project model MUST have 'organization_id'. Valid 'common.models' not loaded?")
+            raise RuntimeError("Project model MUST have 'organization_id'. Valid 'backend.common.models' not loaded?")
         else:
-            print("✅ [STARTUP] Project model has 'organization_id'")
+            print(f"✅ [STARTUP] Project model has 'organization_id' (Module: {models.Project.__module__})")
 
         # Check Database
         db = SessionCore()
