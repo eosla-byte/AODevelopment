@@ -291,9 +291,19 @@ async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = D
     print(f"DEBUG: Dashboard Access Granted for {user_jwt.get('email')}")
     
     db = SessionCore()
-    user_db = db.query(AccountUser).filter(AccountUser.email == user_jwt["sub"]).first()
+    # FIX: sub is UUID (id), not email.
+    user_id = user_jwt.get("sub")
+    user_email = user_jwt.get("email")
+    print(f"DEBUG: Lookup User ID: {user_id} (Email fallback: {user_email})")
+    
+    user_db = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+    
+    if not user_db and user_email:
+        print(f"DEBUG: User not found by ID {user_id}, trying email {user_email}...")
+        user_db = db.query(AccountUser).filter(AccountUser.email == user_email).first()
     
     if not user_db:
+        print(f"DEBUG: DASHBOARD REDIRECT: token_sub={user_id} token_email={user_email} reason=user_not_found_in_db")
         db.close()
         return RedirectResponse("/login")
 
@@ -511,7 +521,8 @@ async def manual_fix(user_jwt = Depends(get_current_admin)):
     if not user_jwt: return "Not authenticated"
     
     db = SessionCore()
-    user = db.query(AccountUser).filter(AccountUser.email == user_jwt["sub"]).first()
+    # FIX: sub is ID
+    user = db.query(AccountUser).filter(AccountUser.id == user_jwt["sub"]).first()
     if user:
         user.role = "SuperAdmin"
         db.commit()
@@ -834,12 +845,15 @@ async def get_my_organizations_endpoint(request: Request):
             if payload and payload.get("type") == "refresh":
                  user_email = payload.get("sub")
 
-    if not user_email:
+    if not user_email: # Variable name user_email but actually holds sub/id
         raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    user_id = user_email # Rename for clarity
         
     db = SessionCore() 
     try:
-        user = db.query(AccountUser).filter(AccountUser.email == user_email).first()
+        # FIX: Lookup by ID
+        user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
         if not user: return []
         
         # Fetch Orgs
