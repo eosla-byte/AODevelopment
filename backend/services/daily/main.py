@@ -98,18 +98,30 @@ def get_current_user_id(request: Request):
         return None
     
     token = None
+    token_source = "None"
     
     # 1. Bearer Header
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
          token = auth_header.split(" ")[1]
+         token_source = "Header"
          
     # 2. Cookies (HttpOnly)
     if not token:
         token = request.cookies.get("access_token") or request.cookies.get("accounts_access_token")
+        if token:
+            token_source = "Cookie"
         
     if not token:
         # print("⚠️ [Auth] No token found. Guest Mode.")
+        return None
+
+    # DEBUG: Token Structure
+    dot_count = token.count('.')
+    print(f"🔐 [Auth] Token Source: {token_source} | Dots: {dot_count} | Partial: {token[:10]}...")
+    
+    if dot_count != 2:
+        print(f"❌ [Auth] Invalid JWT Structure (Dots: {dot_count}). Token: {token[:20]}...")
         return None
         
     try:
