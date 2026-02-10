@@ -628,7 +628,6 @@ def update_task_details(
 def add_task_comment(
     task_id: str,
     content: str = Body(..., embed=True),
-    content: str = Body(..., embed=True),
     user_id: str = Depends(get_current_user_id),
     request: Request = None
 ):
