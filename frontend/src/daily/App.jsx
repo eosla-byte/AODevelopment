@@ -50,8 +50,11 @@ function App() {
         const bootstrap = async () => {
             try {
                 // 1. Strict Session Check
-                // If token expired, api.init() trigger fetchWithAuth -> 401 -> Redirect.
-                // We won't even reach setUser if that happens (exception thrown).
+                // If token expired, api.init() / api.ping() triggers fetchWithAuth -> 401 -> Redirect.
+
+                // Try Ping first for speed, or Init for data? 
+                // Init is better because we need the data anyway.
+                // If 401, the interceptor THROWS "AUTH_EXPIRED_REDIRECTING"
                 const data = await api.init();
 
                 // 2. Set User from Backend Source of Truth

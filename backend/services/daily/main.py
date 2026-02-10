@@ -188,6 +188,16 @@ def get_auth_token(request: Request):
         token = token.split(" ")[1]
     return {"token": token}
 
+@app.get("/auth/ping")
+def auth_ping(user_id: str = Depends(get_current_user_id)):
+    """
+    Lightweight auth check. Returns 200 OK + User ID if valid.
+    Returns 401 if invalid/expired (handled by dependency).
+    """
+    if not user_id:
+        raise HTTPException(status_code=401, detail="unauthenticated")
+    return {"status": "authenticated", "user_id": user_id}
+
 def run_db_fix():
     print("🔧 [STARTUP] Checking Database Schema Constraints...")
     from sqlalchemy import text
@@ -524,6 +534,8 @@ def get_organization_users(
     org_id: str = Depends(get_current_org_id),
     user_id: str = Depends(get_current_user_id) # Strict Auth Gate
 ):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="unauthenticated")
     if not org_id:
         return []
     users = database.get_org_users(org_id)
@@ -539,6 +551,8 @@ def get_available_bim_projects(
     org_id: str = Depends(get_current_org_id),
     user_id: str = Depends(get_current_user_id) # Strict Auth Gate
 ):
+    if not user_id:
+        raise HTTPException(status_code=401, detail="unauthenticated")
     if not org_id:
         return []
     # Fetching Project Profiles (resources_projects) instead of bim_projects

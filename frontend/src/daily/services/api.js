@@ -76,64 +76,52 @@ async function fetchWithAuth(url, options = {}) {
 // INTERCEPTOR HELPER
 async function fetchWithAuth(url, options = {}) {
     try {
+        // Ensure credentials are included for cookies
+        options.credentials = "include";
+
         const response = await fetch(url, options);
 
         if (response.status === 401) {
-            // Clone to read body safely
-            const body = await response.clone().json().catch(() => ({}));
-            const error = body.detail || body.error;
+            console.error("🔒 [Auth] 401 Unauthorized. Session Expired. Creating Redirect...");
 
-            // 1. ATTEMPT REFRESH (If Specific Error)
-            if (error === "token_expired") {
-                console.log("🔄 Token Expired. Attempting Refresh...");
-                try {
-                    // MUST call Accounts Service for refresh
-                    const refreshRes = await fetch("https://accounts.somosao.com/auth/refresh", {
-                        method: "POST",
-                        credentials: "include"
-                    });
+            // 1. CLEAR SESSION (Frontend Clean)
+            localStorage.removeItem("ao_user_id");
+            localStorage.removeItem("ao_user_name");
+            localStorage.removeItem("ao_org_id");
+            localStorage.removeItem("ao_user"); // Also clear full user object
 
-                    if (refreshRes.ok) {
-                        console.log("✅ Token Refreshed. Retrying original request...");
-                        return await fetch(url, options);
-                    } else {
-                        console.error("❌ Refresh Failed.");
-                    }
-                } catch (refreshErr) {
-                    console.error("❌ Refresh Error", refreshErr);
-                }
-            }
+            // 2. ATTEMPT SERVER LOGOUT (Best Effort, don't await blocking)
+            fetch("https://accounts.somosao.com/auth/logout", { method: "POST", credentials: "include" })
+                .catch(err => console.warn("Logout ping failed", err));
 
-            // 2. FORCE LOGIN (If Refresh Failed or Other 401)
-            // Strict check for signals that mean "Log in again"
-            if (error === "token_expired" || error === "token_invalid" || error === "token_invalid_signature" || error === "UNAUTHORIZED" || response.status === 401) {
-                console.error("🔒 Session Invalid. Redirecting to login...");
-
-                // CLEAR SESSION
-                localStorage.removeItem("ao_user_id");
-                localStorage.removeItem("ao_user_name");
-                localStorage.removeItem("ao_org_id");
-
-                // ATTEMPT SERVER LOGOUT (Best Effort)
-                try {
-                    await fetch("https://accounts.somosao.com/auth/logout");
-                } catch (e) { /* ignore */ }
-
-                // REDIRECT
-                const currentUrl = window.location.href;
+            // 3. IMMEDIATE REDIRECT
+            // Force reload to clear memory state too? No, href is enough.
+            const currentUrl = window.location.href;
+            // Prevent redirect loop if already on login
+            if (!currentUrl.includes("/login")) {
                 window.location.href = "https://accounts.somosao.com/login?redirect=" + encodeURIComponent(currentUrl);
-
-                throw new Error("SESSION_EXPIRED");
             }
+
+            // 4. BREAK FLOW
+            // This error must NOT be caught by normal try/catch blocks that continue execution.
+            // We throw a specific fatal error.
+            throw new Error("AUTH_EXPIRED_REDIRECTING");
         }
 
         if (!response.ok) {
-            // Pass through other errors
+            // Pass through other errors (403, 404, 500)
+            // Optional: Parse body for detail
+            // const body = await response.clone().json().catch(() => ({}));
+            // const detail = body.detail || response.statusText;
+            // throw new Error(detail); 
         }
 
         return response;
     } catch (e) {
-        if (e.message === "SESSION_EXPIRED") throw e;
+        if (e.message === "AUTH_EXPIRED_REDIRECTING") {
+            // Stop execution of caller
+            throw e;
+        }
         throw e;
     }
 }
@@ -259,17 +247,15 @@ export const api = {
 
     // --- Project Creation ---
     async getBimProjects() {
-        const res = await fetchWithAuth(`/bim-projects`, { // Relative to API_BASE? No, these seem to be root relative in Modal
-            headers: this.getHeaders(),
-            credentials: "include"
+        const res = await fetchWithAuth(`/bim-projects`, {
+            headers: this.getHeaders()
         });
         return await res.json();
     },
 
     async getOrgUsers() {
         const res = await fetchWithAuth(`/org-users`, {
-            headers: this.getHeaders(),
-            credentials: "include"
+            headers: this.getHeaders()
         });
         return await res.json();
     },
@@ -279,14 +265,21 @@ export const api = {
         const res = await fetchWithAuth(`/projects`, {
             method: 'POST',
             headers: this.getHeaders(),
-            body: JSON.stringify(payload),
-            credentials: "include"
+            body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error("Failed to create project");
         return await res.json();
     },
 
     // --- Session Management ---
+
+    async ping() {
+        // Lightweight check
+        const res = await fetchWithAuth(`/auth/ping`, {
+            headers: this.getHeaders()
+        });
+        return await res.json();
+    },
     async init() {
         // Bootstrap call. If 401, interceptor redirects.
         const res = await fetchWithAuth(`/init`, {
