@@ -31,6 +31,13 @@ class Project(Base):
     additional_time_months = Column(Float, default=0.0)
     archived = Column(Boolean, default=False)
     
+    # Core Project Profile Fields
+    organization_id = Column(String, ForeignKey('accounts_organizations.id', ondelete="CASCADE"), nullable=False, index=True)
+    project_cost = Column(Float, default=0.0)
+    sq_meters = Column(Float, default=0.0)
+    ratio = Column(Float, default=0.0)
+    estimated_time = Column(String)
+    
     # Financial metrics
     projected_profit_margin = Column(Float, default=0.0)
     real_profit_margin = Column(Float, default=0.0)
@@ -47,6 +54,7 @@ class Project(Base):
     
     # Relationships
     timeline_events = relationship("TimelineEvent", back_populates="project")
+    organization = relationship("Organization", back_populates="projects")
 
 class TimelineEvent(Base):
     __tablename__ = 'resources_timeline_events'
@@ -425,6 +433,7 @@ class Organization(Base):
     
     users = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
     service_permissions = relationship("ServicePermission", back_populates="organization", cascade="all, delete-orphan")
+    projects = relationship("Project", back_populates="organization", cascade="all, delete-orphan")
 
 class OrganizationUser(Base):
     """

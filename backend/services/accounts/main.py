@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, Depends, HTTPException, status, Form, Body
+from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, HTMLResponse, JSONResponse
@@ -31,31 +32,50 @@ from common.models import AccountUser
 # Initialize Templates
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-app = FastAPI(title="AO Accounts Service")
-
-# Mount Static if exists
-if os.path.exists(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-else:
-    # Create it to prevent future errors? Or just don't mount.
-    # User asked to mount it.
-    os.makedirs(STATIC_DIR, exist_ok=True)
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
 # -----------------------------------------------------------------------------
-# CONSTANTS & CONFIGURATION
+# LIFESPAN & STARTUP
 # -----------------------------------------------------------------------------
-ACCESS_COOKIE_NAME = "accounts_access_token"
-REFRESH_COOKIE_NAME = "accounts_refresh_token"
-# Shared Session Config (for Daily/BIM)
-COOKIE_DOMAIN = ".somosao.com"
-COOKIE_SAMESITE = "none"
-COOKIE_SECURE = True
 
-@app.on_event("startup")
-async def startup_event():
-    run_db_fix()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 1. Startup: Verify Project Model & Schema
+    print("🔍 [STARTUP] Verifying Project Model & Schema...")
+    try:
+        # Check ORM Model
+        if not hasattr(models.Project, "organization_id"):
+            print(f"❌ [CRITICAL] Project model matches: {models.Project.__module__}")
+            print(f"❌ [CRITICAL] Attributes: {dir(models.Project)}")
+            raise RuntimeError("Project model MUST have 'organization_id'. Valid 'common.models' not loaded?")
+        else:
+            print("✅ [STARTUP] Project model has 'organization_id'")
+
+        # Check Database
+        db = SessionCore()
+        try:
+            # Simple check: try to selecy organization_id from resources_projects limit 1
+            # If column missing, this throws
+            from sqlalchemy import text
+            db.execute(text("SELECT organization_id FROM resources_projects LIMIT 1"))
+            print("✅ [STARTUP] DB table 'resources_projects' has 'organization_id'")
+        except Exception as e:
+            print(f"❌ [CRITICAL] DB Check Failed: {e}")
+            raise RuntimeError(f"Database schema missing 'organization_id': {e}")
+        finally:
+            db.close()
+            
+        # 2. Run Legacy Fixes
+        run_db_fix()
+            
+    except Exception as e:
+        print(f"🔥 [FATAL] Startup Verification Failed: {e}")
+        # We raise to stop deployment if possible, or at least log loudly
+        raise e
+        
+    yield
+    # Shutdown logic if needed
+
+app = FastAPI(title="AO Accounts Service", lifespan=lifespan)
+
 
 # ... (version check same)
 
