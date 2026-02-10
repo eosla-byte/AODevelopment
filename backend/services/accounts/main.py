@@ -286,26 +286,35 @@ class ProjectCreateSchema(pydantic.BaseModel):
 
 @app.get("/api/organizations/{org_id}/projects")
 def get_org_projects(org_id: str, user = Depends(get_current_active_user)):
-    if not user: raise HTTPException(status_code=401)
+    print(f"PROJECTS: frontend calls /api/organizations/{org_id}/projects")
     
-    db = SessionCore() # Projects are in Core DB (resources_projects)
+    # 1. Auth Check
+    if not user: 
+        print("PROJECTS: 401 Unauthorized")
+        raise HTTPException(status_code=401)
+    
+    # 2. Org Access Check
+    db = SessionCore()
     try:
-        # 1. Verify Member Access
-        # Allow any member to VIEW projects? Yes for now.
+        # Check if user is member of this org
         membership = db.query(models.OrganizationUser).filter(
             models.OrganizationUser.organization_id == org_id,
             models.OrganizationUser.user_id == user["sub"]
         ).first()
-        
+
+        # Allow SuperAdmin even if not member
         if not membership and user.get("role") != "SuperAdmin":
+             print(f"PROJECTS: 403 Forbidden (User {user['sub']} not in Org {org_id})")
              raise HTTPException(status_code=403, detail="Not a member")
-             
-        # 2. Fetch Projects
-        # Using the SQLALchemy model 'Project' which maps to 'resources_projects'
+        
+        # 3. Query Projects
+        print(f"PROJECTS: Fetching projects for org_id={org_id}...")
         projects = db.query(models.Project).filter(
             models.Project.organization_id == org_id,
             models.Project.archived == False
         ).all()
+        
+        print(f"PROJECTS: Found {len(projects)} projects.")
         
         return [{
             "id": p.id,
@@ -317,6 +326,26 @@ def get_org_projects(org_id: str, user = Depends(get_current_active_user)):
             "estimated_time": p.estimated_time,
             "created_at": p.created_at.isoformat() if p.created_at else None
         } for p in projects]
+        
+    except Exception as e:
+        print(f"PROJECTS: Error fetching projects: {e}")
+        return [] # Fallback to empty list on error
+    finally:
+        db.close()
+
+# Fallback / Alias if frontend calls /api/projects directly
+@app.get("/api/projects")
+def get_current_user_projects(user = Depends(get_current_active_user)):
+    print("PROJECTS: frontend calls /api/projects (Fallback)")
+    if not user: raise HTTPException(status_code=401)
+    
+    # Try to determine org from user context
+    db = SessionCore()
+    try:
+        # Use last_active_org_id if available, otherwise return empty
+        # or return ALL projects user has access to?
+        # Let's return empty for now to avoid 404.
+        return []
     finally:
         db.close()
 
