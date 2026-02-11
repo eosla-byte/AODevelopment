@@ -152,12 +152,11 @@ def get_current_active_user(request: Request):
 def get_current_admin(user = Depends(get_current_active_user)):
     if not user:
         return None
-    # Check Role
-    role = user.get("role")
-    if role not in ["Admin", "SuperAdmin"]:
-         print(f"DEBUG: Role '{role}' denied admin access.")
-         # Return None to trigger 401/Redirect in caller
-         return None
+    # Check Role (case-insensitive)
+    role = (user.get("role") or "").strip().lower()
+    if role not in ["admin", "superadmin", "super_admin"]:
+        print(f"DEBUG: Role '{role}' denied admin access.")
+        return None
     return user
 
 # --- DB Migration Helper ---
@@ -622,89 +621,91 @@ async def logout():
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = Depends(get_current_active_user)):
-    if not user_jwt: 
+    if not user_jwt:
         print("DEBUG: Dashboard Redirecting to /login (No active user)")
         return RedirectResponse("/login")
-    
+
     print(f"DEBUG: Dashboard Access Granted for {user_jwt.get('email')}")
-    
+
+    def _is_uuid(val: str) -> bool:
+        try:
+            uuid.UUID(str(val))
+            return True
+        except Exception:
+            return False
+
     db = SessionCore()
-    # FIX: sub is UUID (id), not email.
-    user_id = user_jwt.get("sub")
-    user_email = user_jwt.get("email")
-    print(f"DEBUG: Lookup User ID: {user_id} (Email fallback: {user_email})")
-    
-    user_db = db.query(AccountUser).filter(AccountUser.id == user_id).first()
-    
-    if not user_db and user_email:
-        print(f"DEBUG: User not found by ID {user_id}, trying email {user_email}...")
-        user_db = db.query(AccountUser).filter(AccountUser.email == user_email).first()
-    
-    if not user_db:
-        print(f"DEBUG: DASHBOARD REDIRECT: token_sub={user_id} token_email={user_email} reason=user_not_found_in_db")
-        db.close()
-        return RedirectResponse("/login")
+    try:
+        token_sub = user_jwt.get("sub")
+        token_email = (user_jwt.get("email") or "").strip().lower()
+        print(f"DEBUG: Lookup User ID: {token_sub} (Email fallback: {token_email})")
 
-    view_context = {
-        "request": request,
-        "user": user_db,
-        "view_mode": "member", # member, org_admin, super_admin
-        "organizations": [],
-        "current_org": None,
-        # Updated Service List (Public Services)
-        "available_services": ["daily", "plans", "build", "clients", "plugin"]
-    }
+        user_db = None
 
-    # 1. SUPER ADMIN VIEW
-    if user_db.role == "SuperAdmin":
-        if org_id:
-            # Switch to Org Admin View for specific org
-            target_org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
-            if target_org:
+        # 1) Prefer email lookup (most stable in your current token flow)
+        if token_email and hasattr(AccountUser, "email"):
+            user_db = db.query(AccountUser).filter(AccountUser.email == token_email).first()
+
+        # 2) Fallback to subject lookup ONLY if the ORM model actually has 'id'
+        if not user_db and token_sub and hasattr(AccountUser, "id"):
+            user_db = db.query(AccountUser).filter(AccountUser.id == token_sub).first()
+
+        # 3) Optional fallback: if model uses 'uuid' or 'user_id' as PK
+        if not user_db and token_sub and _is_uuid(token_sub):
+            if hasattr(AccountUser, "uuid"):
+                user_db = db.query(AccountUser).filter(AccountUser.uuid == token_sub).first()
+            elif hasattr(AccountUser, "user_id"):
+                user_db = db.query(AccountUser).filter(AccountUser.user_id == token_sub).first()
+
+        if not user_db:
+            print(f"DEBUG: DASHBOARD REDIRECT: token_sub={token_sub} token_email={token_email} reason=user_not_found_in_db")
+            return RedirectResponse("/login")
+
+        user_pk = getattr(user_db, "id", None) or getattr(user_db, "uuid", None) or getattr(user_db, "user_id", None)
+
+        view_context = {
+            "request": request,
+            "user": user_db,
+            "view_mode": "member",
+            "organizations": [],
+            "current_org": None,
+            "available_services": ["daily", "plans", "build", "clients", "plugin"],
+        }
+
+        # SUPER ADMIN VIEW
+        if (getattr(user_db, "role", "") or "").lower() == "superadmin":
+            if org_id:
+                target_org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
+                if target_org:
+                    view_context["view_mode"] = "org_admin"
+                    view_context["current_org"] = target_org
+            else:
+                view_context["view_mode"] = "super_admin"
+                view_context["organizations"] = db.query(models.Organization).all()
+
+        # ORG ADMIN VIEW
+        else:
+            membership = None
+            if user_pk and hasattr(models, "OrganizationUser"):
+                q = db.query(models.OrganizationUser).filter(
+                    models.OrganizationUser.user_id == str(user_pk),
+                    models.OrganizationUser.role == "Admin",
+                )
+                if org_id:
+                    q = q.filter(models.OrganizationUser.organization_id == org_id)
+                membership = q.first()
+
+            if membership:
                 view_context["view_mode"] = "org_admin"
-                view_context["current_org"] = target_org
-        else:
-            view_context["view_mode"] = "super_admin"
-            # Fetch all organizations with member counts
-            orgs = db.query(models.Organization).all()
-            view_context["organizations"] = orgs
+                view_context["current_org"] = membership.organization
 
-    # 2. ORG ADMIN VIEW (If not super admin, but IS an admin of a specific org)
-    else:
-        # distinct Logic: Find memberships where role='Admin'
-        # If org_id provided, check if member of THAT org
-        query = db.query(models.OrganizationUser).filter(
-            models.OrganizationUser.user_id == user_db.id,
-            models.OrganizationUser.role == "Admin"
-        )
-        
-        if org_id:
-             query = query.filter(models.OrganizationUser.organization_id == org_id)
-             
-        membership = query.first()
-        
-        if membership:
-            view_context["view_mode"] = "org_admin"
-            view_context["current_org"] = membership.organization
-        else:
-            # 3. STATIC MEMBER VIEW (Apps Launcher)
-            view_context["view_mode"] = "member"
-    
-    # db.close() # TemplateResponse might need lazy loads? 
-    # Better to eager load or keep session open if Jinja needs it?
-    # For safety with simple relationships, we can close if we eagerly loaded.
-    # But SqlAlchemy objects detach if session closes.
-    # We will close APTER template rendering? No, template response renders immediately? 
-    # Actually TemplateResponse is a background task wrapper effectively, but vars need to be ready.
-    # Let's simple query active objects into Pydantic or Dictionaries if issues arise.
-    # For now, let's keep database objects but we must be careful.
-    # Actually, fastAPI depends dependency closes DB session? 
-    # If using yield in get_db, yes. But here we manually opened SessionCore().
-    # We should NOT close it before return if we pass ORM objects that need lazy loading.
-    # But we should ensure it closes eventually.
-    # Hack: Convert to list/dict before closing.
-    
-    return templates.TemplateResponse("dashboard.html", view_context)
+        return templates.TemplateResponse("dashboard.html", view_context)
+
+    finally:
+        db.close()
+
+
+
 
 # --- User Management API ---
 
