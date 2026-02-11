@@ -22,6 +22,11 @@ class Project(Base):
     # Core Project Profile Fields
     # Core Project Profile Fields
     organization_id = Column(String, nullable=False, index=True) # ForeignKey removed for Railway service decoupling
+    
+    # REQUIRED FIELDS FOR STABILITY
+    archived = Column(Boolean, default=False)
+    status = Column(String, default="Active")
+
 
 class Collaborator(Base):
     __tablename__ = 'resources_collaborators'
@@ -110,4 +115,9 @@ class ContactSubmission(Base):
 class PluginSheetSession(Base):
     __tablename__ = 'plugin_sheet_sessions'
     id = Column(String, primary_key=True)
+
+class SheetTemplate(Base):
+    __tablename__ = 'plugin_sheet_templates'
+    id = Column(Integer, primary_key=True)
+
  

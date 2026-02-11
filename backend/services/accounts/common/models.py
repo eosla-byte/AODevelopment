@@ -22,6 +22,11 @@ class Project(Base):
     # Core Project Profile Fields
     # Core Project Profile Fields
     organization_id = Column(String, nullable=False, index=True) # ForeignKey removed for Railway service decoupling
+    
+    # REQUIRED FIELDS FOR STABILITY
+    archived = Column(Boolean, default=False)
+    status = Column(String, default="Active")
+
 
     # Relationships are optional in local definition if we don't eager load them or use them in this service
     # But keeping them prevents mapper errors if code tries to access them
@@ -71,5 +76,18 @@ class ExpenseCard(Base):
 class PluginSheetSession(Base):
     __tablename__ = 'plugin_sheet_sessions'
     id = Column(String, primary_key=True)
+
+class Quotation(Base):
+    __tablename__ = 'resources_quotations'
+    id = Column(String, primary_key=True)
+
+class QuotationTemplate(Base):
+    __tablename__ = 'resources_quotation_templates'
+    id = Column(Integer, primary_key=True)
+
+class SheetTemplate(Base):
+    __tablename__ = 'plugin_sheet_templates'
+    id = Column(Integer, primary_key=True)
+
 
 
