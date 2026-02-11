@@ -865,7 +865,14 @@ async def manual_fix(user_jwt = Depends(get_current_admin)):
     db = SessionCore()
     # FIX: sub is ID
     user = db.query(AccountUser).filter(AccountUser.id == user_jwt["sub"]).first()
-    if use@app.get("/setup_initial_admin")
+    if user:
+        user.role = "SuperAdmin"
+        user.services_access = user.services_access or {}
+        db.commit()
+    db.close()
+    return "User promoted to SuperAdmin"
+
+@app.get("/setup_initial_admin")
 async def setup_admin():
     """One-time bootstrap endpoint.
     Creates a platform-level superadmin user (and optionally an admin) without requiring an org context.
