@@ -63,6 +63,10 @@ class Project(Base):
     # Relationships
     timeline_events = relationship("TimelineEvent", back_populates="project")
     organization = relationship("Organization", back_populates="projects")
+    
+    # Audit
+    created_at = Column(DateTime, server_default=func.now())
+    created_by = Column(String, ForeignKey("accounts_users.id"), nullable=True, index=True)
 
 # -----------------------------------------------------------------------------
 
