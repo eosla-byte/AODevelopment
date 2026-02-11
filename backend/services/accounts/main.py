@@ -265,6 +265,10 @@ async def root(request: Request, user = Depends(get_current_admin)):
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
+@app.get("/select-org", response_class=HTMLResponse)
+async def select_org_page(request: Request):
+    return templates.TemplateResponse("select_org.html", {"request": request})
+
 @app.post("/auth/login")
 async def login_action(email: str = Form(...), password: str = Form(...)):
     # print(f"Login Attempt: '{email}'")
