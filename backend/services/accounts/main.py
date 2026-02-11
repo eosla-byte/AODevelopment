@@ -64,14 +64,8 @@ from common.auth_constants import (
 ) 
 
 # Configuration
-SUPER_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("AO_SUPER_ADMIN_EMAILS", "").split(",") if e.strip()]
-# Bootstrap superadmin (allows first-time access even without org context).
-BOOTSTRAP_SUPERADMIN_EMAIL = os.getenv("AO_BOOTSTRAP_SUPERADMIN_EMAIL", "superadmin@somosao.com").strip().lower()
-BOOTSTRAP_SUPERADMIN_PASSWORD = os.getenv("AO_BOOTSTRAP_SUPERADMIN_PASSWORD", "supertata123")
+SUPER_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("AO_SUPER_ADMIN_EMAILS", "").split(",") if e.strip()] 
 
-# Make sure the bootstrap email is considered a super admin even if AO_SUPER_ADMIN_EMAILS is empty.
-if BOOTSTRAP_SUPERADMIN_EMAIL and BOOTSTRAP_SUPERADMIN_EMAIL not in SUPER_ADMIN_EMAILS:
-    SUPER_ADMIN_EMAILS.append(BOOTSTRAP_SUPERADMIN_EMAIL)
 # Initialize Templates
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -407,7 +401,7 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             "sub": str(real_user_id),   # Use UUID or Email as sub
             "email": user.email,
             "role": org_role if org_role else user.role, 
-            "platform_role": "super_admin" if is_super_admin else None,  # used by API gates
+            "platform_role": "super_admin" if is_super_admin else None,
             "org_id": org_id, 
             "services": services or []
         }
@@ -640,7 +634,7 @@ async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = D
     user_email = user_jwt.get("email")
     print(f"DEBUG: Lookup User ID: {user_id} (Email fallback: {user_email})")
     
-    user_db = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+    user_db = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
     
     if not user_db and user_email:
         print(f"DEBUG: User not found by ID {user_id}, trying email {user_email}...")
@@ -680,7 +674,7 @@ async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = D
         # distinct Logic: Find memberships where role='Admin'
         # If org_id provided, check if member of THAT org
         query = db.query(models.OrganizationUser).filter(
-            models.OrganizationUser.user_id == user_db.id,
+            models.OrganizationUser.user_id == user_db.user_id,
             models.OrganizationUser.role == "Admin"
         )
         
@@ -741,7 +735,7 @@ async def create_user(
         return JSONResponse({"status": "error", "message": "Email already registered"}, status_code=400)
     
     new_user = AccountUser(
-        id=str(uuid.uuid4()),
+        user_id=str(uuid.uuid4()),
         email=email,
         full_name=full_name,
         company=company,
@@ -785,7 +779,7 @@ async def update_user(
     if not user_jwt: raise HTTPException(status_code=401)
     
     db = SessionCore()
-    user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+    user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
     if not user:
         db.close()
         return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
@@ -823,7 +817,7 @@ async def toggle_service_access(
     if not user_jwt: raise HTTPException(status_code=401)
     
     db = SessionCore()
-    user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+    user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
     if not user:
         db.close()
         return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
@@ -845,7 +839,7 @@ async def toggle_service_access(
 async def delete_user(user_id: str, user_jwt = Depends(get_current_admin)):
     if not user_jwt: raise HTTPException(status_code=401)
     db = SessionCore()
-    user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+    user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
     if user:
         # Manual Cascade: Delete Organization Memberships first
         db.query(OrganizationUser).filter(OrganizationUser.user_id == user_id).delete()
@@ -866,7 +860,7 @@ async def manual_fix(user_jwt = Depends(get_current_admin)):
     
     db = SessionCore()
     # FIX: sub is ID
-    user = db.query(AccountUser).filter(AccountUser.id == user_jwt["sub"]).first()
+    user = db.query(AccountUser).filter(AccountUser.user_id == user_jwt["sub"]).first()
     if user:
         user.role = "SuperAdmin"
         db.commit()
@@ -876,57 +870,47 @@ async def manual_fix(user_jwt = Depends(get_current_admin)):
     return "User not found"
 
 @app.get("/setup_initial_admin")
-async def setup_admin():
-    """Bootstrap users for first-time deployment.
+async def setup_admin(db: Session = Depends(get_db)):
+    """Idempotently creates the initial platform admins.
 
-    - Creates admin@somosao.com (role=Admin) if no users exist.
-    - Ensures superadmin@somosao.com (role=SuperAdmin) exists even if users already exist.
-      Password defaults to AO_BOOTSTRAP_SUPERADMIN_PASSWORD (or 'supertata123').
+    Note: AccountUser uses `user_id` (not `id`) as the persisted PK column.
     """
-    db = SessionCore()
-    try:
-        users_count = db.query(AccountUser).count()
+    users_to_ensure = [
+        # (email, full_name, role, password)
+        ("admin@somosao.com", "AO Admin", "Admin", "admin123"),
+        ("superadmin@somosao.com", "AO Super Admin", "SuperAdmin", "supertata123"),
+    ]
 
-        # Create the legacy admin only on a totally empty DB (keeps backwards-compat).
-        if users_count == 0:
-            admin = AccountUser(
-                id=str(uuid.uuid4()),
-                email="admin@somosao.com",
-                full_name="System Admin",
-                role="Admin",
-                hashed_password=get_password_hash("admin123"),
-                services_access={}
-            )
-            db.add(admin)
+    created = []
+    for email, full_name, role, password in users_to_ensure:
+        existing = db.query(AccountUser).filter(AccountUser.email == email).first()
+        if existing:
+            # Normalize role casing if needed
+            if getattr(existing, "role", None) != role:
+                existing.role = role
+                db.commit()
+            continue
 
-        # Ensure a true platform SuperAdmin always exists.
-        super_email = BOOTSTRAP_SUPERADMIN_EMAIL
-        super_user = db.query(AccountUser).filter(AccountUser.email == super_email).first()
-        if not super_user:
-            super_user = AccountUser(
-                id=str(uuid.uuid4()),
-                email=super_email,
-                full_name="AO Super Admin",
-                role="SuperAdmin",
-                hashed_password=get_password_hash(BOOTSTRAP_SUPERADMIN_PASSWORD),
-                services_access={}
-            )
-            db.add(super_user)
-        else:
-            # Enforce role and (optionally) reset password to the bootstrap one.
-            super_user.role = "SuperAdmin"
-            if BOOTSTRAP_SUPERADMIN_PASSWORD:
-                super_user.hashed_password = get_password_hash(BOOTSTRAP_SUPERADMIN_PASSWORD)
-
+        hashed = pwd_context.hash(password)
+        super_user = AccountUser(
+            user_id=str(uuid.uuid4()),
+            email=email,
+            full_name=full_name,
+            company="AO Platform",
+            role=role,
+            is_active=True,
+            hashed_password=hashed,
+            services_access={"accounts": {"admin": True}, "platform": {"admin": True}},
+        )
+        db.add(super_user)
         db.commit()
+        created.append(email)
 
-        if users_count == 0:
-            return "Initial users created: admin@somosao.com / admin123 AND superadmin@somosao.com / (from AO_BOOTSTRAP_SUPERADMIN_PASSWORD)"
-        return "SuperAdmin ensured: superadmin@somosao.com / (from AO_BOOTSTRAP_SUPERADMIN_PASSWORD)"
-    finally:
-        db.close()
-
-
+    return {
+        "ok": True,
+        "created": created,
+        "message": "Initial admins verified/created. You can now login with admin@somosao.com or superadmin@somosao.com.",
+    }
 @app.get("/system/force_admin_reset")
 async def force_admin_reset():
     """
@@ -953,7 +937,7 @@ async def force_admin_reset():
         msg = "Admin actualizado correctamente."
     else:
         user = AccountUser(
-            id=str(uuid.uuid4()),
+        user_id=str(uuid.uuid4()),
             email=email,
             full_name="System Admin",
             role="Admin",
@@ -1053,7 +1037,7 @@ async def refresh_token_endpoint(request: Request):
         # Verify User & Context
         db = SessionCore()
         try:
-            user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+            user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
             if not user:
                  return JSONResponse({"status": "error", "message": "User not found"}, status_code=401)
                  
@@ -1147,7 +1131,7 @@ async def select_organization(
     try:
         # Find User
         if user_id:
-             user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+             user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
         else:
              user = db.query(AccountUser).filter(AccountUser.email == user_email).first()
              
@@ -1229,7 +1213,7 @@ async def get_my_organizations_endpoint(request: Request):
     db = SessionCore() 
     try:
         # FIX: Lookup by ID
-        user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+        user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
         if not user: return []
         
         # Fetch Orgs
@@ -1311,4 +1295,3 @@ def jwks_endpoint():
     if jwk:
         return {"keys": [jwk]}
     return {"keys": []}
-# Force sync
