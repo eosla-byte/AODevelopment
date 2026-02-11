@@ -10,6 +10,7 @@ import uuid
 import datetime
 from typing import List, Optional
 import pydantic
+from sqlalchemy.orm import Session  # for type hints
 
 
 
@@ -153,8 +154,11 @@ def get_current_admin(user = Depends(get_current_active_user)):
     if not user:
         return None
     # Check Role
-    role = user.get("role")
-    if role not in ["Admin", "SuperAdmin"]:
+    role = (user.get("role") or "").strip()
+    role_norm = role.lower()
+    email = (user.get("email") or "").lower()
+    # Allow platform admins even if role casing differs.
+    if role_norm not in ["admin", "superadmin"] and email not in [e.lower() for e in SUPER_ADMIN_EMAILS]:
          print(f"DEBUG: Role '{role}' denied admin access.")
          # Return None to trigger 401/Redirect in caller
          return None
@@ -634,7 +638,7 @@ async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = D
     user_email = user_jwt.get("email")
     print(f"DEBUG: Lookup User ID: {user_id} (Email fallback: {user_email})")
     
-    user_db = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
+    user_db = db.query(AccountUser).filter(AccountUser.id == user_id).first()
     
     if not user_db and user_email:
         print(f"DEBUG: User not found by ID {user_id}, trying email {user_email}...")
@@ -674,7 +678,7 @@ async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = D
         # distinct Logic: Find memberships where role='Admin'
         # If org_id provided, check if member of THAT org
         query = db.query(models.OrganizationUser).filter(
-            models.OrganizationUser.user_id == user_db.user_id,
+            models.OrganizationUser.user_id == user_db.id,
             models.OrganizationUser.role == "Admin"
         )
         
@@ -735,7 +739,7 @@ async def create_user(
         return JSONResponse({"status": "error", "message": "Email already registered"}, status_code=400)
     
     new_user = AccountUser(
-        user_id=str(uuid.uuid4()),
+        id=str(uuid.uuid4()),
         email=email,
         full_name=full_name,
         company=company,
@@ -779,7 +783,7 @@ async def update_user(
     if not user_jwt: raise HTTPException(status_code=401)
     
     db = SessionCore()
-    user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
+    user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
     if not user:
         db.close()
         return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
@@ -817,7 +821,7 @@ async def toggle_service_access(
     if not user_jwt: raise HTTPException(status_code=401)
     
     db = SessionCore()
-    user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
+    user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
     if not user:
         db.close()
         return JSONResponse({"status": "error", "message": "User not found"}, status_code=404)
@@ -839,7 +843,7 @@ async def toggle_service_access(
 async def delete_user(user_id: str, user_jwt = Depends(get_current_admin)):
     if not user_jwt: raise HTTPException(status_code=401)
     db = SessionCore()
-    user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
+    user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
     if user:
         # Manual Cascade: Delete Organization Memberships first
         db.query(OrganizationUser).filter(OrganizationUser.user_id == user_id).delete()
@@ -860,57 +864,118 @@ async def manual_fix(user_jwt = Depends(get_current_admin)):
     
     db = SessionCore()
     # FIX: sub is ID
-    user = db.query(AccountUser).filter(AccountUser.user_id == user_jwt["sub"]).first()
-    if user:
-        user.role = "SuperAdmin"
-        db.commit()
-        db.close()
-        return f"User {user.email} promoted to SuperAdmin. Please logout and login again."
-    db.close()
-    return "User not found"
-
-@app.get("/setup_initial_admin")
-async def setup_admin(db: Session = Depends(get_db)):
-    """Idempotently creates the initial platform admins.
-
-    Note: AccountUser uses `user_id` (not `id`) as the persisted PK column.
+    user = db.query(AccountUser).filter(AccountUser.id == user_jwt["sub"]).first()
+    if use@app.get("/setup_initial_admin")
+async def setup_admin():
+    """One-time bootstrap endpoint.
+    Creates a platform-level superadmin user (and optionally an admin) without requiring an org context.
+    Safe to call multiple times.
     """
-    users_to_ensure = [
-        # (email, full_name, role, password)
-        ("admin@somosao.com", "AO Admin", "Admin", "admin123"),
-        ("superadmin@somosao.com", "AO Super Admin", "SuperAdmin", "supertata123"),
-    ]
+    db = SessionCore()
+    try:
+        # Users to ensure exist
+        seed_users = [
+            {
+                "email": "superadmin@somosao.com",
+                "password": "supertata123",
+                "role": "superadmin",
+                "full_name": "Super Admin",
+            },
+            # Keep the original admin account as an admin (not org-bound)
+            {
+                "email": "admin@somosao.com",
+                "password": None,  # don't overwrite
+                "role": "admin",
+                "full_name": "Administrator",
+            },
+        ]
 
-    created = []
-    for email, full_name, role, password in users_to_ensure:
-        existing = db.query(AccountUser).filter(AccountUser.email == email).first()
-        if existing:
-            # Normalize role casing if needed
-            if getattr(existing, "role", None) != role:
-                existing.role = role
-                db.commit()
-            continue
+        def _set_if(obj, attr, value):
+            if value is None:
+                return
+            if hasattr(obj, attr):
+                setattr(obj, attr, value)
 
-        hashed = pwd_context.hash(password)
-        super_user = AccountUser(
-            user_id=str(uuid.uuid4()),
-            email=email,
-            full_name=full_name,
-            company="AO Platform",
-            role=role,
-            is_active=True,
-            hashed_password=hashed,
-            services_access={"accounts": {"admin": True}, "platform": {"admin": True}},
-        )
-        db.add(super_user)
-        db.commit()
-        created.append(email)
+        def _ensure_user(email: str, password: str | None, role: str, full_name: str):
+            # Find by email if the model supports it
+            email_col = getattr(AccountUser, "email", None)
+            q = db.query(AccountUser)
+            if email_col is not None:
+                existing = q.filter(email_col == email).first()
+            else:
+                # Fallback: try username
+                username_col = getattr(AccountUser, "username", None)
+                if username_col is None:
+                    return None, False
+                existing = q.filter(username_col == email).first()
 
-    return {
-        "ok": True,
-        "created": created,
-        "message": "Initial admins verified/created. You can now login with admin@somosao.com or superadmin@somosao.com.",
-    }
+            if existing:
+                # Ensure role is correct (don't touch password unless explicitly provided)
+                _set_if(existing, "role", role)
+                _set_if(existing, "full_name", full_name)
+                _set_if(existing, "is_active", True)
+                return existing, False
+
+            u = AccountUser()
+
+            # Primary key variants
+            if hasattr(u, "id"):
+                u.id = str(uuid.uuid4())
+            elif hasattr(u, "user_id"):
+                u.user_id = str(uuid.uuid4())
+            elif hasattr(u, "uid"):
+                u.uid = str(uuid.uuid4())
+
+            # Core identity fields
+            _set_if(u, "email", email)
+            _set_if(u, "username", email)
+            _set_if(u, "full_name", full_name)
+            _set_if(u, "role", role)
+            _set_if(u, "is_active", True)
+
+            # Org context for platform users should be empty / None
+            _set_if(u, "org_id", None)
+            _set_if(u, "active_org_id", None)
+
+            # Optional permissions/flags
+            _set_if(u, "services_access", {})
+            _set_if(u, "services_count", 0)
+
+            # Password
+            if password:
+                hashed = hash_password(password)
+                # common field names
+                _set_if(u, "hashed_password", hashed)
+                _set_if(u, "password_hash", hashed)
+                _set_if(u, "password", hashed)
+
+            db.add(u)
+            db.commit()
+            db.refresh(u)
+            return u, True
+
+        results = []
+        for su in seed_users:
+            user_obj, created = _ensure_user(
+                su["email"], su["password"], su["role"], su["full_name"]
+            )
+            if user_obj is None:
+                results.append({"email": su["email"], "status": "failed (model mismatch)"})
+            else:
+                results.append({"email": su["email"], "status": "created" if created else "exists"})
+
+        return {"ok": True, "results": results}
+    finally:
+        db.close()
+Admin",
+        hashed_password=get_password_hash("admin123"),
+        services_access={}
+    )
+    db.add(admin)
+    db.commit()
+    db.close()
+    return "Initial admin created: admin@somosao.com / admin123"
+
 @app.get("/system/force_admin_reset")
 async def force_admin_reset():
     """
@@ -937,7 +1002,7 @@ async def force_admin_reset():
         msg = "Admin actualizado correctamente."
     else:
         user = AccountUser(
-        user_id=str(uuid.uuid4()),
+            id=str(uuid.uuid4()),
             email=email,
             full_name="System Admin",
             role="Admin",
@@ -1037,7 +1102,7 @@ async def refresh_token_endpoint(request: Request):
         # Verify User & Context
         db = SessionCore()
         try:
-            user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
+            user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
             if not user:
                  return JSONResponse({"status": "error", "message": "User not found"}, status_code=401)
                  
@@ -1131,7 +1196,7 @@ async def select_organization(
     try:
         # Find User
         if user_id:
-             user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
+             user = db.query(AccountUser).filter(AccountUser.id == user_id).first()
         else:
              user = db.query(AccountUser).filter(AccountUser.email == user_email).first()
              
@@ -1190,51 +1255,88 @@ async def select_organization(
 
 @app.get("/api/my-organizations")
 async def get_my_organizations_endpoint(request: Request):
-    # Manual Auth Check (User level)
+    """Return organizations visible to the current user.
+
+    - Normal users: orgs where they are a member.
+    - Platform admins/superadmins: all orgs (so they can manage tenants/users).
+    """
     token = request.cookies.get(ACCESS_COOKIE_NAME)
     user_email = None
-    if token:
-         payload = decode_token(token)
-         if payload: user_email = payload.get("sub")
-         
-    # Allow via Refresh token too? For the "Select Org" screen when Access is expired/missing?
-    if not user_email:
-        refresh = request.cookies.get(REFRESH_COOKIE_NAME)
-        if refresh:
-            payload = decode_token(refresh)
-            if payload and payload.get("type") == "refresh":
-                 user_email = payload.get("sub")
+    role_norm = ""
 
-    if not user_email: # Variable name user_email but actually holds sub/id
-        raise HTTPException(status_code=401, detail="Unauthorized")
-        
-    user_id = user_email # Rename for clarity
-        
-    db = SessionCore() 
+    if token:
+        payload = decode_token(token)
+        if payload:
+            user_email = (payload.get("sub") or payload.get("email") or "").strip()
+            role_norm = ((payload.get("role") or "")).strip().lower()
+
+    refresh_token = request.cookies.get(REFRESH_COOKIE_NAME)
+    if (not user_email) and refresh_token:
+        refresh_payload = decode_token(refresh_token, expected_type="refresh")
+        if refresh_payload:
+            user_email = (refresh_payload.get("sub") or refresh_payload.get("email") or "").strip()
+            role_norm = ((refresh_payload.get("role") or "")).strip().lower()
+
+    if not user_email:
+        return []
+
+    db = SessionCore()
     try:
-        # FIX: Lookup by ID
-        user = db.query(AccountUser).filter(AccountUser.user_id == user_id).first()
-        if not user: return []
-        
-        # Fetch Orgs
-        memberships = db.query(models.OrganizationUser).filter(
-            models.OrganizationUser.user_id == user.id
-        ).all()
-        
-        results = []
-        for m in memberships:
-            org = m.organization
-            if org:
-                # Get User Role in this Org
-                results.append({
-                    "id": org.id,
-                    "name": org.name,
-                    "logo": org.logo_url,
-                    "role": m.role
-                })
-        return results
+        email_col = getattr(AccountUser, "email", None)
+        if email_col is None:
+            return []
+
+        user_db = db.query(AccountUser).filter(email_col == user_email).first()
+        if not user_db:
+            return []
+
+        # Platform admins see ALL orgs
+        is_platform_admin = (role_norm in ["admin", "superadmin"]) or (user_email.lower() in [e.lower() for e in SUPER_ADMIN_EMAILS])
+        if is_platform_admin:
+            orgs = db.query(models.Organization).all()
+            return [
+                {
+                    "id": o.id,
+                    "name": getattr(o, "name", None),
+                    "role": "superadmin" if role_norm == "superadmin" else "admin",
+                    "is_active": True,
+                }
+                for o in orgs
+            ]
+
+        # Normal users: via membership table
+        member_org_ids = (
+            db.query(models.OrganizationUser.org_id)
+            .filter(models.OrganizationUser.user_id == getattr(user_db, "id", getattr(user_db, "user_id", None)))
+            .all()
+        )
+        member_org_ids = [row[0] for row in member_org_ids]
+
+        if not member_org_ids:
+            return []
+
+        orgs = db.query(models.Organization).filter(models.Organization.id.in_(member_org_ids)).all()
+
+        # map roles
+        roles = {
+            r.org_id: r.role
+            for r in db.query(models.OrganizationUser)
+            .filter(models.OrganizationUser.user_id == getattr(user_db, "id", getattr(user_db, "user_id", None)))
+            .all()
+        }
+
+        return [
+            {
+                "id": o.id,
+                "name": getattr(o, "name", None),
+                "role": roles.get(o.id, "user"),
+                "is_active": getattr(o, "is_active", True),
+            }
+            for o in orgs
+        ]
     finally:
         db.close()
+
 
 @app.post("/auth/logout")
 async def logout_endpoint():
