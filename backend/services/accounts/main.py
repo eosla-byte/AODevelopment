@@ -74,28 +74,29 @@ templates = Jinja2Templates(directory=TEMPLATES_DIR)
 async def lifespan(app: FastAPI):
     # 1. Startup: Verify Project Model & Schema
     print("🔍 [STARTUP] Verifying Project Model & Schema...")
-    print(f"🍪 [CONFIG] Cookies: Access='{ACCESS_COOKIE_NAME}', Refresh='{REFRESH_COOKIE_NAME}'")
     print(f"🍪 [CONFIG] Domain='{COOKIE_DOMAIN}', Secure={COOKIE_SECURE}, SameSite='{COOKIE_SAMESITE}'")
+    
+    db = None
     try:
         # Check ORM Model
-        # Note: models imported from common.models
         if not hasattr(models.Project, "organization_id"):
-            print(f"❌ [CRITICAL] Project model matches: {models.Project.__module__}")
-            print(f"❌ [CRITICAL] Attributes: {dir(models.Project)}")
-            raise RuntimeError("Project model MUST have 'organization_id'.")
-        else:
-            print(f"✅ [STARTUP] Project model has 'organization_id' (Module: {models.Project.__module__})")
-
-        try:
-            # Check for Table Existence
-            from sqlalchemy import text
-            # We select 1 to verify table exists
-            db.execute(text("SELECT 1 FROM bim_projects LIMIT 1"))
-            print("✅ [STARTUP] DB table 'bim_projects' VERIFIED.")
-        except Exception as e:
-            print(f"❌ [CRITICAL] DB Check Failed: {e}")
-            raise RuntimeError(f"Database table 'bim_projects' missing. Error: {e}")
-        finally:
+             print(f"❌ [CRITICAL] Project model matches: {models.Project.__module__}")
+             raise RuntimeError("Project model MUST have 'organization_id'.")
+        
+        # Check DB Connection & Table
+        from sqlalchemy import text
+        db = SessionCore()
+        # Safe check using text()
+        db.execute(text("SELECT 1 FROM bim_projects LIMIT 1"))
+        print("✅ [STARTUP] DB table 'bim_projects' VERIFIED.")
+        
+    except Exception as e:
+        print(f"❌ [CRITICAL] Startup Check Failed: {e}")
+        # We allow startup to fail if DB is missing critical tables?
+        # Yes, prompt says "raise RuntimeError".
+        raise RuntimeError(f"Startup Failed: {e}")
+    finally:
+        if db:
             db.close()
             
         # 2. Run Legacy Fixes
