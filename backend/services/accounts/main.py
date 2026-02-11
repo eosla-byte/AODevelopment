@@ -85,14 +85,14 @@ async def lifespan(app: FastAPI):
         # Check Database
         db = SessionCore()
         try:
-            # Simple check: try to selecy organization_id from resources_projects limit 1
-            # If column missing, this throws
+            # Check for ALL required columns
             from sqlalchemy import text
-            db.execute(text("SELECT organization_id FROM resources_projects LIMIT 1"))
-            print("✅ [STARTUP] DB table 'resources_projects' has 'organization_id'")
+            # We select them to force error if missing
+            db.execute(text("SELECT organization_id, created_at, created_by FROM resources_projects LIMIT 1"))
+            print("✅ [STARTUP] DB table 'resources_projects' schema VERIFIED.")
         except Exception as e:
             print(f"❌ [CRITICAL] DB Check Failed: {e}")
-            raise RuntimeError(f"Database schema missing 'organization_id': {e}")
+            raise RuntimeError(f"Database schema out of date. Run 'alembic upgrade head'. Error: {e}")
         finally:
             db.close()
             
