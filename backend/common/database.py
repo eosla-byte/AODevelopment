@@ -26,15 +26,15 @@ from sqlalchemy.orm.attributes import flag_modified
 def get_db_url(primary_var, fallback_var, default_val, name="DB"):
     url = os.getenv(primary_var)
     if url:
-        print(f"✅ [DB CONFIG] {name}: Used env var '{primary_var}'")
+        print(f"[DB CONFIG] {name}: Used env var '{primary_var}'")
         return url.strip().replace("postgres://", "postgresql://")
     
     url = os.getenv(fallback_var)
     if url:
-        print(f"✅ [DB CONFIG] {name}: Used fallback env var '{fallback_var}'")
+        print(f"[DB CONFIG] {name}: Used fallback env var '{fallback_var}'")
         return url.strip().replace("postgres://", "postgresql://")
         
-    print(f"⚠️ [DB CONFIG] {name}: No env var found. Using default '{default_val}'")
+    print(f"[DB CONFIG] {name}: No env var found. Using default '{default_val}'")
     return default_val
 
 # Core DB (Identity, Users, Orgs) - Primary for Accounts Service
@@ -62,8 +62,48 @@ def get_db_host(url):
         return url.split("@")[1].split("/")[0] if "@" in url else "Unknown"
     except: return "Unknown"
 
-print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'} | Host: {get_db_host(CORE_DB_URL)}")
-print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'} | Host: {get_db_host(OPS_DB_URL)}")
+print(f"[DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'} | Host: {get_db_host(OPS_DB_URL)}")
+
+# -----------------------------------------------------------------------------
+# PRODUCTION SAFETY GUARD
+# -----------------------------------------------------------------------------
+def check_production_safety():
+    """
+    Prevents deployment if critical databases are using SQLite in Production.
+    Relies on RAILWAY_ENVIRONMENT_NAME or AO_ENV.
+    """
+    env_name = os.getenv("RAILWAY_ENVIRONMENT_NAME", "") or os.getenv("AO_ENV", "")
+    env_norm = env_name.lower().strip()
+    
+    is_prod = "production" in env_norm or "prod" in env_norm
+    
+    if is_prod:
+        print(f"[GUARD] Production Environment Detected ('{env_name}')")
+        
+        errors = []
+        
+        # 1. Check for Missing Vars
+        if not OPS_DB_URL: errors.append("❌ OPS_DB_URL is missing.")
+        if not CORE_DB_URL: errors.append("❌ CORE_DB_URL is missing.")
+
+        # 2. Check for SQLite Scheme (Explicit)
+        if OPS_DB_URL and (OPS_DB_URL.startswith("sqlite:") or "sqlite" in OPS_DB_URL):
+            errors.append("❌ OPS_DB_URL is using SQLite. Ephemeral storage is NOT allowed in Production.")
+            
+        if CORE_DB_URL and (CORE_DB_URL.startswith("sqlite:") or "sqlite" in CORE_DB_URL):
+            errors.append("❌ CORE_DB_URL is using SQLite. Persistent identity storage is required in Production.")
+            
+        if errors:
+            print("\n".join(errors))
+            print("⛔ [GUARD] DEPLOYMENT ABORTED due to Unsafe Configuration.")
+            raise RuntimeError("Unsafe Production Configuration: Invalid Database Connection Strings.")
+            
+    else:
+        print(f"[GUARD] Environment '{env_name}' is treated as Non-Production. SQLite allowed.")
+
+# Execute Guard
+check_production_safety()
+
 
 # Retry Logic
 import time
@@ -83,20 +123,20 @@ def wait_for_db(engine, name="DB"):
     
     while retries < max_retries:
         try:
-            print(f"🔄 [DB {name}] Connecting to {engine.url.host}...")
+            print(f"[DB {name}] Connecting to {engine.url.host}...")
             # Try to connect
             with engine.connect() as conn:
-                print(f"✅ [DB {name}] Connection Success!")
+                print(f"[DB {name}] Connection Success!")
                 return
         except OperationalError as e:
-            print(f"⚠️ [DB {name}] Connection Refused: {e}")
-            print(f"⏳ [DB {name}] Retrying in {wait}s... ({retries+1}/{max_retries})")
+            print(f"[DB {name}] Connection Refused: {e}")
+            print(f"[DB {name}] Retrying in {wait}s... ({retries+1}/{max_retries})")
             time.sleep(wait)
             wait *= 2 # Exponential backoff: 1, 2, 4, 8...
             if wait > 10: wait = 10 # Cap at 10s
             retries += 1
             
-    print(f"❌ [DB {name}] CRITICAL: Could not connect to database after {max_retries} attempts.")
+    print(f"[DB {name}] CRITICAL: Could not connect to database after {max_retries} attempts.")
     # We allow it to crash/continue so uvicorn logs the final exception from main app.
 
 # Create Engines
@@ -148,15 +188,15 @@ def get_plugin_db():
 # We avoid running create_all against Postgres in production to prevent "NoReferencedTableError" 
 # and other DDL issues. Production schema should be managed by migrations.
 if "sqlite" in CORE_DB_URL or os.getenv("FORCE_DB_CREATE", "false").lower() == "true":
-    print("🔧 [DB] Running Base.metadata.create_all (SQLite/Dev Mode)...")
+    print("[DB] Running Base.metadata.create_all (SQLite/Dev Mode)...")
     try:
         if "sqlite" in EXT_DB_URL: Base.metadata.create_all(bind=engine_ext) 
         if "sqlite" in CORE_DB_URL: Base.metadata.create_all(bind=engine_core)
         if "sqlite" in OPS_DB_URL: Base.metadata.create_all(bind=engine_ops) 
     except Exception as e:
-        print(f"⚠️ [DB] Warning: create_all failed (likely innocuous if tables exist): {e}")
+        print(f"[DB] Warning: create_all failed (likely innocuous if tables exist): {e}")
 else:
-    print("🔒 [DB] Skipping Base.metadata.create_all (Postgres/Prod Mode).") 
+    print("[DB] Skipping Base.metadata.create_all (Postgres/Prod Mode).") 
 
 
 SCAN_CATEGORIES = {

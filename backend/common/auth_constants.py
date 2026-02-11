@@ -7,7 +7,7 @@ REFRESH_COOKIE_NAME = "accounts_refresh_token"
 
 # Shared Session Config (for Daily/BIM/Accounts)
 COOKIE_DOMAIN = ".somosao.com"
-COOKIE_SAMESITE = "none"
+COOKIE_SAMESITE = "none" # Required for cross-site/iframe
 COOKIE_SECURE = True
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 40320 # 4 weeks (standardized)

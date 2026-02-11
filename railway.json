@@ -1,0 +1,37 @@
+{
+    "$schema": "https://railway.app/railway.schema.json",
+    "build": {
+        "builder": "NIXPACKS"
+    },
+    "deploy": {
+        "startCommand": "uvicorn backend.main:app --host 0.0.0.0 --port $PORT",
+        "restartPolicyType": "ON_FAILURE",
+        "restartPolicyMaxRetries": 5
+    },
+    "services": {
+        "accounts": {
+            "buildCommand": "echo 'Building Accounts Service'",
+            "startCommand": "uvicorn backend.services.accounts.main:app --host 0.0.0.0 --port $PORT"
+        },
+        "bim": {
+            "buildCommand": "echo 'Building BIM Service'",
+            "startCommand": "uvicorn backend.services.bim.main:app --host 0.0.0.0 --port $PORT"
+        },
+        "daily": {
+            "buildCommand": "echo 'Building Daily Service'",
+            "startCommand": "uvicorn backend.services.daily.main:app --host 0.0.0.0 --port $PORT"
+        },
+        "finance": {
+            "buildCommand": "echo 'Building Finance Service'",
+            "startCommand": "uvicorn backend.services.finance.main:app --host 0.0.0.0 --port $PORT"
+        },
+        "plugin": {
+            "buildCommand": "echo 'Building Plugin Service'",
+            "startCommand": "uvicorn backend.services.plugin.main:app --host 0.0.0.0 --port $PORT"
+        },
+        "monolith": {
+            "buildCommand": "echo 'Building Monolith Service'",
+            "startCommand": "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+        }
+    }
+}

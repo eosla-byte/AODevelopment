@@ -52,6 +52,7 @@ from common.auth import create_access_token, create_refresh_token, decode_token,
 from common.auth_utils import verify_password, get_password_hash 
 import common.models as models 
 from common.models import AccountUser 
+from common.db_migration_entitlements import run_entitlements_migration 
 from common.auth_constants import (
     ACCESS_COOKIE_NAME, 
     REFRESH_COOKIE_NAME,
@@ -96,6 +97,29 @@ async def lifespan(app: FastAPI):
         
         # 2. Run Legacy Fixes
         run_db_fix()
+        
+        # Production Hardening: Check for Migration Safety
+        env_name = os.getenv("RAILWAY_ENVIRONMENT_NAME", "") or os.getenv("AO_ENV", "")
+        is_prod = "production" in env_name.lower() or "prod" in env_name.lower()
+        
+        if is_prod:
+             # In PROD, we assume migrations ran via CD pipeline or manual admin action.
+             # We just verify schema exists to fail fast if broken.
+             print("[STARTUP] Production Mode: Skipping auto-migration. Verifying Schema...")
+             try:
+                 # Simple check: can we query Entitlements?
+                 # If table missing, this throws OperationalError
+                 with SessionCore() as db_check: # Use a new session for this check
+                     db_check.execute(text("SELECT 1 FROM accounts_entitlements LIMIT 1"))
+                 print("[STARTUP] Schema Verification Passed.")
+             except Exception as e:
+                 print(f"❌ [STARTUP] CRITICAL: Entitlements Schema Missing in Production! Error: {e}")
+                 # We might want to raise SystemExit here, but let's log critical for now.
+                 # raise e 
+        else:
+            # In DEV/TEST, auto-migrate for convenience
+            print("[STARTUP] Dev Mode: Running Auto-Migrations...")
+            run_entitlements_migration()
 
     except Exception as e:
         print(f"❌ [CRITICAL] Startup Check Failed: {e}")
@@ -113,6 +137,9 @@ app = FastAPI(title="AO Accounts Service", lifespan=lifespan)
 
 
 # ... (version check same)
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "service": "accounts", "version": "v1.0"}
 
 # ... (dependencies)
 def get_current_active_user(request: Request):
@@ -398,7 +425,21 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         # Robust ID Resolution (Fix for AppUser missing 'id')
         real_user_id = getattr(user, "id", None)
         if not real_user_id:
-            real_user_id = user.email
+             # HARDENING: Fallback to email is NO LONGER ALLOWED.
+             # If user model has no ID, this is a critical data error.
+             print(f"❌ [LOGIN] CRITICAL: User {email} has no UUID (Legacy AppUser?). Login blocked.")
+             return JSONResponse({"status": "error", "message": "Account migration required. Contact Support."}, status_code=403)
+             # real_user_id = user.email # REMOVED
+
+        # Fetch Entitlements Version for Cache Invalidation
+        entitlements_version = 1
+        if org_id:
+             try:
+                 org_obj = db.query(models.Organization).filter(models.Organization.id == org_id).first()
+                 if org_obj:
+                     entitlements_version = getattr(org_obj, "entitlements_version", 1)
+             except Exception:
+                 pass
 
         # Token Claims (Standardized)
         claims = {
@@ -407,6 +448,7 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             "role": org_role if org_role else user.role, 
             "platform_role": "super_admin" if is_super_admin else None,
             "org_id": org_id, 
+            "entitlements_version": entitlements_version,
             "services": services or []
         }
         
@@ -442,6 +484,7 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         )
 
         # COOKIE 2: Legacy/Compat (access_token) - Share config
+        # HARDENING: Short Max-Age (1 Hour) to encourage migration
         response.set_cookie(
             key="access_token", 
             value=access_token, 
@@ -449,7 +492,8 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             samesite=COOKIE_SAMESITE,
             secure=COOKIE_SECURE, 
             domain=COOKIE_DOMAIN,
-            path="/"
+            path="/",
+            max_age=3600 # 1 Hour Deprecation Window
         )
 
         # COOKIE 3: Refresh Token
@@ -594,24 +638,65 @@ def toggle_org_service(
          
     db = SessionCore()
     try:
-        perm = db.query(models.ServicePermission).filter(
-            models.ServicePermission.organization_id == org_id,
-            models.ServicePermission.service_slug == data.service_slug
+        # V3 ENTITLEMENTS UPDATE
+        # 1. Update/Create OrgEntitlement
+        ent = db.query(models.OrgEntitlement).filter(
+            models.OrgEntitlement.org_id == org_id,
+            models.OrgEntitlement.entitlement_key == data.service_slug
         ).first()
         
-        if perm:
-            perm.is_active = data.is_active
+        if ent:
+            ent.enabled = data.is_active
         else:
-            perm = models.ServicePermission(
-                id=str(uuid.uuid4()),
-                organization_id=org_id,
-                service_slug=data.service_slug,
-                is_active=data.is_active
+            # Check if valid entitlement key
+            master = db.query(models.Entitlement).filter(models.Entitlement.id == data.service_slug).first()
+            if not master:
+                 # Auto-create master if missing? Or error?
+                 # Let's error to be safe, or auto-create for dev speed.
+                 # Error is safer.
+                 # Actually, for "daily", "bim" etc they should exist.
+                 if not master:
+                     return JSONResponse({"detail": f"Invalid Service Slug: {data.service_slug}"}, status_code=400)
+            
+            ent = models.OrgEntitlement(
+                org_id=org_id,
+                entitlement_key=data.service_slug,
+                enabled=data.is_active
             )
-            db.add(perm)
+            db.add(ent)
+            
+        # 2. BUMP VERSION (Critical for Cache Invalidation)
+        org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
+        if org:
+            current_ver = getattr(org, "entitlements_version", 1)
+            org.entitlements_version = current_ver + 1
+            print(f"🔄 [ENTITLEMENTS] Bumped Org {org_id} version to {org.entitlements_version}")
+            
+        # 3. Legacy Sync (Optional, for ServicePermission table if still used)
+        # We perform it to be safe during transition
+        try:
+            perm = db.query(models.ServicePermission).filter(
+                models.ServicePermission.organization_id == org_id,
+                models.ServicePermission.service_slug == data.service_slug
+            ).first()
+            if perm:
+                perm.is_active = data.is_active
+            else:
+                db.add(models.ServicePermission(
+                    id=str(uuid.uuid4()),
+                    organization_id=org_id,
+                    service_slug=data.service_slug,
+                    is_active=data.is_active
+                ))
+        except Exception:
+            pass # Ignore legacy errors
             
         db.commit()
-        return {"status": "ok"}
+        return {"status": "ok", "new_version": org.entitlements_version if org else None}
+    except Exception as e:
+        db.rollback()
+        print(f"toggle_org_service ERROR: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 

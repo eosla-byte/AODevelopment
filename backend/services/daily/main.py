@@ -143,17 +143,38 @@ def run_db_fix():
 
     try:
         db = database.SessionOps()
-        # 1. Drop Invalid Constraints
-        # Drop Constraint if exists (Self-healing for cross-db FKs)
-        actions = []
-        try:
-            db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_owner_id_fkey"))
-            actions.append("Dropped daily_teams_owner_id_fkey")
-            db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_organization_id_fkey"))
-            actions.append("Dropped daily_teams_organization_id_fkey")
-            # Also check daily_projects if necessary
-            db.execute(text("ALTER TABLE daily_projects DROP CONSTRAINT IF EXISTS daily_projects_organization_id_fkey"))
-            actions.append("Dropped daily_projects_organization_id_fkey")
+        
+        # 0. HARDENING: Production Schema Validation
+        # If in Production, we DO NOT auto-fix. We CHECK and FAIL if invalid.
+        env_name = os.getenv("RAILWAY_ENVIRONMENT_NAME", "") or os.getenv("AO_ENV", "")
+        is_prod = "production" in env_name.lower().strip()
+        
+        if is_prod:
+             print("🛡️ [HARDENING] Production Mode: Validating Daily Schema...")
+             try:
+                 # Check for critical tables/columns
+                 db.execute(text("SELECT bim_project_id FROM daily_projects LIMIT 1"))
+                 db.execute(text("SELECT channel_id FROM daily_messages LIMIT 1"))
+                 print("✅ [HARDENING] Daily Schema Validated.")
+             except Exception as e:
+                 print(f"❌ [CRITICAL] Production Schema Mismatch: {e}")
+                 raise RuntimeError("Production Schema Invalid. Run migrations manually.")
+        
+        # 1. Drop Invalid Constraints - DISABLED/DEV-ONLY
+        if not is_prod:
+            # 1. Drop Invalid Constraints
+            # Drop Constraint if exists (Self-healing for cross-db FKs)
+            # actions = []
+            # try:
+            #     # db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_owner_id_fkey"))
+            #     # actions.append("Dropped daily_teams_owner_id_fkey")
+            #     # db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_organization_id_fkey"))
+            #     # actions.append("Dropped daily_teams_organization_id_fkey")
+            #     # Also check daily_projects if necessary
+            #     # db.execute(text("ALTER TABLE daily_projects DROP CONSTRAINT IF EXISTS daily_projects_organization_id_fkey"))
+            #     # actions.append("Dropped daily_projects_organization_id_fkey")
+            
+            actions = []
             
             # 2. Check for Missing Columns (Schema Mismatch Fix)
             # Check bim_project_id in daily_projects
@@ -318,13 +339,15 @@ def create_daily_team_safe(name: str, owner_id: str, organization_id: str = None
         except Exception as e:
             err_str = str(e).lower()
             if "foreignkey" in err_str:
-                print("⚠️ [INLINED] Dropping Constraints...")
-                db.rollback()
-                db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_owner_id_fkey"))
-                db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_organization_id_fkey"))
-                db.commit()
-                db.add(team)
-                db.commit()
+                print("⚠️ [INLINED] ForeignKey Violation detected.")
+                # print("⚠️ [INLINED] Dropping Constraints... DISABLED (Phase 2)")
+                # db.rollback()
+                # db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_owner_id_fkey"))
+                # db.execute(text("ALTER TABLE daily_teams DROP CONSTRAINT IF EXISTS daily_teams_organization_id_fkey"))
+                # db.commit()
+                # db.add(team)
+                # db.commit()
+                raise e # Fail loudly instead of destroying schema
             else:
                 raise e
         

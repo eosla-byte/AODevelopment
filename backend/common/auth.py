@@ -13,7 +13,7 @@ from typing import Optional, Dict, Any
 # Keys: AO_JWT_PRIVATE_KEY_PEM / AO_JWT_PUBLIC_KEY_PEM
 # Exact names required.
 
-print("✅ [AUTH] Loading ROOT auth.py")
+print("[AUTH] Loading ROOT auth.py")
 
 def load_key_strict(env_name, required=False):
     val = os.getenv(env_name)
@@ -170,9 +170,11 @@ async def get_current_user_claims(request: Request) -> Dict[str, Any]:
         
     # 2. Cookie (HttpOnly) - Unified check
     if not token:
-        token = request.cookies.get("accounts_access_token")
+        token = request.cookies.get(ACCESS_COOKIE_NAME) # accounts_access_token
     if not token:
-        token = request.cookies.get("access_token")
+        token = request.cookies.get("accounts_access_token") # Explicit Fallback
+    if not token:
+        token = request.cookies.get("access_token") # Legacy Fallback
     
     # 3. Validation
     if not token:
@@ -204,29 +206,55 @@ def get_current_user(claims: Dict[str, Any] = Depends(get_current_user_claims)) 
     """
     return claims
 
+from .entitlements import entitlements_client
+
 def require_service(service_slug: str):
     """
-    Dependency factory to enforce service entitlement.
+    Dependency factory to enforce service entitlement via V3 Entitlements System.
     Usage: @app.get(..., dependencies=[Depends(require_service("daily"))])
     """
     def _check_service(request: Request, claims: Dict[str, Any] = Depends(get_current_user_claims)):
-        # SuperAdmin/Admin Bypass
+        # SuperAdmin/Admin Bypass? 
+        # CAUTION: "Admin" role might be Organization Admin, who SHOULD be restricted by Plan.
+        # "SuperAdmin" (Platform) bypasses everything.
         role = claims.get("role")
-        if role in ["SuperAdmin", "Admin"]:
+        if role == "SuperAdmin":
             return claims
             
-        services = claims.get("services", [])
+        # 1. Get Context
+        org_id = claims.get("org_id")
         
-        # Check if service is enabled
-        # Normalize slugs (lowercase)
-        # Handle cases where services might be a dict or list
-        if isinstance(services, list):
-             if service_slug.lower() not in [s.lower() for s in services]:
-                 raise HTTPException(status_code=403, detail="service_not_enabled")
-        elif isinstance(services, dict):
-             if not services.get(service_slug, False):
-                 raise HTTPException(status_code=403, detail="service_not_enabled")
-                 
+        # If no org_id in token (e.g. initial login or freelance mode?), 
+        # we can't check org entitlements.
+        # Strategy: Valid services must be tied to an Org Context or User Global Access?
+        # For Phase 3, we assume Service Access is via Organization Plan.
+        
+        if not org_id:
+             # Fallback to legacy "services" list checks if org_id is missing?
+             # Or blocking? 
+             # Let's fallback to legacy list for backward compat if Org ID is missing.
+             services = claims.get("services", [])
+             if isinstance(services, list):
+                 if service_slug.lower() in [s.lower() for s in services]:
+                     return claims
+             # Block if no org context and no legacy claim matches
+             raise HTTPException(status_code=403, detail="No Organization Context for Entitlement Check")
+
+        # 2. Versioned Check
+        token_version = claims.get("entitlements_version", 0) # Default to 0 to force refresh if missing
+        
+        has_access = entitlements_client.check_access(org_id, token_version, service_slug)
+        
+        if not has_access:
+            # Final Fallback: Check legacy 'services' claim one last time 
+            # (Transition Period: Token might have 'services' but DB not ready?)
+            # Prompt said: "Do NOT embed full services list... optional temporary backward compatibility ok"
+            services = claims.get("services", [])
+            if isinstance(services, list) and service_slug.lower() in [s.lower() for s in services]:
+                return claims
+                
+            raise HTTPException(status_code=403, detail=f"Organization does not have access to '{service_slug}'")
+                  
         return claims
         
     return _check_service

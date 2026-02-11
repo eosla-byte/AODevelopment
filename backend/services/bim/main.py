@@ -135,6 +135,10 @@ if not os.path.exists(static_dir):
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "service": "bim", "version": "v1.0"}
+
 @app.on_event("startup")
 def ensure_schema_updates():
     print(">>> Startup: Checking BIM Schema...")

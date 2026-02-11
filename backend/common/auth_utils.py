@@ -12,7 +12,12 @@ from typing import Optional
 from .auth import (
     create_access_token as _create_access_token_rs256,
     decode_token as _decode_token_rs256,
+    get_current_user_claims as _get_current_user_claims_rs256,
     oauth2_scheme
+)
+from .auth_constants import (
+    ACCESS_COOKIE_NAME,
+    ACCESS_TOKEN_EXPIRE_MINUTES
 )
 
 from passlib.context import CryptContext
@@ -66,13 +71,22 @@ async def get_current_user(
     
     # 1. Try Token from Header (OAuth2PasswordBearer) -> 2. If missing, Try Cookie
     if not token:
-        cookie_token = request.cookies.get("accounts_access_token")
-        if cookie_token:
-            if cookie_token.startswith("Bearer "):
-                token = cookie_token.split(" ")[1]
-            else:
-                token = cookie_token
+        # Unified Cookie
+        token = request.cookies.get(ACCESS_COOKIE_NAME)
+    
+    if not token:
+        # Explicit Fallback
+        token = request.cookies.get("accounts_access_token")
         
+    if not token:
+        # Legacy Fallback
+        token = request.cookies.get("access_token")
+        if token:
+             print(f"⚠️ [DEPRECATION] Legacy 'access_token' cookie used by {request.client.host} for {request.url.path}")      
+        # Handle Bearer prefix in cookie just in case
+        if token and token.startswith("Bearer "):
+            token = token.split(" ")[1]
+
     # 3. Fallback: Query Param (Bulletproof for Iframes where cookies are blocked)
     if not token:
         token = request.query_params.get("token") or request.query_params.get("access_token")

@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Integer, Float, Boolean, ForeignKey, DateTime, JSON, Text, create_engine
-from sqlalchemy.orm import sessionmaker, relationship, DeclarativeBase
+from sqlalchemy.orm import sessionmaker, relationship, DeclarativeBase, synonym
 from sqlalchemy.sql import func
 import datetime
 
@@ -56,13 +56,18 @@ class Project(Base):
 
     # Relationships
     timeline_events = relationship("TimelineEvent", back_populates="project")
-    organization = relationship("Organization", back_populates="projects")
+    organization = relationship(
+        "Organization",
+        back_populates="projects",
+        primaryjoin="Project.organization_id==Organization.id",
+        foreign_keys="[Project.organization_id]"
+    )
 
 class TimelineEvent(Base):
     __tablename__ = 'resources_timeline_events'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    project_id = Column(String, ForeignKey('resources_projects.id'))
+    project_id = Column(String, ForeignKey('bim_projects.id'))
     type = Column(String)
     date = Column(String)
     filename = Column(String)
@@ -324,7 +329,7 @@ class BimOrganization(Base):
     is_active = Column(Boolean, default=True)
 
     users = relationship("BimUser", back_populates="organization")
-    projects = relationship("BimProject", back_populates="organization")
+    # projects = relationship("BimProject", back_populates="organization")
 
 class BimUser(Base):
     __tablename__ = 'bim_users'
@@ -452,13 +457,24 @@ class Organization(Base):
     contact_email = Column(String)
     tax_id = Column(String) # NIT/RFC
     logo_url = Column(String)
+    slug = Column(String, unique=True, index=True)
     status = Column(String, default="Active")
+    
+    # Versioning for Entitlements Cache Invalidation
+    entitlements_version = Column(Integer, default=1)
     
     created_at = Column(DateTime, default=func.now())
     
     users = relationship("OrganizationUser", back_populates="organization", cascade="all, delete-orphan")
     service_permissions = relationship("ServicePermission", back_populates="organization", cascade="all, delete-orphan")
-    projects = relationship("Project", back_populates="organization", cascade="all, delete-orphan")
+    entitlements = relationship("OrgEntitlement", back_populates="organization", cascade="all, delete-orphan")
+    projects = relationship(
+        "Project",
+        back_populates="organization",
+        primaryjoin="Project.organization_id==Organization.id",
+        foreign_keys="[Project.organization_id]",
+        cascade="all, delete-orphan"
+    )
 
 class OrganizationUser(Base):
     """
@@ -501,6 +517,32 @@ class ServicePermission(Base):
     valid_until = Column(DateTime, nullable=True)
     
     organization = relationship("Organization", back_populates="service_permissions")
+
+    organization = relationship("Organization", back_populates="service_permissions")
+
+class Entitlement(Base):
+    """
+    Master list of available entitlements (capabilities/services).
+    """
+    __tablename__ = 'accounts_entitlements'
+    
+    id = Column(String, primary_key=True) # key, e.g., 'daily', 'bim', 'finance'
+    description = Column(String)
+
+class OrgEntitlement(Base):
+    """
+    Active entitlements for an organization.
+    """
+    __tablename__ = 'accounts_org_entitlements'
+    
+    org_id = Column(String, ForeignKey('accounts_organizations.id'), primary_key=True)
+    entitlement_key = Column(String, ForeignKey('accounts_entitlements.id'), primary_key=True)
+    
+    enabled = Column(Boolean, default=True)
+    limits_json = Column(JSON, default={}) # Quotas, extra feature flags
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    
+    organization = relationship("Organization", back_populates="entitlements")
 
 # -----------------------------------------------------------------------------
 # SCHEMA: DAILY APP (Daily.somosao.com) -> Prefix 'daily_'

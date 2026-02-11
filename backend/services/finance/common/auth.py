@@ -181,24 +181,51 @@ async def get_current_user_claims(request: Request) -> Dict[str, Any]:
     
     return payload
 
+# Import EntitlementsClient from Root Backend
+try:
+    from backend.common.entitlements import entitlements_client
+except ImportError:
+    # Fallback for local dev if path is weird, but usually backend is in path
+    import sys
+    import os
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")))
+    from backend.common.entitlements import entitlements_client
+
 def require_service(service_slug: str):
     """
-    Dependency factory to enforce service entitlement.
+    Dependency factory to enforce service entitlement via V3 Entitlements System.
     Usage: @app.get(..., dependencies=[Depends(require_service("daily"))])
     """
     def _check_service(request: Request, claims: Dict[str, Any] = Depends(get_current_user_claims)):
-        # SuperAdmin/Admin Bypass
+        # SuperAdmin/Admin Bypass? 
         role = claims.get("role")
-        if role in ["SuperAdmin", "Admin"]:
-            return True
+        if role == "SuperAdmin":
+            return claims
             
-        services = claims.get("services", [])
+        # 1. Get Context
+        org_id = claims.get("org_id")
         
-        # Check if service is enabled
-        # Normalize? slugs should be lowercase in claims
-        if service_slug not in services:
-             # print(f"⛔ [Auth] Access Denied: User {claims.get('sub')} lacks '{service_slug}' entitlement.")
-             raise HTTPException(status_code=403, detail="service_not_enabled")
+        if not org_id:
+             # Fallback to legacy "services" list checks if org_id is missing?
+             services = claims.get("services", [])
+             if isinstance(services, list):
+                 if service_slug.lower() in [s.lower() for s in services]:
+                     return claims
+             raise HTTPException(status_code=403, detail="No Organization Context for Entitlement Check")
+
+        # 2. Versioned Check
+        token_version = claims.get("entitlements_version", 0)
+        
+        has_access = entitlements_client.check_access(org_id, token_version, service_slug)
+        
+        if not has_access:
+            # Final Fallback: Check legacy 'services' claim one last time
+            services = claims.get("services", [])
+            if isinstance(services, list) and service_slug.lower() in [s.lower() for s in services]:
+                return claims
+                
+            raise HTTPException(status_code=403, detail=f"Organization does not have access to '{service_slug}'")
+                  
         return claims
         
     return _check_service

@@ -36,6 +36,10 @@ async def dashboard(request: Request):
 def version_check():
     return {"service": "AO Finance", "version": "v1.0"}
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "service": "finance", "version": "v1.0"}
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8002))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

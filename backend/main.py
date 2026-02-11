@@ -109,6 +109,10 @@ async def debug_auth_endpoint(email: str = "eosla@somosao.com"):
 def version_check():
     return {"version": "v3_monolith_fixed", "timestamp": datetime.datetime.now().isoformat()}
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "service": "monolith", "version": "v3_monolith_fixed"}
+
 # Include Plugin API
 # Include Plugin API
 from routers import plugin_api, plugin_cloud, ai, sheet_api, acc_manager
@@ -189,14 +193,19 @@ class AuthMiddleware(BaseHTTPMiddleware):
             is_protected = False
         
         if is_protected:
-            token = request.cookies.get("access_token")
-            # Fallback Header
-            # Fallback Header
+            # 1. Unified Cookie (accounts_access_token)
+            token = request.cookies.get("accounts_access_token")
+            
+            # 2. Legacy Cookie (access_token) - Fallback
+            if not token:
+                token = request.cookies.get("access_token")
+            
+            # 3. Authorization Header (Bearer)
             auth_header = request.headers.get("Authorization")
             if not token and auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
             
-            # Fallback Query Param (Bulletproof for WebViews/Iframes)
+            # 4. Query Param (WebView/Iframe)
             if not token:
                 token = request.query_params.get("token") or request.query_params.get("access_token")
 
