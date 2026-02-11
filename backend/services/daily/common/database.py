@@ -7,7 +7,18 @@ from sqlalchemy.orm import Session, sessionmaker, joinedload
 from sqlalchemy import create_engine
 from sqlalchemy.sql import func
 from . import models
-from .models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard, PluginSheetSession, DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
+from . import models
+from .models import Base, Project as DBProject, DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage, DailyChannel
+
+# Safe Import for models not defined locally
+DBCollaborator = getattr(models, "Collaborator", None)
+TimelineEvent = getattr(models, "TimelineEvent", None)
+ContactSubmission = getattr(models, "ContactSubmission", None)
+AppUser = getattr(models, "AppUser", None)
+ExpenseColumn = getattr(models, "ExpenseColumn", None)
+ExpenseCard = getattr(models, "ExpenseCard", None)
+PluginSheetSession = getattr(models, "PluginSheetSession", None)
+
 from sqlalchemy.orm.attributes import flag_modified
 
 # DATABASE SETUP

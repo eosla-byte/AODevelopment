@@ -1,22 +1,32 @@
-import sys
-import os
+from sqlalchemy import Column, String, Integer, Float, Boolean, ForeignKey, DateTime, JSON, Text
+from sqlalchemy.orm import relationship, DeclarativeBase
+from sqlalchemy.sql import func
+import datetime
 
-# PROXY TO GLOBAL MODELS
-# This file ensures all services use the Single Source of Truth (common/models.py)
-# We prioritize the ROOT common module over local/relative ones.
+# LOCAL DECOUPLED MODELS
+# Copied from backend/common/models.py to avoid 'backend' package dependency on Railway
+# This ensures the service is self-contained.
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Assumes structure: services/SERVICE/common/models.py -> .../backend/ (Root)
-root_dir = os.path.abspath(os.path.join(current_dir, "../../../"))
+class Base(DeclarativeBase):
+    pass
 
-if root_dir not in sys.path:
-    sys.path.insert(0, root_dir)
+class Project(Base):
+    __tablename__ = 'bim_projects'
+    
+    id = Column(String, primary_key=True) # Custom ID or UUID
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True) 
+    status = Column(String, default="Active")
+    created_at = Column(DateTime, server_default=func.now())
+    
+    # Core Project Profile Fields
+    organization_id = Column(String, ForeignKey('accounts_organizations.id', ondelete="CASCADE"), nullable=False, index=True)
 
-try:
-    # This should now pick up backend/common/models.py (as common.models)
-    from common.models import *
-except ImportError as e:
-    # If that fails, try explicit relative? No, stick to common.
-    # Print error to help debug in logs
-    print(f"CRITICAL: Could not import common.models in proxy. Path: {sys.path}")
-    raise e
+    # Relationships are optional in local definition if we don't eager load them or use them in this service
+    # But keeping them prevents mapper errors if code tries to access them
+    # Note: Target classes must be defined or handled loosely.
+    # For now, we define Project. Organization will be defined if needed or we use string reference.
+    # organization = relationship("Organization", back_populates="projects")
+    
+# We only define what Accounts service needs for now, or what is critical for startup.
+# If Accounts database.py imports other models, we need them here or mocked.

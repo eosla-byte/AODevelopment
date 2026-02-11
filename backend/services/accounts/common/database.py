@@ -6,8 +6,23 @@ from typing import List, Optional
 from sqlalchemy.orm import Session, sessionmaker, joinedload
 from sqlalchemy import create_engine
 from sqlalchemy.sql import func
-from . import models
-from .models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard, PluginSheetSession
+import common.models as models
+from .models import Base, Project as DBProject
+
+# Safe Import for models not defined locally in the decoupled file
+DBCollaborator = getattr(models, "Collaborator", None)
+TimelineEvent = getattr(models, "TimelineEvent", None)
+ContactSubmission = getattr(models, "ContactSubmission", None)
+AppUser = getattr(models, "AppUser", None)
+ExpenseColumn = getattr(models, "ExpenseColumn", None)
+ExpenseCard = getattr(models, "ExpenseCard", None)
+PluginSheetSession = getattr(models, "PluginSheetSession", None)
+DailyTeam = getattr(models, "DailyTeam", None)
+DailyProject = getattr(models, "DailyProject", None)
+DailyColumn = getattr(models, "DailyColumn", None)
+DailyTask = getattr(models, "DailyTask", None)
+DailyComment = getattr(models, "DailyComment", None)
+DailyMessage = getattr(models, "DailyMessage", None)
 from sqlalchemy.orm.attributes import flag_modified
 
 # DATABASE SETUP

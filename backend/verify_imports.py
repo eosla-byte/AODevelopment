@@ -53,11 +53,23 @@ try:
     print(f"Accounts Project: {accounts_models.Project}")
     print(f"BIM Project: {bim_models.Project}")
 
-    if Project is accounts_models.Project is bim_models.Project is daily_models.Project:
-        print("✅ Project Model Unification CONFIRMED")
+    # DECOUPLED ARCHITECTURE CHECK
+    # Services now define their own Project class to avoid 'backend' dependency.
+    # So we expect them to be DIFFERENT classes, but with SAME table name.
+    
+    if Project is not accounts_models.Project:
+        print("ℹ️  Project Models are Decoupled (As Expected for Railway Fix)")
+        
+    if accounts_models.Project.__tablename__ == 'bim_projects':
+        print("✅ Accounts Project maps to 'bim_projects'")
     else:
-        print("❌ Project Model Unification FAILED (Mismatch)")
-        print(f"IDs: G={id(Project)}, A={id(accounts_models.Project)}, B={id(bim_models.Project)}")
+        print(f"❌ Accounts Project Key Mismatch: {accounts_models.Project.__tablename__}")
+        
+    if bim_models.Project.__tablename__ == 'bim_projects':
+        print("✅ BIM Project maps to 'bim_projects'")
+        
+    if daily_models.Project.__tablename__ == 'bim_projects':
+        print("✅ Daily Project maps to 'bim_projects'")
 
 except Exception as e:
     print(f"❌ Verification FAILED: {e}")

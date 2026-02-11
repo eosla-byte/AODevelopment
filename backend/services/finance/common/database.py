@@ -8,7 +8,19 @@ from sqlalchemy.orm import Session, sessionmaker, joinedload
 from sqlalchemy import create_engine, text
 from sqlalchemy.sql import func
 from . import models
-from .models import Base, Project as DBProject, Collaborator as DBCollaborator, TimelineEvent, ContactSubmission, AppUser, ExpenseColumn, ExpenseCard, PluginSheetSession, DailyTeam, DailyProject, DailyColumn, DailyTask, DailyComment, DailyMessage
+from .models import Base, Project as DBProject, Collaborator as DBCollaborator, ExpenseColumn, ExpenseCard, Quotation, QuotationTemplate
+
+# Safe Import for models not defined locally
+TimelineEvent = getattr(models, "TimelineEvent", None)
+ContactSubmission = getattr(models, "ContactSubmission", None)
+AppUser = getattr(models, "AppUser", None)
+PluginSheetSession = getattr(models, "PluginSheetSession", None)
+DailyTeam = getattr(models, "DailyTeam", None)
+DailyProject = getattr(models, "DailyProject", None)
+DailyColumn = getattr(models, "DailyColumn", None)
+DailyTask = getattr(models, "DailyTask", None)
+DailyComment = getattr(models, "DailyComment", None)
+DailyMessage = getattr(models, "DailyMessage", None)
 from sqlalchemy.orm.attributes import flag_modified
 
 # DATABASE SETUP
