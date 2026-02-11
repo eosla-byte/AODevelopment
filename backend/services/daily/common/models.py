@@ -208,5 +208,8 @@ class SheetTemplate(Base):
     __tablename__ = 'plugin_sheet_templates'
     id = Column(Integer, primary_key=True)
 
+# Backward-compat alias for legacy imports
+AccountUser = AppUser
+
 
 
