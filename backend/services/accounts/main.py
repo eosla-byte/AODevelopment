@@ -8,7 +8,6 @@ import os
 import sys
 import uuid
 import datetime
-from datetime import timedelta
 from typing import List, Optional
 import pydantic
 
@@ -65,8 +64,14 @@ from common.auth_constants import (
 ) 
 
 # Configuration
-SUPER_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("AO_SUPER_ADMIN_EMAILS", "").split(",") if e.strip()] 
+SUPER_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("AO_SUPER_ADMIN_EMAILS", "").split(",") if e.strip()]
+# Bootstrap superadmin (allows first-time access even without org context).
+BOOTSTRAP_SUPERADMIN_EMAIL = os.getenv("AO_BOOTSTRAP_SUPERADMIN_EMAIL", "superadmin@somosao.com").strip().lower()
+BOOTSTRAP_SUPERADMIN_PASSWORD = os.getenv("AO_BOOTSTRAP_SUPERADMIN_PASSWORD", "supertata123")
 
+# Make sure the bootstrap email is considered a super admin even if AO_SUPER_ADMIN_EMAILS is empty.
+if BOOTSTRAP_SUPERADMIN_EMAIL and BOOTSTRAP_SUPERADMIN_EMAIL not in SUPER_ADMIN_EMAILS:
+    SUPER_ADMIN_EMAILS.append(BOOTSTRAP_SUPERADMIN_EMAIL)
 # Initialize Templates
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -153,11 +158,12 @@ def get_current_active_user(request: Request):
 def get_current_admin(user = Depends(get_current_active_user)):
     if not user:
         return None
-    # Check Role (case-insensitive)
-    role = (user.get("role") or "").strip().lower()
-    if role not in ["admin", "superadmin", "super_admin"]:
-        print(f"DEBUG: Role '{role}' denied admin access.")
-        return None
+    # Check Role
+    role = user.get("role")
+    if role not in ["Admin", "SuperAdmin"]:
+         print(f"DEBUG: Role '{role}' denied admin access.")
+         # Return None to trigger 401/Redirect in caller
+         return None
     return user
 
 # --- DB Migration Helper ---
@@ -272,105 +278,7 @@ async def login_page(request: Request):
 async def select_org_page(request: Request):
     return templates.TemplateResponse("select_org.html", {"request": request})
 
-# --- Super Admin Platform Routes (Global) ---
-
-@app.get("/api/orgs")
-async def list_all_orgs(user=Depends(get_current_active_user)):
-    # Platform Super Admin Only
-    is_super = user.get("platform_role") == "super_admin" or user.get("role") == "SuperAdmin"
-    if not is_super: raise HTTPException(status_code=403)
-    
-    db = SessionCore()
-    try:
-        orgs = db.query(models.Organization).all()
-        return [{"id": o.id, "name": o.name, "slug": o.slug, "logo": o.logo_url} for o in orgs]
-    finally:
-        db.close()
-
-class CreateOrgData(pydantic.BaseModel):
-    name: str
-    slug: str
-
-@app.post("/api/orgs")
-async def create_global_org(data: CreateOrgData, user=Depends(get_current_active_user)):
-    # Platform Super Admin Only
-    is_super = user.get("platform_role") == "super_admin" or user.get("role") == "SuperAdmin"
-    if not is_super: raise HTTPException(status_code=403)
-    
-    db = SessionCore()
-    try:
-        # Check slug
-        if db.query(models.Organization).filter(models.Organization.slug == data.slug).first():
-            return JSONResponse({"detail": "Slug already exists"}, status_code=400)
-            
-        new_org = models.Organization(
-            id=str(uuid.uuid4()),
-            name=data.name,
-            slug=data.slug,
-            is_active=True,
-            created_at=datetime.datetime.utcnow()
-        )
-        db.add(new_org)
-        
-        # Auto-assign Creator as Admin provided they have a valid user ID
-        user_id = user.get("sub")
-        if user_id:
-            membership = models.OrganizationUser(
-                id=str(uuid.uuid4()),
-                organization_id=new_org.id,
-                user_id=user_id,
-                role="Admin"
-            )
-            db.add(membership)
-            
-            # Update Active Context
-            # We must find the user record to update last_active_org_id
-            u = db.query(AccountUser).filter(AccountUser.id == user_id).first()
-            # If not found by ID, try email (legacy/AppUser)
-            if not u:
-                u = db.query(AccountUser).filter(AccountUser.email == user.get("email")).first()
-                
-            if u:
-                u.last_active_org_id = new_org.id
-                u.last_active_org_role = "Admin"
-                db.add(u)
-
-        db.commit()
-        return {"status": "ok", "org_id": new_org.id, "message": "Organization created and set active."}
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
-
-@app.post("/api/set-active-org")
-async def set_active_org_global(data: dict = Body(...), user=Depends(get_current_active_user)):
-    # Helper to switch context without full login flow if just updating DB preference
-    # But usually frontend wants new token. Use /auth/select-org for token refresh.
-    # This endpoint just updates DB state for SuperAdmins who might force-switch?
-    # Use /auth/select-org logic instead for proper flow. 
-    # But user requested `POST /api/set-active-org`.
-    
-    org_id = data.get("org_id")
-    if not org_id: raise HTTPException(status_code=400)
-    
-    is_super = user.get("platform_role") == "super_admin" or user.get("role") == "SuperAdmin"
-    if not is_super: raise HTTPException(status_code=403)
-    
-    db = SessionCore()
-    try:
-        # Update user
-        u = db.query(AccountUser).filter(AccountUser.email == user.get("email")).first()
-        if u:
-            u.last_active_org_id = org_id
-            db.commit()
-            return {"status": "ok"}
-        raise HTTPException(status_code=404)
-    finally:
-        db.close()
-
-# --- Legacy Platform Routes (Keep for compatibility if needed, or redirect) ---
-# ... (Leaving existing platform routes as aliases or parallel)
+# --- Super Admin Platform Routes ---
 
 @app.get("/platform/dashboard", response_class=HTMLResponse)
 async def platform_dashboard(request: Request, user=Depends(get_current_active_user)):
@@ -485,44 +393,39 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         org_id, org_role, services = get_active_org_context(db, user)
         
         # SUPER ADMIN OVERRIDE
-        is_super_admin = user.email.lower() in SUPER_ADMIN_EMAILS
+        is_super_admin = user.email in SUPER_ADMIN_EMAILS
         if is_super_admin:
             org_role = "SuperAdmin"
 
-        # Robust ID Resolution
+        # Robust ID Resolution (Fix for AppUser missing 'id')
         real_user_id = getattr(user, "id", None)
         if not real_user_id:
             real_user_id = user.email
 
-        # Token Claims
+        # Token Claims (Standardized)
         claims = {
-            "sub": str(real_user_id),
+            "sub": str(real_user_id),   # Use UUID or Email as sub
             "email": user.email,
             "role": org_role if org_role else user.role, 
-            "platform_role": "super_admin" if is_super_admin else None,
+            "platform_role": "super_admin" if is_super_admin else None,  # used by API gates
             "org_id": org_id, 
             "services": services or []
         }
         
-        # Determine Status
+        # Determine Response Status
         status_response = "ok"
         redirect_url = "/dashboard" 
         
         if not org_id:
             if is_super_admin:
                 status_response = "ok"
-                redirect_url = "/dashboard" # Global Dashboard supports super admin now
+                redirect_url = "/platform/dashboard"
             else:
                 status_response = "select_org"
                 redirect_url = "/select-org"
             
-        # ACCESS TOKEN (Explicit Expiry)
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data=claims, 
-            audience=["somosao", "ao-platform"],
-            expires_delta=access_token_expires
-        )
+        # ACCESS TOKEN (Dual Audience for compatibility)
+        access_token = create_access_token(data=claims, audience=["somosao", "ao-platform"])
         
         # REFRESH TOKEN
         refresh_claims = {"sub": str(real_user_id), "email": user.email}
@@ -530,19 +433,17 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         
         response = JSONResponse({"status": status_response, "redirect": redirect_url, "user": {"id": str(real_user_id), "email": user.email}})
         
-        # COOKIE 1: Unified Access Token (Explicit Max-Age)
+        # COOKIE 1: Unified Access Token (accounts_access_token)
         response.set_cookie(
             key=ACCESS_COOKIE_NAME, 
             value=access_token, 
             httponly=True,
             samesite=COOKIE_SAMESITE,
             secure=COOKIE_SECURE, 
-            domain=COOKIE_DOMAIN,
-            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            expires=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            domain=COOKIE_DOMAIN
         )
 
-        # COOKIE 2: Legacy Access Token
+        # COOKIE 2: Legacy/Compat (access_token) - Share config
         response.set_cookie(
             key="access_token", 
             value=access_token, 
@@ -550,9 +451,7 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             samesite=COOKIE_SAMESITE,
             secure=COOKIE_SECURE, 
             domain=COOKIE_DOMAIN,
-            path="/",
-            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            expires=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            path="/"
         )
 
         # COOKIE 3: Refresh Token
@@ -729,96 +628,89 @@ async def logout():
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = Depends(get_current_active_user)):
-    if not user_jwt:
+    if not user_jwt: 
         print("DEBUG: Dashboard Redirecting to /login (No active user)")
         return RedirectResponse("/login")
-
+    
     print(f"DEBUG: Dashboard Access Granted for {user_jwt.get('email')}")
-
-    def _is_uuid(val: str) -> bool:
-        try:
-            uuid.UUID(str(val))
-            return True
-        except Exception:
-            return False
-
+    
     db = SessionCore()
-    try:
-        token_sub = user_jwt.get("sub")
-        token_email = (user_jwt.get("email") or "").strip().lower()
-        print(f"DEBUG: Lookup User ID: {token_sub} (Email fallback: {token_email})")
-
-        user_db = None
-
-        # 1) Prefer email lookup (most stable in your current token flow)
-        if token_email and hasattr(AccountUser, "email"):
-            user_db = db.query(AccountUser).filter(AccountUser.email == token_email).first()
-
-        # 2) Fallback to subject lookup ONLY if the ORM model actually has 'id'
-        if not user_db and token_sub and hasattr(AccountUser, "id"):
-            user_db = db.query(AccountUser).filter(AccountUser.id == token_sub).first()
-
-        # 3) Optional fallback: if model uses 'uuid' or 'user_id' as PK
-        if not user_db and token_sub and _is_uuid(token_sub):
-            if hasattr(AccountUser, "uuid"):
-                user_db = db.query(AccountUser).filter(AccountUser.uuid == token_sub).first()
-            elif hasattr(AccountUser, "user_id"):
-                user_db = db.query(AccountUser).filter(AccountUser.user_id == token_sub).first()
-
-        if not user_db:
-            print(f"DEBUG: DASHBOARD REDIRECT: token_sub={token_sub} token_email={token_email} reason=user_not_found_in_db")
-            return RedirectResponse("/login")
-
-        user_pk = getattr(user_db, "id", None) or getattr(user_db, "uuid", None) or getattr(user_db, "user_id", None)
-
-        view_context = {
-            "request": request,
-            "user": user_db,
-            "view_mode": "member",
-            "organizations": [],
-            "current_org": None,
-            "available_services": ["daily", "plans", "build", "clients", "plugin"],
-        }
-
-        # SUPER ADMIN VIEW
-        # Check explicit claim-based role OR Email Match
-        is_super = (getattr(user_db, "role", "") or "").lower() == "superadmin"
-        if not is_super and user_db.email.lower() in SUPER_ADMIN_EMAILS:
-            is_super = True
-            
-        if is_super:
-            if org_id:
-                target_org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
-                if target_org:
-                    view_context["view_mode"] = "org_admin"
-                    view_context["current_org"] = target_org
-            else:
-                view_context["view_mode"] = "super_admin"
-                view_context["organizations"] = db.query(models.Organization).all()
-
-        # ORG ADMIN VIEW
-        else:
-            membership = None
-            if user_pk and hasattr(models, "OrganizationUser"):
-                q = db.query(models.OrganizationUser).filter(
-                    models.OrganizationUser.user_id == str(user_pk),
-                    models.OrganizationUser.role == "Admin",
-                )
-                if org_id:
-                    q = q.filter(models.OrganizationUser.organization_id == org_id)
-                membership = q.first()
-
-            if membership:
-                view_context["view_mode"] = "org_admin"
-                view_context["current_org"] = membership.organization
-
-        return templates.TemplateResponse("dashboard.html", view_context)
-
-    finally:
+    # FIX: sub is UUID (id), not email.
+    user_id = user_jwt.get("sub")
+    user_email = user_jwt.get("email")
+    print(f"DEBUG: Lookup User ID: {user_id} (Email fallback: {user_email})")
+    
+    user_db = db.query(AccountUser).filter(AccountUser.id == user_id).first()
+    
+    if not user_db and user_email:
+        print(f"DEBUG: User not found by ID {user_id}, trying email {user_email}...")
+        user_db = db.query(AccountUser).filter(AccountUser.email == user_email).first()
+    
+    if not user_db:
+        print(f"DEBUG: DASHBOARD REDIRECT: token_sub={user_id} token_email={user_email} reason=user_not_found_in_db")
         db.close()
+        return RedirectResponse("/login")
 
+    view_context = {
+        "request": request,
+        "user": user_db,
+        "view_mode": "member", # member, org_admin, super_admin
+        "organizations": [],
+        "current_org": None,
+        # Updated Service List (Public Services)
+        "available_services": ["daily", "plans", "build", "clients", "plugin"]
+    }
 
+    # 1. SUPER ADMIN VIEW
+    if user_db.role == "SuperAdmin":
+        if org_id:
+            # Switch to Org Admin View for specific org
+            target_org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
+            if target_org:
+                view_context["view_mode"] = "org_admin"
+                view_context["current_org"] = target_org
+        else:
+            view_context["view_mode"] = "super_admin"
+            # Fetch all organizations with member counts
+            orgs = db.query(models.Organization).all()
+            view_context["organizations"] = orgs
 
+    # 2. ORG ADMIN VIEW (If not super admin, but IS an admin of a specific org)
+    else:
+        # distinct Logic: Find memberships where role='Admin'
+        # If org_id provided, check if member of THAT org
+        query = db.query(models.OrganizationUser).filter(
+            models.OrganizationUser.user_id == user_db.id,
+            models.OrganizationUser.role == "Admin"
+        )
+        
+        if org_id:
+             query = query.filter(models.OrganizationUser.organization_id == org_id)
+             
+        membership = query.first()
+        
+        if membership:
+            view_context["view_mode"] = "org_admin"
+            view_context["current_org"] = membership.organization
+        else:
+            # 3. STATIC MEMBER VIEW (Apps Launcher)
+            view_context["view_mode"] = "member"
+    
+    # db.close() # TemplateResponse might need lazy loads? 
+    # Better to eager load or keep session open if Jinja needs it?
+    # For safety with simple relationships, we can close if we eagerly loaded.
+    # But SqlAlchemy objects detach if session closes.
+    # We will close APTER template rendering? No, template response renders immediately? 
+    # Actually TemplateResponse is a background task wrapper effectively, but vars need to be ready.
+    # Let's simple query active objects into Pydantic or Dictionaries if issues arise.
+    # For now, let's keep database objects but we must be careful.
+    # Actually, fastAPI depends dependency closes DB session? 
+    # If using yield in get_db, yes. But here we manually opened SessionCore().
+    # We should NOT close it before return if we pass ORM objects that need lazy loading.
+    # But we should ensure it closes eventually.
+    # Hack: Convert to list/dict before closing.
+    
+    return templates.TemplateResponse("dashboard.html", view_context)
 
 # --- User Management API ---
 
@@ -985,23 +877,55 @@ async def manual_fix(user_jwt = Depends(get_current_admin)):
 
 @app.get("/setup_initial_admin")
 async def setup_admin():
+    """Bootstrap users for first-time deployment.
+
+    - Creates admin@somosao.com (role=Admin) if no users exist.
+    - Ensures superadmin@somosao.com (role=SuperAdmin) exists even if users already exist.
+      Password defaults to AO_BOOTSTRAP_SUPERADMIN_PASSWORD (or 'supertata123').
+    """
     db = SessionCore()
-    if db.query(AccountUser).count() > 0:
+    try:
+        users_count = db.query(AccountUser).count()
+
+        # Create the legacy admin only on a totally empty DB (keeps backwards-compat).
+        if users_count == 0:
+            admin = AccountUser(
+                id=str(uuid.uuid4()),
+                email="admin@somosao.com",
+                full_name="System Admin",
+                role="Admin",
+                hashed_password=get_password_hash("admin123"),
+                services_access={}
+            )
+            db.add(admin)
+
+        # Ensure a true platform SuperAdmin always exists.
+        super_email = BOOTSTRAP_SUPERADMIN_EMAIL
+        super_user = db.query(AccountUser).filter(AccountUser.email == super_email).first()
+        if not super_user:
+            super_user = AccountUser(
+                id=str(uuid.uuid4()),
+                email=super_email,
+                full_name="AO Super Admin",
+                role="SuperAdmin",
+                hashed_password=get_password_hash(BOOTSTRAP_SUPERADMIN_PASSWORD),
+                services_access={}
+            )
+            db.add(super_user)
+        else:
+            # Enforce role and (optionally) reset password to the bootstrap one.
+            super_user.role = "SuperAdmin"
+            if BOOTSTRAP_SUPERADMIN_PASSWORD:
+                super_user.hashed_password = get_password_hash(BOOTSTRAP_SUPERADMIN_PASSWORD)
+
+        db.commit()
+
+        if users_count == 0:
+            return "Initial users created: admin@somosao.com / admin123 AND superadmin@somosao.com / (from AO_BOOTSTRAP_SUPERADMIN_PASSWORD)"
+        return "SuperAdmin ensured: superadmin@somosao.com / (from AO_BOOTSTRAP_SUPERADMIN_PASSWORD)"
+    finally:
         db.close()
-        return "Admin already exists or users exist. Setup disabled."
-    
-    admin = AccountUser(
-        id=str(uuid.uuid4()),
-        email="admin@somosao.com",
-        full_name="System Admin",
-        role="Admin",
-        hashed_password=get_password_hash("admin123"),
-        services_access={}
-    )
-    db.add(admin)
-    db.commit()
-    db.close()
-    return "Initial admin created: admin@somosao.com / admin123"
+
 
 @app.get("/system/force_admin_reset")
 async def force_admin_reset():
@@ -1148,17 +1072,7 @@ async def refresh_token_endpoint(request: Request):
                 "services": services or []
             }
             
-            # Check for Super Admin (via Email or Role)
-            if user.email.lower() in SUPER_ADMIN_EMAILS:
-                 claims["platform_role"] = "super_admin"
-                 claims["role"] = "SuperAdmin" # Force upgrade
-            
-            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-            access_token = create_access_token(
-                data=claims, 
-                audience=["somosao", "ao-platform"],
-                expires_delta=access_token_expires
-            )
+            access_token = create_access_token(data=claims, audience=["somosao", "ao-platform"])
             
             response = JSONResponse({"status": "ok", "message": "Token refreshed", "org_id": org_id})
             
@@ -1169,9 +1083,7 @@ async def refresh_token_endpoint(request: Request):
                 httponly=True,
                 samesite=COOKIE_SAMESITE,
                 secure=COOKIE_SECURE, 
-                domain=COOKIE_DOMAIN,
-                max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-                expires=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+                domain=COOKIE_DOMAIN
             )
             
             # 2. Legacy access_token
@@ -1182,9 +1094,7 @@ async def refresh_token_endpoint(request: Request):
                 samesite=COOKIE_SAMESITE,
                 secure=COOKIE_SECURE,
                 domain=COOKIE_DOMAIN,
-                path="/",
-                max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-                expires=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+                path="/"
             )
             
             return response
@@ -1260,30 +1170,15 @@ async def select_organization(
         # 3. ISSUE NEW TOKEN
         org_id, org_role, services = _build_context(db, membership)
         
-        if not org_id:
-            pass
-
-        # 3. ISSUE NEW TOKEN
-        # Use existing context resolver
-        org_id, org_role, services = get_active_org_context(db, user)
-        
         claims = {
             "sub": user.id,
             "email": user.email,
             "role": org_role if org_role else user.role,
-            "org_id": org_id, # Updated ID
+            "org_id": org_id,
             "services": services or []
         }
         
-        if user.email in SUPER_ADMIN_EMAILS:
-             claims["platform_role"] = "super_admin"
-        
-        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            data=claims, 
-            audience=["somosao", "ao-platform"],
-            expires_delta=access_token_expires
-        )
+        access_token = create_access_token(data=claims, audience=["somosao", "ao-platform"])
         
         response = JSONResponse({"status": "ok", "message": "Organization selected"})
         
@@ -1293,9 +1188,7 @@ async def select_organization(
             httponly=True,
             samesite=COOKIE_SAMESITE,
             secure=COOKIE_SECURE, 
-            domain=COOKIE_DOMAIN,
-            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            expires=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            domain=COOKIE_DOMAIN
         )
         
         response.set_cookie(
@@ -1305,9 +1198,7 @@ async def select_organization(
             samesite=COOKIE_SAMESITE,
             secure=COOKIE_SECURE,
             domain=COOKIE_DOMAIN,
-            path="/",
-            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            expires=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+            path="/" 
         )
         return response
     finally:
