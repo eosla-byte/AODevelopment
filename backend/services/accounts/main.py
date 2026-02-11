@@ -68,6 +68,35 @@ from common.auth_constants import (
 # Configuration
 SUPER_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("AO_SUPER_ADMIN_EMAILS", "").split(",") if e.strip()] 
 
+import logging
+logger = logging.getLogger("uvicorn")
+
+# -----------------------------------------------------------------------------
+# ENTITLEMENTS VERIFICATION (Module Level)
+# -----------------------------------------------------------------------------
+is_prod = (
+    (os.getenv("RAILWAY_ENVIRONMENT_NAME", "") or "").lower() == "production"
+    or (os.getenv("AO_ENV", "") or "").lower() == "production"
+)
+
+if is_prod:
+    logger.info("[ENTITLEMENTS] Production: skipping auto-migration. Verifying schema...")
+    try:
+        from sqlalchemy import text
+        with SessionCore() as db_check:
+            db_check.execute(text("SELECT 1 FROM accounts_entitlements LIMIT 1"))
+        logger.info("[ENTITLEMENTS] Production: entitlements schema verified.")
+    except Exception as e:
+        logger.error(f"[ENTITLEMENTS] Production schema verification failed: {type(e).__name__}")
+        raise RuntimeError("Production schema invalid. Run migrations manually.") from e
+else:
+    logger.info("[ENTITLEMENTS] Non-prod: running auto-migration/seeding...")
+    try:
+        from common.db_migration_entitlements import run_entitlements_migration
+        run_entitlements_migration()
+    except Exception as e:
+        logger.warning(f"[ENTITLEMENTS] Auto-migration skipped or failed: {e}")
+
 # Initialize Templates
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -98,55 +127,10 @@ async def lifespan(app: FastAPI):
         # 2. Run Legacy Fixes
         run_db_fix()
         
-        # Production Hardening: Check for Migration Safety
-        env_name = os.getenv("RAILWAY_ENVIRONMENT_NAME", "") or os.getenv("AO_ENV", "")
-        # Treat as prod if 'production' OR 'prod' in name.
-        is_prod = "production" in env_name.lower() or "prod" in env_name.lower()
-        
-        if is_prod:
-             # In PROD, we assume migrations ran via CD pipeline or manual admin action.
-             # We just verify schema exists to fail fast if broken.
-             print("[ENTITLEMENTS] Prod: verifying schema only")
-             try:
-                 # Raw SQL Verify
-                 db.execute(text("SELECT 1 FROM accounts_entitlements LIMIT 1"))
-                 print("✅ [ENTITLEMENTS] Prod: schema verified")
-             except Exception as e:
-                 print(f"❌ [CRITICAL] Entitlements Migration MISSING in Prod! Error: {e}")
-                 # We SHOULD fail here if strict, but maybe legacy ignores it?
-                 # User said: "fail with explicit message if table missing"
-                 raise RuntimeError("Production Schema Missing: accounts_entitlements")
-        else:
-             print("[ENTITLEMENTS] Dev: running auto-migration")
-             try:
-                 # Lazy Import to avoid ModuleNotFoundError in Prod containers
-                 # Try multiple paths
-                 try:
-                     from common.db_migration_entitlements import run_entitlements_migration
-                 except ImportError:
-                     # If common is not in path directly, try backend.common
-                     import sys
-                     # Add backend root if not present (heuristic)
-                     backend_root = os.path.abspath(os.path.join(BASE_DIR, "../../.."))
-                     if backend_root not in sys.path:
-                         sys.path.append(backend_root)
-                     from backend.common.db_migration_entitlements import run_entitlements_migration
-                 
-                 run_entitlements_migration(db_url=os.getenv("CORE_DB_URL"))
-                 
-             except ImportError as ie:
-                 print(f"⚠️ [STARTUP] Could not import migration module: {ie}")
-                 print("Assuming schema exists or will be managed externally.")
-             except Exception as e:
-                 print(f"⚠️ [STARTUP] Migration Warning: {e}")
-                 # Don't crash dev for this, just warn
-
     except Exception as e:
         print(f"❌ [STARTUP] FATAL ERROR: {e}")
         import traceback
         traceback.print_exc()
-        # In PROD, we might want to crash container so it restarts?
-        # User said "Fix immediately"
         raise e
     finally:
         if db:
@@ -154,30 +138,6 @@ async def lifespan(app: FastAPI):
             
     yield
     print("🛑 [SHUTDOWN] Application stopping...")
-                 # If table missing, this throws OperationalError
-                 with SessionCore() as db_check: # Use a new session for this check
-                     db_check.execute(text("SELECT 1 FROM accounts_entitlements LIMIT 1"))
-                 print("[STARTUP] Schema Verification Passed.")
-             except Exception as e:
-                 print(f"❌ [STARTUP] CRITICAL: Entitlements Schema Missing in Production! Error: {e}")
-                 # We might want to raise SystemExit here, but let's log critical for now.
-                 # raise e 
-        else:
-            # In DEV/TEST, auto-migrate for convenience
-            print("[STARTUP] Dev Mode: Running Auto-Migrations...")
-            run_entitlements_migration()
-
-    except Exception as e:
-        print(f"❌ [CRITICAL] Startup Check Failed: {e}")
-        # We allow startup to fail if DB is missing critical tables?
-        # Yes, prompt says "raise RuntimeError".
-        raise RuntimeError(f"Startup Failed: {e}")
-    finally:
-        if db:
-            db.close()
-        
-    yield
-    # Shutdown logic if needed
 
 app = FastAPI(title="AO Accounts Service", lifespan=lifespan)
 
