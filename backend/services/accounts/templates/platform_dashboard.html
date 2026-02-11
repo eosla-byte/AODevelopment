@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Platform Admin - AO Accounts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #fff;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1
+                    class="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+                    Platform Admin
+                </h1>
+                <p class="text-slate-400">Super Admin Dashboard</p>
+            </div>
+            <a href="/dashboard" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm transition">
+                Ir al Dashboard Regular
+            </a>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Create Organization -->
+            <div class="glass-panel p-6 rounded-2xl">
+                <h2 class="text-xl font-semibold mb-4 text-blue-300">Crear Nueva Organización</h2>
+                <form id="createOrgForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Nombre de la Organización</label>
+                        <input type="text" name="name" required
+                            class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 text-white"
+                            placeholder="Ej: Mi Empresa">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Slug (Identificador)</label>
+                        <input type="text" name="slug" required
+                            class="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-blue-500 text-white"
+                            placeholder="Ej: mi-empresa">
+                        <p class="text-xs text-slate-500 mt-1">Usado en URLs. Solo letras minúsculas, números y guiones.
+                        </p>
+                    </div>
+                    <button type="submit"
+                        class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-500 rounded-lg font-semibold text-white transition">
+                        Crear Organización
+                    </button>
+                </form>
+                <p id="msg" class="mt-4 text-sm text-center hidden"></p>
+            </div>
+
+            <!-- Existing Organizations -->
+            <div class="glass-panel p-6 rounded-2xl">
+                <h2 class="text-xl font-semibold mb-4 text-purple-300">Organizaciones Existentes</h2>
+                <div id="orgList" class="space-y-2 max-h-96 overflow-y-auto">
+                    <p class="text-slate-500 text-sm italic">Cargando...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load existing orgs
+        async function loadOrgs() {
+            try {
+                const res = await fetch('/api/platform/orgs');
+                if (!res.ok) throw new Error('Failed to load');
+                const orgs = await res.json();
+
+                const container = document.getElementById('orgList');
+                container.innerHTML = '';
+
+                if (orgs.length === 0) {
+                    container.innerHTML = '<p class="text-slate-500 text-sm">No hay organizaciones creadas.</p>';
+                    return;
+                }
+
+                orgs.forEach(org => {
+                    const el = document.createElement('div');
+                    el.className = 'p-3 bg-slate-800/50 rounded-lg border border-slate-700 flex justify-between items-center';
+                    el.innerHTML = `
+                        <div>
+                            <div class="font-medium">${org.name}</div>
+                            <div class="text-xs text-slate-400">${org.slug}</div>
+                        </div>
+                        <button onclick="setActiveOrg('${org.id}')" class="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 rounded text-slate-300">
+                            Set Active
+                        </button>
+                    `;
+                    container.appendChild(el);
+                });
+            } catch (err) {
+                document.getElementById('orgList').innerHTML = '<p class="text-red-400 text-sm">Error cargando organizaciones.</p>';
+            }
+        }
+
+        // Set Active Org
+        async function setActiveOrg(orgId) {
+            try {
+                const res = await fetch('/api/platform/set-active-org', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ org_id: orgId })
+                });
+                if (res.ok) {
+                    window.location.href = '/dashboard';
+                } else {
+                    alert('Error setting active org');
+                }
+            } catch (e) {
+                alert('Error de conexión');
+            }
+        }
+
+        loadOrgs();
+
+        // Create Org
+        document.getElementById('createOrgForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            const msg = document.getElementById('msg');
+
+            try {
+                const res = await fetch('/api/platform/orgs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    msg.className = "mt-4 text-sm text-center text-green-400";
+                    msg.innerText = "Organización creada exitosamente. Redirigiendo...";
+                    msg.classList.remove('hidden');
+                    setTimeout(() => window.location.href = '/dashboard', 1500);
+                } else {
+                    msg.className = "mt-4 text-sm text-center text-red-400";
+                    msg.innerText = result.detail || "Error al crear organización";
+                    msg.classList.remove('hidden');
+                }
+            } catch (err) {
+                msg.className = "mt-4 text-sm text-center text-red-400";
+                msg.innerText = "Error de conexión";
+                msg.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+
+</html>

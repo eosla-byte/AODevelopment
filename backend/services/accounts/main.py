@@ -63,6 +63,9 @@ from common.auth_constants import (
     COOKIE_SECURE
 ) 
 
+# Configuration
+SUPER_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("AO_SUPER_ADMIN_EMAILS", "").split(",") if e.strip()] 
+
 # Initialize Templates
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -269,6 +272,101 @@ async def login_page(request: Request):
 async def select_org_page(request: Request):
     return templates.TemplateResponse("select_org.html", {"request": request})
 
+# --- Super Admin Platform Routes ---
+
+@app.get("/platform/dashboard", response_class=HTMLResponse)
+async def platform_dashboard(request: Request, user=Depends(get_current_active_user)):
+    # Simple check
+    if not user or user.get("platform_role") != "super_admin":
+        return RedirectResponse("/")
+    return templates.TemplateResponse("platform_dashboard.html", {"request": request})
+
+class CreateOrgSchema(pydantic.BaseModel):
+    name: str
+    slug: str
+
+@app.get("/api/platform/orgs")
+async def list_orgs(user=Depends(get_current_active_user)):
+    if not user or user.get("platform_role") != "super_admin":
+        raise HTTPException(status_code=403)
+    
+    db = SessionCore()
+    try:
+        orgs = db.query(models.Organization).all()
+        return [{"id": o.id, "name": o.name, "slug": o.slug} for o in orgs]
+    finally:
+        db.close()
+
+@app.post("/api/platform/orgs")
+async def create_org(data: CreateOrgSchema, user=Depends(get_current_active_user)):
+    if not user or user.get("platform_role") != "super_admin":
+        raise HTTPException(status_code=403)
+        
+    db = SessionCore()
+    try:
+        # Check slug
+        existing = db.query(models.Organization).filter(models.Organization.slug == data.slug).first()
+        if existing:
+            return JSONResponse({"detail": "Slug already exists"}, status_code=400)
+            
+        new_org = models.Organization(
+            id=str(uuid.uuid4()),
+            name=data.name,
+            slug=data.slug,
+            is_active=True,
+            created_at=datetime.datetime.utcnow()
+        )
+        db.add(new_org)
+        
+        # Add User as Admin if OrganizationUser model exists
+        if hasattr(models, "OrganizationUser"):
+             current_user_id = user.get("sub")
+             membership = models.OrganizationUser(
+                id=str(uuid.uuid4()),
+                organization_id=new_org.id,
+                user_id=current_user_id,
+                role="Admin"
+             )
+             db.add(membership)
+        
+        # Update user last_active_org_id
+        try:
+             u = db.query(AccountUser).filter(AccountUser.email == user.get("email")).first()
+             if u:
+                 u.last_active_org_id = new_org.id
+                 u.last_active_org_role = "Admin"
+                 db.add(u)
+        except Exception:
+            pass
+            
+        db.commit()
+        return {"status": "ok", "org_id": new_org.id}
+    except Exception as e:
+        db.rollback()
+        print(f"Create Org Failed: {e}")
+        return JSONResponse({"detail": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+@app.post("/api/platform/set-active-org")
+async def set_active_org(data: dict = Body(...), user=Depends(get_current_active_user)):
+    if not user: raise HTTPException(status_code=401)
+    
+    org_id = data.get("org_id")
+    if not org_id: return JSONResponse({"detail": "Missing org_id"}, status_code=400)
+    
+    db = SessionCore()
+    try:
+        u = db.query(AccountUser).filter(AccountUser.email == user.get("email")).first()
+        if u:
+            # If SuperAdmin, allow loop setting
+            u.last_active_org_id = org_id
+            db.commit()
+            return {"status": "ok"}
+        return JSONResponse({"detail": "User not found"}, status_code=404)
+    finally:
+        db.close()
+
 @app.post("/auth/login")
 async def login_action(email: str = Form(...), password: str = Form(...)):
     # print(f"Login Attempt: '{email}'")
@@ -288,6 +386,11 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         # ORG CONTEXT RESOLUTION
         org_id, org_role, services = get_active_org_context(db, user)
         
+        # SUPER ADMIN OVERRIDE
+        is_super_admin = user.email in SUPER_ADMIN_EMAILS
+        if is_super_admin:
+            org_role = "SuperAdmin"
+
         # Robust ID Resolution (Fix for AppUser missing 'id')
         real_user_id = getattr(user, "id", None)
         if not real_user_id:
@@ -298,6 +401,7 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
             "sub": str(real_user_id),   # Use UUID or Email as sub
             "email": user.email,
             "role": org_role if org_role else user.role, 
+            "platform_role": "super_admin" if is_super_admin else None,
             "org_id": org_id, 
             "services": services or []
         }
@@ -307,8 +411,12 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         redirect_url = "/dashboard" 
         
         if not org_id:
-            status_response = "select_org"
-            redirect_url = "/select-org"
+            if is_super_admin:
+                status_response = "ok"
+                redirect_url = "/platform/dashboard"
+            else:
+                status_response = "select_org"
+                redirect_url = "/select-org"
             
         # ACCESS TOKEN (Dual Audience for compatibility)
         access_token = create_access_token(data=claims, audience=["somosao", "ao-platform"])
