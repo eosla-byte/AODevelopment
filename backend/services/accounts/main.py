@@ -182,57 +182,74 @@ def get_active_org_context(db, user: "AccountUser"):
     """
     Determines the active organization context for a user.
     Returns: (org_id, role, services_list) or (None, None, [])
-    Robust against missing OrganizationUser model.
+    Robust against missing OrganizationUser model AND missing User attributes.
     """
     
-    # 1. Determine Org ID
-    # Prioritize last active, then fallback to user's primary org if schema supports it
+    # 1. Determine Org ID (Safe Access)
     org_id = getattr(user, "last_active_org_id", None)
     if not org_id:
         org_id = getattr(user, "organization_id", None)
-        
-    # 2. Determine Role
-    # Fallback to user.role if specific org role not found (or schema missing)
+    
+    # 2. Determine Role (Safe Access)
     org_role = getattr(user, "last_active_org_role", None)
     if not org_role:
         org_role = getattr(user, "role", "Member")
-        
-    # 3. Determine Services
+    
+    # 3. Determine Services (Safe Access & Multi-Type Support)
     services = []
     
-    # Try to fetch Org Services if model exists and we have an ID
-    if org_id and hasattr(models, "Organization"):
-        try:
-            org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
-            if org:
-                # If Org has specific enabled services, use them.
-                # Otherwise fallback to User entitlements.
-                # For now, let's assume we want the INTERSECTION of User Access & Org Features?
-                # Or just User Access? 
-                # Start with User Access as base (legacy behavior)
-                pass 
-        except Exception:
-            pass
-
-    # Default to User Global Access
-    # Logic: If user has access to a service globally, they can use it in context of the Org
-    # unless Org specifically disables it (which we aren't checking vigorously yet due to schema flux).
-    if user.services_access:
-        services = [k for k, v in user.services_access.items() if v]
+    # Candidates: services_access (dict usually), services (list usually)
+    services_raw = getattr(user, "services_access", None)
+    if not services_raw:
+        # Fallback to 'services' attribute if exists
+        services_raw = getattr(user, "services", None)
         
-        # Normalize keys to lowercase slugs
-        slug_map = {
-            "AODailyWork": "daily",
-            "AOPlanSystem": "bim",
-            "AOBuild": "build",
-            "AO Clients": "portal",
-            "AOdev": "plugin",
-            "AO HR & Finance": "finance"
-        }
-        services = [slug_map.get(s, s.lower()) for s in services]
+    if services_raw:
+        if isinstance(services_raw, dict):
+            # If dict, assume {slug: bool} and take True ones
+            services = [k for k, v in services_raw.items() if v]
+        elif isinstance(services_raw, (list, tuple, set)):
+            services = list(services_raw)
+        elif isinstance(services_raw, str):
+            services = [services_raw]
+            
+    # Normalize keys to lowercase slugs
+    slug_map = {
+        "AODailyWork": "daily",
+        "AOPlanSystem": "bim",
+        "AOBuild": "build",
+        "AO Clients": "portal",
+        "AOdev": "plugin",
+        "AO HR & Finance": "finance"
+    }
+
+    # Helper to map slugs
+    def map_slug(s):
+        return slug_map.get(s, s.lower())
+
+    if services:
+        services = [map_slug(s) for s in services]
+    else:
+        # Optional: Try to fetch Org Services if User has no explicit services
+        if org_id and hasattr(models, "Organization"):
+            try:
+                org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
+                if org:
+                    # check org.services or org.enabled_services
+                    org_s = getattr(org, "services", None) or getattr(org, "enabled_services", None)
+                    if org_s:
+                        if isinstance(org_s, dict):
+                            services = [map_slug(k) for k, v in org_s.items() if v]
+                        elif isinstance(org_s, (list, tuple, set)):
+                            services = [map_slug(s) for s in org_s]
+                        elif isinstance(org_s, str):
+                            services = [map_slug(org_s)]
+            except Exception:
+                pass
 
     # Log Resolution
-    print(f"[ACCOUNTS] Active org resolved: org_id={org_id}, org_role={org_role}, services_count={len(services)}")
+    user_email = getattr(user, "email", "unknown")
+    print(f"[ACCOUNTS] Active org resolved: user={user_email}, org_id={org_id}, org_role={org_role}, services_count={len(services)}")
     
     return org_id, org_role, services
 
