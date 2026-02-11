@@ -77,14 +77,18 @@
                 });
                 const data = await res.json();
 
-                if (data.status === 'ok') {
-                    window.location.href = data.redirect;
+                // SUCCESS: Check for explicit success status OR presence of redirect URL
+                // Backend returns status='select_org' + redirect='/select-org' when no active project context.
+                if (data.status === 'ok' || data.status === 'select_org' || data.redirect) {
+                    window.location.href = data.redirect || "/dashboard";
                 } else {
-                    errDiv.innerText = data.message;
+                    // ERROR: Show message or fallback
+                    errDiv.innerText = data.message || "Credenciales inválidas o error al iniciar sesión.";
                     errDiv.classList.remove('hidden');
                 }
             } catch (err) {
-                errDiv.innerText = "Error de conexión";
+                console.error(err);
+                errDiv.innerText = "Error de conexión. Intenta de nuevo.";
                 errDiv.classList.remove('hidden');
             }
         });
