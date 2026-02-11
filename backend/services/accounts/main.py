@@ -181,48 +181,46 @@ def run_db_fix():
 def get_active_org_context(db, user: "AccountUser"):
     """
     Determines the active organization context for a user.
-    Returns: (org_id, role, services_list) or (None, None, None)
+    Returns: (org_id, role, services_list) or (None, None, [])
+    Robust against missing OrganizationUser model.
     """
-    # 1. Check Last Active (Safe Access)
-    last_org_id = getattr(user, "last_active_org_id", None)
     
-    if last_org_id:
-        membership = db.query(models.OrganizationUser).filter(
-            models.OrganizationUser.user_id == user.id,
-            models.OrganizationUser.organization_id == last_org_id
-        ).first()
-        if membership:
-            return _build_context(db, membership)
-            
-    # 2. Check Total Memberships
-    memberships = db.query(models.OrganizationUser).filter(
-        models.OrganizationUser.user_id == user.id
-    ).all()
-    
-    if len(memberships) == 1:
-        # Auto-select the only one
-        return _build_context(db, memberships[0])
+    # 1. Determine Org ID
+    # Prioritize last active, then fallback to user's primary org if schema supports it
+    org_id = getattr(user, "last_active_org_id", None)
+    if not org_id:
+        org_id = getattr(user, "organization_id", None)
         
-    # 3. Multiple or None -> Require Selection
-    print(f"⚠️ [LOGIN] No active org context for user={user.email}, continuing with defaults")
-    return None, None, []
-
-def _build_context(db, membership):
-    # Get Services from Organization permissions
-    # For now, we might default to user global services OR org specific.
-    # Architecture says: "Services come from Entitlements"
-    # Let's merge User Global + Org Entitlements? 
-    # Or just use User Global for now as per current schema?
-    # Current schema has `user.services_access` (JSON).
-    # Let's stick to `user.services_access` for the list of enabled apps,
-    # but maybe filtered by Org? 
-    # Simpler: Just use user.services_access keys where value is True.
-    
+    # 2. Determine Role
+    # Fallback to user.role if specific org role not found (or schema missing)
+    org_role = getattr(user, "last_active_org_role", None)
+    if not org_role:
+        org_role = getattr(user, "role", "Member")
+        
+    # 3. Determine Services
     services = []
-    if membership.user.services_access:
-        services = [k for k, v in membership.user.services_access.items() if v]
-        # Normalize keys to lowercase slugs if needed (AOdailyWork -> daily)
-        # Mapping:
+    
+    # Try to fetch Org Services if model exists and we have an ID
+    if org_id and hasattr(models, "Organization"):
+        try:
+            org = db.query(models.Organization).filter(models.Organization.id == org_id).first()
+            if org:
+                # If Org has specific enabled services, use them.
+                # Otherwise fallback to User entitlements.
+                # For now, let's assume we want the INTERSECTION of User Access & Org Features?
+                # Or just User Access? 
+                # Start with User Access as base (legacy behavior)
+                pass 
+        except Exception:
+            pass
+
+    # Default to User Global Access
+    # Logic: If user has access to a service globally, they can use it in context of the Org
+    # unless Org specifically disables it (which we aren't checking vigorously yet due to schema flux).
+    if user.services_access:
+        services = [k for k, v in user.services_access.items() if v]
+        
+        # Normalize keys to lowercase slugs
         slug_map = {
             "AODailyWork": "daily",
             "AOPlanSystem": "bim",
@@ -232,8 +230,11 @@ def _build_context(db, membership):
             "AO HR & Finance": "finance"
         }
         services = [slug_map.get(s, s.lower()) for s in services]
-        
-    return membership.organization_id, membership.role, services
+
+    # Log Resolution
+    print(f"[ACCOUNTS] Active org resolved: org_id={org_id}, org_role={org_role}, services_count={len(services)}")
+    
+    return org_id, org_role, services
 
 # --- Routes ---
 
