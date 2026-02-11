@@ -11,54 +11,49 @@ Base = declarative_base()
 # -----------------------------------------------------------------------------
 
 class Project(Base):
-    __tablename__ = 'resources_projects'
-    # __table_args__ = {'schema': 'resources'} # Commented for SQLite compatibility
+    __tablename__ = 'bim_projects'
+    # __table_args__ = {'schema': 'public'} 
 
     id = Column(String, primary_key=True) # Custom ID or UUID
     name = Column(String, nullable=False)
-    client = Column(String)
-    status = Column(String, default="Activo")
-    nit = Column(String)
-    legal_name = Column(String)
-    po_number = Column(String)
-    amount = Column(Float, default=0.0)
-    paid_amount = Column(Float, default=0.0)
-    emoji = Column(String, default="📁")
-    category = Column(String, default="Residencial")
-    square_meters = Column(Float, default=0.0)
-    start_date = Column(String) # ISO String
-    duration_months = Column(Float, default=0.0)
-    additional_time_months = Column(Float, default=0.0)
-    archived = Column(Boolean, default=False)
-
+    description = Column(Text, nullable=True) # Added to match bim_projects
+    status = Column(String, default="Active")
+    created_at = Column(DateTime, server_default=func.now())
+    
     # Core Project Profile Fields
     organization_id = Column(String, ForeignKey('accounts_organizations.id', ondelete="CASCADE"), nullable=False, index=True)
-    project_cost = Column(Float, default=0.0)
-    sq_meters = Column(Float, default=0.0)
-    ratio = Column(Float, default=0.0)
-    estimated_time = Column(String)
-    
-    # Financial metrics
-    projected_profit_margin = Column(Float, default=0.0)
-    real_profit_margin = Column(Float, default=0.0)
-    
-    # JSON Fields for flexible data
-    acc_config = Column(JSON, default={})
-    partners_config = Column(JSON, default={})
-    files_meta = Column(JSON, default={})
-    reminders = Column(JSON, default=[])   
-    assigned_collaborators = Column(JSON, default={}) # {collab_id: percentage}
-    
-    # Estimation Data (Resources, Financial Config)
-    estimation_data = Column(JSON, default={})
-    
+
+    # LEGACY FIELDS (Commented out as they do not exist in bim_projects)
+    # client = Column(String)
+    # nit = Column(String)
+    # legal_name = Column(String)
+    # po_number = Column(String)
+    # amount = Column(Float, default=0.0)
+    # paid_amount = Column(Float, default=0.0)
+    # emoji = Column(String, default="📁")
+    # category = Column(String, default="Residencial")
+    # square_meters = Column(Float, default=0.0)
+    # start_date = Column(String) 
+    # duration_months = Column(Float, default=0.0)
+    # additional_time_months = Column(Float, default=0.0)
+    # archived = Column(Boolean, default=False)
+    # project_cost = Column(Float, default=0.0)
+    # sq_meters = Column(Float, default=0.0)
+    # ratio = Column(Float, default=0.0)
+    # estimated_time = Column(String)
+    # projected_profit_margin = Column(Float, default=0.0)
+    # real_profit_margin = Column(Float, default=0.0)
+    # acc_config = Column(JSON, default={})
+    # partners_config = Column(JSON, default={})
+    # files_meta = Column(JSON, default={})
+    # reminders = Column(JSON, default=[])   
+    # assigned_collaborators = Column(JSON, default={})
+    # estimation_data = Column(JSON, default={})
+    # created_by = Column(String, ForeignKey("accounts_users.id"), nullable=True, index=True) # Temporarily commented unless confirmed in DB
+
     # Relationships
     timeline_events = relationship("TimelineEvent", back_populates="project")
     organization = relationship("Organization", back_populates="projects")
-    
-    # Audit
-    created_at = Column(DateTime, server_default=func.now())
-    created_by = Column(String, ForeignKey("accounts_users.id"), nullable=True, index=True) # User ID UUID
 
 class TimelineEvent(Base):
     __tablename__ = 'resources_timeline_events'
@@ -77,19 +72,6 @@ class TimelineEvent(Base):
 # UPDATE ORGANIZATION with relationship (at the end of file or wherever Organization is defined)
 # I need to find Organization definition to update it.
 # It was around line 435 in previous view.
-
-
-class TimelineEvent(Base):
-    __tablename__ = 'resources_timeline_events'
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    project_id = Column(String, ForeignKey('resources_projects.id'))
-    type = Column(String)
-    date = Column(String)
-    filename = Column(String)
-    category = Column(String)
-    
-    project = relationship("Project", back_populates="timeline_events")
 
 class Collaborator(Base):
     __tablename__ = 'resources_collaborators'
@@ -352,18 +334,18 @@ class BimUser(Base):
     
     organization = relationship("BimOrganization", back_populates="users")
 
-class BimProject(Base):
-    __tablename__ = 'bim_projects'
-    
-    id = Column(String, primary_key=True) # UUID
-    organization_id = Column(String, ForeignKey('bim_organizations.id'))
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    status = Column(String, default="Active")
-    settings = Column(JSON, default={}) # Project settings (e.g. valid companies, colors)
-    created_at = Column(DateTime, default=func.now())
-    
-    organization = relationship("BimOrganization", back_populates="projects")
+# class BimProject(Base):
+#     __tablename__ = 'bim_projects'
+#     
+#     id = Column(String, primary_key=True) # UUID
+#     organization_id = Column(String, ForeignKey('bim_organizations.id'))
+#     name = Column(String, nullable=False)
+#     description = Column(Text)
+#     status = Column(String, default="Active")
+#     settings = Column(JSON, default={}) # Project settings (e.g. valid companies, colors)
+#     created_at = Column(DateTime, default=func.now())
+#     
+#     organization = relationship("BimOrganization", back_populates="projects")
 
 # -----------------------------------------------------------------------------
 # SCHEMA: BIM SCHEDULE MODULE

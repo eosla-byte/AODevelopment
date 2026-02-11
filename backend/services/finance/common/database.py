@@ -111,8 +111,9 @@ def get_projects(archived: bool = False) -> List[models.Project]:
     db = SessionLocal()
     try:
         # Filter out 'Analisis' (Estimations) from standard project list
+        # Filter status if it exists, otherwise get all
+        # To be safe, try/except or assume status exists (it does in bim_projects)
         projects = db.query(models.Project).filter(
-            models.Project.archived == archived,
             models.Project.status != "Analisis" 
         ).all()
         
@@ -121,31 +122,12 @@ def get_projects(archived: bool = False) -> List[models.Project]:
             p.files = {cat: [] for cat in SCAN_CATEGORIES.keys()}
             
             # Safeguard numeric fields
-            if p.amount is None: p.amount = 0.0
-            if p.paid_amount is None: p.paid_amount = 0.0
-            if p.duration_months is None: p.duration_months = 0.0
-            if p.additional_time_months is None: p.additional_time_months = 0.0
-
-            # Populate Events from Files Meta
-            events = []
-            if p.files_meta and isinstance(p.files_meta, dict):
-                for cat, files in p.files_meta.items():
-                    if isinstance(files, dict):
-                        for fname, meta in files.items():
-                            if isinstance(meta, dict):
-                                date_str = meta.get("date", "")
-                                # If no date, maybe we shouldn't show it on timeline? 
-                                # Or show at start date?
-                                # Let's try to parse or keep empty.
-                                # The template JS handles date parsing.
-                                if date_str:
-                                    events.append({
-                                        "type": "file",
-                                        "date": date_str,
-                                        "category": cat,
-                                        "filename": fname
-                                    })
-            p.events = events
+            p.amount = 0.0
+            p.paid_amount = 0.0
+            p.duration_months = 0.0
+            p.additional_time_months = 0.0
+            p.files_meta = {}
+            p.events = []
             
             db.expunge(p)
         return projects
@@ -156,24 +138,8 @@ def get_projects(archived: bool = False) -> List[models.Project]:
         db.close()
 
 def update_project_profit_config(project_id: str, projected: float, real: float, partners: dict) -> bool:
-    db = SessionLocal()
-    try:
-        proj = db.query(models.Project).filter(models.Project.id == project_id).first()
-        if not proj: return False
-        
-        proj.projected_profit_margin = projected
-        proj.real_profit_margin = real
-        proj.partners_config = partners
-        flag_modified(proj, "partners_config")
-        
-        db.commit()
-        return True
-    except Exception as e:
-        print(f"Error update_project_profit_config: {e}")
-        db.rollback()
-        return False
-    finally:
-        db.close()
+    # Deprecated
+    return True
 
 def get_project_details(project_id: str) -> Optional[models.Project]:
     db = SessionLocal()
@@ -184,76 +150,21 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
             
         proj.files = {cat: [] for cat in SCAN_CATEGORIES.keys()}
         
-        # SAFEGUARDS for JSON attributes (Ensure correct Types)
-        if proj.reminders is None or not isinstance(proj.reminders, list): 
-            proj.reminders = []
-            
-        if proj.acc_config is None or not isinstance(proj.acc_config, dict): 
-            proj.acc_config = {}
-            
-        if proj.partners_config is None or not isinstance(proj.partners_config, dict): 
-            proj.partners_config = {}
-            
-        if proj.assigned_collaborators is None or not isinstance(proj.assigned_collaborators, dict): 
-            proj.assigned_collaborators = {}
-            
-        if proj.files_meta is None or not isinstance(proj.files_meta, dict): 
-            proj.files_meta = {}
+        # MOCK LEGACY ATTRIBUTES
+        proj.reminders = []
+        proj.acc_config = {}
+        proj.partners_config = {}
+        proj.assigned_collaborators = {}
+        proj.files_meta = {}
 
-        # SAFEGUARDS for Numeric Fields (Ensure Float)
-        if proj.amount is None: proj.amount = 0.0
-        if proj.paid_amount is None: proj.paid_amount = 0.0
-        if proj.square_meters is None: proj.square_meters = 0.0
-        if proj.projected_profit_margin is None: proj.projected_profit_margin = 0.0
-        if proj.real_profit_margin is None: proj.real_profit_margin = 0.0
-        if proj.duration_months is None: proj.duration_months = 0.0
-        if proj.additional_time_months is None: proj.additional_time_months = 0.0
-
-        # CALCULATE FINANCIAL METRICS FROM METADATA
-        cat_totals = {}
-        for cat in SCAN_CATEGORIES.keys():
-            cat_totals[cat] = 0.0
-
-        if proj.files_meta:
-            for cat, files_dict in proj.files_meta.items():
-                if isinstance(files_dict, dict):
-                    current_sum = 0.0
-                    # Ensure category exists in files dict (though initialized above, safety check)
-                    if cat not in proj.files:
-                        proj.files[cat] = []
-
-                    for fname, meta in files_dict.items():
-                        if isinstance(meta, dict):
-                            # Populate File Object for UI
-                            file_obj = {
-                                "name": fname,
-                                "amount": 0.0,
-                                "note": meta.get("note", ""),
-                                "date": meta.get("date", "")
-                            }
-                            
-                            try:
-                                val = float(meta.get("amount", 0.0))
-                                current_sum += val
-                                file_obj["amount"] = val
-                            except: pass
-                            
-                            proj.files[cat].append(file_obj)
-                    
-                    if cat in cat_totals:
-                         cat_totals[cat] = current_sum
-                    else:
-                         cat_totals[cat] = current_sum
-
-        proj.cat_totals = cat_totals 
-        
-        # Override paid_amount with calculated if we rely on files, 
-        # or should we respect DB if files are empty?
-        # Logic says: Recalculate from files if available.
-        # But 'payments' usually come from files in "Pagos".
-        proj.paid_amount = cat_totals.get("Pagos", 0.0)
-        proj.total_iva_paid = cat_totals.get("Impuestos_IVA", 0.0)
-        proj.total_isr_paid = cat_totals.get("Impuestos_ISR", 0.0)
+        proj.amount = 0.0
+        proj.paid_amount = 0.0
+        proj.square_meters = 0.0
+        proj.projected_profit_margin = 0.0
+        proj.real_profit_margin = 0.0
+        proj.duration_months = 0.0
+        proj.additional_time_months = 0.0
+        proj.cat_totals = {}
         
         db.expunge(proj)
         return proj
@@ -261,37 +172,9 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
         db.close()
 
 def create_project(name: str, client: str = "", nit: str = "", legal_name: str = "", po_number: str = "", amount: float = 0.0, status: str = "Activo", emoji: str = "📁", custom_id: str = None, category: str = "Residencial") -> bool:
-    db = SessionLocal()
-    try:
-        if custom_id:
-            new_id = custom_id
-        else:
-            new_id = str(int(datetime.datetime.now().timestamp()))
-            
-        new_proj = models.Project(
-            id=new_id,
-            name=name,
-            client=client,
-            nit=nit,
-            legal_name=legal_name,
-            po_number=po_number,
-            amount=amount,
-            status=status,
-            emoji=emoji,
-            category=category,
-            start_date=datetime.datetime.now().isoformat()
-        )
-        db.add(new_proj)
-        db.commit()
-            
-        return True
-    except Exception as e:
-        print(f"Error create_project: {e}")
-        db.rollback()
-        return False
-
-    finally:
-        db.close()
+    # Legacy Create - No-op
+    pass
+    return True
 
 def get_project_stats_by_category():
     """
@@ -371,22 +254,22 @@ def update_project_meta(project_id: str, new_client: str, new_status: str, nit: 
         proj = db.query(models.Project).filter(models.Project.id == project_id).first()
         if not proj: return False
         
-        proj.client = new_client
+        # proj.client = new_client
         proj.status = new_status
-        proj.nit = nit
-        proj.legal_name = legal_name
-        proj.po_number = po_number
-        proj.amount = amount
-        proj.emoji = emoji
-        proj.start_date = start_date
-        proj.duration_months = duration_months
-        proj.additional_time_months = additional_time_months
-        proj.paid_amount = paid_amount
-        proj.square_meters = square_meters
-        proj.category = category
-        proj.archived = archived
-        if acc_config:
-            proj.acc_config = acc_config
+        # proj.nit = nit
+        # proj.legal_name = legal_name
+        # proj.po_number = po_number
+        # proj.amount = amount
+        # proj.emoji = emoji
+        # proj.start_date = start_date
+        # proj.duration_months = duration_months
+        # proj.additional_time_months = additional_time_months
+        # proj.paid_amount = paid_amount
+        # proj.square_meters = square_meters
+        # proj.category = category
+        # proj.archived = archived
+        # if acc_config:
+        #     proj.acc_config = acc_config
             
         db.commit()
         return True

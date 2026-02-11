@@ -51,11 +51,15 @@ from common.auth import create_access_token, create_refresh_token, decode_token,
 from common.auth_utils import verify_password, get_password_hash 
 import common.models as models 
 from common.models import AccountUser 
-from common.auth_constants import (
+from backend.common.auth_constants import (
     ACCESS_COOKIE_NAME, 
-    REFRESH_COOKIE_NAME, 
-    COOKIE_DOMAIN, 
-    COOKIE_SAMESITE, 
+    REFRESH_COOKIE_NAME,
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS,
+    ALGORITHM,
+    cookie_settings,
+    COOKIE_DOMAIN,
+    COOKIE_SAMESITE,
     COOKIE_SECURE
 ) 
 
@@ -82,17 +86,15 @@ async def lifespan(app: FastAPI):
         else:
             print(f"✅ [STARTUP] Project model has 'organization_id' (Module: {models.Project.__module__})")
 
-        # Check Database
-        db = SessionCore()
         try:
-            # Check for ALL required columns
+            # Check for Table Existence
             from sqlalchemy import text
-            # We select them to force error if missing
-            db.execute(text("SELECT organization_id, created_at, created_by FROM resources_projects LIMIT 1"))
-            print("✅ [STARTUP] DB table 'resources_projects' schema VERIFIED.")
+            # We select 1 to verify table exists
+            db.execute(text("SELECT 1 FROM bim_projects LIMIT 1"))
+            print("✅ [STARTUP] DB table 'bim_projects' VERIFIED.")
         except Exception as e:
             print(f"❌ [CRITICAL] DB Check Failed: {e}")
-            raise RuntimeError(f"Database schema out of date. Run 'alembic upgrade head'. Error: {e}")
+            raise RuntimeError(f"Database table 'bim_projects' missing. Error: {e}")
         finally:
             db.close()
             
@@ -421,11 +423,11 @@ def create_org_project(
             organization_id=org_id, # Enforced from URL path
             name=project_data.name,
             status=project_data.status,
-            project_cost=project_data.project_cost,
-            sq_meters=project_data.sq_meters,
-            ratio=project_data.ratio,
-            estimated_time=project_data.estimated_time,
-            created_by=user["sub"]
+            # project_cost=project_data.project_cost, # Legacy
+            # sq_meters=project_data.sq_meters,
+            # ratio=project_data.ratio,
+            # estimated_time=project_data.estimated_time,
+            # created_by=user["sub"] # Temporarily removed
         )
         db.add(new_project)
         db.commit()

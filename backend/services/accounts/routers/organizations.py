@@ -310,7 +310,10 @@ def list_org_projects_endpoint(
     # Using Raw SQL to avoid AttributeError if models.Project is stale in deployment
     from sqlalchemy import text
     try:
-        sql = text("SELECT id, name, project_cost, sq_meters, ratio, estimated_time, status FROM resources_projects WHERE organization_id = :org_id")
+    try:
+        # sql = text("SELECT id, name, project_cost, sq_meters, ratio, estimated_time, status FROM resources_projects WHERE organization_id = :org_id")
+        # Changed to bim_projects and removed legacy fields
+        sql = text("SELECT id, name, status, created_at FROM bim_projects WHERE organization_id = :org_id")
         result = db.execute(sql, {"org_id": org_id}).fetchall()
         
         projects = []
@@ -318,12 +321,13 @@ def list_org_projects_endpoint(
             projects.append({
                 "id": row.id,
                 "name": row.name,
-                "project_cost": row.project_cost,
-                "sq_meters": row.sq_meters,
-                "ratio": row.ratio,
-                "estimated_time": row.estimated_time,
+                "project_cost": 0.0, # Defaulting to 0/None as field is gone
+                "sq_meters": 0.0,
+                "ratio": 0.0,
+                "estimated_time": None,
                 "status": row.status,
-                "organization_id": org_id
+                "organization_id": org_id,
+                "created_at": str(row.created_at)
             })
         return projects
     except Exception as e:
@@ -349,10 +353,10 @@ def create_org_project_endpoint(
             id=new_id,
             organization_id=org_id,
             name=project.name,
-            project_cost=project.project_cost,
-            sq_meters=project.sq_meters,
-            ratio=project.ratio,
-            estimated_time=project.estimated_time,
+            # project_cost=project.project_cost, # Legacy
+            # sq_meters=project.sq_meters,
+            # ratio=project.ratio,
+            # estimated_time=project.estimated_time,
             status="Active"
         )
         
@@ -372,12 +376,12 @@ def create_org_project_endpoint(
         
         # 1. Lazy Migration (Attempt to patch schema)
         print("⚠️ [LAZY MIGRATION] Attempting to patch schema (Blind Fix)...")
+        # Removed legacy migrations for resources_projects as we target bim_projects now
         migrations = [
-            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS organization_id VARCHAR",
-            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS project_cost FLOAT DEFAULT 0.0",
-            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS sq_meters FLOAT DEFAULT 0.0",
-            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS ratio FLOAT DEFAULT 0.0",
-            "ALTER TABLE resources_projects ADD COLUMN IF NOT EXISTS estimated_time VARCHAR"
+            "CREATE TABLE IF NOT EXISTS bim_projects (id VARCHAR PRIMARY KEY, organization_id VARCHAR, name VARCHAR, status VARCHAR, created_at TIMESTAMPTZ DEFAULT NOW())",
+             # Ensure cols exist
+            "ALTER TABLE bim_projects ADD COLUMN IF NOT EXISTS organization_id VARCHAR",
+            "ALTER TABLE bim_projects ADD COLUMN IF NOT EXISTS status VARCHAR"
         ]
         
         for sql in migrations:
@@ -392,19 +396,15 @@ def create_org_project_endpoint(
         print("✅ [RAW SQL FALLBACK] Schema patched. Retrying insertion via Raw SQL...")
         try:
             sql_insert = text("""
-                INSERT INTO resources_projects 
-                (id, organization_id, name, project_cost, sq_meters, ratio, estimated_time, status)
-                VALUES (:id, :org_id, :name, :cost, :sq, :ratio, :time, 'Active')
+                INSERT INTO bim_projects 
+                (id, organization_id, name, status)
+                VALUES (:id, :org_id, :name, 'Active')
             """)
             
             db.execute(sql_insert, {
                 "id": new_id,
                 "org_id": org_id,
-                "name": project.name,
-                "cost": project.project_cost,
-                "sq": project.sq_meters,
-                "ratio": project.ratio,
-                "time": project.estimated_time
+                "name": project.name
             })
             db.commit()
             
