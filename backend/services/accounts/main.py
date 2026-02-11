@@ -52,7 +52,7 @@ from common.auth import create_access_token, create_refresh_token, decode_token,
 from common.auth_utils import verify_password, get_password_hash 
 import common.models as models 
 from common.models import AccountUser 
-from common.db_migration_entitlements import run_entitlements_migration 
+# from common.db_migration_entitlements import run_entitlements_migration # MOVED TO LIFESPAN
 from common.auth_constants import (
     ACCESS_COOKIE_NAME, 
     REFRESH_COOKIE_NAME,
@@ -100,14 +100,60 @@ async def lifespan(app: FastAPI):
         
         # Production Hardening: Check for Migration Safety
         env_name = os.getenv("RAILWAY_ENVIRONMENT_NAME", "") or os.getenv("AO_ENV", "")
+        # Treat as prod if 'production' OR 'prod' in name.
         is_prod = "production" in env_name.lower() or "prod" in env_name.lower()
         
         if is_prod:
              # In PROD, we assume migrations ran via CD pipeline or manual admin action.
              # We just verify schema exists to fail fast if broken.
-             print("[STARTUP] Production Mode: Skipping auto-migration. Verifying Schema...")
+             print("[ENTITLEMENTS] Prod: verifying schema only")
              try:
-                 # Simple check: can we query Entitlements?
+                 # Raw SQL Verify
+                 db.execute(text("SELECT 1 FROM accounts_entitlements LIMIT 1"))
+                 print("✅ [ENTITLEMENTS] Prod: schema verified")
+             except Exception as e:
+                 print(f"❌ [CRITICAL] Entitlements Migration MISSING in Prod! Error: {e}")
+                 # We SHOULD fail here if strict, but maybe legacy ignores it?
+                 # User said: "fail with explicit message if table missing"
+                 raise RuntimeError("Production Schema Missing: accounts_entitlements")
+        else:
+             print("[ENTITLEMENTS] Dev: running auto-migration")
+             try:
+                 # Lazy Import to avoid ModuleNotFoundError in Prod containers
+                 # Try multiple paths
+                 try:
+                     from common.db_migration_entitlements import run_entitlements_migration
+                 except ImportError:
+                     # If common is not in path directly, try backend.common
+                     import sys
+                     # Add backend root if not present (heuristic)
+                     backend_root = os.path.abspath(os.path.join(BASE_DIR, "../../.."))
+                     if backend_root not in sys.path:
+                         sys.path.append(backend_root)
+                     from backend.common.db_migration_entitlements import run_entitlements_migration
+                 
+                 run_entitlements_migration(db_url=os.getenv("CORE_DB_URL"))
+                 
+             except ImportError as ie:
+                 print(f"⚠️ [STARTUP] Could not import migration module: {ie}")
+                 print("Assuming schema exists or will be managed externally.")
+             except Exception as e:
+                 print(f"⚠️ [STARTUP] Migration Warning: {e}")
+                 # Don't crash dev for this, just warn
+
+    except Exception as e:
+        print(f"❌ [STARTUP] FATAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        # In PROD, we might want to crash container so it restarts?
+        # User said "Fix immediately"
+        raise e
+    finally:
+        if db:
+            db.close()
+            
+    yield
+    print("🛑 [SHUTDOWN] Application stopping...")
                  # If table missing, this throws OperationalError
                  with SessionCore() as db_check: # Use a new session for this check
                      db_check.execute(text("SELECT 1 FROM accounts_entitlements LIMIT 1"))
