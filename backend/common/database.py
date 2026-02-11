@@ -22,11 +22,31 @@ from sqlalchemy.orm.attributes import flag_modified
 # Use 'DATABASE_URL' as a fallback ONLY if it makes sense for the primary purpose of that variable.
 # Ideally, DevOps should set each variable explicitly (CORE_DB_URL, EXT_DB_URL, etc.)
 
+# Helper to log source
+def get_db_url(primary_var, fallback_var, default_val, name="DB"):
+    url = os.getenv(primary_var)
+    if url:
+        print(f"✅ [DB CONFIG] {name}: Used env var '{primary_var}'")
+        return url.strip().replace("postgres://", "postgresql://")
+    
+    url = os.getenv(fallback_var)
+    if url:
+        print(f"✅ [DB CONFIG] {name}: Used fallback env var '{fallback_var}'")
+        return url.strip().replace("postgres://", "postgresql://")
+        
+    print(f"⚠️ [DB CONFIG] {name}: No env var found. Using default '{default_val}'")
+    return default_val
+
 # Core DB (Identity, Users, Orgs) - Primary for Accounts Service
-CORE_DB_URL = os.getenv("CORE_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+# Railway provides DATABASE_URL for the main Postgres instance.
+CORE_DB_URL = get_db_url("CORE_DB_URL", "DATABASE_URL", "sqlite:///./aodev.db", "Core")
 
 # Ops DB (Finance, Admin) - Primary for Finance Service
-OPS_DB_URL = os.getenv("OPS_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+# If OPS_DB_URL or OPS_DATABASE_URL is set, use it.
+# Otherwise, default to SQLite (local file) to avoid accidental sharing of Core DB tables 
+# unless explicitly mapped to DATABASE_URL.
+# Fallback to DATABASE_URL only if specifically requested via generic var, but safer to default to sqlite for Ops if undefined.
+OPS_DB_URL = get_db_url("OPS_DB_URL", "OPS_DATABASE_URL", "sqlite:///./ops.db", "Ops")
 
 # Plugin DB - Primary for Plugin API
 PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
@@ -45,11 +65,50 @@ def get_db_host(url):
 print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'} | Host: {get_db_host(CORE_DB_URL)}")
 print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'} | Host: {get_db_host(OPS_DB_URL)}")
 
+# Retry Logic
+import time
+from sqlalchemy.exc import OperationalError
+
+def wait_for_db(engine, name="DB"):
+    """
+    Waits for database to become available with exponential backoff.
+    Max 10 retries.
+    """
+    if "sqlite" in str(engine.url):
+        return # SQLite is file-based, no wait needed usually.
+        
+    retries = 0
+    max_retries = 10
+    wait = 1
+    
+    while retries < max_retries:
+        try:
+            print(f"🔄 [DB {name}] Connecting to {engine.url.host}...")
+            # Try to connect
+            with engine.connect() as conn:
+                print(f"✅ [DB {name}] Connection Success!")
+                return
+        except OperationalError as e:
+            print(f"⚠️ [DB {name}] Connection Refused: {e}")
+            print(f"⏳ [DB {name}] Retrying in {wait}s... ({retries+1}/{max_retries})")
+            time.sleep(wait)
+            wait *= 2 # Exponential backoff: 1, 2, 4, 8...
+            if wait > 10: wait = 10 # Cap at 10s
+            retries += 1
+            
+    print(f"❌ [DB {name}] CRITICAL: Could not connect to database after {max_retries} attempts.")
+    # We allow it to crash/continue so uvicorn logs the final exception from main app.
+
 # Create Engines
-engine_core = create_engine(CORE_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in CORE_DB_URL else {})
-engine_ops = create_engine(OPS_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in OPS_DB_URL else {})
-engine_plugin = create_engine(PLUGIN_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in PLUGIN_DB_URL else {})
-engine_ext = create_engine(EXT_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in EXT_DB_URL else {})
+engine_core = create_engine(CORE_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in CORE_DB_URL else {}, pool_pre_ping=True)
+engine_ops = create_engine(OPS_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in OPS_DB_URL else {}, pool_pre_ping=True)
+engine_plugin = create_engine(PLUGIN_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in PLUGIN_DB_URL else {}, pool_pre_ping=True)
+engine_ext = create_engine(EXT_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in EXT_DB_URL else {}, pool_pre_ping=True)
+
+# Verify Connections on Import/Startup
+wait_for_db(engine_core, "Core")
+if "sqlite" not in OPS_DB_URL:
+    wait_for_db(engine_ops, "Ops")
 
 # Create Session Factories
 SessionCore = sessionmaker(autocommit=False, autoflush=False, bind=engine_core)
@@ -91,9 +150,9 @@ def get_plugin_db():
 if "sqlite" in CORE_DB_URL or os.getenv("FORCE_DB_CREATE", "false").lower() == "true":
     print("🔧 [DB] Running Base.metadata.create_all (SQLite/Dev Mode)...")
     try:
-        Base.metadata.create_all(bind=engine_ext) 
-        Base.metadata.create_all(bind=engine_core)
-        Base.metadata.create_all(bind=engine_ops) 
+        if "sqlite" in EXT_DB_URL: Base.metadata.create_all(bind=engine_ext) 
+        if "sqlite" in CORE_DB_URL: Base.metadata.create_all(bind=engine_core)
+        if "sqlite" in OPS_DB_URL: Base.metadata.create_all(bind=engine_ops) 
     except Exception as e:
         print(f"⚠️ [DB] Warning: create_all failed (likely innocuous if tables exist): {e}")
 else:
