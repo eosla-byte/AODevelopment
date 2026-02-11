@@ -20,7 +20,8 @@ class Project(Base):
     created_at = Column(DateTime, server_default=func.now())
     
     # Core Project Profile Fields
-    organization_id = Column(String, ForeignKey('accounts_organizations.id', ondelete="CASCADE"), nullable=False, index=True)
+    # Core Project Profile Fields
+    organization_id = Column(String, nullable=False, index=True) # ForeignKey removed for Railway service decoupling
 
     # Relationships are optional in local definition if we don't eager load them or use them in this service
     # But keeping them prevents mapper errors if code tries to access them

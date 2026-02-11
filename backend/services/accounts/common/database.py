@@ -76,14 +76,19 @@ def get_plugin_db():
     finally: db.close()
 
 # Ensure tables exist
-# For Phase 1 (Shared Code): Create ALL tables on ALL DBs to avoid missing table errors
-# especially for new modules like BIM (bim_users, bim_projects)
-# We bind to engine_ext because auth.py uses SessionExt, but since they likely share the same sqlite file, 
-# this ensures the file has the schema.
-Base.metadata.create_all(bind=engine_ext) 
-# Also ensure for Ops/Core just in case they are different files in some configs
-Base.metadata.create_all(bind=engine_core)
-Base.metadata.create_all(bind=engine_ops) 
+# Ensure tables exist (SQLite ONLY or Explicit Opt-In)
+# We avoid running create_all against Postgres in production to prevent "NoReferencedTableError" 
+# and other DDL issues. Production schema should be managed by migrations.
+if "sqlite" in CORE_DB_URL or os.getenv("FORCE_DB_CREATE", "false").lower() == "true":
+    print("🔧 [DB] Running Base.metadata.create_all (SQLite/Dev Mode)...")
+    try:
+        Base.metadata.create_all(bind=engine_ext) 
+        Base.metadata.create_all(bind=engine_core)
+        Base.metadata.create_all(bind=engine_ops) 
+    except Exception as e:
+        print(f"⚠️ [DB] Warning: create_all failed (likely innocuous if tables exist): {e}")
+else:
+    print("🔒 [DB] Skipping Base.metadata.create_all (Postgres/Prod Mode).") 
 
 
 SCAN_CATEGORIES = {
