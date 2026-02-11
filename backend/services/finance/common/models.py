@@ -89,5 +89,25 @@ class QuotationTemplate(Base):
     content_json = Column(JSON, default=[])
     created_at = Column(DateTime, default=func.now())
 
-# Models used in finance but not critical locally can be omitted or added if needed
-# ContactSubmission? AppUser? 
+# LEGACY COMPAT: Stubs for shared database.py usage
+class AppUser(Base):
+    __tablename__ = 'resources_users'
+    email = Column(String, primary_key=True)
+    full_name = Column(String)
+    hashed_password = Column(String)
+    role = Column(String)
+    is_active = Column(Boolean)
+    permissions = Column(JSON)
+
+class TimelineEvent(Base):
+    __tablename__ = 'resources_timeline_events'
+    id = Column(Integer, primary_key=True)
+
+class ContactSubmission(Base):
+    __tablename__ = 'web_contact_submissions'
+    id = Column(Integer, primary_key=True)
+
+class PluginSheetSession(Base):
+    __tablename__ = 'plugin_sheet_sessions'
+    id = Column(String, primary_key=True)
+ 

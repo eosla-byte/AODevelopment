@@ -155,3 +155,40 @@ class DailyMessage(Base):
     
     project = relationship("DailyProject", back_populates="messages")
     channel = relationship("DailyChannel", back_populates="messages")
+
+# LEGACY COMPAT: Type Hint Stubs
+class Collaborator(Base):
+    __tablename__ = 'resources_collaborators'
+    id = Column(String, primary_key=True)
+    name = Column(String)
+
+class AppUser(Base):
+    __tablename__ = 'resources_users'
+    email = Column(String, primary_key=True)
+    full_name = Column(String)
+    hashed_password = Column(String)
+    role = Column(String)
+    is_active = Column(Boolean)
+    permissions = Column(JSON)
+
+class TimelineEvent(Base):
+    __tablename__ = 'resources_timeline_events'
+    id = Column(Integer, primary_key=True)
+
+class ContactSubmission(Base):
+    __tablename__ = 'web_contact_submissions'
+    id = Column(Integer, primary_key=True)
+
+class ExpenseColumn(Base):
+    __tablename__ = 'resources_expense_columns'
+    id = Column(String, primary_key=True)
+
+class ExpenseCard(Base):
+    __tablename__ = 'resources_expense_cards'
+    id = Column(String, primary_key=True)
+
+class PluginSheetSession(Base):
+    __tablename__ = 'plugin_sheet_sessions'
+    id = Column(String, primary_key=True)
+
+

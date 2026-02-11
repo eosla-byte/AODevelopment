@@ -29,5 +29,47 @@ class Project(Base):
     # For now, we define Project. Organization will be defined if needed or we use string reference.
     # organization = relationship("Organization", back_populates="projects")
     
+    
 # We only define what Accounts service needs for now, or what is critical for startup.
 # If Accounts database.py imports other models, we need them here or mocked.
+
+# LEGACY COMPAT: Type Hint Stubs
+# database.py type hints reference these, so they must exist as attributes of this module.
+class Collaborator(Base):
+    __tablename__ = 'resources_collaborators'
+    id = Column(String, primary_key=True)
+    name = Column(String)
+    email = Column(String)
+    created_at = Column(DateTime, default=func.now())
+    # Minimal definition to satisfy "List[models.Collaborator]" type hint
+
+class AppUser(Base):
+    __tablename__ = 'resources_users'
+    email = Column(String, primary_key=True)
+    full_name = Column(String)
+    hashed_password = Column(String)
+    role = Column(String)
+    is_active = Column(Boolean)
+    permissions = Column(JSON)
+
+class TimelineEvent(Base):
+    __tablename__ = 'resources_timeline_events'
+    id = Column(Integer, primary_key=True)
+
+class ContactSubmission(Base):
+    __tablename__ = 'web_contact_submissions'
+    id = Column(Integer, primary_key=True)
+
+class ExpenseColumn(Base):
+    __tablename__ = 'resources_expense_columns'
+    id = Column(String, primary_key=True)
+
+class ExpenseCard(Base):
+    __tablename__ = 'resources_expense_cards'
+    id = Column(String, primary_key=True)
+
+class PluginSheetSession(Base):
+    __tablename__ = 'plugin_sheet_sessions'
+    id = Column(String, primary_key=True)
+
+
