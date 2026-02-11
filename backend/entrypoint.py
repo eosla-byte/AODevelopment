@@ -21,13 +21,18 @@ def run_migrations():
         # subprocess.run(["alembic", "upgrade", "head"], check=True, cwd=BASE_DIR)
         
         # Alternatively, run programmatically to avoid path issues
-        from alembic.config import Config
-        from alembic import command
-        
-        alembic_cfg = Config(os.path.join(BASE_DIR, "alembic.ini"))
-        command.upgrade(alembic_cfg, "head")
-        
-        print("✅ [ENTRYPOINT] Migrations applied successfully.")
+        try:
+            from alembic.config import Config
+            from alembic import command
+            
+            alembic_cfg = Config(os.path.join(BASE_DIR, "alembic.ini"))
+            command.upgrade(alembic_cfg, "head")
+            
+            print("✅ [ENTRYPOINT] Migrations applied successfully.")
+        except (ImportError, ModuleNotFoundError):
+            print("⚠️ [ENTRYPOINT] WARNING: Alembic not installed; skipping migrations")
+            print("ℹ️ [ENTRYPOINT] INFO: Continuing startup")
+            return
     except Exception as e:
         print(f"❌ [ENTRYPOINT] Migration Failed: {e}")
         # Decide: Fail hard or continue? 
