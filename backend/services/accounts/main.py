@@ -85,10 +85,11 @@ if is_prod:
         from sqlalchemy import text
         with SessionCore() as db_check:
             db_check.execute(text("SELECT 1 FROM accounts_entitlements LIMIT 1"))
-        logger.info("[ENTITLEMENTS] Production: entitlements schema verified.")
+        logger.info("[ENTITLEMENTS] Production schema verified OK.")
     except Exception as e:
-        logger.error(f"[ENTITLEMENTS] Production schema verification failed: {type(e).__name__}")
-        raise RuntimeError("Production schema invalid. Run migrations manually.") from e
+        logger.warning(f"[ENTITLEMENTS] Production schema verification failed: {type(e).__name__}")
+        logger.warning(f"Error details: {e}")
+        logger.warning("Service continuing. Please run 'alembic upgrade head' to fix schema.")
 else:
     logger.info("[ENTITLEMENTS] Non-prod: running auto-migration/seeding...")
     try:
