@@ -485,7 +485,7 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         org_id, org_role, services = get_active_org_context(db, user)
         
         # SUPER ADMIN OVERRIDE
-        is_super_admin = user.email in SUPER_ADMIN_EMAILS
+        is_super_admin = user.email.lower() in SUPER_ADMIN_EMAILS
         if is_super_admin:
             org_role = "SuperAdmin"
 
@@ -783,7 +783,7 @@ async def dashboard(request: Request, org_id: Optional[str] = None, user_jwt = D
         # SUPER ADMIN VIEW
         # Check explicit claim-based role OR Email Match
         is_super = (getattr(user_db, "role", "") or "").lower() == "superadmin"
-        if not is_super and user_db.email in SUPER_ADMIN_EMAILS:
+        if not is_super and user_db.email.lower() in SUPER_ADMIN_EMAILS:
             is_super = True
             
         if is_super:
@@ -1149,7 +1149,7 @@ async def refresh_token_endpoint(request: Request):
             }
             
             # Check for Super Admin (via Email or Role)
-            if user.email in SUPER_ADMIN_EMAILS:
+            if user.email.lower() in SUPER_ADMIN_EMAILS:
                  claims["platform_role"] = "super_admin"
                  claims["role"] = "SuperAdmin" # Force upgrade
             
