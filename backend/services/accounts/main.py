@@ -967,14 +967,7 @@ async def setup_admin():
         return {"ok": True, "results": results}
     finally:
         db.close()
-Admin",
-        hashed_password=get_password_hash("admin123"),
-        services_access={}
-    )
-    db.add(admin)
-    db.commit()
-    db.close()
-    return "Initial admin created: admin@somosao.com / admin123"
+
 
 @app.get("/system/force_admin_reset")
 async def force_admin_reset():
