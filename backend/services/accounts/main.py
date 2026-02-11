@@ -183,11 +183,13 @@ def get_active_org_context(db, user: "AccountUser"):
     Determines the active organization context for a user.
     Returns: (org_id, role, services_list) or (None, None, None)
     """
-    # 1. Check Last Active
-    if user.last_active_org_id:
+    # 1. Check Last Active (Safe Access)
+    last_org_id = getattr(user, "last_active_org_id", None)
+    
+    if last_org_id:
         membership = db.query(models.OrganizationUser).filter(
             models.OrganizationUser.user_id == user.id,
-            models.OrganizationUser.organization_id == user.last_active_org_id
+            models.OrganizationUser.organization_id == last_org_id
         ).first()
         if membership:
             return _build_context(db, membership)
@@ -202,7 +204,8 @@ def get_active_org_context(db, user: "AccountUser"):
         return _build_context(db, memberships[0])
         
     # 3. Multiple or None -> Require Selection
-    return None, None, None
+    print(f"⚠️ [LOGIN] No active org context for user={user.email}, continuing with defaults")
+    return None, None, []
 
 def _build_context(db, membership):
     # Get Services from Organization permissions
