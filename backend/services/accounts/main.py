@@ -90,6 +90,9 @@ async def lifespan(app: FastAPI):
         db.execute(text("SELECT 1 FROM bim_projects LIMIT 1"))
         print("✅ [STARTUP] DB table 'bim_projects' VERIFIED.")
         
+        # 2. Run Legacy Fixes
+        run_db_fix()
+
     except Exception as e:
         print(f"❌ [CRITICAL] Startup Check Failed: {e}")
         # We allow startup to fail if DB is missing critical tables?
@@ -98,14 +101,6 @@ async def lifespan(app: FastAPI):
     finally:
         if db:
             db.close()
-            
-        # 2. Run Legacy Fixes
-        run_db_fix()
-            
-    except Exception as e:
-        print(f"🔥 [FATAL] Startup Verification Failed: {e}")
-        # We raise to stop deployment if possible, or at least log loudly
-        raise e
         
     yield
     # Shutdown logic if needed
