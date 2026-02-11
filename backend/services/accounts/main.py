@@ -284,9 +284,14 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         # ORG CONTEXT RESOLUTION
         org_id, org_role, services = get_active_org_context(db, user)
         
+        # Robust ID Resolution (Fix for AppUser missing 'id')
+        real_user_id = getattr(user, "id", None)
+        if not real_user_id:
+            real_user_id = user.email
+
         # Token Claims (Standardized)
         claims = {
-            "sub": user.id,   # Use UUID as sub
+            "sub": str(real_user_id),   # Use UUID or Email as sub
             "email": user.email,
             "role": org_role if org_role else user.role, 
             "org_id": org_id, 
@@ -305,10 +310,10 @@ async def login_action(email: str = Form(...), password: str = Form(...)):
         access_token = create_access_token(data=claims, audience=["somosao", "ao-platform"])
         
         # REFRESH TOKEN
-        refresh_claims = {"sub": user.id, "email": user.email}
+        refresh_claims = {"sub": str(real_user_id), "email": user.email}
         refresh_token = create_refresh_token(data=refresh_claims)
         
-        response = JSONResponse({"status": status_response, "redirect": redirect_url, "user": {"id": user.id, "email": user.email}})
+        response = JSONResponse({"status": status_response, "redirect": redirect_url, "user": {"id": str(real_user_id), "email": user.email}})
         
         # COOKIE 1: Unified Access Token (accounts_access_token)
         response.set_cookie(
