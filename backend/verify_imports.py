@@ -20,6 +20,12 @@ except Exception as e:
     sys.exit(1)
 
 try:
+    from common.auth_constants import ACCESS_COOKIE_NAME
+    print("✅ Auth Constants Import OK")
+except Exception as e:
+    print(f"❌ Auth Constants Import FAILED: {e}")
+
+try:
     from services.accounts import main as accounts_main
     print("✅ Accounts Service Import OK")
 except Exception as e:
@@ -50,7 +56,7 @@ try:
     if Project is accounts_models.Project is bim_models.Project is daily_models.Project:
         print("✅ Project Model Unification CONFIRMED")
     else:
-        print("❌ Project Model Unification FAILED")
+        print("❌ Project Model Unification FAILED (Mismatch)")
         print(f"IDs: G={id(Project)}, A={id(accounts_models.Project)}, B={id(bim_models.Project)}")
 
 except Exception as e:

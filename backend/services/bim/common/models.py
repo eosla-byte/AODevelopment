@@ -2,22 +2,19 @@ import sys
 import os
 
 # PROXY TO GLOBAL MODELS
-# This file ensures all services use the Single Source of Truth (backend/common/models.py)
+# This file ensures all services use the Single Source of Truth (common/models.py)
+# We prioritize the ROOT common module over local/relative ones.
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Assumes structure: services/SERVICE/common/models.py -> .../backend/ (Root)
+root_dir = os.path.abspath(os.path.join(current_dir, "../../../"))
+
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
 
 try:
-    from backend.common.models import *
-except ImportError:
-    # Fallback for environments where 'backend' is not in path
-    # Attempt to find root (AODevelopment)
-    current = os.path.dirname(os.path.abspath(__file__))
-    # .../services/SERVICE/common/models.py -> up 3 levels to AODevelopment
-    root = os.path.abspath(os.path.join(current, "../../../"))
-    if root not in sys.path:
-        sys.path.append(root)
-    
-    try:
-        from backend.common.models import *
-    except ImportError:
-        # Last resort: Try simple common.models if we are inside backend?
-        # No, we want distinct global models.
-        raise ImportError("Could not import backend.common.models. Ensure AODevelopment root is in sys.path.")
+    # This should now pick up backend/common/models.py (as common.models)
+    from common.models import *
+except ImportError as e:
+    print(f"CRITICAL: Could not import common.models in proxy. Path: {sys.path}")
+    raise e

@@ -51,7 +51,7 @@ from common.auth import create_access_token, create_refresh_token, decode_token,
 from common.auth_utils import verify_password, get_password_hash 
 import common.models as models 
 from common.models import AccountUser 
-from backend.common.auth_constants import (
+from common.auth_constants import (
     ACCESS_COOKIE_NAME, 
     REFRESH_COOKIE_NAME,
     ACCESS_TOKEN_EXPIRE_MINUTES,
