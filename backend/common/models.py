@@ -1,10 +1,10 @@
 from sqlalchemy import Column, String, Integer, Float, Boolean, ForeignKey, DateTime, JSON, Text, create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
+from sqlalchemy.orm import sessionmaker, relationship, DeclarativeBase
 from sqlalchemy.sql import func
 import datetime
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 # -----------------------------------------------------------------------------
 # SCHEMA: RESOURCES (Gestion Interna) -> Prefix 'resources_'
