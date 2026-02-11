@@ -106,6 +106,9 @@ class AppUser(Base):
     permissions = Column(JSON, default={}) # { "CivilConnection": true, ... }
     assigned_projects = Column(JSON, default=[]) # List of Project IDs assigned to this user
 
+    # Compatibility: Allow .id to reference .email for legacy queries
+    id = synonym("email")
+
 # -----------------------------------------------------------------------------
 # SCHEMA: WEB (Sitio Publico) -> Prefix 'web_'
 # -----------------------------------------------------------------------------
