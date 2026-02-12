@@ -49,7 +49,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         
         # Public Paths
         public_paths = ["/", "/login", "/health", "/version_check", "/logout", "/favicon.ico"]
-        if path in public_paths or path.startswith("/static") or path.startswith("/assets"):
+        if path in public_paths or path.startswith("/static") or path.startswith("/assets") or path.startswith("/debug"):
             return await call_next(request)
             
         # Token Check
