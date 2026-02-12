@@ -156,7 +156,8 @@ def debug_auth_config():
     Diagnostic endpoint to verify loaded keys and algorithms.
     """
     import hashlib
-    from common.auth import AO_JWT_PUBLIC_KEY_PEM, AO_JWT_PRIVATE_KEY_PEM, ALGORITHM
+    import jwt
+    from common.auth import AO_JWT_PUBLIC_KEY_PEM, AO_JWT_PRIVATE_KEY_PEM, ALGORITHM, AO_JWT_KEY_ID
     
     pub_fp = "MISSING"
     if AO_JWT_PUBLIC_KEY_PEM:
@@ -168,18 +169,30 @@ def debug_auth_config():
     priv_fp = "MISSING"
     if AO_JWT_PRIVATE_KEY_PEM:
         try:
-            # We hash the private key content itself for ID
             priv_fp = hashlib.sha256(AO_JWT_PRIVATE_KEY_PEM).hexdigest()[:16]
         except:
             priv_fp = "ERROR"
+
+    # Self-Test: Sign and Verify
+    pair_status = "UNKNOWN"
+    try:
+        if AO_JWT_PRIVATE_KEY_PEM and AO_JWT_PUBLIC_KEY_PEM:
+            payload = {"sub": "test", "iss": "accounts.somosao.com"}
+            token = jwt.encode(payload, AO_JWT_PRIVATE_KEY_PEM, algorithm=ALGORITHM, headers={"kid": AO_JWT_KEY_ID})
+            # Verify
+            jwt.decode(token, AO_JWT_PUBLIC_KEY_PEM, algorithms=[ALGORITHM], options={"verify_exp": False, "verify_aud": False, "verify_iss": False})
+            pair_status = "MATCH (Ok)"
+        else:
+            pair_status = "INCOMPLETE (Missing Key)"
+    except Exception as e:
+        pair_status = f"MISMATCH ({str(e)})"
 
     return {
         "service": "accounts",
         "algorithm": ALGORITHM,
         "public_key_fingerprint": pub_fp,
-        "private_key_fingerprint": priv_fp, # Should match if derived from same pair? No, private key has different bytes.
-        # But we can check if they are mathematically paired? Too complex for here.
-        # User just needs to see if "public_key_fingerprint" matches Finance's.
+        "private_key_fingerprint": priv_fp,
+        "key_pair_status": pair_status,
         "pem_preview": AO_JWT_PUBLIC_KEY_PEM[:30].decode('utf-8') if AO_JWT_PUBLIC_KEY_PEM else None
     }
 
