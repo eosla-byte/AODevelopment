@@ -16,21 +16,31 @@ branch_labels = None
 depends_on = None
 
 
+from sqlalchemy import inspect
+
 def upgrade():
-    # 1. Add Column
-    op.add_column('resources_projects', sa.Column('organization_id', sa.String(), nullable=True))
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    cols = {c["name"] for c in inspector.get_columns("resources_projects")}
     
-    # 2. Create Index
-    op.create_index(op.f('ix_resources_projects_organization_id'), 'resources_projects', ['organization_id'], unique=False)
-    
-    # 3. Create ForeignKey
-    op.create_foreign_key('fk_projects_organization', 'resources_projects', 'accounts_organizations', ['organization_id'], ['id'], ondelete='CASCADE')
-    
-    # 4. Update existing nullable? (Optional manual step usually)
-    # op.alter_column('resources_projects', 'organization_id', nullable=False)
+    if "organization_id" not in cols:
+        # 1. Add Column
+        op.add_column('resources_projects', sa.Column('organization_id', sa.String(), nullable=True))
+        
+        # 2. Create Index
+        op.create_index(op.f('ix_resources_projects_organization_id'), 'resources_projects', ['organization_id'], unique=False)
+        
+        # 3. Create ForeignKey
+        op.create_foreign_key('fk_projects_organization', 'resources_projects', 'accounts_organizations', ['organization_id'], ['id'], ondelete='CASCADE')
 
 
 def downgrade():
-    op.drop_constraint('fk_projects_organization', 'resources_projects', type_='foreignkey')
-    op.drop_index(op.f('ix_resources_projects_organization_id'), table_name='resources_projects')
-    op.drop_column('resources_projects', 'organization_id')
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    cols = {c["name"] for c in inspector.get_columns("resources_projects")}
+    
+    if "organization_id" in cols:
+        op.drop_constraint('fk_projects_organization', 'resources_projects', type_='foreignkey')
+        op.drop_index(op.f('ix_resources_projects_organization_id'), table_name='resources_projects')
+        op.drop_column('resources_projects', 'organization_id')
+
