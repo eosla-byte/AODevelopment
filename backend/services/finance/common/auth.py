@@ -192,12 +192,21 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         # Verify Signature using Public Key
         # DEBUG: Print Token Header and Key details
         try:
+            print(f"🕵️ [AUTH DEBUG] Token Length: {len(token)}")
+            print(f"🕵️ [AUTH DEBUG] Token Start: '{token[:20]}'")
+            print(f"🕵️ [AUTH DEBUG] Token End:   '{token[-20:]}'")
+            
             unverified_header = jwt.get_unverified_header(token)
             print(f"🕵️ [AUTH DEBUG] Token Header: {unverified_header}")
+            
+            # Try decoding payload without verification to ensure body is readable
+            unverified_payload = jwt.decode(token, options={"verify_signature": False})
+            print(f"🕵️ [AUTH DEBUG] Unverified Payload Sub: {unverified_payload.get('sub')}")
+            
             print(f"🕵️ [AUTH DEBUG] Using Key ID: {AO_JWT_KEY_ID}")
             print(f"🕵️ [AUTH DEBUG] Public Key Start: {AO_JWT_PUBLIC_KEY_PEM[:30] if AO_JWT_PUBLIC_KEY_PEM else 'NONE'}...")
         except Exception as e:
-            print(f"🕵️ [AUTH DEBUG] Failed to inspect token header: {e}")
+            print(f"🕵️ [AUTH DEBUG] Failed to inspect token details: {e}")
 
         # We disable strict audience check here because Accounts service issues tokens
         # with multiple audiences ["somosao", "ao-platform"] and PyJWT can be picky.
