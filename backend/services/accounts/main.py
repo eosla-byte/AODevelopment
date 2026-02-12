@@ -89,7 +89,8 @@ if is_prod:
     except Exception as e:
         logger.warning(f"[ENTITLEMENTS] Production schema verification failed: {type(e).__name__}")
         logger.warning(f"Error details: {e}")
-        logger.warning("Service continuing. Please run 'alembic upgrade head' to fix schema.")
+        logger.error("[ENTITLEMENTS] CRITICAL: Schema verification failed in PROD. Exiting to prevent crash loops.")
+        sys.exit(1)
 else:
     logger.info("[ENTITLEMENTS] Non-prod: running auto-migration/seeding...")
     try:
