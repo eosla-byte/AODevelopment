@@ -116,6 +116,15 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
             token = token.split(" ")[1]
 
         # Verify Signature using Public Key
+        # DEBUG: Print Token Header and Key details
+        try:
+            unverified_header = jwt.get_unverified_header(token)
+            print(f"🕵️ [AUTH DEBUG] Token Header: {unverified_header}")
+            print(f"🕵️ [AUTH DEBUG] Using Key ID: {AO_JWT_KEY_ID}")
+            print(f"🕵️ [AUTH DEBUG] Public Key Start: {AO_JWT_PUBLIC_KEY_PEM[:30] if AO_JWT_PUBLIC_KEY_PEM else 'NONE'}...")
+        except Exception as e:
+            print(f"🕵️ [AUTH DEBUG] Failed to inspect token header: {e}")
+
         # We disable strict audience check here because Accounts service issues tokens
         # with multiple audiences ["somosao", "ao-platform"] and PyJWT can be picky.
         # The signature verification with Public Key is the primary security mechanism.
@@ -132,6 +141,7 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         return None
     except jwt.InvalidTokenError as e:
         print(f"⚠️ [AUTH] Invalid Token: {e}")
+        # DEBUG RE-RAISE to see detailed error in logs? No, print is enough usually.
         return None
     except Exception as e:
         print(f"❌ [AUTH] Unexpected Decode Error: {e}")
