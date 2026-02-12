@@ -1,0 +1,3162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- EDITOR CONTAINER -->
+<div class="h-full flex flex-col bg-slate-100 overflow-hidden font-sans">
+    <!-- LCD Libraries -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+
+            #canvasContainer,
+            #canvasContainer * {
+                visibility: visible;
+            }
+
+            #canvasContainer {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white;
+                overflow: visible !important;
+                height: auto !important;
+            }
+
+            nav,
+            aside,
+            #selection-overlay,
+            #properties-toolbar,
+            .resize-handle,
+            #left-toolbar {
+                display: none !important;
+            }
+
+            .page-sheet {
+                break-after: page;
+                page-break-after: always;
+                margin: 0 !important;
+                border: none !important;
+                box-shadow: none !important;
+                width: 100% !important;
+            }
+
+            /* Hide page info overlay if any */
+            .page-info {
+                display: none;
+            }
+        }
+
+        .page-cover {
+            padding: 0 !important;
+            border: none !important;
+        }
+
+        .page-cover .page-header-section,
+        .page-cover .page-footer-section {
+            display: none !important;
+        }
+
+        .page-cover .page-blocks-area {
+            /* If we want overlay text to be readable, we might need some padding or safe area 
+               But 'ocupen todo el espacio' implies full flexibility. 
+               Let's add some default padding or just let blocks handle it. */
+            padding: 50px;
+            height: 100%;
+        }
+
+        /* Resize Handles */
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: white;
+            border: 1px solid #6366f1;
+            border-radius: 50%;
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .group:hover .resize-handle {
+            opacity: 1;
+        }
+
+        .resize-n {
+            top: -5px;
+            left: 50%;
+            cursor: n-resize;
+        }
+
+        .resize-e {
+            top: 50%;
+            right: -5px;
+            cursor: e-resize;
+        }
+
+        .resize-s {
+            bottom: -5px;
+            left: 50%;
+            cursor: s-resize;
+        }
+
+        .resize-w {
+            top: 50%;
+            left: -5px;
+            cursor: w-resize;
+        }
+
+        .resize-ne {
+            top: -5px;
+            right: -5px;
+            cursor: ne-resize;
+        }
+
+        .resize-nw {
+            top: -5px;
+            left: -5px;
+            cursor: nw-resize;
+        }
+
+        .resize-se {
+            bottom: -5px;
+            right: -5px;
+            cursor: se-resize;
+        }
+
+        .resize-sw {
+            bottom: -5px;
+            left: -5px;
+            cursor: sw-resize;
+        }
+
+        /* Print Styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+
+            #canvasContainer,
+            #canvasContainer * {
+                visibility: visible;
+            }
+
+            #canvasContainer {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                background: white;
+                overflow: visible !important;
+                height: auto !important;
+            }
+
+            nav,
+            aside,
+            #selection-overlay,
+            #properties-toolbar,
+            .resize-handle {
+                display: none !important;
+            }
+
+            @page {
+                size: Letter;
+                /* Explicitly Letter size per user request history implied (Region: Guatemala/US usu. Letter) or A4 if international. Adjust if needed. */
+                margin: 0;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+                background: white;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            #canvasContainer {
+                position: static !important;
+                width: 100% !important;
+                height: auto !important;
+                background: white !important;
+                display: block !important;
+                overflow: visible !important;
+                padding: 0 !important;
+                transform: none !important;
+                /* Ensure no scale transforms */
+            }
+
+            .page-sheet {
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+                page-break-after: always;
+                break-inside: avoid;
+                width: 100% !important;
+                /* Assuming base page design is handled by width, we let height flow or match aspect ratio */
+                height: 100%;
+                max-width: 100%;
+                left: 0 !important;
+                top: 0 !important;
+            }
+
+            nav,
+            aside,
+            #selection-overlay,
+            #properties-toolbar,
+            .resize-handle,
+            #left-toolbar,
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+
+    <!-- TOP BAR: Navigation & Meta -->
+    <div
+        class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-20 shadow-sm flex-none">
+        <div class="flex items-center gap-4">
+            <a href="/cotizaciones" class="text-slate-400 hover:text-slate-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                    stroke="currentColor" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+                </svg>
+            </a>
+            <div class="h-8 w-px bg-slate-200"></div>
+            <div class="flex flex-col">
+                <input type="text" id="docTitle" value="{{ quotation.title }}"
+                    class="font-black text-lg text-slate-800 bg-transparent border-none outline-none focus:ring-2 focus:ring-indigo-100 rounded px-1 -ml-1 placeholder-slate-300"
+                    placeholder="Título de la Cotización">
+                <input type="text" id="clientName" value="{{ quotation.client_name or '' }}"
+                    class="text-xs font-bold text-slate-500 uppercase tracking-wider bg-transparent border-none outline-none focus:ring-2 focus:ring-indigo-100 rounded px-1 -ml-1 placeholder-slate-300 w-64"
+                    placeholder="NOMBRE DEL CLIENTE">
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <!-- ESTIMATION SELECTOR -->
+            <div class="relative group mr-4">
+                <select id="estimationSelector" onchange="linkEstimation(this.value)"
+                    class="appearance-none bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg px-3 py-2 pr-8 focus:outline-none focus:border-indigo-500 hover:bg-slate-100 transition-all cursor-pointer">
+                    <option value="">-- Vincular Estimación --</option>
+                    {% for est in estimations if est.status == 'Aprobada' %}
+                    <option value="{{ est.id }}" {% if request.query_params.get('linked_estimation')==est.id
+                        %}selected{% endif %}>{{ est.name }} - {{ est.client }}</option>
+                    {% endfor %}
+                </select>
+
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                    </svg>
+                </div>
+            </div>
+
+            <span id="saveStatus" class="text-xs font-bold text-slate-300 uppercase tracking-wider mr-2">Guardado</span>
+            <button onclick="saveDocument()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-indigo-200 transition-all flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                    stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                Guardar
+            </button>
+            <button onclick="exportToPDF()"
+                class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-slate-200 transition-all flex items-center gap-2 text-xs">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2"
+                    stroke="currentColor" class="w-4 h-4">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+                Exportar PDF
+            </button>
+            <!-- Convert to Project (Only if not Draft) -->
+            <button onclick="saveAsTemplate()"
+                class="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-pink-200 transition-all text-xs">
+                💾 Guardar Template
+            </button>
+            <button onclick="convertToProject()"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-emerald-200 transition-all text-xs">
+                Convertir a Proyecto
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- LEFT TOOLBAR (Tools) -->
+        <div
+            class="w-72 bg-white border-r border-slate-200 flex flex-col flex-none z-10 shadow-xl overflow-y-auto custom-scrollbar">
+            <div class="p-4 bg-slate-50 border-b border-slate-200">
+                <h3 class="font-black text-slate-700 text-sm uppercase tracking-wider">Herramientas</h3>
+            </div>
+
+            <!-- Basic Blocks -->
+            <div class="p-4 grid grid-cols-2 gap-3">
+                <button onclick="addBlock('text')"
+                    class="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl transition-all group shadow-sm">
+                    <span class="text-xl mb-1 group-hover:scale-110 transition-transform">¶</span>
+                    <span class="text-[10px] font-bold text-slate-600">Texto</span>
+                </button>
+                <button onclick="addBlock('table')"
+                    class="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl transition-all group shadow-sm">
+                    <span class="text-xl mb-1 group-hover:scale-110 transition-transform">▦</span>
+                    <span class="text-[10px] font-bold text-slate-600">Tabla</span>
+                </button>
+                <button onclick="addBlock('timeline')"
+                    class="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl transition-all group shadow-sm">
+                    <span class="text-xl mb-1 group-hover:scale-110 transition-transform">📅</span>
+                    <span class="text-[10px] font-bold text-slate-600">Cronograma</span>
+                </button>
+                <button onclick="addBlock('image')"
+                    class="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl transition-all group shadow-sm">
+                    <span class="text-xl mb-1 group-hover:scale-110 transition-transform">🖼️</span>
+                    <span class="text-[10px] font-bold text-slate-600">Imagen</span>
+                </button>
+                <button onclick="addBlock('card')"
+                    class="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl transition-all group shadow-sm">
+                    <span class="text-xl mb-1 group-hover:scale-110 transition-transform">🎫</span>
+                    <span class="text-[10px] font-bold text-slate-600">Tarjeta</span>
+                </button>
+                <button onclick="addBlock('icon')"
+                    class="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl transition-all group shadow-sm">
+                    <span class="text-xl mb-1 group-hover:scale-110 transition-transform">★</span>
+                    <span class="text-[10px] font-bold text-slate-600">Icono</span>
+                </button>
+                <button onclick="addBlock('shape')"
+                    class="flex flex-col items-center justify-center p-3 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50 rounded-xl transition-all group shadow-sm">
+                    <span class="text-xl mb-1 group-hover:scale-110 transition-transform">◯</span>
+                    <span class="text-[10px] font-bold text-slate-600">Formas</span>
+                </button>
+            </div>
+
+            <div class="px-4 pb-4">
+                <button onclick="addPageBreak()"
+                    class="w-full flex items-center justify-center gap-2 p-3 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl transition-all text-indigo-700 font-bold text-xs">
+                    <span class="text-lg">+</span> Nueva Página
+                </button>
+                <button onclick="openPageReorder()"
+                    class="w-full flex items-center justify-center gap-2 p-3 mt-2 bg-slate-100 border border-slate-200 hover:bg-slate-200 rounded-xl transition-all text-slate-600 font-bold text-xs">
+                    <span class="text-lg">📄</span> Organizar Páginas
+                </button>
+            </div>
+
+            <!-- ESTIMATION DATA SECTION -->
+
+            <!-- ESTIMATION DATA SECTION -->
+            <div class="px-4 pb-4 border-t border-slate-100 mt-2 pt-2 overflow-y-auto max-h-64 custom-scrollbar">
+                <h3 class="font-black text-slate-400 text-[10px] uppercase tracking-wider mb-2">Datos de Estimación</h3>
+                <div id="estimation-data-container" class="space-y-1">
+                    <p class="text-[10px] text-slate-400 italic text-center">Sin vincular</p>
+                </div>
+            </div>
+
+            <div class="mt-auto p-4 border-t border-slate-200 bg-slate-50">
+                <div class="text-xs text-slate-400 font-bold mb-2 uppercase">Total Estimado</div>
+                <input type="number" id="docTotalAmount" value="{{ quotation.total_amount }}"
+                    class="w-full text-2xl font-black text-indigo-700 bg-transparent border-b-2 border-indigo-200 outline-none focus:border-indigo-600 px-1 py-1"
+                    placeholder="0.00">
+            </div>
+        </div>
+
+        <!-- CANVAS (The Paper) -->
+        <div class="flex-1 overflow-y-auto bg-slate-100 p-8 flex flex-col items-center gap-8 relative"
+            id="canvasContainer">
+            <!-- Pages will be injected here via JS -->
+        </div>
+    </div>
+
+</div>
+
+<!-- INTERACTION OVERLAY (For Selection & Resizing) -->
+<div id="selection-overlay" class="pointer-events-none fixed top-0 left-0 z-40 hidden border-2 border-indigo-500"
+    style="display: none;">
+    <!-- Resize Handles -->
+    <div class="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border border-indigo-500 pointer-events-auto cursor-nw-resize"
+        data-handle="nw"></div>
+    <div class="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-indigo-500 pointer-events-auto cursor-n-resize"
+        data-handle="n"></div>
+    <div class="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border border-indigo-500 pointer-events-auto cursor-ne-resize"
+        data-handle="ne"></div>
+    <div class="absolute top-1/2 -left-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-indigo-500 pointer-events-auto cursor-w-resize"
+        data-handle="w"></div>
+    <div class="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border border-indigo-500 pointer-events-auto cursor-e-resize"
+        data-handle="e"></div>
+    <div class="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border border-indigo-500 pointer-events-auto cursor-sw-resize"
+        data-handle="sw"></div>
+    <div class="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border border-indigo-500 pointer-events-auto cursor-s-resize"
+        data-handle="s"></div>
+    <div class="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border border-indigo-500 pointer-events-auto cursor-se-resize"
+        data-handle="se"></div>
+</div>
+
+<!-- FLOATING PROPERTIES TOOLBAR -->
+<div id="properties-toolbar"
+    class="fixed top-24 right-4 bg-white shadow-2xl rounded-xl border border-slate-200 w-64 z-[100] hidden flex-col overflow-hidden transition-all duration-200 font-sans">
+    <div class="bg-slate-50 p-3 border-b border-slate-100 flex justify-between items-center handle cursor-move">
+        <span class="font-bold text-xs uppercase text-slate-500 tracking-wider">Propiedades</span>
+        <button onclick="deselectBlock()" class="text-slate-400 hover:text-slate-600">×</button>
+    </div>
+    <div class="p-4 space-y-4 max-h-[80vh] overflow-y-auto custom-scrollbar">
+
+        <!-- Position / Size -->
+        <div class="grid grid-cols-2 gap-2">
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 block mb-1">ANCHO</label>
+                <div class="flex">
+                    <input type="text" id="prop-w"
+                        class="w-full text-xs border border-slate-200 rounded-l p-1 outline-none focus:border-indigo-500"
+                        onchange="applyProperty('width', this.value)">
+                    <span
+                        class="text-[10px] bg-slate-50 border border-l-0 border-slate-200 rounded-r p-1 flex items-center text-slate-400">px</span>
+                </div>
+            </div>
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 block mb-1">ALTO</label>
+                <div class="flex">
+                    <input type="text" id="prop-h"
+                        class="w-full text-xs border border-slate-200 rounded-l p-1 outline-none focus:border-indigo-500"
+                        onchange="applyProperty('height', this.value)">
+                    <span
+                        class="text-[10px] bg-slate-50 border border-l-0 border-slate-200 rounded-r p-1 flex items-center text-slate-400">px</span>
+                </div>
+            </div>
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 block mb-1">X</label>
+                <input type="text" id="prop-x"
+                    class="w-full text-xs border border-slate-200 rounded p-1 outline-none focus:border-indigo-500"
+                    onchange="applyProperty('x', this.value)">
+            </div>
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 block mb-1">Y</label>
+                <input type="text" id="prop-y"
+                    class="w-full text-xs border border-slate-200 rounded p-1 outline-none focus:border-indigo-500"
+                    onchange="applyProperty('y', this.value)">
+            </div>
+        </div>
+
+        <hr class="border-slate-100">
+
+        <!-- Style: Background / Opacity -->
+        <div class="space-y-3">
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 block mb-1">FONDO / RELLENO</label>
+                <div class="flex items-center gap-2">
+                    <input type="color" id="prop-bg-color" class="h-6 w-8 p-0 border rounded cursor-pointer"
+                        onchange="applyProperty('bgColor', this.value)">
+                    <input type="text" id="prop-bg-text" class="flex-1 text-xs border border-slate-200 rounded p-1"
+                        placeholder="#FFFFFF" onchange="applyProperty('bgColor', this.value)">
+                </div>
+            </div>
+
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 block mb-1">OPACIDAD (%)</label>
+                <div class="flex items-center gap-2">
+                    <input type="range" id="prop-opacity" min="0" max="100"
+                        class="flex-1 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer"
+                        oninput="applyProperty('opacity', this.value)">
+                    <span id="prop-opacity-val" class="text-xs font-bold text-slate-600 w-8 text-right">100</span>
+                </div>
+            </div>
+
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 block mb-1">BORDE</label>
+                <div class="flex items-center gap-2 mb-2">
+                    <input type="color" id="prop-border-color" class="h-6 w-8 p-0 border rounded cursor-pointer"
+                        onchange="applyProperty('borderColor', this.value)">
+                    <select id="prop-border-width" class="flex-1 text-xs border border-slate-200 rounded p-1"
+                        onchange="applyProperty('borderWidth', this.value)">
+                        <option value="0px">Ninguno</option>
+                        <option value="1px">1px</option>
+                        <option value="2px">2px</option>
+                        <option value="4px">4px</option>
+                        <option value="8px">8px</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <hr class="border-slate-100">
+
+        <!-- Actions -->
+        <div class="grid grid-cols-2 gap-2">
+            <button onclick="bringToFront()"
+                class="text-xs bg-white border border-slate-200 hover:bg-slate-50 to-front-btn py-1 rounded text-slate-600 font-medium">Traer
+                al Frente</button>
+            <button onclick="sendToBack()"
+                class="text-xs bg-white border border-slate-200 hover:bg-slate-50 to-back-btn py-1 rounded text-slate-600 font-medium">Enviar
+                al Fondo</button>
+            <button onclick="deleteActiveBlock()"
+                class="text-xs bg-red-50 border border-red-100 text-red-500 hover:bg-red-100 py-1 rounded col-span-2 font-bold">🗑️
+                Eliminar Bloque</button>
+        </div>
+
+        <!-- Shape Extras (Only if shape) -->
+        <div id="prop-shape-extras" class="hidden pt-2 border-t border-slate-100">
+            <label class="text-[10px] font-bold text-slate-400 block mb-1">TIPO DE FORMA</label>
+            <div class="grid grid-cols-4 gap-1">
+                <button onclick="setShapeProp('rounded-none')"
+                    class="p-1 border rounded hover:bg-slate-100 text-[10px]">Rect</button>
+                <button onclick="setShapeProp('rounded-full')"
+                    class="p-1 border rounded hover:bg-slate-100 text-[10px]">Circ</button>
+                <button onclick="setShapeProp('rounded-xl')"
+                    class="p-1 border rounded hover:bg-slate-100 text-[10px]">Rnd</button>
+                <button onclick="toggleArrowProp()"
+                    class="p-1 border rounded hover:bg-slate-100 text-[10px]">Arr</button>
+            </div>
+        </div>
+
+        <!-- Image Extras (Only if image) -->
+        <div id="prop-image-extras" class="hidden pt-2 border-t border-slate-100">
+            <button onclick="triggerCropWizard()"
+                class="w-full py-2 bg-indigo-50 text-indigo-600 text-xs font-bold rounded hover:bg-indigo-100 mb-2">✂️
+                Recortar Imagen</button>
+            <button onclick="triggerImageUpload()"
+                class="w-full py-2 bg-slate-100 text-slate-600 text-xs font-bold rounded hover:bg-slate-200">📂 Cambiar
+                Imagen</button>
+        </div>
+
+    </div>
+</div>
+
+<!-- TEMPLATES -->
+<template id="tpl-page-sheet">
+    <div
+        class="bg-white w-[816px] min-h-[1056px] shadow-2xl p-[50px] flex flex-col gap-6 relative print:w-full print:shadow-none print:m-0 print:break-after-page page-sheet group">
+
+        <!-- Header -->
+        <div class="flex justify-between items-end border-b-4 border-slate-900 pb-3 mb-4 select-none">
+            <div class="max-w-[40%]">
+                <h1 class="text-4xl font-black text-slate-900 tracking-tighter leading-none mb-2">COTIZACIÓN</h1>
+                <div class="text-sm font-bold text-slate-400 uppercase tracking-widest">{{
+                    quotation.created_at.strftime('%d %B, %Y') }}</div>
+            </div>
+            <div class="text-right flex flex-col items-end">
+                <img src="/static/img/logo_ao_negro.png" onerror="this.style.display='none'" class="h-10 mb-1" />
+                <div class="text-xl font-bold text-slate-800 leading-none">AO Development</div>
+                <div class="text-[10px] text-slate-500 font-medium tracking-wide uppercase mt-1">Innovamos y Creamos
+                    Arquitectura</div>
+            </div>
+        </div>
+
+        <!-- Blocks Container for this page -->
+        <div class="flex flex-col gap-4 min-h-[500px] page-blocks-area flex-1"></div>
+
+        <!-- Page Number / Footer -->
+        <div
+            class="mt-auto pt-4 border-t border-slate-100 flex justify-between text-[10px] text-slate-400 font-medium select-none">
+            <span>AO Development S.A. | www.oarqs.com</span>
+            <span class="page-number-display">Página 1</span>
+        </div>
+    </div>
+</template>
+
+<!-- TEMPLATES FOR BLOCKS (Hidden) -->
+<template id="tpl-text">
+    <div class="group relative border border-transparent hover:border-slate-200 rounded p-1 transition-all block-item"
+        data-type="text">
+        <div class="absolute -right-3 top-0 opacity-0 group-hover:opacity-100 flex flex-col gap-1">
+            <button onclick="moveBlock(this, -1)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs hover:bg-slate-100">▲</button>
+            <button onclick="deleteBlock(this)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs text-red-500 hover:bg-red-50">✕</button>
+            <button onclick="moveBlock(this, 1)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs hover:bg-slate-100">▼</button>
+        </div>
+        <div contenteditable="true"
+            class="prose max-w-none outline-none empty:before:content-['Escribe_aquí...'] empty:before:text-slate-300 text-slate-700 text-sm leading-relaxed p-2 block-content">
+
+        </div>
+    </div>
+</template>
+
+<template id="tpl-table">
+    <div class="absolute group border border-transparent hover:border-slate-200 rounded p-2 transition-all block-item my-4"
+        data-type="table">
+        <div class="absolute -right-3 top-0 opacity-0 group-hover:opacity-100 flex flex-col gap-1">
+            <button onclick="deleteBlock(this)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs text-red-500 hover:bg-red-50">✕</button>
+            <button onclick="moveBlock(this, -1)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs hover:bg-slate-100">▲</button>
+            <button onclick="moveBlock(this, 1)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs hover:bg-slate-100">▼</button>
+        </div>
+        <div class="overflow-x-auto relative">
+            <table class="w-full text-sm border-collapse block-content-table">
+                <thead>
+                    <tr class="bg-slate-900 text-white">
+                        <th contenteditable="true" class="p-3 border border-slate-700 w-16 text-center">#</th>
+                        <th contenteditable="true" class="p-3 border border-slate-700 text-left">Descripción del Ítem
+                        </th>
+                        <th contenteditable="true" class="p-3 border border-slate-700 w-24 text-center">Cant.</th>
+                        <th contenteditable="true" class="p-3 border border-slate-700 w-24 text-center">Precio</th>
+                        <th contenteditable="true" class="p-3 border border-slate-700 w-24 text-center">Total</th>
+                        <th class="p-1 border border-slate-700 w-8 print:hidden"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td contenteditable="true" class="p-2 border border-slate-200 text-center">1</td>
+                        <td contenteditable="true" class="p-2 border border-slate-200">Concepto ejemplo...</td>
+                        <td contenteditable="true" class="p-2 border border-slate-200 text-center">1</td>
+                        <td contenteditable="true" class="p-2 border border-slate-200 text-right">0.00</td>
+                        <td class="p-2 border border-slate-200 text-right font-bold bg-slate-50">0.00</td>
+                        <td class="p-1 border border-slate-200 text-center print:hidden">
+                            <button onclick="this.closest('tr').remove()"
+                                class="text-xs text-red-300 hover:text-red-500">×</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <button onclick="addGenericRow(this)"
+                class="mt-2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1 rounded font-bold print:hidden">+
+                Agregar Fila</button>
+
+            <div class="flex justify-end mt-4 mb-2 border-t-2 border-slate-800 pt-2">
+                <div class="text-right">
+                    <span class="text-xs font-bold text-red-500 uppercase mr-4">TOTAL DE INVERSIÓN</span>
+                    <span class="text-xl font-black text-red-500 table-grand-total">Q 0.00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+    // TABLE CALCULATION LOGIC
+    document.addEventListener('input', (e) => {
+        if (e.target.closest('table.block-content-table') && !e.target.closest('.timeline-table')) {
+            recalcTable(e.target.closest('table'));
+        }
+    });
+
+    function recalcTable(table) {
+        let total = 0;
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            // Index 2 = Cant, 3 = Precio, 4 = Total
+            // Note: Timeline table has different structure so we guard above
+            const cells = row.querySelectorAll('td');
+            if (cells.length < 5) return;
+
+            const qStr = cells[2].innerText.replace(/[^0-9.-]+/g, "");
+            const pStr = cells[3].innerText.replace(/[^0-9.-]+/g, "");
+
+            const q = parseFloat(qStr) || 0;
+            const p = parseFloat(pStr) || 0;
+
+            const sub = q * p;
+            total += sub;
+
+            cells[4].innerText = sub.toFixed(2);
+        });
+
+        // Update Grand Total
+        const container = table.closest('.block-item');
+        const grandTotalEl = container.querySelector('.table-grand-total');
+        if (grandTotalEl) grandTotalEl.innerText = "Q " + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+</script>
+
+<template id="tpl-service">
+    <div class="absolute group border border-blue-50 hover:border-blue-200 bg-blue-50/20 rounded-xl p-4 transition-all block-item my-4 flex items-start gap-4"
+        data-type="service">
+        <div class="absolute -right-3 top-0 opacity-0 group-hover:opacity-100 flex flex-col gap-1">
+            <button onclick="deleteBlock(this)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs text-red-500 hover:bg-red-50">✕</button>
+            <button onclick="moveBlock(this, -1)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs hover:bg-slate-100">▲</button>
+            <button onclick="moveBlock(this, 1)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs hover:bg-slate-100">▼</button>
+        </div>
+
+        <!-- Icon -->
+        <div
+            class="w-16 h-16 bg-white rounded-lg shadow-sm flex items-center justify-center text-4xl block-service-icon border border-slate-100 flex-none">
+            📐
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1">
+            <div contenteditable="true" class="font-bold text-slate-800 text-lg mb-1 outline-none block-service-title">
+                Título del Servicio</div>
+            <div contenteditable="true" class="text-sm text-slate-600 leading-relaxed outline-none block-service-desc">
+                Descripción detallada...</div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-timeline">
+    <div class="absolute group border border-transparent hover:border-slate-200 rounded p-2 transition-all block-item my-4"
+        data-type="timeline">
+        <div class="absolute -right-3 top-0 opacity-0 group-hover:opacity-100 flex flex-col gap-1">
+            <button onclick="deleteBlock(this)"
+                class="w-6 h-6 bg-white border shadow rounded text-xs text-red-500 hover:bg-red-50">✕</button>
+        </div>
+        <h4 class="font-bold text-slate-800 uppercase text-xs mb-3 border-b border-indigo-500 pb-1 inline-block">
+            Cronograma de Ejecución</h4>
+        <!-- Interactive simple grid -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs block-content-table">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500">
+                        <th class="p-2 text-left w-1/3">Fase</th>
+                        <th class="p-2 text-center w-12">S1</th>
+                        <th class="p-2 text-center w-12">S2</th>
+                        <th class="p-2 text-center w-12">S3</th>
+                        <th class="p-2 text-center w-12">S4</th>
+                        <th class="p-2 text-center w-12">S5</th>
+                        <th class="p-2 text-center w-12">S6</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr>
+                        <td contenteditable="true" class="p-2 font-bold text-slate-700">Fase 1: Anteproyecto</td>
+                        <td class="p-1">
+                            <div class="h-4 bg-indigo-200 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <button onclick="addTimelineRow(this)" class="mt-2 text-[10px] text-indigo-600 font-bold hover:underline">+
+                Agregar Fase</button>
+        </div>
+    </div>
+</template>
+
+<script>
+    const quotId = "{{ quotation.id }}";
+    let isDirty = false;
+    let autoSaveTimer = null;
+    let localBlocks = []; // In-memory state of blocks
+
+    // Initial Load
+    const savedContent = {{ quotation.content_json | tojson | safe }};
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Hydrate local state
+        if (savedContent && savedContent.length > 0) {
+            localBlocks = savedContent;
+        } else {
+            // Default: Just a text block (Page created automatically)
+            localBlocks = [{ type: 'text', content: '<h3 class="font-bold text-lg">Propuesta de Servicios Profesionales</h3><p>Estimado cliente, es un gusto presentarle...</p>' }];
+        }
+
+        renderDocument(); // Main render function
+
+        // Auto-save logic
+        document.getElementById('canvasContainer').addEventListener('input', () => {
+            isDirty = true;
+            document.getElementById('saveStatus').innerText = "Editando...";
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(saveDocument, 3000); // 3s debounce
+        });
+    });
+
+    // --- RENDERING CORE ---
+    function renderDocument() {
+        const container = document.getElementById('canvasContainer');
+        container.innerHTML = ''; // Clear all pages
+
+        // Start Page 1
+        let pageCount = 1;
+        let currentPageEl = createNewPageElement(pageCount);
+        let currentPageBody = currentPageEl.querySelector('.page-blocks-area');
+        container.appendChild(currentPageEl);
+
+        // Auto-layout cursor for legacy blocks
+        let currentY = 20;
+
+        localBlocks.forEach((block, index) => {
+            if (block.type === 'page_break') {
+                pageCount++;
+                currentPageEl = createNewPageElement(pageCount);
+                currentPageBody = currentPageEl.querySelector('.page-blocks-area');
+                container.appendChild(currentPageEl);
+                currentY = 20; // Reset for new page
+            } else if (block.type === 'page_config') {
+                // Apply config to CURRENT page
+                applyPageConfig(currentPageEl, block.content);
+            } else {
+                const blockEl = createBlockElement(block);
+                if (blockEl) {
+                    // Positioning Logic
+                    if (block.x !== undefined && block.y !== undefined) {
+                        blockEl.style.left = block.x + 'px';
+                        blockEl.style.top = block.y + 'px';
+                    } else {
+                        // Legacy / New unformatted block: Stack it
+                        blockEl.style.left = '50px';
+                        blockEl.style.top = currentY + 'px';
+                        currentY += 100; // Estimate height increment
+                    }
+
+                    currentPageBody.appendChild(blockEl);
+                }
+            }
+        });
+
+        // Ensure at least one page
+        if (container.children.length === 0) {
+            container.appendChild(createNewPageElement(1));
+        }
+
+        // Initialize Custom Drag Events
+        initDraggable();
+
+        // Restore Active Page Selection
+        const pageAreas = document.querySelectorAll('.page-blocks-area');
+        if (activePageIndex >= 0 && activePageIndex < pageAreas.length) {
+            setActivePage(pageAreas[activePageIndex]);
+        } else if (pageAreas.length > 0) {
+            setActivePage(pageAreas[0]);
+        }
+    }
+
+    // --- CUSTOM DRAG & DROP ENGINE (ABSOLUTE POSITIONING) ---
+    // Replaces Sortable.js for "InDesign-style" canvas interaction.
+
+    let dragItem = null;
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+
+    function initResizable() {
+        const handles = document.querySelectorAll('.resize-handle');
+        handles.forEach(handle => {
+            // Clone to remove old listeners if any
+            const newHandle = handle.cloneNode(true);
+            handle.parentNode.replaceChild(newHandle, handle);
+
+            newHandle.addEventListener('mousedown', (e) => {
+                e.stopPropagation(); // Prevent drag of block
+                e.preventDefault();
+
+                const block = newHandle.closest('.block-item');
+                const type = Array.from(newHandle.classList).find(c => c.startsWith('resize-')).replace('resize-', '');
+
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startW = block.offsetWidth;
+                const startH = block.offsetHeight;
+                const startLeft = block.offsetLeft;
+                const startTop = block.offsetTop;
+
+                function onMove(e) {
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+
+                    if (type.includes('e')) {
+                        block.style.width = (startW + dx) + 'px';
+                        block.classList.remove('w-full', 'w-1/2', 'w-1/3', 'w-1/4', 'w-3/4');
+                    }
+                    if (type.includes('s')) {
+                        block.style.height = (startH + dy) + 'px';
+                    }
+                    if (type.includes('w')) {
+                        block.style.width = (startW - dx) + 'px';
+                        block.style.left = (startLeft + dx) + 'px';
+                        block.classList.remove('w-full', 'w-1/2', 'w-1/3', 'w-1/4', 'w-3/4');
+                    }
+                    if (type.includes('n')) {
+                        block.style.height = (startH - dy) + 'px';
+                        block.style.top = (startTop + dy) + 'px';
+                    }
+
+                    isDirty = true;
+                }
+
+                function onUp() {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                }
+
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        });
+    }
+
+    function initDraggable() {
+        initResizable();
+        document.removeEventListener('mousedown', handleDragStart);
+        document.addEventListener('mousedown', handleDragStart);
+    }
+
+    function handleDragStart(e) {
+        // Only trigger if clicking a handle
+        const handle = e.target.closest('.block-handle');
+        if (!handle) return;
+
+        e.preventDefault(); // Prevent text selection
+        dragItem = handle.closest('.block-item');
+        const page = dragItem.closest('.page-blocks-area');
+
+        // Calculate offset (Mouse vs Element Top-Left)
+        const rect = dragItem.getBoundingClientRect();
+        const pageRect = page.getBoundingClientRect();
+
+        // We operate in Page-Relative coordinates
+        // Current Left/Top are styles or computed
+        const currentLeft = dragItem.offsetLeft;
+        const currentTop = dragItem.offsetTop;
+
+        // Mouse position relative to Element
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+
+        // Add listeners
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
+
+        // Visual
+        dragItem.style.zIndex = '1000';
+        dragItem.classList.add('dragging');
+    }
+
+    function handleDragMove(e) {
+        if (!dragItem) return;
+
+        // Check which page we are over
+        const pages = document.querySelectorAll('.page-blocks-area');
+        let targetPage = null;
+
+        // Simple hit test
+        for (const p of pages) {
+            const r = p.getBoundingClientRect();
+            if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) {
+                targetPage = p;
+                break;
+            }
+        }
+
+        if (targetPage) {
+            // If moved to different page, reparent
+            if (targetPage !== dragItem.parentElement) {
+                targetPage.appendChild(dragItem);
+            }
+
+            // Calculate Position relative to Target Page
+            const pRect = targetPage.getBoundingClientRect();
+            let newX = e.clientX - pRect.left - dragOffsetX;
+            let newY = e.clientY - pRect.top - dragOffsetY;
+
+            // Apply bounds? (Optional, user said "anywhere", but maybe keep inside?)
+            // For InDesign feel, usually strict bounds, but let's allow "bleeding" slightly for flexibility
+
+            dragItem.style.left = newX + 'px';
+            dragItem.style.top = newY + 'px';
+        }
+    }
+
+    function handleDragEnd(e) {
+        if (dragItem) {
+            dragItem.style.zIndex = '';
+            dragItem.classList.remove('dragging');
+            dragItem = null;
+            isDirty = true;
+        }
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+    }
+
+    function applyPageConfig(pageEl, config) {
+        let cfg = config;
+        if (typeof config === 'string') {
+            try { cfg = JSON.parse(config); } catch (e) { return; }
+        }
+
+        // Reset defaults
+        pageEl.classList.remove('page-cover');
+        const header = pageEl.querySelector('.page-header-section');
+        const footer = pageEl.querySelector('.page-footer-section');
+        if (header) header.style.display = 'flex';
+        if (footer) footer.style.display = 'flex';
+        pageEl.style.backgroundImage = 'none';
+
+        if (cfg.isCover) {
+            pageEl.classList.add('page-cover');
+            if (header) header.style.display = 'none';
+            if (footer) footer.style.display = 'none';
+        } else {
+            // Granular control
+            if (cfg.hideHeader && header) header.style.display = 'none';
+            if (cfg.hideFooter && footer) footer.style.display = 'none';
+        }
+
+        if (cfg.backgroundImage) {
+            pageEl.style.backgroundImage = `url('${cfg.backgroundImage}')`;
+            pageEl.style.backgroundSize = 'cover';
+            pageEl.style.backgroundPosition = 'center';
+            pageEl.style.backgroundRepeat = 'no-repeat';
+        }
+
+        // Restore Editable Content
+        if (cfg.headerLeft && pageEl.querySelector('.page-header-left')) {
+            pageEl.querySelector('.page-header-left').innerHTML = cfg.headerLeft;
+        }
+        if (cfg.headerRight && pageEl.querySelector('.page-header-right')) {
+            pageEl.querySelector('.page-header-right').innerHTML = cfg.headerRight;
+        }
+        if (cfg.footerLeft && pageEl.querySelector('.page-footer-left')) {
+            pageEl.querySelector('.page-footer-left').innerHTML = cfg.footerLeft;
+        }
+    }
+
+    function createNewPageElement(pageNumber) {
+        const tpl = document.getElementById('tpl-page-sheet-v2');
+        const clone = tpl.content.cloneNode(true);
+        const el = clone.querySelector('.page-sheet');
+
+        // Add page controls
+        const controls = document.createElement('div');
+        controls.className = "absolute top-2 left-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-50 print:hidden";
+        controls.innerHTML = `
+            <button onclick="openPageConfig(this)" class="bg-indigo-600 text-white text-xs px-2 py-1 rounded shadow hover:bg-indigo-700 font-bold shadow-indigo-200">🛠️ Configurar Página</button>
+        `;
+        el.appendChild(controls);
+
+        el.querySelector('.page-number-display').innerText = "Página " + pageNumber;
+        return el;
+    }
+
+    // Toggle Cover Mode (Inserts/Removes page_config block)
+    function toggleCoverMode(btn) {
+        const pageEl = btn.closest('.page-sheet');
+        const container = document.getElementById('canvasContainer');
+        const pages = Array.from(container.children);
+        const pageIndex = pages.indexOf(pageEl);
+
+        // Confirm action
+        const isCover = pageEl.classList.contains('page-cover');
+        const action = isCover ? "Restaurar formato estándar?" : "Convertir en Portada (Full Bleed)?";
+        if (!confirm(action)) return;
+
+        // Reconstruct localBlocks from DOM to ensure sync
+        localBlocks = serializeBlocksFromDOM();
+
+        // We need to inject or remove 'page_config' block for this specific page.
+        // It's tricky to map linear blocks to pages without re-parsing.
+        // But since we just serialized from DOM, we have the linear list including page_breaks.
+
+        // We will traverse the new localBlocks to find the target page
+        let tempPage = 0;
+        let pStart = 0;
+
+        for (let i = 0; i < localBlocks.length; i++) {
+            if (localBlocks[i].type === 'page_break') {
+                tempPage++;
+                if (tempPage === pageIndex) {
+                    pStart = i + 1; // Start of our page
+                    break;
+                }
+            }
+        }
+        if (pageIndex === 0) pStart = 0;
+
+        // Check if first block at pStart is page_config
+        let hasConfig = false;
+        if (localBlocks[pStart] && localBlocks[pStart].type === 'page_config') {
+            hasConfig = true;
+        }
+
+        if (isCover) {
+            // Remove config (Restore standard)
+            if (hasConfig) localBlocks.splice(pStart, 1);
+        } else {
+            // Add config
+            // Prompt for background image? Use default for now.
+            const bg = prompt("URL de la imagen de fondo (dejar vacío para predeterminada):", "/static/img/cover_bg.png");
+            const finalBg = bg ? bg : '/static/img/cover_bg.png';
+
+            const configBlock = {
+                type: 'page_config',
+                content: { isCover: true, backgroundImage: finalBg }
+            };
+
+            if (hasConfig) {
+                // Update existing
+                localBlocks[pStart] = configBlock;
+            } else {
+                // Insert new
+                localBlocks.splice(pStart, 0, configBlock);
+            }
+        }
+
+        renderDocument();
+        isDirty = true;
+    }
+
+    function serializeBlocksFromDOM() {
+        const blocks = [];
+        const pages = document.querySelectorAll('.page-sheet');
+        pages.forEach((page, index) => {
+            if (index > 0) blocks.push({ type: 'page_break', content: '' });
+
+            // Serialize Page Config
+            let pageConfig = { isCover: false, backgroundImage: '', hideHeader: false, hideFooter: false };
+            let hasConfig = false;
+
+            if (page.classList.contains('page-cover')) {
+                pageConfig.isCover = true;
+                hasConfig = true;
+            }
+
+            // Check visual state for Granular Config
+            const header = page.querySelector('.page-header-section');
+            const footer = page.querySelector('.page-footer-section');
+
+            if (header && header.style.display === 'none' && !pageConfig.isCover) {
+                pageConfig.hideHeader = true;
+                hasConfig = true;
+            }
+            if (footer && footer.style.display === 'none' && !pageConfig.isCover) {
+                pageConfig.hideFooter = true;
+                hasConfig = true;
+            }
+
+            let bg = page.style.backgroundImage;
+            if (bg && bg !== 'none' && bg !== '') {
+                if (bg.startsWith('url(')) {
+                    bg = bg.slice(5, -2);
+                    bg = bg.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
+                }
+                pageConfig.backgroundImage = bg;
+                hasConfig = true;
+            }
+
+            // Serialize Editable Header/Footer
+            const hLeft = page.querySelector('.page-header-left');
+            const hRight = page.querySelector('.page-header-right');
+            const fLeft = page.querySelector('.page-footer-left');
+
+            if (hLeft) { pageConfig.headerLeft = hLeft.innerHTML; hasConfig = true; }
+            if (hRight) { pageConfig.headerRight = hRight.innerHTML; hasConfig = true; }
+            if (fLeft) { pageConfig.footerLeft = fLeft.innerHTML; hasConfig = true; }
+
+            if (hasConfig) {
+                blocks.push({ type: 'page_config', content: pageConfig });
+            }
+
+            const items = page.querySelectorAll('.block-item');
+            items.forEach(el => {
+                const type = el.dataset.type;
+                let content = '';
+                if (type === 'text') content = el.querySelector('.block-content').innerHTML;
+                else if (type === 'image') content = el.querySelector('.block-image-content').innerHTML;
+                else if (type === 'table' || type === 'timeline') content = el.querySelector('.block-content-table').innerHTML;
+                else if (type === 'service') {
+                    content = JSON.stringify({
+                        icon: el.querySelector('.block-service-icon').innerText,
+                        title: el.querySelector('.block-service-title').innerText,
+                        desc: el.querySelector('.block-service-desc').innerText
+                    });
+                }
+                else if (type === 'card') {
+                    const cardData = {
+                        color: el.querySelector('input[type="color"]').value,
+                        title: el.querySelectorAll('[contenteditable]')[0].innerHTML,
+                        price: el.querySelectorAll('[contenteditable]')[1].innerHTML,
+                        details: el.querySelectorAll('[contenteditable]')[2].innerHTML
+                    };
+                    content = JSON.stringify(cardData);
+                }
+                else if (type === 'icon') {
+                    const iconData = {
+                        imgSrc: el.querySelector('.block-icon-img').src,
+                        title: el.querySelector('[contenteditable]').innerText
+                    };
+                    content = JSON.stringify(iconData);
+                }
+                if (type) {
+                    // Capture Dimensions & Position
+                    // We prefer explicit style width/height if set by interaction layer
+                    // If not, we fallback to classes or defaults
+                    const w = el.style.width || (el.classList.contains('w-full') ? 'w-full' : el.style.width);
+                    const h = el.style.height || '';
+                    const x = el.offsetLeft;
+                    const y = el.offsetTop;
+
+                    // Capture Visual Styles
+                    const styleProps = {
+                        opacity: el.style.opacity || '',
+                        zIndex: el.style.zIndex || '',
+                        borderWidth: el.style.borderWidth || '',
+                        borderColor: el.style.borderColor || '',
+                        borderStyle: el.style.borderStyle || '',
+                        backgroundColor: el.style.backgroundColor || '' // For block background
+                    };
+
+                    // For Shapes, capture internal class/style
+                    if (type === 'shape') {
+                        const shContent = el.querySelector('.shape-content');
+                        if (shContent) {
+                            if (shContent.classList.contains('rounded-full')) styleProps.borderRadius = 'rounded-full';
+                            else if (shContent.classList.contains('rounded-xl')) styleProps.borderRadius = 'rounded-xl';
+                            else styleProps.borderRadius = 'rounded-none';
+
+                            styleProps.clipPath = shContent.style.clipPath || '';
+                            styleProps.innerColor = shContent.style.backgroundColor || '';
+                        }
+                    } else if (type === 'card') {
+                        styleProps.innerColor = el.querySelector('.shadow-lg').style.backgroundColor || '';
+                    }
+
+                    blocks.push({ type, content, width: w, height: h, x, y, style: styleProps });
+                }
+            });
+        });
+        return blocks;
+    }
+
+    // ... (helper functions for card/icon)
+    function setBlockWidth(btn, widthClass) {
+        const block = btn.closest('.block-item');
+        block.classList.remove('w-full', 'w-1/2', 'w-1/3', 'w-1/4', 'w-3/4');
+        block.classList.add(widthClass);
+        isDirty = true;
+    }
+
+    function setBlockCustomWidth(btn) {
+        const block = btn.closest('.block-item');
+        const current = block.style.width || '';
+        const input = prompt("Ingresa el porcentaje de ancho (ej. 45):", current.replace('%', ''));
+        if (input === null) return;
+
+        const val = parseFloat(input);
+        if (isNaN(val)) return;
+
+        // Remove standard classes
+        block.classList.remove('w-full', 'w-1/2', 'w-1/3', 'w-1/4', 'w-3/4');
+
+        // Apply custom style
+        block.style.width = val + '%';
+        isDirty = true;
+    }
+
+    function updateCardColor(input) {
+        input.closest('.shadow-lg').style.backgroundColor = input.value;
+        isDirty = true;
+    }
+
+    function handleIconUpload(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const container = input.closest('.block-icon-container');
+                const img = container.querySelector('.block-icon-img');
+                const placeholder = container.querySelector('.block-icon-placeholder');
+                img.src = e.target.result;
+                img.style.display = 'block';
+                placeholder.style.display = 'none';
+                isDirty = true;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // Toolbar Listener
+    document.addEventListener('selectionchange', () => {
+        const selection = window.getSelection();
+        const toolbar = document.getElementById('textToolbar');
+        if (!toolbar) return;
+
+        let isEditable = false;
+        if (selection.rangeCount > 0) {
+            const node = selection.anchorNode;
+            if (node) {
+                const el = node.nodeType === 3 ? node.parentNode : node;
+                if (el.isContentEditable || el.closest('[contenteditable]')) {
+                    isEditable = true;
+                }
+            }
+        }
+
+        if (isEditable) {
+            toolbar.classList.remove('hidden');
+        } else {
+            // Optional: hide if lost focus. But maybe keep if clicking buttons?
+            // Clicking buttons might lose focus on text.
+            // We rely on 'mousedown' on buttons not preventing focus loss unless we use preventDefault
+        }
+    });
+
+    // We also show toolbar when focusing any editable
+    document.addEventListener('focusin', (e) => {
+        if (e.target.isContentEditable) {
+            document.getElementById('textToolbar').classList.remove('hidden');
+        }
+    });
+
+    // Hide when clicking outside
+    document.addEventListener('click', (e) => {
+        const toolbar = document.getElementById('textToolbar');
+        if (!e.target.closest('#textToolbar') && !e.target.isContentEditable && !e.target.closest('[contenteditable]')) {
+            toolbar.classList.add('hidden');
+        }
+    });
+
+    function createBlockElement(data) {
+        let el = null;
+        let tplId = '';
+
+        switch (data.type) {
+            case 'text': tplId = 'tpl-text-v2'; break;
+            case 'image': tplId = 'tpl-image-v2'; break;
+            case 'table': tplId = 'tpl-table-v2'; break;
+            case 'timeline': tplId = 'tpl-timeline-v2'; break;
+            case 'service': tplId = 'tpl-service-v2'; break;
+            case 'card': tplId = 'tpl-card-v2'; break;
+            case 'icon': tplId = 'tpl-icon-v2'; break;
+            case 'shape': tplId = 'tpl-shape-v2'; break;
+            default: return null;
+        }
+
+        const tpl = document.getElementById(tplId);
+        if (!tpl) return null; // Fallback or error
+
+        const clone = tpl.content.cloneNode(true);
+        el = clone.querySelector('.block-item');
+
+        // Apply Width
+        // Apply Position & Size
+        el.style.left = (data.x || 0) + 'px';
+        el.style.top = (data.y || 0) + 'px';
+
+        // Width
+        if (data.width && data.width !== 'w-full' && !data.width.startsWith('w-')) {
+            el.style.width = data.width; // px value
+        } else if (data.width && data.width.startsWith('w-')) {
+            el.classList.add(data.width);
+        } else {
+            // Fallback
+            if (!data.width) el.classList.add('w-full');
+        }
+
+        // Height
+        if (data.height) el.style.height = data.height;
+
+        // Apply Style Props
+        if (data.style) {
+            if (data.style.opacity) el.style.opacity = data.style.opacity;
+            if (data.style.zIndex) el.style.zIndex = data.style.zIndex;
+            if (data.style.borderWidth) el.style.borderWidth = data.style.borderWidth;
+            if (data.style.borderColor) el.style.borderColor = data.style.borderColor;
+            if (data.style.borderStyle) el.style.borderStyle = data.style.borderStyle;
+            if (data.style.backgroundColor) el.style.backgroundColor = data.style.backgroundColor;
+        }
+
+        if (data.type === 'text') {
+            el.querySelector('.block-content').innerHTML = data.content;
+        } else if (data.type === 'image') {
+            if (data.content && data.content.trim() !== '') {
+                if (data.content.startsWith('<img')) {
+                    el.querySelector('.block-image-content').innerHTML = data.content;
+                } else if (data.content.startsWith('http') || data.content.startsWith('data:')) {
+                    el.querySelector('.block-image-content').innerHTML = `<img src="${data.content}" class="w-full h-auto rounded-lg shadow-sm">`;
+                } else {
+                    el.querySelector('.block-image-content').innerHTML = data.content;
+                }
+                el.querySelector('.block-image-placeholder').style.display = 'none';
+                el.querySelector('.block-image-content').style.display = 'block';
+            }
+        } else if (data.type === 'table' || data.type === 'timeline') {
+            if (data.content) el.querySelector('.block-content-table').innerHTML = data.content;
+        } else if (data.type === 'service') {
+            if (data.content && typeof data.content === 'object') {
+                el.querySelector('.block-service-icon').innerText = data.content.icon;
+                el.querySelector('.block-service-title').innerText = data.content.title;
+                el.querySelector('.block-service-desc').innerText = data.content.desc;
+            } else if (data.content && typeof data.content === 'string') {
+                try {
+                    const parsed = JSON.parse(data.content);
+                    el.querySelector('.block-service-icon').innerText = parsed.icon;
+                    el.querySelector('.block-service-title').innerText = parsed.title;
+                    el.querySelector('.block-service-desc').innerText = parsed.desc;
+                } catch (e) { }
+            }
+        } else if (data.type === 'card') {
+            if (data.content) {
+                try {
+                    const parsed = typeof data.content === 'string' ? JSON.parse(data.content) : data.content;
+                    el.querySelector('input[type="color"]').value = parsed.color || '#ffffff';
+                    el.querySelector('.shadow-lg').style.backgroundColor = parsed.color || '#ffffff';
+                    const edits = el.querySelectorAll('[contenteditable]');
+                    edits[0].innerHTML = parsed.title;
+                    edits[1].innerHTML = parsed.price;
+                    edits[2].innerHTML = parsed.details;
+                } catch (e) { }
+            }
+        } else if (data.type === 'icon') {
+            if (data.content) {
+                try {
+                    const parsed = typeof data.content === 'string' ? JSON.parse(data.content) : data.content;
+                    const img = el.querySelector('.block-icon-img');
+                    img.src = parsed.imgSrc;
+                    img.style.display = 'block';
+                    el.querySelector('.block-icon-placeholder').style.display = 'none';
+                    el.querySelector('[contenteditable]').innerText = parsed.title;
+                } catch (e) { }
+            }
+        } else if (data.type === 'shape') {
+            // Apply Shape Specifics from style
+            if (data.style) {
+                const shContent = el.querySelector('.shape-content');
+                if (shContent) {
+                    if (data.style.borderRadius) shContent.classList.add(data.style.borderRadius);
+                    else shContent.classList.add('rounded-none'); // default
+
+                    if (data.style.clipPath) shContent.style.clipPath = data.style.clipPath;
+                    if (data.style.innerColor) shContent.style.backgroundColor = data.style.innerColor;
+                }
+            }
+        }
+
+        // Extra Style applications
+        if (data.type === 'card' && data.style && data.style.innerColor) {
+            const sl = el.querySelector('.shadow-lg');
+            if (sl) sl.style.backgroundColor = data.style.innerColor;
+        }
+
+        return el;
+    }
+
+    function addBlock(type) {
+        let content = '';
+        if (type === 'text') content = '<p>Texto...</p>';
+        else if (type === 'card') content = JSON.stringify({ color: '#ffffff', title: 'Título', price: 'Q0.00', details: '<ul><li>Detalles</li></ul>' });
+        else if (type === 'icon') content = JSON.stringify({ imgSrc: '', title: 'TITULO' });
+        else if (type === 'shape') content = '';
+
+        localBlocks = serializeBlocksFromDOM();
+
+        // Find insert position based on active page
+        // Use activePageIndex directly for robustness
+        let pIndex = activePageIndex;
+        if (pIndex < 0 || pIndex === undefined) pIndex = 0;
+
+        // 1. Serialize existing
+        localBlocks = serializeBlocksFromDOM();
+
+        // 2. Find Index in localBlocks
+        let insertIndex = localBlocks.length;
+
+        let pCount = 0;
+        for (let i = 0; i < localBlocks.length; i++) {
+            if (localBlocks[i].type === 'page_break') {
+                pCount++;
+                if (pCount > pIndex) {
+                    insertIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // Default Position: Center-ish
+        // We can randomise slightly to avoid perfect stack
+        const defaultX = 50 + (Math.random() * 20);
+        const defaultY = 100 + (Math.random() * 20);
+
+        localBlocks.splice(insertIndex, 0, { type, content, width: 'w-full', x: defaultX, y: defaultY });
+        renderDocument();
+
+        // Try to restore focus or scroll
+        const pageAreas = document.querySelectorAll('.page-blocks-area');
+        if (pageAreas[pIndex]) {
+            // Only scroll if far away?
+            // pageAreas[pIndex].scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+        isDirty = true;
+    }
+
+    // Width Logic
+    function setBlockWidth(btn, width) {
+        const el = btn.closest('.block-item');
+        el.className = el.className.replace(/w-\S+/g, '').trim();
+        el.classList.add(width);
+        isDirty = true;
+    }
+
+    let activePageElement = null;
+    let activePageIndex = 0; // Persistent index
+
+    function setActivePage(el) {
+        activePageElement = el;
+        // Calculate index
+        const pages = document.querySelectorAll('.page-blocks-area');
+        activePageIndex = Array.from(pages).indexOf(el);
+
+        // Visual feedback
+        pages.forEach(p => p.classList.remove('ring-2', 'ring-indigo-100'));
+        el.classList.add('ring-2', 'ring-indigo-100');
+    }
+
+    // Page Delete Logic
+    function deletePageInList(btn) {
+        const item = btn.closest('.page-sort-item');
+        if (confirm('Eliminar esta página completa y su contenido?')) {
+            item.remove();
+        }
+    }
+
+    function addServiceBlock(title, desc, icon) {
+        localBlocks = serializeBlocksFromDOM();
+        localBlocks.push({ type: 'service', content: { title, desc, icon } });
+        renderDocument();
+        isDirty = true;
+    }
+
+    function addPageBreak() {
+        localBlocks = serializeBlocksFromDOM();
+        localBlocks.push({ type: 'page_break', content: '' });
+        renderDocument();
+        const pages = document.querySelectorAll('.page-sheet');
+        pages[pages.length - 1].scrollIntoView({ behavior: 'smooth' });
+        isDirty = true;
+    }
+
+    function saveAsTemplate() {
+        const title = prompt("Nombre del Template:");
+        if (!title) return;
+
+        localBlocks = serializeBlocksFromDOM();
+
+        fetch('/cotizaciones/templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: title,
+                content_json: localBlocks
+            })
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') alert('Template guardado!');
+                else alert('Error: ' + (d.message || 'Unknown'));
+            })
+            .catch(e => alert('Error de Red: ' + e));
+    }
+
+    function deleteBlock(btn) {
+        if (confirm('Eliminar bloque?')) {
+            btn.closest('.block-item').remove();
+            isDirty = true;
+        }
+    }
+
+    function moveBlock(btn, direction) {
+        const curr = btn.closest('.block-item');
+        const parent = curr.parentNode;
+        if (direction === -1 && curr.previousElementSibling) {
+            parent.insertBefore(curr, curr.previousElementSibling);
+        } else if (direction === 1 && curr.nextElementSibling) {
+            parent.insertBefore(curr.nextElementSibling, curr);
+        }
+        isDirty = true;
+    }
+
+    function handleImageUpload(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const container = input.closest('.block-item');
+                const contentDiv = container.querySelector('.block-image-content');
+                const placeholder = container.querySelector('.block-image-placeholder');
+
+                contentDiv.innerHTML = `<img src="${e.target.result}" class="w-full h-auto rounded-lg shadow-sm">`;
+                contentDiv.style.display = 'block';
+                placeholder.style.display = 'none';
+                isDirty = true;
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    // --- SAVING ---
+    // --- SAVING ---
+    function saveDocument() {
+        const title = document.getElementById('docTitle').value;
+        const client = document.getElementById('clientName').value;
+        const amount = parseFloat(document.getElementById('docTotalAmount').value) || 0;
+
+        // Sync Source of Truth
+        localBlocks = serializeBlocksFromDOM();
+
+        const payload = {
+            id: quotId,
+            updates: {
+                title: title,
+                client_name: client,
+                total_amount: amount,
+                content_json: localBlocks,
+                updated_at: new Date().toISOString()
+            }
+        };
+
+        fetch('/cotizaciones/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    document.getElementById('saveStatus').innerText = "Guardado " + new Date().toLocaleTimeString();
+                    isDirty = false;
+                } else {
+                    document.getElementById('saveStatus').innerText = "Error";
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                document.getElementById('saveStatus').innerText = "Error Conexión";
+            });
+    }
+
+    function exportToPDF() {
+        openExportModal();
+    }
+
+    function openExportModal() {
+        if (!document.getElementById('export-modal')) {
+            const modalHtml = `
+            <div id="export-modal" class="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center hidden backdrop-blur-sm">
+                <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                    <div class="p-5 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-slate-800">Exportar Cotización</h3>
+                        <button onclick="document.getElementById('export-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div class="p-4 border border-slate-200 rounded-lg hover:border-indigo-500 cursor-pointer transition-all group" onclick="confirmExport('pdf')">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-file-pdf text-xl"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-800">Guardar como PDF</div>
+                                    <div class="text-xs text-slate-500">Formato digital optimizado.</div>
+                                </div>
+                            </div>
+                        </div>
+                         <div class="p-4 border border-slate-200 rounded-lg hover:border-indigo-500 cursor-pointer transition-all group" onclick="confirmExport('print')">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-500 group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-print text-xl"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-800">Imprimir</div>
+                                    <div class="text-xs text-slate-500">Enviar a impresora.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+        document.getElementById('export-modal').classList.remove('hidden');
+    }
+
+    function confirmExport(type) {
+        document.getElementById('export-modal').classList.add('hidden');
+
+        // Clone the content
+        const content = document.getElementById('canvasContainer').innerHTML;
+
+        // Gather all styles from parent to ensure identical rendering
+        const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+            .map(s => s.outerHTML)
+            .join('');
+
+        // Create Print Window
+        const printWindow = window.open('', '', 'height=900,width=800');
+
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>Cotizacion_${document.getElementById('docTitle').value || 'Export'}</title>
+                ${styles}
+                <style>
+                    /* Reset visibility for the print window */
+                    @media print {
+                        body * {
+                            visibility: visible !important;
+                        }
+                        .no-print {
+                            display: none !important;
+                        }
+                        .page-sheet {
+                            margin: 0 !important;
+                            page-break-after: always !important;
+                            box-shadow: none !important; /* Remove page shadow */
+                            border: none !important;
+                        }
+                        
+                        /* GLOBAL CLEANUP START */
+                        
+                        /* Remove Borders from Block Containers but verify if users use them? 
+                           Likely yes for Tables. The .block-item border is usually the hover border (transparent).
+                        */
+                        .block-item {
+                            border: none !important;
+                            /* background-color: transparent !important;  <-- REMOVED to allow colored shapes/cards */
+                        }
+
+                        /* Images: Remove any border/outline */
+                        img {
+                            border: none !important;
+                            outline: none !important;
+                            background: transparent !important;
+                        }
+
+                        /* Geometric Shapes: Keep Visuals */
+                        .shape-content {
+                             /* Allow shadows if part of design */
+                        }
+
+                        /* Cards: Remove "Card" look if needed, but keep content bg */
+                        [data-type="card"] .shadow-lg {
+                            box-shadow: none !important;
+                            border: none !important;
+                        }
+
+                        /* GLOBAL CLEANUP END */
+                    }
+
+                    body { 
+                        font-family: 'Barlow', sans-serif; 
+                        background: white; 
+                        margin: 0; 
+                        padding: 0;
+                    }
+                    /* Force Print Layout Overrides */
+                    .page-sheet {
+                        width: 215.9mm !important; /* Letter Width */
+                        height: 279.4mm !important; /* Letter Height */
+                        margin: 0 auto !important;
+                        background: white !important;
+                        position: relative !important;
+                        overflow: hidden !important;
+                        page-break-after: always !important;
+                        box-shadow: none !important;
+                        left: auto !important;
+                        top: auto !important;
+                        transform: none !important;
+                    }
+                    .page-sheet:last-child {
+                        page-break-after: auto !important;
+                    }
+                    
+                    /* Hide Editor Controls */
+                    .no-print, .block-controls, .resize-handle, .page-number, .grid-overlay, .ruler-x, .ruler-y {
+                        display: none !important;
+                    }
+
+                    #canvasContainer {
+                        transform: none !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        position: static !important;
+                    }
+                    
+                    /* Ensure backgrounds print */
+                    * {
+                        -webkit-print-color-adjust: exact !important;
+                        print-color-adjust: exact !important;
+                    }
+
+                    @media print {
+                        body { margin: 0; }
+                        @page {
+                            size: letter portrait;
+                            margin: 0;
+                        }
+                        .page-sheet {
+                            page-break-after: always;
+                            break-inside: avoid;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div id="canvasContainer">
+                    ${content}
+                </div>
+                <script>
+                    window.onload = function() {
+                         // Clean up any editor-specific artifacts if needed
+                         setTimeout(() => {
+                             window.print();
+                         }, 1000);
+                    }
+                <\/script>
+</body>
+
+</html>
+`);
+
+        printWindow.document.close();
+        printWindow.focus();
+    }
+
+    async function linkEstimation(estId) {
+        if (!estId) return;
+
+        try {
+            const resp = await fetch(`/estimaciones/${estId}`);
+            if (!resp.ok) throw new Error("Error fetching estimation");
+            const data = await resp.json();
+
+            // Populate fields if empty or user confirms
+            if (confirm(`¿Importar datos de estimación "${data.name}"? Esto sobrescribirá el título y cliente.`)) {
+                document.getElementById('docTitle').value = "Propuesta: " + data.name;
+                document.getElementById('clientName').value = data.client;
+                document.getElementById('docTotalAmount').value = data.amount;
+                // Trigger save to lock data
+                isDirty = true;
+            }
+
+            const container = document.getElementById('estimation-data-container');
+            container.innerHTML = `
+<div class="bg-indigo-50 p-2 rounded border border-indigo-100 mb-2">
+    <p class="text-[10px] text-indigo-500 font-bold mb-1">DATA VINCULADA</p>
+    <div class="text-xs text-slate-700 font-bold">${data.name}</div>
+    <div class="text-[10px] text-slate-500 mb-1">${data.client}</div>
+    <div class="text-xs text-indigo-600 font-mono">Q${parseFloat(data.amount).toLocaleString()}</div>
+    <div class="text-[10px] text-slate-400 mt-1">${(data.square_meters || 0).toLocaleString()} m²</div>
+</div>
+`;
+
+            isDirty = true;
+
+        } catch (e) {
+            alert("Error vinculando: " + e);
+        }
+    }
+
+    async function saveDocument() {
+        const title = document.getElementById('docTitle').value;
+        const client = document.getElementById('clientName').value;
+        const amount = parseFloat(document.getElementById('docTotalAmount').value) || 0;
+
+        // Sync Source of Truth
+        localBlocks = serializeBlocksFromDOM();
+
+        const payload = {
+            id: quotId,
+            updates: {
+                title: title,
+                client_name: client,
+                total_amount: amount,
+                content_json: localBlocks,
+                updated_at: new Date().toISOString()
+            }
+        };
+
+        fetch('/cotizaciones/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+            .then(r => r.json())
+            .then(d => {
+                if (d.status === 'success') {
+                    document.getElementById('saveStatus').innerText = "Guardado " + new Date().toLocaleTimeString();
+                    isDirty = false;
+                } else {
+                    document.getElementById('saveStatus').innerText = "Error";
+                }
+            })
+            .catch(e => {
+                console.error(e);
+                document.getElementById('saveStatus').innerText = "Error Conexión";
+            });
+    }
+
+    async function convertToProject() {
+        if (!confirm("¿Convertir esta cotización a Proyecto? Esto creará un nuevo perfil de proyecto con los datos actuales."))
+            return;
+
+        const title = document.getElementById('docTitle').value;
+        // Mock simple conversion
+        const formData = new FormData();
+        formData.append('name', title);
+        formData.append('status', 'Activo');
+        try {
+            const response = await fetch('/create_project', {
+                method: 'POST',
+                body: formData
+            });
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                alert("Proyecto creado exitosamente (verifique lista)");
+            }
+        } catch (e) {
+            alert("Error al convertir: " + e);
+        }
+    }
+
+    // Tables logic
+    function toggleCell(cell) {
+        if (cell.classList.contains('bg-slate-100')) {
+            cell.classList.remove('bg-slate-100');
+            cell.classList.add('bg-indigo-200');
+        } else {
+            cell.classList.add('bg-slate-100');
+            cell.classList.remove('bg-indigo-200');
+        }
+    }
+
+    function addTimelineRow(btn) {
+        const table = btn.previousElementSibling;
+        const tbody = table.querySelector('tbody');
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+<td contenteditable="true" class="p-2 font-bold text-slate-700">Nueva Fase</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1">
+    <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+</td>
+<td class="p-1 text-center"><button onclick="this.closest('tr').remove()"
+        class="text-red-300 hover:text-red-500">×</button></td>
+`;
+        tbody.appendChild(newRow);
+    }
+
+    function addGenericRow(btn) {
+        const table = btn.previousElementSibling;
+        const tbody = table.querySelector('tbody');
+        const count = tbody.children.length + 1;
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+<td contenteditable="true" class="p-2 border border-slate-200 text-center">${count}</td>
+<td contenteditable="true" class="p-2 border border-slate-200">Concepto...</td>
+<td contenteditable="true" class="p-2 border border-slate-200 text-center">1</td>
+<td contenteditable="true" class="p-2 border border-slate-200 text-right">0.00</td>
+<td class="p-2 border border-slate-200 text-right font-bold bg-slate-50">0.00</td>
+<td class="p-1 border border-slate-200 text-center print:hidden">
+    <button onclick="this.closest('tr').remove()" class="text-xs text-red-300 hover:text-red-500">×</button>
+</td>
+`;
+        tbody.appendChild(newRow);
+    }
+</script>
+
+<!-- Text Formatting Toolbar -->
+<div id="textToolbar"
+    class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-white shadow-xl rounded-lg p-2 flex gap-2 border border-slate-200 z-50 print:hidden hidden transition-opacity duration-200">
+    <button onclick="document.execCommand('bold',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded font-bold text-slate-700">B</button>
+    <button onclick="document.execCommand('italic',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded italic text-slate-700">I</button>
+    <button onclick="document.execCommand('underline',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded underline text-slate-700">U</button>
+    <div class="w-px bg-slate-200 mx-1"></div>
+    <!-- Alignment -->
+    <button onclick="document.execCommand('justifyLeft',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-700" title="Izquierda">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h16"></path>
+        </svg>
+    </button>
+    <button onclick="document.execCommand('justifyCenter',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-700" title="Centro">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M4 18h16"></path>
+        </svg>
+    </button>
+    <button onclick="document.execCommand('justifyRight',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-700" title="Derecha">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M4 18h16"></path>
+        </svg>
+    </button>
+    <button onclick="document.execCommand('justifyFull',false,null)"
+        class="w-8 h-8 flex items-center justify-center hover:bg-slate-100 rounded text-slate-700" title="Justificar">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+    </button>
+    <div class="w-px bg-slate-200 mx-1"></div>
+    <input type="color" onchange="document.execCommand('foreColor', false, this.value)"
+        class="w-8 h-8 p-0 border-none rounded cursor-pointer" title="Color de texto">
+    <select onchange="document.execCommand('fontSize', false, this.value)"
+        class="h-8 border-slate-200 rounded text-xs bg-slate-50">
+        <option value="3">Normal</option>
+        <option value="5">Grande</option>
+        <option value="7">Enorme</option>
+    </select>
+    <select onchange="document.execCommand('fontName', false, this.value)"
+        class="h-8 border-slate-200 rounded text-xs bg-slate-50 w-24">
+        <option value="Barlow">Barlow</option>
+        <option value="Inter">Inter</option>
+        <option value="serif">Serif</option>
+    </select>
+</div>
+
+<template id="tpl-image">
+    <div class="group relative border border-transparent hover:border-slate-200 rounded p-1 transition-all block-item mb-4"
+        data-type="image">
+        <!-- Controls -->
+        <div
+            class="absolute -right-10 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1 print:hidden z-10">
+            <button onclick="deleteBlock(this)"
+                class="p-2 bg-red-50 rounded-lg text-red-500 hover:bg-red-100 shadow-sm transition-all"
+                title="Eliminar">🗑️</button>
+            <button onclick="moveBlock(this, -1)"
+                class="p-2 bg-slate-100 rounded-lg text-slate-500 hover:bg-slate-200 shadow-sm transition-all"
+                title="Subir">⬆️</button>
+            <button onclick="moveBlock(this, 1)"
+                class="p-2 bg-slate-100 rounded-lg text-slate-500 hover:bg-slate-200 shadow-sm transition-all"
+                title="Bajar">⬇️</button>
+        </div>
+
+        <!-- Content -->
+        <div class="block-image-content" style="display:none;"></div>
+
+        <!-- Placeholder / Upload -->
+        <div
+            class="block-image-placeholder border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+            <span class="text-4xl mb-2">🖼️</span>
+            <span class="text-sm font-bold text-slate-500 mb-2">Agregar Imagen</span>
+            <input type="file" accept="image/*" class="text-xs text-slate-400" onchange="handleImageUpload(this)">
+        </div>
+    </div>
+</template>
+
+<template id="tpl-card">
+    <div class="block-item mb-4 relative group" data-type="card">
+        <div
+            class="absolute -right-10 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1 print:hidden z-10">
+            <button onclick="deleteBlock(this)"
+                class="p-2 bg-red-50 rounded-lg text-red-500 hover:bg-red-100 shadow-sm transition-all">🗑️</button>
+            <button onclick="moveBlock(this, -1)"
+                class="p-2 bg-slate-100 rounded-lg text-slate-500 hover:bg-slate-200 shadow-sm transition-all">⬆️</button>
+            <button onclick="moveBlock(this, 1)"
+                class="p-2 bg-slate-100 rounded-lg text-slate-500 hover:bg-slate-200 shadow-sm transition-all">⬇️</button>
+        </div>
+
+        <div class="relative w-full rounded-xl shadow-lg p-6 transition-all border border-slate-100"
+            style="background-color: #ffffff;">
+            <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity print:hidden">
+                <label class="text-[10px] text-slate-400 font-bold uppercase mr-1">Fondo</label>
+                <input type="color" class="w-6 h-6 p-0 border-0 rounded cursor-pointer align-middle"
+                    onchange="updateCardColor(this)">
+            </div>
+
+            <div contenteditable="true"
+                class="text-xl font-bold mb-2 text-slate-900 border-none outline-none focus:ring-2 ring-indigo-200 rounded p-1">
+                Título de la Tarjeta</div>
+            <div contenteditable="true"
+                class="text-3xl font-black mb-4 text-slate-900 border-none outline-none focus:ring-2 ring-indigo-200 rounded p-1">
+                Q0.00</div>
+            <div contenteditable="true"
+                class="prose prose-sm text-slate-600 border-none outline-none focus:ring-2 ring-indigo-200 rounded p-1">
+                <ul class="list-disc pl-5">
+                    <li>Detalle del plan 1</li>
+                    <li>Detalle del plan 2</li>
+                </ul>
+            </div>
+            <div class="mt-4 pt-4 border-t border-black/10">
+                <button contenteditable="true"
+                    class="bg-indigo-600 text-white font-bold py-2 px-4 rounded w-full border-none outline-none">Elegir
+                    Plan</button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-icon">
+    <div class="block-item mb-4 group relative flex flex-col items-center" data-type="icon">
+        <div
+            class="absolute -right-10 top-0 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1 print:hidden z-10">
+            <button onclick="deleteBlock(this)"
+                class="p-2 bg-red-50 rounded-lg text-red-500 hover:bg-red-100 shadow-sm transition-all">🗑️</button>
+            <button onclick="moveBlock(this, -1)"
+                class="p-2 bg-slate-100 rounded-lg text-slate-500 hover:bg-slate-200 shadow-sm transition-all">⬆️</button>
+            <button onclick="moveBlock(this, 1)"
+                class="p-2 bg-slate-100 rounded-lg text-slate-500 hover:bg-slate-200 shadow-sm transition-all">⬇️</button>
+        </div>
+
+        <div
+            class="flex flex-col items-center justify-center gap-2 p-2 rounded hover:bg-slate-50 transition-colors w-full">
+            <div
+                class="w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 flex items-center justify-center block-icon-container relative shadow-sm group-hover:shadow-md transition-all">
+                <img src="" class="w-full h-full object-cover hidden block-icon-img">
+                <span class="text-3xl text-slate-300 block-icon-placeholder">★</span>
+                <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept="image/*"
+                    onchange="handleIconUpload(this)" title="Subir Icono">
+            </div>
+            <div contenteditable="true"
+                class="text-center font-bold text-slate-700 text-xs uppercase tracking-wide border-none outline-none focus:ring-2 ring-indigo-200 rounded px-2 py-1 min-w-[100px]">
+                TITULO</div>
+        </div>
+    </div>
+</template>
+<!-- V2 TEMPLATE FOR PAGE SHEET -->
+<template id="tpl-page-sheet-v2">
+    <div
+        class="bg-white w-[816px] min-h-[1056px] shadow-2xl p-[50px] flex flex-col gap-6 relative print:w-full print:shadow-none print:m-0 print:break-after-page page-sheet group">
+
+        <!-- Header -->
+        <div class="flex justify-between items-end border-b-4 border-slate-900 pb-3 mb-4 page-header-section">
+            <div class="max-w-[40%] outline-none page-header-left" contenteditable="true">
+                <h1 class="text-4xl font-black text-slate-900 tracking-tighter leading-none mb-2">COTIZACIÓN</h1>
+                <div class="text-sm font-bold text-slate-400 uppercase tracking-widest">{{
+                    quotation.created_at.strftime('%d %B, %Y') }}</div>
+            </div>
+            <div class="text-right flex flex-col items-end outline-none page-header-right" contenteditable="true">
+                <img src="/static/img/logo_ao_negro.png" onerror="this.style.display='none'" class="h-10 mb-1" />
+                <div class="text-xl font-bold text-slate-800 leading-none">AO Development</div>
+                <div class="text-[10px] text-slate-500 font-medium tracking-wide uppercase mt-1">Innovamos y Creamos
+                    Arquitectura</div>
+            </div>
+        </div>
+
+        <!-- Blocks Container for this page -->
+        <div class="relative w-full h-full min-h-[900px] page-blocks-area flex-1" onclick="setActivePage(this)"></div>
+
+        <!-- Page Number / Footer -->
+        <div
+            class="mt-auto pt-4 border-t border-slate-100 flex justify-between text-[10px] text-slate-100 font-medium page-footer-section">
+            <span class="outline-none page-footer-left" contenteditable="true">AO Development S.A. |
+                www.oarqs.com</span>
+            <span class="page-number-display select-none">Página 1</span>
+        </div>
+    </div>
+</template>
+
+<!-- V2 TEMPLATES WITH DRAG HANDLES -->
+<template id="tpl-text-v2">
+    <div class="absolute group border border-transparent hover:border-slate-200 rounded p-1 transition-all block-item"
+        data-type="text">
+        <div class="block-content outline-none" contenteditable="true">
+            <p>Escribe aquí...</p>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-image-v2">
+    <div class="absolute group pt-1 pb-1 hover:bg-slate-50 transition-colors block-item rounded border border-transparent hover:border-indigo-100"
+        data-type="image">
+
+        <div class="block-image-content" style="display:none;"></div>
+
+        <div
+            class="block-image-placeholder border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+            <span class="text-4xl mb-2">🖼️</span>
+            <span class="text-sm font-bold text-slate-500 mb-2">Agregar Imagen</span>
+            <input type="file" accept="image/*" class="text-xs text-slate-400" onchange="handleImageUpload(this)">
+        </div>
+    </div>
+</template>
+
+<template id="tpl-card-v2">
+    <div class="absolute block-item group hover:bg-slate-50 transition-colors p-2 rounded border border-transparent hover:border-indigo-100"
+        data-type="card">
+
+
+        <div class="relative w-full rounded-xl shadow-lg p-6 transition-all border border-slate-100"
+            style="background-color: #ffffff;">
+            <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity print:hidden">
+                <label class="text-[10px] text-slate-400 font-bold uppercase mr-1">Fondo</label>
+                <input type="color" class="w-6 h-6 p-0 border-0 rounded cursor-pointer align-middle"
+                    onchange="updateCardColor(this)">
+            </div>
+
+            <div contenteditable="true"
+                class="text-xl font-bold mb-2 text-slate-900 border-none outline-none focus:ring-2 ring-indigo-200 rounded p-1">
+                Título de la Tarjeta</div>
+            <div contenteditable="true"
+                class="text-3xl font-black mb-4 text-slate-900 border-none outline-none focus:ring-2 ring-indigo-200 rounded p-1">
+                Q0.00</div>
+            <div contenteditable="true"
+                class="prose prose-sm text-slate-600 border-none outline-none focus:ring-2 ring-indigo-200 rounded p-1">
+                <ul class="list-disc pl-5">
+                    <li>Detalle del plan 1</li>
+                    <li>Detalle del plan 2</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    </div>
+    </div>
+    </div>
+</template>
+
+<template id="tpl-icon-v2">
+    <div class="absolute block-item group flex flex-col items-center hover:bg-slate-50 transition-colors p-2 rounded border border-transparent hover:border-indigo-100"
+        data-type="icon">
+
+        <div class="flex flex-col items-center justify-center gap-2 p-2 rounded w-full">
+            <div
+                class="w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 flex items-center justify-center block-icon-container relative shadow-sm group-hover:shadow-md transition-all">
+                <img src="" class="w-full h-full object-cover hidden block-icon-img">
+                <span class="text-3xl text-slate-300 block-icon-placeholder">★</span>
+                <!-- Trigger Wizard -->
+                <div class="absolute inset-0 cursor-pointer" onclick="openIconWizard(this)"></div>
+            </div>
+            <div contenteditable="true"
+                class="text-center font-bold text-slate-700 text-xs uppercase tracking-wide border-none outline-none focus:ring-2 ring-indigo-200 rounded px-2 py-1 min-w-[100px]">
+                TITULO</div>
+        </div>
+    </div>
+</template>
+
+<template id="tpl-table-v2">
+    <div class="absolute group border border-transparent hover:border-slate-200 rounded p-2 transition-all block-item"
+        data-type="table">
+        <div class="overflow-x-auto relative">
+            <table class="w-full text-sm border-collapse block-content-table">
+                <thead>
+                    <tr class="bg-slate-900 text-white">
+                        <th contenteditable="true" class="p-3 border border-slate-700 w-16 text-center">#</th>
+                        <th contenteditable="true" class="p-3 border border-slate-700 text-left">Descripción del Ítem
+                        </th>
+                        <th contenteditable="true" class="p-3 border border-slate-700 w-24 text-center">Cant.</th>
+                        <th contenteditable="true" class="p-3 border border-slate-700 w-24 text-center">Precio</th>
+                        <th contenteditable="true" class="p-3 border border-slate-700 w-24 text-center">Total</th>
+                        <th class="p-1 border border-slate-700 w-8 print:hidden"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td contenteditable="true" class="p-2 border border-slate-200 text-center">1</td>
+                        <td contenteditable="true" class="p-2 border border-slate-200">Concepto ejemplo...</td>
+                        <td contenteditable="true" class="p-2 border border-slate-200 text-center">1</td>
+                        <td contenteditable="true" class="p-2 border border-slate-200 text-right">0.00</td>
+                        <td class="p-2 border border-slate-200 text-right font-bold bg-slate-50">0.00</td>
+                        <td class="p-1 border border-slate-200 text-center print:hidden"><button
+                                onclick="this.closest('tr').remove()"
+                                class="text-xs text-red-300 hover:text-red-500">×</button></td>
+                    </tr>
+                </tbody>
+            </table>
+            <button onclick="addGenericRow(this)"
+                class="mt-2 text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1 rounded font-bold print:hidden">+
+                Agregar Fila</button>
+
+            <div class="flex justify-end mt-4 mb-2 border-t-2 border-slate-800 pt-2">
+                <div class="text-right">
+                    <span class="text-xs font-bold text-slate-900 uppercase mr-4">TOTAL DE INVERSIÓN</span>
+                    <span class="text-2xl font-black text-slate-900 table-grand-total">Q 0.00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+    // TABLE CALCULATION LOGIC
+    document.addEventListener('input', (e) => {
+        if (e.target.closest('table.block-content-table') && !e.target.closest('.timeline-table')) {
+            recalcTable(e.target.closest('table'));
+        }
+    });
+
+    function recalcTable(table) {
+        let total = 0;
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            // Index 2 = Cant, 3 = Precio, 4 = Total
+            // Note: Timeline table has different structure so we guard above
+            const cells = row.querySelectorAll('td');
+            if (cells.length < 5) return;
+
+            const qStr = cells[2].innerText.replace(/[^0-9.-]+/g, "");
+            const pStr = cells[3].innerText.replace(/[^0-9.-]+/g, "");
+
+            const q = parseFloat(qStr) || 0;
+            const p = parseFloat(pStr) || 0;
+
+            const sub = q * p;
+            total += sub;
+
+            cells[4].innerText = sub.toFixed(2);
+        });
+
+        // Update Grand Total
+        const container = table.closest('.block-item');
+        const grandTotalEl = container.querySelector('.table-grand-total');
+        if (grandTotalEl) grandTotalEl.innerText = "Q " + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+</script>
+
+<template id="tpl-service-v2">
+    <div class="absolute group border border-blue-50 hover:border-blue-200 bg-blue-50/20 rounded-xl p-4 transition-all block-item flex items-start gap-4"
+        data-type="service">
+        <div
+            class="w-16 h-16 bg-white rounded-lg shadow-sm flex items-center justify-center text-4xl block-service-icon border border-slate-100 flex-none">
+            📐</div>
+        <div class="flex-1">
+            <div contenteditable="true" class="font-bold text-slate-800 text-lg mb-1 outline-none block-service-title">
+                Título del Servicio</div>
+            <div contenteditable="true" class="text-sm text-slate-600 leading-relaxed outline-none block-service-desc">
+                Descripción detallada...</div>
+        </div>
+    </div>
+</template>
+
+</template>
+
+<template id="tpl-shape-v2">
+    <div class="absolute group border border-transparent hover:border-indigo-200 rounded p-1 transition-all block-item"
+        data-type="shape">
+        <!-- Shape Content - Use h-full to respect parent resize -->
+        <div class="shape-content w-full h-full bg-slate-200 shadow-lg transition-all" contenteditable="true"></div>
+    </div>
+</template>
+
+<script>
+    // --- NEW INTERACTION LAYER ---
+    let activeBlock = null;
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+    let activeHandle = null; // 'n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'
+    let initialRect = { left: 0, top: 0, width: 0, height: 0 };
+    let dragStartPos = { x: 0, y: 0 };
+
+    // Init Logic
+    document.addEventListener('DOMContentLoaded', () => {
+        initInteractionLayer();
+    });
+
+    function initInteractionLayer() {
+        const overlay = document.getElementById('selection-overlay');
+        const canvas = document.getElementById('canvasContainer');
+
+        if (!overlay || !canvas) return;
+
+        // Global Mouse Events
+        document.addEventListener('mousedown', handleGlobalMouseDown);
+        document.addEventListener('mousemove', handleGlobalMouseMove);
+        document.addEventListener('mouseup', handleGlobalMouseUp);
+
+        // Keys
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (activeBlock && !e.target.isContentEditable) {
+                    deleteActiveBlock();
+                }
+            }
+        });
+    }
+
+    function handleGlobalMouseDown(e) {
+        // 1. Check if clicking on Resize Handle
+        if (e.target.dataset && e.target.dataset.handle) {
+            e.preventDefault();
+            activeHandle = e.target.dataset.handle;
+            startResize(e);
+            return;
+        }
+
+        // 2. Check if clicking on Property Toolbar
+        if (e.target.closest('#properties-toolbar')) return;
+
+        // 3. Check if clicking on a Block Item
+        const block = e.target.closest('.block-item');
+        if (block) {
+            // If already active and clicking contenteditable, let it focus.
+            if (activeBlock === block && e.target.isContentEditable) {
+                return;
+            }
+
+            // If clicking contenteditable but distinct block, we still want to select it first?
+            // Usually yes.
+
+            activeBlock = block;
+            selectBlock(block);
+
+            // Start Drag?
+            // Only if NOT clicking a handle, and NOT clicking contenteditable (unless we use a drag handle area, but user wants 'click to move')
+            // User feedback: "Click-to-Move" means clicking anywhere on the block allows moving, 
+            // BUT editing text is needed. Usually distinct modes or handle.
+            // Compromise: If clicking directly on text/input, don't drag immediately unless holding Shift?
+            // OR: We treat the border area as drag, or we have a specific behavior.
+
+            // Current Refactor Goal: "Precise drag-and-drop... jumpy movement".
+            // If e.target is contenteditable, don't drag.
+            if (!e.target.isContentEditable && !e.target.closest('[contenteditable]')) {
+                e.preventDefault();
+                startDrag(e);
+            }
+            return;
+        }
+
+        // 4. Clicked Canvas/Background
+        if (e.target.closest('#canvasContainer')) {
+            deselectBlock();
+        }
+    }
+
+    function selectBlock(block) {
+        activeBlock = block;
+        updateOverlay();
+        document.getElementById('selection-overlay').style.display = 'block';
+        document.getElementById('properties-toolbar').classList.remove('hidden');
+        document.getElementById('properties-toolbar').classList.add('flex');
+        syncToolbarProperties();
+    }
+
+    function deselectBlock() {
+        activeBlock = null;
+        document.getElementById('selection-overlay').style.display = 'none';
+        document.getElementById('properties-toolbar').classList.remove('flex');
+        document.getElementById('properties-toolbar').classList.add('hidden');
+    }
+
+    // --- DRAGGING ---
+    function startDrag(e) {
+        isDragging = true;
+        const rect = activeBlock.getBoundingClientRect();
+        const parentRect = activeBlock.offsetParent.getBoundingClientRect();
+
+        // Calculate offset (mouse pos relative to block top-left)
+        dragOffset.x = e.clientX - rect.left;
+        dragOffset.y = e.clientY - rect.top;
+
+        // Initial relative pos for reference (though we use delta usually, here offset is easier)
+    }
+
+    // --- RESIZING ---
+    function startResize(e) {
+        if (!activeBlock) return;
+        const rect = activeBlock.getBoundingClientRect();
+        const parentRect = activeBlock.offsetParent.getBoundingClientRect(); // Page sheet
+
+        initialRect = {
+            left: activeBlock.offsetLeft,
+            top: activeBlock.offsetTop,
+            width: activeBlock.offsetWidth,
+            height: activeBlock.offsetHeight,
+            mouseX: e.clientX,
+            mouseY: e.clientY
+        };
+    }
+
+    function handleGlobalMouseMove(e) {
+        if (activeHandle) {
+            // Resize logic
+            e.preventDefault();
+            const deltaX = e.clientX - initialRect.mouseX;
+            const deltaY = e.clientY - initialRect.mouseY;
+
+            let newW = initialRect.width;
+            let newH = initialRect.height;
+            let newL = initialRect.left;
+            let newT = initialRect.top;
+
+            if (activeHandle.includes('e')) newW = initialRect.width + deltaX;
+            if (activeHandle.includes('w')) {
+                newW = initialRect.width - deltaX;
+                newL = initialRect.left + deltaX;
+            }
+            if (activeHandle.includes('s')) newH = initialRect.height + deltaY;
+            if (activeHandle.includes('n')) {
+                newH = initialRect.height - deltaY;
+                newT = initialRect.top + deltaY;
+            }
+
+            if (newW < 20) newW = 20;
+            if (newH < 20) newH = 20;
+
+            activeBlock.style.width = newW + 'px';
+            activeBlock.style.height = newH + 'px';
+            activeBlock.style.left = newL + 'px';
+            activeBlock.style.top = newT + 'px';
+
+            updateOverlay();
+            // Throttle toolbar update?
+            // syncToolbarProperties(); 
+        } else if (isDragging && activeBlock) {
+            e.preventDefault();
+            const parentRect = activeBlock.offsetParent.getBoundingClientRect();
+
+            // Target Position
+            let newX = e.clientX - parentRect.left - dragOffset.x;
+            let newY = e.clientY - parentRect.top - dragOffset.y;
+
+            // Optional: Grid Snap (10px)
+            // newX = Math.round(newX / 10) * 10;
+            // newY = Math.round(newY / 10) * 10;
+
+            activeBlock.style.left = newX + 'px';
+            activeBlock.style.top = newY + 'px';
+
+            updateOverlay();
+        }
+    }
+
+    function handleGlobalMouseUp(e) {
+        if (isDragging || activeHandle) {
+            isDragging = false;
+            activeHandle = null;
+            if (activeBlock) {
+                syncToolbarProperties();
+                isDirty = true;
+            }
+        }
+    }
+
+    function updateOverlay() {
+        if (!activeBlock) return;
+        const overlay = document.getElementById('selection-overlay');
+        const rect = activeBlock.getBoundingClientRect();
+
+        // Overlay is fixed? No, blocks are absolute in a relative page. 
+        // Overlay logic: If overlay is 'fixed', we match screen rects.
+        // If overlay is 'absolute' in body, we match page coords.
+        // In the HTML I added: `fixed top - 0 left - 0`. So we use getBoundingClientRect directly.
+
+        overlay.style.width = rect.width + 'px';
+        overlay.style.height = rect.height + 'px';
+        overlay.style.top = rect.top + 'px';
+        overlay.style.left = rect.left + 'px';
+    }
+
+    // --- TOOLBAR SYNC ---
+    function syncToolbarProperties() {
+        if (!activeBlock) return;
+
+        // Dimensions
+        document.getElementById('prop-w').value = activeBlock.offsetWidth;
+        document.getElementById('prop-h').value = activeBlock.offsetHeight;
+        document.getElementById('prop-x').value = activeBlock.offsetLeft;
+        document.getElementById('prop-y').value = activeBlock.offsetTop;
+
+        // Styles
+        // Note: some blocks might have styles on inner content, simplified for now:
+        // We look at the block-item mostly.
+        const comp = window.getComputedStyle(activeBlock);
+
+        // Opacity
+        const op = comp.opacity;
+        document.getElementById('prop-opacity').value = Math.round(op * 100);
+        document.getElementById('prop-opacity-val').innerText = Math.round(op * 100);
+
+        // Colors (tricky part: might be bg-white class vs inline style)
+        // RGB to Hex helper needed?
+        // simple shim
+
+        // Border
+        document.getElementById('prop-border-width').value = activeBlock.style.borderWidth || '0px';
+
+        // TYPE SPECIFIC
+        const type = activeBlock.dataset.type;
+        const shapeExtras = document.getElementById('prop-shape-extras');
+        const imgExtras = document.getElementById('prop-image-extras');
+
+        shapeExtras.classList.add('hidden');
+        imgExtras.classList.add('hidden');
+
+        if (type === 'shape') shapeExtras.classList.remove('hidden');
+        if (type === 'image') imgExtras.classList.remove('hidden');
+    }
+
+    function applyProperty(prop, val) {
+        if (!activeBlock) return;
+
+        switch (prop) {
+            case 'width': activeBlock.style.width = val + 'px'; break;
+            case 'height': activeBlock.style.height = val + 'px'; break;
+            case 'x': activeBlock.style.left = val + 'px'; break;
+            case 'y': activeBlock.style.top = val + 'px'; break;
+            case 'opacity':
+                activeBlock.style.opacity = val / 100;
+                document.getElementById('prop-opacity-val').innerText = val;
+                break;
+            case 'bgColor':
+                // Apply to relevant child or block?
+                // For cards/shapes, it's inner. For text, maybe block.
+                const child = activeBlock.querySelector('.shadow-lg, .shape-content, .block-content');
+                if (child) child.style.backgroundColor = val;
+                else activeBlock.style.backgroundColor = val;
+                break;
+            case 'borderColor':
+                activeBlock.style.borderColor = val;
+                // If width is 0, make it 1
+                if (!activeBlock.style.borderWidth) activeBlock.style.borderWidth = '1px';
+                break;
+            case 'borderWidth':
+                activeBlock.style.borderWidth = val;
+                // Force border style
+                activeBlock.style.borderStyle = val === '0px' ? 'none' : 'solid';
+                break;
+        }
+        updateOverlay();
+        isDirty = true;
+    }
+
+    function bringToFront() {
+        if (activeBlock) activeBlock.style.zIndex = '10'; // Simple layer
+    }
+    function sendToBack() {
+        if (activeBlock) activeBlock.style.zIndex = '0';
+    }
+    function deleteActiveBlock() {
+        if (activeBlock && confirm('Eliminar bloque?')) {
+            activeBlock.remove();
+            deselectBlock();
+            isDirty = true;
+        }
+    }
+
+    // Shape Specifics
+    function setShapeProp(cls) {
+        if (!activeBlock) return;
+        const content = activeBlock.querySelector('.shape-content');
+        if (!content) return;
+        content.classList.remove('rounded-none', 'rounded-full', 'rounded-xl');
+        content.classList.add(cls);
+        content.style.clipPath = '';
+    }
+
+    function toggleArrowProp() {
+        if (!activeBlock) return;
+        const content = activeBlock.querySelector('.shape-content');
+        if (!content) return;
+
+        const isArrow = content.style.clipPath !== '';
+        if (isArrow) content.style.clipPath = '';
+        else content.style.clipPath = 'polygon(0% 20%, 60% 20%, 60% 0%, 100% 50%, 60% 100%, 60% 80%, 0% 80%)';
+    }
+
+    // Scroll listener to update overlay position
+    document.getElementById('canvasContainer').addEventListener('scroll', () => {
+        if (activeBlock) updateOverlay();
+    }, { capture: true, passive: true });
+
+    // Window resize listener
+    window.addEventListener('resize', () => {
+        if (activeBlock) updateOverlay();
+    });
+
+</script>
+
+<template id="tpl-timeline-v2">
+    <div class="absolute group border border-transparent hover:border-slate-200 rounded p-2 transition-all block-item"
+        data-type="timeline">
+        <h4 class="font-bold text-slate-800 uppercase text-xs mb-3 border-b border-indigo-500 pb-1 inline-block">
+            Cronograma de Ejecución</h4>
+        <div class="overflow-x-auto">
+            <div class="flex gap-2 mb-2">
+                <button onclick="addTimelineColumn(this)"
+                    class="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-2 py-1 rounded font-bold">+
+                    Mes</button>
+                <button onclick="removeTimelineColumn(this)"
+                    class="text-[10px] bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1 rounded font-bold">-
+                    Mes</button>
+            </div>
+            <table class="w-full text-xs block-content-table timeline-table">
+                <thead>
+                    <tr class="bg-slate-50 text-slate-500">
+                        <th class="p-2 text-left w-1/3">Fase</th>
+                        <th class="p-2 text-center w-12 timeline-col">M1</th>
+                        <th class="p-2 text-center w-12 timeline-col">M2</th>
+                        <th class="p-2 text-center w-12 timeline-col">M3</th>
+                        <th class="p-2 text-center w-12 timeline-col">M4</th>
+                        <th class="p-2 text-center w-12 timeline-col">M5</th>
+                        <th class="p-2 text-center w-12 timeline-col">M6</th>
+                        <th class="p-1 w-8"></th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr>
+                        <td contenteditable="true" class="p-2 font-bold text-slate-700">Fase 1: Anteproyecto</td>
+                        <td class="p-1 timeline-col">
+                            <div class="h-4 bg-indigo-200 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1 timeline-col">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1 timeline-col">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1 timeline-col">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1 timeline-col">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1 timeline-col">
+                            <div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>
+                        </td>
+                        <td class="p-1"></td>
+                    </tr>
+                </tbody>
+            </table>
+            <button onclick="addTimelineRow(this)" class="mt-2 text-[10px] text-indigo-600 font-bold hover:underline">+
+                Agregar Fase</button>
+        </div>
+    </div>
+</template>
+
+<!-- Icon Cropper Wizard Modal -->
+<div id="iconWizardModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[100] font-sans">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+            <h3 class="font-bold text-slate-800">Asistente de Icono</h3>
+            <button onclick="closeIconWizard()" class="text-slate-400 hover:text-slate-600">×</button>
+        </div>
+
+        <div class="p-6 flex-1 overflow-y-auto">
+            <!-- Step 1: Upload -->
+            <div id="iw-step-1" class="text-center py-8">
+                <label
+                    class="cursor-pointer flex flex-col items-center justify-center gap-4 p-12 border-2 border-dashed border-slate-300 rounded-xl hover:bg-slate-50 transition-colors">
+                    <span class="text-5xl">📤</span>
+                    <span class="font-bold text-slate-600">Subir Imagen PNG/JPG</span>
+                    <input type="file" accept="image/*" class="hidden" onchange="iwHandleFile(this)">
+                </label>
+            </div>
+
+            <!-- Step 2: Crop -->
+            <div id="iw-step-2" class="hidden h-[400px]">
+                <img id="iw-crop-target" class="max-h-full mx-auto block" style="max-width: 100%;">
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-100 flex justify-between bg-slate-50">
+            <button onclick="closeIconWizard()" class="text-slate-500 font-bold text-sm px-4">Cancelar</button>
+            <button id="iw-btn-confirm" onclick="iwConfirmCrop()"
+                class="bg-indigo-600 text-white font-bold py-2 px-6 rounded-lg shadow-lg hover:bg-indigo-700 hidden">Recortar
+                y Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Page Config Modal -->
+<div id="pageConfigModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[100] font-sans">
+    <div class="bg-white rounded-xl shadow-2xl w-96 overflow-hidden">
+        <div class="p-4 border-b border-slate-100 bg-slate-50">
+            <h3 class="font-bold text-slate-800">Configuración de Página</h3>
+        </div>
+        <div class="p-6 space-y-4">
+            <label class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" id="cfg-show-header" class="w-5 h-5 accent-indigo-600">
+                <span class="font-bold text-slate-700">Mostrar Encabezado</span>
+            </label>
+            <label class="flex items-center gap-3 p-3 border rounded-lg hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" id="cfg-show-footer" class="w-5 h-5 accent-indigo-600">
+                <span class="font-bold text-slate-700">Mostrar Pie de Página</span>
+            </label>
+            <div class="pt-4 border-t border-slate-100">
+                <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Imagen de Fondo (URL)</label>
+                <input type="text" id="cfg-bg-image" class="w-full text-sm border-slate-200 rounded p-2"
+                    placeholder="https://...">
+                <button onclick="document.getElementById('cfg-bg-image').value=''"
+                    class="text-xs text-red-400 mt-1 hover:text-red-600">Quitar Fondo</button>
+            </div>
+
+            <button onclick="setFullBleed()"
+                class="w-full py-2 bg-slate-800 text-white rounded font-bold text-xs uppercase tracking-wide hover:bg-slate-900">Aplicar
+                "Full Bleed" (Portada)</button>
+        </div>
+        <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <button onclick="closePageConfig()" class="text-slate-500 font-bold text-sm px-4 mr-2">Cancelar</button>
+            <button onclick="savePageConfig()"
+                class="bg-indigo-600 text-white font-bold py-2 px-6 rounded shadow hover:bg-indigo-700">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Page Reorder Modal -->
+<div id="pageReorderModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-[100] font-sans">
+    <div class="bg-white rounded-xl shadow-2xl w-96 overflow-hidden flex flex-col max-h-[80vh]">
+        <div class="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+            <h3 class="font-bold text-slate-800">Organizar Páginas</h3>
+            <button onclick="closePageReorder()" class="text-slate-400 hover:text-slate-600">×</button>
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto bg-slate-50">
+            <div id="page-list-sortable" class="space-y-2">
+                <!-- Pages injected here -->
+            </div>
+        </div>
+        <div class="p-4 border-t border-slate-100 bg-white flex justify-end">
+            <button onclick="closePageReorder()" class="text-slate-500 font-bold text-sm px-4 mr-2">Cancelar</button>
+            <button onclick="confirmPageReorder()"
+                class="bg-indigo-600 text-white font-bold py-2 px-6 rounded shadow hover:bg-indigo-700">Aplicar
+                Orden</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- PAGE REORDER LOGIC ---
+    let pageReorderSortable = null;
+
+    function openPageReorder() {
+        // 1. Serialize current
+        localBlocks = serializeBlocksFromDOM();
+
+        // 2. Split into pages
+        const pages = [];
+        let buffer = [];
+        localBlocks.forEach(b => {
+            if (b.type === 'page_break') {
+                pages.push(buffer);
+                buffer = [];
+            } else {
+                buffer.push(b);
+            }
+        });
+        if (buffer.length > 0 || pages.length === 0) pages.push(buffer);
+
+        // 3. Render List
+        const list = document.getElementById('page-list-sortable');
+        list.innerHTML = '';
+        pages.forEach((p, idx) => {
+            const div = document.createElement('div');
+            div.className = "p-3 bg-white border border-slate-200 rounded shadow-sm flex items-center gap-3 cursor-grab hover:border-indigo-300 page-sort-item";
+            div.dataset.index = idx;
+
+            // Try to find a title/preview
+            let preview = "Página " + (idx + 1);
+            const config = p.find(x => x.type === 'page_config');
+            if (config && config.content.isCover) preview += " (Portada)";
+
+            div.innerHTML = `< span class= "text-slate-400" >☰</span > <span class="font-bold text-slate-700 text-sm flex-1">${preview}</span> <button class="text-red-400 hover:text-red-600 font-bold" onclick="deletePageInList(this)">🗑️</button>`;
+            list.appendChild(div);
+        });
+
+        // 4. Init Sortable
+        if (pageReorderSortable) pageReorderSortable.destroy();
+        pageReorderSortable = new Sortable(list, {
+            animation: 150,
+            ghostClass: 'bg-indigo-50'
+        });
+
+        document.getElementById('pageReorderModal').classList.remove('hidden');
+        document.getElementById('pageReorderModal').classList.add('flex');
+    }
+
+    function closePageReorder() {
+        document.getElementById('pageReorderModal').classList.add('hidden');
+        document.getElementById('pageReorderModal').classList.remove('flex');
+    }
+
+    function confirmPageReorder() {
+        // 1. Get new order
+        const list = document.getElementById('page-list-sortable');
+        const items = Array.from(list.children);
+        const newIndices = items.map(el => parseInt(el.dataset.index));
+
+        // 2. Split original blocks again (to be safe)
+        const pages = [];
+        let buffer = [];
+        localBlocks.forEach(b => {
+            if (b.type === 'page_break') {
+                pages.push(buffer);
+                buffer = [];
+            } else {
+                buffer.push(b);
+            }
+        });
+        if (buffer.length > 0 || pages.length === 0) pages.push(buffer);
+
+        // 3. Reconstruct
+        let newBlocks = [];
+        newIndices.forEach((oldIdx, i) => {
+            if (i > 0) newBlocks.push({ type: 'page_break', content: '' });
+            if (pages[oldIdx]) newBlocks = newBlocks.concat(pages[oldIdx]);
+        });
+
+        localBlocks = newBlocks;
+        renderDocument();
+        isDirty = true;
+        closePageReorder();
+    }
+
+    // --- ICON / IMAGE WIZARD LOGIC ---
+    let currentIconBlock = null; // Can be icon block OR image block
+    let cropper = null;
+    let isImageBlock = false; // Flag to distinguish
+
+    function openIconWizard(trigger) {
+        // trigger can be the img element or file input
+        currentIconBlock = trigger.closest('.block-item');
+        isImageBlock = currentIconBlock.dataset.type === 'image';
+
+        document.getElementById('iconWizardModal').classList.remove('hidden');
+        document.getElementById('iconWizardModal').classList.add('flex');
+
+        // Reset
+        document.getElementById('iw-step-1').classList.remove('hidden');
+        document.getElementById('iw-step-2').classList.add('hidden');
+        document.getElementById('iw-btn-confirm').classList.add('hidden');
+        if (cropper) { cropper.destroy(); cropper = null; }
+
+        // If trigger is an IMG and has src, maybe load it directly?
+        if (trigger.tagName === 'IMG' && trigger.src && !trigger.src.includes('placeholder')) {
+            document.getElementById('iw-step-1').classList.add('hidden');
+            document.getElementById('iw-step-2').classList.remove('hidden');
+            document.getElementById('iw-btn-confirm').classList.remove('hidden');
+            const img = document.getElementById('iw-crop-target');
+            img.src = trigger.src;
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(img, { aspectRatio: 1, viewMode: 1 }); // Aspect ratio free for images?
+            if (isImageBlock) {
+                cropper.setAspectRatio(NaN); // Free for images
+            }
+        }
+    }
+
+    function closeIconWizard() {
+        document.getElementById('iconWizardModal').classList.add('hidden');
+        document.getElementById('iconWizardModal').classList.remove('flex');
+        currentIconBlock = null;
+    }
+
+    function iwHandleFile(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('iw-step-1').classList.add('hidden');
+                document.getElementById('iw-step-2').classList.remove('hidden');
+                document.getElementById('iw-btn-confirm').classList.remove('hidden');
+
+                const img = document.getElementById('iw-crop-target');
+                img.src = e.target.result;
+
+                if (cropper) cropper.destroy();
+                cropper = new Cropper(img, {
+                    aspectRatio: isImageBlock ? NaN : 1, // Free for images, Sq for icons
+                    viewMode: 1
+                });
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function iwConfirmCrop() {
+        if (!cropper) return;
+        // High Qual
+        const canvas = cropper.getCroppedCanvas({ width: isImageBlock ? 800 : 256, height: isImageBlock ? 600 : 256 });
+        const dataUrl = canvas.toDataURL('image/png');
+
+        // Apply to block
+        if (currentIconBlock) {
+            if (isImageBlock) {
+                // Image Block Logic
+                const contentDiv = currentIconBlock.querySelector('.block-image-content');
+                contentDiv.innerHTML = `< img src = "${dataUrl}" class= "w-full h-full object-cover" >`;
+                contentDiv.style.display = 'block';
+                currentIconBlock.querySelector('.block-image-placeholder').style.display = 'none';
+            } else {
+                // Icon Block Logic
+                const img = currentIconBlock.querySelector('.block-icon-img');
+                const placeholder = currentIconBlock.querySelector('.block-icon-placeholder');
+                img.src = dataUrl;
+                img.style.display = 'block';
+                placeholder.style.display = 'none';
+            }
+            isDirty = true;
+        }
+
+        closeIconWizard();
+    }
+
+    function addTimelineColumn(btn) {
+        const block = btn.closest('.block-item');
+        const table = block.querySelector('table');
+        const theadRow = table.querySelector('thead tr');
+        const tbodyRows = table.querySelectorAll('tbody tr');
+
+        // Count existing Month columns (excluding first "Fase" and last "Actions")
+        // Implementation: We look for cells with 'timeline-col' class in head
+        // Or simply count children - 2
+        const currentCols = theadRow.querySelectorAll('.timeline-col').length;
+        const newIndex = currentCols + 1;
+
+        // Add Header
+        const newTh = document.createElement('th');
+        newTh.className = "p-2 text-center w-12 timeline-col";
+        newTh.innerText = "M" + newIndex;
+        // Insert before the last empty th
+        theadRow.insertBefore(newTh, theadRow.lastElementChild);
+
+        // Add Body Cells
+        tbodyRows.forEach(row => {
+            const newTd = document.createElement('td');
+            newTd.className = "p-1 timeline-col";
+            newTd.innerHTML = '<div class="h-4 bg-slate-100 rounded cursor-pointer" onclick="toggleCell(this)"></div>';
+            // Insert before row's last cell (or matching index)
+            // But timeline rows structure: [Fase, M1...M6] -> No delete button inside row currently?
+            // Actually existing template did not have delete button inside row in tbody slice I saw?
+            // Wait, tpl-timeline-v2 in view says: 
+            // <tr> <td>Fase</td> <td>...</td> </tr>
+            // Ah, usually there is NO delete button per row in Timeline? 
+            // Checking L1455, it's just <td>M...</td>. 
+            // BUT in L1363 (tpl-table-v2) there IS a delete button.
+            // In tpl-timeline-v2 (L1435), the row ends with last M6 cell. 
+            // Wait, my replacement chunk earlier ADDED <th class="p-1 w-8"></th> at end of THEAD.
+            // So I should treat the last column as non-month.
+            // Checking my previous replacement chunk for TPL-TIMELINE-V2...
+            // " <th class="p-1 w-8"></th> " was added in the previous multi_replace.
+            // So yes, insert BEFORE the last child.
+            row.insertBefore(newTd, row.lastElementChild); // Assuming last is the empty/delete placeholder?
+            // Wait, does the TBODY row have a last cell for delete?
+            // In the previous view (L1435), NO. It ends at S6.
+            // My previous chunk REPLACED headers but the body was NOT updated to include the extra cell.
+            // THIS IS A BUG. I need to fix the body too.
+        });
+        isDirty = true;
+    }
+
+    function removeTimelineColumn(btn) {
+        const block = btn.closest('.block-item');
+        const table = block.querySelector('table');
+        const theadRow = table.querySelector('thead tr');
+        const cols = theadRow.querySelectorAll('.timeline-col');
+
+        if (cols.length <= 1) return; // Keep at least 1
+
+        const lastCol = cols[cols.length - 1];
+        const index = Array.from(theadRow.children).indexOf(lastCol);
+
+        lastCol.remove();
+
+        const tbodyRows = table.querySelectorAll('tbody tr');
+        tbodyRows.forEach(row => {
+            if (row.children[index]) row.children[index].remove();
+        });
+        isDirty = true;
+    }
+
+    // --- PAGE CONFIG LOGIC ---
+    let currentPageConfigBtn = null;
+
+    function openPageConfig(btn) {
+        currentPageConfigBtn = btn;
+        const pageEl = btn.closest('.page-sheet');
+        const header = pageEl.querySelector('.page-header-section');
+        const footer = pageEl.querySelector('.page-footer-section');
+        const bg = pageEl.style.backgroundImage;
+
+        // Determine state
+        const isHeaderVisible = !header || header.style.display !== 'none';
+        const isFooterVisible = !footer || footer.style.display !== 'none';
+        let bgUrl = '';
+
+        if (bg && bg.startsWith('url(')) {
+            bgUrl = bg.slice(5, -2).replace(/['"]/g, '');
+        }
+
+        document.getElementById('cfg-show-header').checked = isHeaderVisible;
+        document.getElementById('cfg-show-footer').checked = isFooterVisible;
+        document.getElementById('cfg-bg-image').value = bgUrl;
+
+        document.getElementById('pageConfigModal').classList.remove('hidden');
+        document.getElementById('pageConfigModal').classList.add('flex');
+    }
+
+    function closePageConfig() {
+        document.getElementById('pageConfigModal').classList.add('hidden');
+        document.getElementById('pageConfigModal').classList.remove('flex');
+        currentPageConfigBtn = null;
+    }
+
+
+    function setFullBleed() {
+        document.getElementById('cfg-show-header').checked = false;
+        document.getElementById('cfg-show-footer').checked = false;
+        document.getElementById('cfg-bg-image').value = '/static/img/cover_bg.png';
+    }
+
+    function savePageConfig() {
+        if (!currentPageConfigBtn) return;
+
+        const showHeader = document.getElementById('cfg-show-header').checked;
+        const showFooter = document.getElementById('cfg-show-footer').checked;
+        const bgUrl = document.getElementById('cfg-bg-image').value;
+
+        const pageEl = currentPageConfigBtn.closest('.page-sheet');
+        const container = document.getElementById('canvasContainer');
+        const pages = Array.from(container.children);
+        const pageIndex = pages.indexOf(pageEl);
+
+        // Sync to localBlocks
+        localBlocks = serializeBlocksFromDOM();
+
+        // Find Page Config Block
+        let tempPage = 0;
+        let pStart = 0;
+
+        for (let i = 0; i < localBlocks.length; i++) {
+            if (localBlocks[i].type === 'page_break') {
+                tempPage++;
+                if (tempPage === pageIndex) {
+                    pStart = i + 1;
+                    break;
+                }
+            }
+        }
+        if (pageIndex === 0) pStart = 0;
+
+        // Construct new Config
+        const newConfig = {
+            isCover: (!showHeader && !showFooter),
+            hideHeader: !showHeader,
+            hideFooter: !showFooter,
+            backgroundImage: bgUrl
+        };
+
+        const configBlock = { type: 'page_config', content: newConfig };
+
+        // Check if existing
+        let hasConfig = false;
+        if (localBlocks[pStart] && localBlocks[pStart].type === 'page_config') {
+            hasConfig = true;
+        }
+
+        if (hasConfig) localBlocks[pStart] = configBlock;
+        else localBlocks.splice(pStart, 0, configBlock);
+
+        renderDocument();
+        isDirty = true;
+        closePageConfig();
+    }
+</script>
+{% endblock %}

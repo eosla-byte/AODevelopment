@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/ao-favicon.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AOweb | Architectural Innovation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* Logo Styles */
+    .logo-container {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 1001;
+      /* Above curtain */
+      transition: all 0.8s ease-out;
+      pointer-events: none;
+      /* Let clicks pass through */
+    }
+  </style>
+  <script type="module" src="/assets/index-BZXfHe2v.js?v=999"></script>
+  <link rel="stylesheet" href="/assets/index-N3r3Gy9x.css?v=999">
+  <link rel="stylesheet" href="/mobile.css">
+</head>
+
+<body>
+  <div class="cursor-dot" data-cursor-dot></div>
+  <div class="cursor-outline" data-cursor-outline></div>
+
+  <!-- Mobile Menu Overlay -->
+  <div id="mobile-nav-overlay">
+    <a href="#project-categories" class="mobile-link">Proyectos</a>
+    <a href="#services" class="mobile-link">Recursos</a>
+    <a href="#careers-section" class="mobile-link">Trabaja con Nosotros</a>
+    <a href="/clients.html" class="mobile-link" style="color: var(--primary-blue);">Clientes</a>
+    <a href="/contact.html" class="mobile-link">Contacto</a>
+    <div class="mt-8 text-xs text-slate-500 font-mono tracking-widest">EST. 2019</div>
+  </div>
+
+  <div id="app">
+    <header id="main-header">
+      <!-- Mobile Toggle -->
+      <button id="mobile-menu-toggle" aria-label="Menu" style="display:none;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </button>
+
+      <!-- Logo moved inside header for fixed positioning -->
+      <div class="static-logo-container">
+        <img src="/logo.png" alt="AO Development Logo" class="hero-logo">
+      </div>
+
+      <div class="header-top">
+        <nav class="center-nav">
+          <div class="nav-item">
+            <a href="#project-categories" class="nav-link">Proyectos</a>
+          </div>
+          <div class="nav-item">
+            <a href="#services" class="nav-link">Recursos</a>
+          </div>
+          <div class="nav-item">
+            <a href="#careers-section" class="nav-link">Trabaja con Nosotros</a>
+          </div>
+          <div class="nav-item">
+            <a href="/clients.html" class="nav-link btn-liquid-glass">
+              Clientes
+            </a>
+          </div>
+        </nav>
+
+        <nav class="right-nav">
+          <a href="/contact.html" class="nav-link">Contacto</a>
+        </nav>
+      </div>
+
+      <div class="header-hero">
+        <!-- Reverted Layout: Just Logo -->
+
+
+        <div class="hero-bottom-bar">
+          <div class="scroll-label">Scroll Down</div>
+          <div class="search-container">
+            <input type="text" placeholder="Buscar..." class="search-input">
+            <span class="search-arrow">→</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- HERO CAROUSEL SECTION -->
+      <section id="banner-image" class="full-width-image video-container">
+        <!-- Static Logo: Absolute positioned here so it scrolls with the cover -->
+
+
+        <!-- Video Carousel Container -->
+
+        <div class="carousel-track">
+          <!-- Video A -->
+          <video class="hero-video active" autoplay muted playsinline data-index="0" data-text="LET IT BIM">
+            <source src="/VIDEO-A.mp4" type="video/mp4">
+          </video>
+          <!-- Video C -->
+          <video class="hero-video" muted playsinline data-index="1" data-text="BIM IS HERE">
+            <source src="/VIDEO_C.mp4" type="video/mp4">
+          </video>
+          <!-- Video D -->
+          <video class="hero-video" muted playsinline data-index="2" data-text="WE CREATE WHAT WE PLAN">
+            <source src="/VIDEO_D.mp4" type="video/mp4">
+          </video>
+        </div>
+
+        <style>
+          /* Reset Body to prevent white bar */
+          body,
+          html {
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: #000;
+            /* Ensure dark background */
+          }
+
+          /* Header Styles - Force Transparent and White Text */
+          #main-header {
+            position: absolute !important;
+            width: 100%;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+            background: transparent !important;
+            background-color: transparent !important;
+            color: white !important;
+            transition: background 0.3s, height 0.6s cubic-bezier(0.25, 0.1, 0.25, 1);
+          }
+
+          #main-header * {
+            background-color: transparent !important;
+            /* Force all children transparent */
+            color: white !important;
+            /* Force all children white text */
+          }
+
+          .header-top {
+            background: transparent !important;
+          }
+
+          /* Force Nav Links White explicitly */
+          .nav-link {
+            color: white !important;
+          }
+
+          /* Fix Active Video Visibility */
+          .hero-video {
+            display: none;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+          }
+
+          .hero-video.active {
+            display: block;
+          }
+        </style>
+
+        <script>
+          document.addEventListener('DOMContentLoaded', () => {
+            /* --- HEADER FIX --- */
+            const header = document.getElementById('main-header');
+            if (header) {
+              header.style.position = 'absolute';
+              header.style.width = '100%';
+              header.style.top = '0';
+              header.style.zIndex = '1000';
+            }
+
+            /* --- VIDEO CAROUSEL LOGIC --- */
+            const videos = document.querySelectorAll('.hero-video');
+            const title = document.querySelector('.main-title');
+            let currentIndex = 0;
+            let isTransitioning = false;
+
+            function playNext() {
+              if (isTransitioning) return;
+              isTransitioning = true;
+
+              console.log("Switching video from index", currentIndex);
+
+              // Stop current
+              const currentVideo = videos[currentIndex];
+              currentVideo.classList.remove('active');
+              currentVideo.pause();
+              currentVideo.currentTime = 0;
+
+              // Next index
+              currentIndex = (currentIndex + 1) % videos.length;
+              const nextVideo = videos[currentIndex];
+
+              // Play next
+              nextVideo.classList.add('active');
+
+              // Update Text immediately
+              if (title && nextVideo.dataset.text) {
+                title.textContent = nextVideo.dataset.text;
+              }
+
+              nextVideo.play().then(() => {
+                isTransitioning = false;
+              }).catch(e => {
+                console.error("Video play failed:", e);
+                // If fail, wait a bit then try next to avoid crazy loops
+                setTimeout(() => {
+                  isTransitioning = false;
+                  playNext();
+                }, 1000);
+              });
+            }
+
+            // Initialize listeners
+            videos.forEach((video, index) => {
+              video.onended = () => {
+                playNext();
+              };
+              video.onerror = (e) => {
+                console.error(`Error playing video ${index}:`, e);
+                setTimeout(playNext, 1000); // Delay on error
+              };
+            });
+
+            // Ensure first video plays
+            const first = videos[0];
+            if (first.paused) {
+              first.play().catch(e => {
+                console.log("Autoplay blocked:", e);
+                // Try playing silently if blocked? Or just accept.
+                // Usually muted autoplay works.
+              });
+            }
+          });
+        </script>
+
+        <div class="video-overlay"></div>
+        <div class="hero-text-overlay">
+          <h1 class="main-title">LET IT BIM</h1>
+        </div>
+  </div>
+  </section>
+
+  <section id="vision-scroll-section">
+    <div class="sticky-vision-wrapper">
+      <div class="vision-content">
+        <!-- Text to be split by JS -->
+        <p id="reveal-text">Innovamos, creamos y evolucionamos la Construcción en Guatemala</p>
+        <h1 id="reveal-signature">SOMOS AO</h1>
+
+        <!-- Statistics Counter -->
+        <div id="stats-counter" class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-number">2019</div>
+            <div class="stat-label">Año de Fundación</div>
+          </div>
+          <div class="stat-separator"></div>
+          <div class="stat-item">
+            <div class="stat-number" id="stat-projects">+50</div>
+            <div class="stat-label">Proyectos</div>
+          </div>
+          <div class="stat-separator"></div>
+          <div class="stat-item">
+            <div class="stat-number" id="stat-countries">2</div>
+            <div class="stat-label">Países</div>
+          </div>
+          <div class="stat-separator"></div>
+          <div class="stat-item">
+            <div class="stat-number" id="stat-sqm">+1,500,351</div>
+            <div class="stat-label">Metros Cuadrados</div>
+          </div>
+        </div>
+      </div>
+  </section>
+
+  <!-- Project Categories Section -->
+  <section id="project-categories">
+    <div class="categories-container">
+      <div class="category-card" data-category="residential">
+        <div class="cat-content">
+          <h3>Residencial</h3>
+          <div class="cat-stats">
+            <div><span class="cat-stat-sqm" data-cat="residential">0</span> m²</div>
+            <div><span class="cat-stat-count" data-cat="residential">0</span> Proyectos</div>
+          </div>
+        </div>
+        <!-- Background will be handled by CSS -->
+        <div class="cat-bg"></div>
+      </div>
+      <div class="category-card" data-category="commercial">
+        <div class="cat-content">
+          <h3>Comercial</h3>
+          <div class="cat-stats">
+            <div><span class="cat-stat-sqm" data-cat="commercial">0</span> m²</div>
+            <div><span class="cat-stat-count" data-cat="commercial">0</span> Proyectos</div>
+          </div>
+        </div>
+        <div class="cat-bg"></div>
+      </div>
+      <div class="category-card" data-category="industrial">
+        <div class="cat-content">
+          <h3>Naves Industriales</h3>
+          <div class="cat-stats">
+            <div><span class="cat-stat-sqm" data-cat="industrial">0</span> m²</div>
+            <div><span class="cat-stat-count" data-cat="industrial">0</span> Proyectos</div>
+          </div>
+        </div>
+        <div class="cat-bg"></div>
+      </div>
+      <div class="category-card" data-category="recreational">
+        <div class="cat-content">
+          <h3>Recreativo</h3>
+          <div class="cat-stats">
+            <div><span class="cat-stat-sqm" data-cat="recreational">0</span> m²</div>
+            <div><span class="cat-stat-count" data-cat="recreational">0</span> Proyectos</div>
+          </div>
+        </div>
+        <div class="cat-bg"></div>
+      </div>
+      <div class="category-card" data-category="educational">
+        <div class="cat-content">
+          <h3>Educativo</h3>
+          <div class="cat-stats">
+            <div><span class="cat-stat-sqm" data-cat="educational">0</span> m²</div>
+            <div><span class="cat-stat-count" data-cat="educational">0</span> Proyectos</div>
+          </div>
+        </div>
+        <div class="cat-bg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Careers Section -->
+  <section id="careers-section">
+    <div class="container careers-layout">
+      <div class="careers-visual">
+        <svg class="abstract-lines" viewBox="0 0 500 500">
+          <path d="M50,450 C150,350 350,350 450,50" fill="none" stroke="white" stroke-width="2" />
+          <path d="M50,50 C150,150 150,350 450,450" fill="none" stroke="white" stroke-width="2" />
+        </svg>
+      </div>
+      <div class="careers-text">
+        <h2>TRABAJA CON NOSOTROS <span class="arrow-icon">→</span></h2>
+        <a href="/contact.html" class="say-hello-btn">Hola.</a>
+      </div>
+      <div class="social-links-display">
+        <span>@somos_ao</span>
+        <span>AO Development</span>
+      </div>
+    </div>
+  </section>
+
+
+
+  <!-- Services Section -->
+  <section id="services" class="fade-on-scroll">
+    <div class="container services-container-wide">
+      <div class="services-header">
+        <h2 class="services-title">Todo lo que necesitas<br>en AO</h2>
+        <p class="services-subtitle">Eleva tu proyecto al siguiente nivel, con un equipo de profesionales listos
+          para desarrollar e implementar tecnologias adaptadas a tu proyecto y requerimientos</p>
+      </div>
+      <div class="services-grid">
+        <!-- Card 1: Diseño Arquitectonico -->
+        <article class="service-card">
+          <div class="card-content">
+            <h3>DISEÑO ARQUITECTONICO</h3>
+            <p>Diseño de vanguardia con atención al detalle y personalización total.</p>
+
+          </div>
+          <div class="card-visual">
+            <img src="/service-design.png" alt="Diseño Arquitectónico Icon">
+          </div>
+        </article>
+
+        <!-- Card 2: BIM Management -->
+        <article class="service-card">
+          <div class="card-content">
+            <h3>BIM MANAGEMENT</h3>
+            <p>Gestión integral de información de construcción para optimizar recursos.</p>
+          </div>
+          <div class="card-visual">
+            <img src="/service-bim-mgmt.png" alt="BIM Management Icon">
+          </div>
+          <div class="card-arrow">→</div>
+        </article>
+
+        <!-- Card 3: Planificacion Constructiva -->
+        <article class="service-card">
+          <div class="card-content">
+            <h3>PLANIFICACIÓN CONSTRUCTIVA</h3>
+            <p>Planificación estratégica y control de ejecución para obras eficientes.</p>
+          </div>
+          <div class="card-visual">
+            <img src="/service-planning.png" alt="Planificación Icon">
+          </div>
+          <div class="card-arrow">→</div>
+        </article>
+
+        <!-- Card 4: BIM Development -->
+        <article class="service-card">
+          <div class="card-content">
+            <h3>BIM DEVELOPMENT</h3>
+            <p>Desarrollo de soluciones tecnológicas y automatización para el sector AECO.</p>
+          </div>
+          <div class="card-visual">
+            <img src="/service-bim-dev.png" alt="BIM Development Icon">
+          </div>
+          <div class="card-arrow">→</div>
+        </article>
+      </div>
+    </div>
+  </section>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 AO Arquitectura. Todos los derechos reservados.</p>
+  </footer>
+  </div>
+  </div>
+
+  <script>
+    /* Mobile Menu Logic */
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggle = document.getElementById('mobile-menu-toggle');
+      const overlay = document.getElementById('mobile-nav-overlay');
+      const links = document.querySelectorAll('.mobile-link');
+
+      if (toggle && overlay) {
+        toggle.addEventListener('click', () => {
+          overlay.classList.toggle('active');
+          // Toggle Icon (Simple)
+          if (overlay.classList.contains('active')) {
+            toggle.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+          } else {
+            toggle.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>';
+          }
+        });
+
+        // Close on link click
+        links.forEach(l => {
+          l.addEventListener('click', () => {
+            overlay.classList.remove('active');
+            toggle.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>';
+          });
+        });
+      }
+    });
+  </script>
+</body>
+
+</html>

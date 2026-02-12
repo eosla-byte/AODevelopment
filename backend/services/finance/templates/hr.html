@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="flex flex-col h-full gap-8 overflow-y-auto pb-10">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-slate-800">Recursos Humanos</h1>
+            <p class="text-slate-500">Gestión de talento humano, nóminas y estructura organizacional.</p>
+        </div>
+        <div class="flex gap-2">
+            {% if view_mode == 'archived' %}
+            <a href="/hr" class="btn bg-white border border-slate-200 text-slate-600 hover:text-slate-800">
+                ← Volver a Activos
+            </a>
+            {% else %}
+            <a href="/hr?view=archived"
+                class="btn bg-white border border-slate-200 text-slate-400 hover:text-slate-600 text-sm font-bold flex items-center gap-2">
+                📁 Archivo
+            </a>
+            <button onclick="document.getElementById('createHrModal').classList.remove('hidden')"
+                class="btn btn-primary flex items-center gap-2">
+                <span>+</span> Nuevo Colaborador
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- KPI Dashboards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <!-- Total Collabs -->
+        <div
+            class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between h-32 relative overflow-hidden group">
+            <div
+                class="absolute right-[-10px] top-[-10px] bg-blue-100 w-20 h-20 rounded-full opacity-50 blur-xl group-hover:scale-150 transition-transform">
+            </div>
+            <div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Colaboradores</h3>
+                <div class="text-3xl font-black text-slate-800 mt-1">{{ metrics.total_collabs }}</div>
+            </div>
+            <div class="text-xs text-slate-500">Activos en planilla</div>
+        </div>
+
+        <!-- Monthly Payroll -->
+        <div
+            class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between h-32 relative overflow-hidden group">
+            <div
+                class="absolute right-[-10px] top-[-10px] bg-green-100 w-20 h-20 rounded-full opacity-50 blur-xl group-hover:scale-150 transition-transform">
+            </div>
+            <div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Planilla Mensual</h3>
+                <div class="text-2xl font-black text-slate-800 mt-1">Q{{ "{:,.2f}".format(metrics.monthly_payroll) }}
+                </div>
+            </div>
+            <div class="text-xs text-slate-500">Costo operativo mensual</div>
+        </div>
+
+        <!-- Annual Payroll -->
+        <div
+            class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between h-32 relative overflow-hidden group">
+            <div
+                class="absolute right-[-10px] top-[-10px] bg-indigo-100 w-20 h-20 rounded-full opacity-50 blur-xl group-hover:scale-150 transition-transform">
+            </div>
+            <div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Proyección Anual</h3>
+                <div class="text-2xl font-black text-slate-800 mt-1">Q{{ "{:,.2f}".format(metrics.annual_payroll) }}
+                </div>
+            </div>
+            <div class="text-xs text-slate-500">Estimado anual de salarios</div>
+        </div>
+
+        <!-- Liability -->
+        <div
+            class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between h-32 relative overflow-hidden group">
+            <div
+                class="absolute right-[-10px] top-[-10px] bg-orange-100 w-20 h-20 rounded-full opacity-50 blur-xl group-hover:scale-150 transition-transform">
+            </div>
+            <div>
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Pasivo Laboral</h3>
+                <div class="text-2xl font-black text-slate-800 mt-1">Q{{ "{:,.2f}".format(metrics.total_liability) }}
+                </div>
+            </div>
+            <div class="text-xs text-slate-500">Acumulado total</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <!-- Main List (Grouped) -->
+        <div class="lg:col-span-3 flex flex-col gap-8">
+            {% for role, u_list in grouped_collabs.items() %}
+            {% if u_list %}
+            <div>
+                <h2
+                    class="text-xl font-bold text-slate-700 mb-4 border-b border-slate-200 pb-2 flex items-center gap-2">
+                    <span class="w-2 h-6 bg-slate-800 rounded-full"></span>
+                    {{ role }}s
+                    <span class="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-normal">{{
+                        u_list|length }}</span>
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {% for c in u_list %}
+                    <a href="/hr/{{ c.id }}"
+                        class="bg-white p-4 rounded-xl border {{ 'border-slate-100 hover:border-slate-300' if c.status == 'Activo' else 'border-red-100 bg-red-50/50 grayscale hover:grayscale-0' }} shadow-sm hover:shadow-md transition-all flex items-center gap-4 cursor-pointer group">
+                        <div class="relative">
+                            <div
+                                class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors overflow-hidden">
+                                {% if c.profile_picture %}
+                                <img src="/hr_file/{{ c.id }}/Profile/{{ c.profile_picture }}"
+                                    class="w-full h-full object-cover">
+                                {% else %}
+                                {{ c.name[0] }}
+                                {% endif %}
+                            </div>
+                            {% if c.status != 'Activo' %}
+                            <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-red-500 border-2 border-white rounded-full flex items-center justify-center"
+                                title="Inactivo">
+                                <span class="text-[8px] text-white">✕</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="flex-1">
+                            <h3
+                                class="font-bold text-slate-800 text-sm group-hover:text-blue-700 transition-colors flex items-center gap-2">
+                                {{ c.name }}
+                            </h3>
+                            <p class="text-xs text-slate-400">{{ c.role }}</p>
+                        </div>
+                        <!-- Small salary hint or status -->
+                        <div class="text-right">
+                            <div class="w-2 h-2 rounded-full bg-green-500 ml-auto"></div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% else %}
+            <!-- Loop else -->
+            {% endfor %}
+
+            {% if metrics.total_collabs == 0 %}
+            <div class="text-center py-20 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <p class="text-slate-400">No hay colaboradores registrados. Crea el primero desde el botón superior.</p>
+                <p class="text-xs text-slate-300">Debug: {{ metrics }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar (Birthdays) -->
+        <div class="flex flex-col gap-6">
+            <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
+                <h3 class="font-bold text-lg mb-1">Cumpleaños</h3>
+                <p class="text-sm opacity-80 mb-4">Mes de {{ current_month_name }}</p>
+
+                {% if birthdays %}
+                <div class="space-y-3">
+                    {% for b in birthdays %}
+                    <div class="flex items-center gap-3 bg-white/10 p-2 rounded-lg backdrop-blur-sm">
+                        <div
+                            class="bg-white text-indigo-600 font-bold text-xs w-8 h-8 flex flex-col items-center justify-center rounded leading-none">
+                            <span>{{ b.day }}</span>
+                        </div>
+                        <div class="text-sm font-medium">{{ b.name }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4 bg-white/10 rounded-lg text-sm opacity-70">
+                    No hay cumpleaños este mes.
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Quick Actions or Info -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <h3 class="font-bold text-slate-700 mb-4 text-sm">Información</h3>
+                <ul class="text-xs text-slate-500 space-y-2 list-disc pl-4">
+                    <li>Los datos financieros son privados para Admin.</li>
+                    <li>Recuerda actualizar el pasivo laboral anualmente.</li>
+                    <li>Las facturas de planillas se cargan en el perfil.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Create Modal -->
+    <div id="createHrModal"
+        class="hidden fixed inset-0 bg-black/60 z-[9000] flex items-center justify-center backdrop-blur-sm transition-opacity">
+        <div
+            class="bg-white rounded-2xl p-6 w-[500px] shadow-2xl transform transition-all scale-100 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-slate-800">Nuevo Colaborador</h2>
+                <button onclick="document.getElementById('createHrModal').classList.add('hidden')"
+                    class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <form action="/hr/create" method="post" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nombre Completo</label>
+                        <input type="text" name="name" required
+                            class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                            placeholder="Ej: Juan Pérez">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Rol / Cargo</label>
+                        <select name="role"
+                            class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                            <option value="Bim Manager">Bim Manager</option>
+                            <option value="Bim Coordinator">Bim Coordinator</option>
+                            <option value="Bim Modeler">Bim Modeler</option>
+                            <option value="Bim Drafter">Bim Drafter</option>
+                            <option value="Administrativo">Administrativo</option>
+                            <option value="Socio">Socio</option>
+                            <option value="Collaborator">Otro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Salario Mensual (Q)</label>
+                        <input type="number" step="0.01" name="salary"
+                            class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                            placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Fecha Inicio</label>
+                        <input type="date" name="start_date"
+                            class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Fecha Cumpleaños</label>
+                        <input type="date" name="birthday"
+                            class="input-field w-full border border-slate-300 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 p-3 rounded text-xs text-slate-500 border border-slate-100">
+                    <p class="font-bold">Nota:</p>
+                    <p>Se creará automáticamente la estructura de carpetas (Profile, Legal, Payments) para este
+                        colaborador.</p>
+                </div>
+
+                <div class="flex gap-3 justify-end mt-6 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="document.getElementById('createHrModal').classList.add('hidden')"
+                        class="px-4 py-2 text-slate-500 hover:bg-slate-100 rounded-lg text-sm font-bold">Cancelar</button>
+                    <button type="submit"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-bold shadow-lg shadow-blue-200 transition-all">Crear
+                        Perfil</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
