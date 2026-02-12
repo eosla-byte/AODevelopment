@@ -49,6 +49,8 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 from common.database import get_db, SessionCore 
 from common.auth import create_access_token, create_refresh_token, decode_token, AO_JWT_PUBLIC_KEY_PEM
+import common.auth
+print(f"🔍 [DIAGNOSTIC] Loaded common.auth from: {common.auth.__file__}")
 from common.auth_utils import verify_password, get_password_hash 
 import common.models as models 
 from common.models import AccountUser 
