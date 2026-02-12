@@ -193,27 +193,13 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         try:
             print(f"🕵️ [AUTH DEBUG] Token Length: {len(token)}")
             
-            # Explicit Key Loading with Cryptography to handle PKCS#1 (BEGIN RSA PUBLIC KEY) vs PKCS#8
-            from cryptography.hazmat.primitives import serialization
-            from cryptography.hazmat.backends import default_backend
+            # Explicit Key Loading REMOVED. 
+            # We now trust the PKCS#8 keys are correct and PyJWT handles them natively.
             
-            try:
-                public_key_obj = serialization.load_pem_public_key(
-                    AO_JWT_PUBLIC_KEY_PEM, 
-                    backend=default_backend()
-                )
-                print(f"✅ [AUTH DEBUG] Cryptography loaded public key successfully.")
-            except Exception as e:
-                print(f"❌ [AUTH DEBUG] Cryptography failed to load key: {e}")
-                raise e
-
-            unverified_header = jwt.get_unverified_header(token)
-            # print(f"🕵️ [AUTH DEBUG] Token Header: {unverified_header}") # Reduce spam
-            
-            # Verify using the Key Object
+            # Verify using the Key Bytes directly
             payload = jwt.decode(
                 token, 
-                public_key_obj, # Pass object instead of bytes
+                AO_JWT_PUBLIC_KEY_PEM, # Pass bytes directly
                 algorithms=[ALGORITHM],
                 options={"require": ["exp", "iss", "sub"], "verify_aud": False}
             )

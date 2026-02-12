@@ -15,15 +15,63 @@ print(f"✅ Loading keys from {KEYS_FILE}...")
 with open(KEYS_FILE, "r") as f:
     content = f.read()
 
-# Extract Private Key
-priv_match = content.split("-----BEGIN PRIVATE KEY-----")[1].split("-----END PRIVATE KEY-----")[0]
-priv_key = "-----BEGIN PRIVATE KEY-----" + priv_match + "-----END PRIVATE KEY-----"
+# Robust extraction using regex or markers
+import re
+try:
+    # Find PRIVATE KEY block
+    priv_blocks = re.findall(r'(-+BEGIN PRIVATE KEY-+[\s\S]*?-+END PRIVATE KEY-+)', content)
+    if not priv_blocks:
+        # Try finding the prompt value
+        # The file has "VALUE:\n<env_var_style>\n\n" usually
+        pass 
+        
+    # Actually, the file V3 format is:
+    # SERVICE: ACCOUNTS
+    # VARIABLE: AO_JWT_PRIVATE_KEY_PEM
+    # VALUE:
+    # <one line with \n>
+    
+    # Wait, my generator script writes the ENV VAR value (escaped newlines)?
+    # Let's check the generator script again.
+    
+    # Ah, generate_rsa_keys.py writes:
+    # f.write(priv_env + "\n\n")  <-- priv_env has \\n
+    
+    # Check if the file contains the escaped version or the multiline version?
+    # The script output says:
+    # f.write("VALUE:\n")
+    # f.write(priv_env + "\n\n")
+    
+    # So the file contains ONE LONG LINE with literals "\n".
+    # I need to parse that line and convert \\n back to \n.
+    
+    # Naive parse: look for the line starting with "-----BEGIN"
+    lines = content.splitlines()
+    priv_key_str = None
+    pub_key_str = None
+    
+    for line in lines:
+        line = line.strip()
+        if "-----BEGIN PRIVATE KEY-----" in line:
+            priv_key_str = line.replace("\\n", "\n")
+        elif "-----BEGIN PUBLIC KEY-----" in line:
+            pub_key_str = line.replace("\\n", "\n")
+            
+    if not priv_key_str:
+        print("❌ Could not find Private Key (escaped) in file")
+        sys.exit(1)
+    if not pub_key_str:
+        print("❌ Could not find Public Key (escaped) in file")
+        sys.exit(1)
 
-# Extract Public Key
-pub_match = content.split("-----BEGIN PUBLIC KEY-----")[1].split("-----END PUBLIC KEY-----")[0]
-pub_key = "-----BEGIN PUBLIC KEY-----" + pub_match + "-----END PUBLIC KEY-----"
+    priv_key = priv_key_str.encode('utf-8')
+    pub_key = pub_key_str.encode('utf-8')
 
-print("✅ Extracted Keys.")
+except Exception as e:
+    print(f"❌ Error parsing file: {e}")
+    sys.exit(1)
+
+print("✅ Extracted Keys (PEM format).")
 
 # 2. Simulate Accounts Signing
 print("\n--- SIMULATING ACCOUNTS SIGNING ---")
