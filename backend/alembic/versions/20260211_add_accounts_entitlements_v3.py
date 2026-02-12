@@ -23,26 +23,33 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
+    # Check for existence to ensure idempotency
+    conn = op.get_bind()
+    insp = sa.inspect(conn)
+    existing_tables = insp.get_table_names()
+
     # 1. Create accounts_entitlements
-    op.create_table(
-        'accounts_entitlements',
-        sa.Column('id', sa.String(), nullable=False),
-        sa.Column('description', sa.String(), nullable=True),
-        sa.PrimaryKeyConstraint('id')
-    )
+    if 'accounts_entitlements' not in existing_tables:
+        op.create_table(
+            'accounts_entitlements',
+            sa.Column('id', sa.String(), nullable=False),
+            sa.Column('description', sa.String(), nullable=True),
+            sa.PrimaryKeyConstraint('id')
+        )
 
     # 2. Create accounts_org_entitlements
-    op.create_table(
-        'accounts_org_entitlements',
-        sa.Column('org_id', sa.String(), nullable=False),
-        sa.Column('entitlement_key', sa.String(), nullable=False),
-        sa.Column('enabled', sa.Boolean(), server_default='true', nullable=True),
-        sa.Column('limits_json', sa.JSON(), server_default='{}', nullable=True),
-        sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), nullable=True),
-        sa.ForeignKeyConstraint(['entitlement_key'], ['accounts_entitlements.id'], ),
-        sa.ForeignKeyConstraint(['org_id'], ['accounts_organizations.id'], ),
-        sa.PrimaryKeyConstraint('org_id', 'entitlement_key')
-    )
+    if 'accounts_org_entitlements' not in existing_tables:
+        op.create_table(
+            'accounts_org_entitlements',
+            sa.Column('org_id', sa.String(), nullable=False),
+            sa.Column('entitlement_key', sa.String(), nullable=False),
+            sa.Column('enabled', sa.Boolean(), server_default='true', nullable=True),
+            sa.Column('limits_json', sa.JSON(), server_default='{}', nullable=True),
+            sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), nullable=True),
+            sa.ForeignKeyConstraint(['entitlement_key'], ['accounts_entitlements.id'], ),
+            sa.ForeignKeyConstraint(['org_id'], ['accounts_organizations.id'], ),
+            sa.PrimaryKeyConstraint('org_id', 'entitlement_key')
+        )
     
     # 3. Add entitlements_version to accounts_organizations if not exists
     # We use "create_column" with a check, or just try/except block if running?

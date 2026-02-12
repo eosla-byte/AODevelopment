@@ -1,1 +1,1 @@
-web: python entrypoint.py
+web: alembic upgrade head && python entrypoint.py
