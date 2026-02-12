@@ -13,25 +13,54 @@ from typing import Optional, Dict, Any
 # Users must set (AO_JWT_PRIVATE_KEY_PEM / AO_JWT_PUBLIC_KEY_PEM) in environment
 # PEMs are multiline, so handle \n replacement if coming from flat env vars.
 
-def load_pem_key(env_var_name):
+import hashlib
+
+def load_pem_key(env_var_name, is_private=False):
     val = os.getenv(env_var_name)
     if not val: return None
-    # Replace literal \n with actual newlines if needed (common devops pattern)
-    return val.replace("\\n", "\n").encode('utf-8')
+    
+    # 1. Sanitize: Remove wrapping quotes and whitespace
+    val = val.strip().strip("'").strip('"')
+    
+    # 2. Fix Escaped Newlines (Critical for Railway/Docker envs)
+    # Replaces literal string "\n" with actual newline character
+    if "\\n" in val:
+        val = val.replace("\\n", "\n")
+        
+    # 3. Validation: Check for PEM Headers
+    header = "-----BEGIN RSA PRIVATE KEY-----" if is_private else "-----BEGIN PUBLIC KEY-----"
+    footer = "-----END RSA PRIVATE KEY-----" if is_private else "-----END PUBLIC KEY-----"
+    
+    if header not in val or footer not in val:
+        print(f"❌ [AUTH] Malformed PEM in {env_var_name}. Missing Header/Footer.")
+        print(f"Debug First 20 chars: {val[:20]}")
+        return None
+        
+    return val.encode('utf-8')
 
-AO_JWT_PRIVATE_KEY_PEM = load_pem_key("AO_JWT_PRIVATE_KEY_PEM")
-AO_JWT_PUBLIC_KEY_PEM = load_pem_key("AO_JWT_PUBLIC_KEY_PEM")
+AO_JWT_PRIVATE_KEY_PEM = load_pem_key("AO_JWT_PRIVATE_KEY_PEM", is_private=True)
+AO_JWT_PUBLIC_KEY_PEM = load_pem_key("AO_JWT_PUBLIC_KEY_PEM", is_private=False)
 AO_JWT_KEY_ID = os.getenv("AO_JWT_KEY_ID", "ao-k1")
 
 # Use Public Key or Secret (Fallback for dev/transition if needed, but Prompt says strict RS256)
-# If no keys, warn but don't crash immediately (might be a service that doesn't sign)
 if not AO_JWT_PUBLIC_KEY_PEM:
-     print("⚠️ [FINANCE AUTH] RS256 Public Key missing!")
+     print("⚠️ [FINANCE AUTH] RS256 Public Key missing! Authentication WILL FAIL.")
 else:
-     print(f"✅ [FINANCE AUTH] RS256 Public Key loaded. Length: {len(AO_JWT_PUBLIC_KEY_PEM)}")
-
-if not AO_JWT_PRIVATE_KEY_PEM and not AO_JWT_PUBLIC_KEY_PEM:
-     print("⚠️ [AUTH] RS256 Keys missing! Authentication may fail.")
+     # LOGGING: Fingerprint only (SHA256)
+     try:
+         # Create a hash of the key bytes to verify consistency across services without exposing the key
+         key_hash = hashlib.sha256(AO_JWT_PUBLIC_KEY_PEM).hexdigest()[:16]
+         lines = AO_JWT_PUBLIC_KEY_PEM.decode('utf-8').split('\n')
+         first_line = lines[0] if lines else "EMPTY"
+         last_line = lines[-1] if lines else "EMPTY"
+         # Handle empty last line from split
+         if not last_line.strip() and len(lines) > 1: last_line = lines[-2]
+         
+         print(f"✅ [FINANCE AUTH] RS256 Public Key loaded.")
+         print(f"   Fingerprint (SHA256): {key_hash}")
+         print(f"   Format Check: {first_line} ... {last_line}")
+     except Exception as e:
+         print(f"⚠️ [FINANCE AUTH] Key loaded but failed to log details: {e}")
 
 ALGORITHM = "RS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
