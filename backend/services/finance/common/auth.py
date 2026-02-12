@@ -14,6 +14,7 @@ from typing import Optional, Dict, Any
 # PEMs are multiline, so handle \n replacement if coming from flat env vars.
 
 import hashlib
+import re
 
 def load_pem_key(env_var_name, is_private=False):
     val = os.getenv(env_var_name)
@@ -22,45 +23,86 @@ def load_pem_key(env_var_name, is_private=False):
     # 1. Sanitize: Remove wrapping quotes and whitespace
     val = val.strip().strip("'").strip('"')
     
-    # 2. Fix Escaped Newlines (Critical for Railway/Docker envs)
-    # Replaces literal string "\n" with actual newline character
-    if "\\n" in val:
-        val = val.replace("\\n", "\n")
-        
-    # 3. Validation: Check for PEM Headers
-    header = "-----BEGIN RSA PRIVATE KEY-----" if is_private else "-----BEGIN PUBLIC KEY-----"
-    footer = "-----END RSA PRIVATE KEY-----" if is_private else "-----END PUBLIC KEY-----"
+    # 2. Normalize Newlines: 
+    # Handle literal escaped \n, \r\n, \r
+    val = val.replace("\\n", "\n").replace("\\r", "")
     
-    if header not in val or footer not in val:
-        print(f"❌ [AUTH] Malformed PEM in {env_var_name}. Missing Header/Footer.")
-        print(f"Debug First 20 chars: {val[:20]}")
-        return None
-        
-    return val.encode('utf-8')
+    # 3. Aggressive Normalization via Split/Join
+    # distinct lines, removing empties
+    lines = [line.strip() for line in val.split("\n") if line.strip()]
+    
+    # 4. Reconstruct PEM
+    # Ensure Header and Footer are correct
+    header_marker = "BEGIN RSA PRIVATE KEY" if is_private else "BEGIN PUBLIC KEY"
+    footer_marker = "END RSA PRIVATE KEY" if is_private else "END PUBLIC KEY"
+    
+    # Filter out potential duplicate headers if env var was pasted weirdly
+    # But usually just finding the content lines is safest.
+    
+    clean_lines = []
+    found_header = False
+    found_footer = False
+    
+    for line in lines:
+        if header_marker in line:
+            clean_lines.append(f"-----{header_marker}-----")
+            found_header = True
+        elif footer_marker in line:
+            clean_lines.append(f"-----{footer_marker}-----")
+            found_footer = True
+        else:
+            # Body lines
+            clean_lines.append(line)
+            
+    if not found_header or not found_footer:
+        # Fallback: validation check
+        print(f"❌ [AUTH] Malformed PEM in {env_var_name}. Missing Header/Footer markers.")
+        # Fail Fast
+        raise ValueError(f"CRITICAL: Invalid PEM structure in {env_var_name}")
 
-AO_JWT_PRIVATE_KEY_PEM = load_pem_key("AO_JWT_PRIVATE_KEY_PEM", is_private=True)
-AO_JWT_PUBLIC_KEY_PEM = load_pem_key("AO_JWT_PUBLIC_KEY_PEM", is_private=False)
+    # Final String
+    pem_str = "\n".join(clean_lines) + "\n"
+    
+    return pem_str.encode('utf-8')
+
+try:
+    AO_JWT_PRIVATE_KEY_PEM = load_pem_key("AO_JWT_PRIVATE_KEY_PEM", is_private=True)
+    AO_JWT_PUBLIC_KEY_PEM = load_pem_key("AO_JWT_PUBLIC_KEY_PEM", is_private=False)
+except Exception as e:
+    print(f"🔥 [STARTUP FATAL] Auth Configuration Error: {e}")
+    # We should probably exit or let it crash, but printing is good for logs.
+    AO_JWT_PRIVATE_KEY_PEM = None
+    AO_JWT_PUBLIC_KEY_PEM = None
+    raise e
+
 AO_JWT_KEY_ID = os.getenv("AO_JWT_KEY_ID", "ao-k1")
 
-# Use Public Key or Secret (Fallback for dev/transition if needed, but Prompt says strict RS256)
-if not AO_JWT_PUBLIC_KEY_PEM:
-     print("⚠️ [FINANCE AUTH] RS256 Public Key missing! Authentication WILL FAIL.")
-else:
-     # LOGGING: Fingerprint only (SHA256)
+# LOGGING: Safe Fingerprint
+if AO_JWT_PUBLIC_KEY_PEM:
      try:
-         # Create a hash of the key bytes to verify consistency across services without exposing the key
+         # SHA256 Fingerprint
          key_hash = hashlib.sha256(AO_JWT_PUBLIC_KEY_PEM).hexdigest()[:16]
-         lines = AO_JWT_PUBLIC_KEY_PEM.decode('utf-8').split('\n')
-         first_line = lines[0] if lines else "EMPTY"
-         last_line = lines[-1] if lines else "EMPTY"
-         # Handle empty last line from split
-         if not last_line.strip() and len(lines) > 1: last_line = lines[-2]
          
-         print(f"✅ [FINANCE AUTH] RS256 Public Key loaded.")
+         # Line Analysis
+         pem_decoded = AO_JWT_PUBLIC_KEY_PEM.decode('utf-8')
+         lines = pem_decoded.strip().split('\n')
+         total_lines = len(lines)
+         first_line = lines[0]
+         second_line = lines[1][:10] + "..." if total_lines > 1 else "N/A"
+         last_line = lines[-1]
+         
+         print(f"✅ [FINANCE AUTH] RS256 Public Key Loaded Successfully.")
          print(f"   Fingerprint (SHA256): {key_hash}")
-         print(f"   Format Check: {first_line} ... {last_line}")
+         print(f"   Lines: {total_lines}")
+         print(f"   Structure: {first_line}")
+         print(f"              {second_line}")
+         print(f"              {last_line}")
+         
      except Exception as e:
          print(f"⚠️ [FINANCE AUTH] Key loaded but failed to log details: {e}")
+
+if not AO_JWT_PRIVATE_KEY_PEM and not AO_JWT_PUBLIC_KEY_PEM:
+     print("⚠️ [AUTH] RS256 Keys missing! Authentication WILL FAIL.")
 
 ALGORITHM = "RS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
