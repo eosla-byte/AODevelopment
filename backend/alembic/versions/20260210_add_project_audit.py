@@ -39,11 +39,13 @@ def upgrade():
         op.create_index(op.f('ix_resources_projects_created_by'), 'resources_projects', ['created_by'], unique=False)
     
     # 4. FK to accounts_users
+    # Check if target table exists first to avoid Transaction Abort
+    existing_tables = inspector.get_table_names()
     if 'fk_projects_created_by' not in constraints:
-        try:
+        if 'accounts_users' in existing_tables:
             op.create_foreign_key('fk_projects_created_by', 'resources_projects', 'accounts_users', ['created_by'], ['id'], ondelete='SET NULL')
-        except Exception:
-            pass # Handle case where table name differs or validation fails
+        else:
+            print("WARNING: Skipping FK to accounts_users because table does not exist.")
 
 
 def downgrade():

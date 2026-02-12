@@ -31,7 +31,11 @@ def upgrade():
         op.create_index(op.f('ix_resources_projects_organization_id'), 'resources_projects', ['organization_id'], unique=False)
         
         # 3. Create ForeignKey
-        op.create_foreign_key('fk_projects_organization', 'resources_projects', 'accounts_organizations', ['organization_id'], ['id'], ondelete='CASCADE')
+        existing_tables = inspector.get_table_names()
+        if 'accounts_organizations' in existing_tables:
+             op.create_foreign_key('fk_projects_organization', 'resources_projects', 'accounts_organizations', ['organization_id'], ['id'], ondelete='CASCADE')
+        else:
+             print("WARNING: Skipping FK to accounts_organizations because table does not exist.")
 
 
 def downgrade():
