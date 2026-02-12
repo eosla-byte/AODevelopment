@@ -15,54 +15,80 @@ from typing import Optional, Dict, Any
 
 print("✅ [AUTH] Loading VENDORED auth.py (services/accounts/common)")
 
-def load_key_strict(env_name, required=False):
+import hashlib
+import re
+
+print("✅ [AUTH] Loading VENDORED auth.py (services/accounts/common)")
+
+def load_key_strict(env_name, required=False, is_private=False):
     val = os.getenv(env_name)
     if not val:
         if required:
             raise ValueError(f"❌ [AUTH] CRITICAL ERROR: Environment variable '{env_name}' is missing.")
         return None
     
-    # Secure Log (Length only)
-    print(f"✅ [AUTH] Loaded {env_name} (Length: {len(val)})")
+    # 1. Sanitize: Remove wrapping quotes and whitespace
+    val = val.strip().strip("'").strip('"')
     
-    # Handle Newline Escaping
-    return val.strip().replace("\\n", "\n").encode('utf-8')
+    # 2. Normalize Newlines: 
+    # Handle literal escaped \n, \r\n, \r
+    val = val.replace("\\n", "\n").replace("\\r", "")
+    
+    # 3. Aggressive Normalization via Split/Join
+    # distinct lines, removing empties
+    lines = [line.strip() for line in val.split("\n") if line.strip()]
+    
+    # 4. Reconstruct PEM
+    # Ensure Header and Footer are correct
+    header_marker = "BEGIN RSA PRIVATE KEY" if is_private else "BEGIN PUBLIC KEY"
+    footer_marker = "END RSA PRIVATE KEY" if is_private else "END PUBLIC KEY"
+    
+    clean_lines = []
+    found_header = False
+    found_footer = False
+    
+    for line in lines:
+        if header_marker in line:
+            clean_lines.append(f"-----{header_marker}-----")
+            found_header = True
+        elif footer_marker in line:
+            clean_lines.append(f"-----{footer_marker}-----")
+            found_footer = True
+        else:
+            # Body lines
+            clean_lines.append(line)
+            
+    if not found_header or not found_footer:
+        pass # Warning logged below, but let's try to return what we have or fail?
+        # For Accounts, we might want to be strict.
+        
+    # Final String
+    pem_str = "\n".join(clean_lines) + "\n"
+    
+    # Secure Log (SHA256 Fingerprint)
+    try:
+         key_bytes = pem_str.encode('utf-8')
+         fp = hashlib.sha256(key_bytes).hexdigest()[:16]
+         print(f"✅ [ACCOUNTS AUTH] Loaded {env_name}")
+         print(f"   Fingerprint: {fp}")
+         print(f"   Lines: {len(clean_lines)}")
+         print(f"   First: {clean_lines[0] if clean_lines else 'EMPTY'}")
+         print(f"   Last:  {clean_lines[-1] if clean_lines else 'EMPTY'}")
+    except Exception as e:
+         print(f"⚠️ [ACCOUNTS AUTH] Failed to log key details: {e}")
 
-import hashlib
+    return pem_str.encode('utf-8')
 
 # Load Keys
 try:
     # Strict loading for Accounts (Private) and Verification (Public)
-    AO_JWT_PRIVATE_KEY_PEM = load_key_strict("AO_JWT_PRIVATE_KEY_PEM", required=False)
-    AO_JWT_PUBLIC_KEY_PEM = load_key_strict("AO_JWT_PUBLIC_KEY_PEM", required=False) # Accounts also needs public to verify its own tokens sometimes
-
-    # LOGGING: Fingerprints (SHA256)
-    if AO_JWT_PUBLIC_KEY_PEM:
-         try:
-             # Calculate fingerprint of the Public Key
-             # If we only have private, we should ideally derive public, but let's assume valid config has both.
-             pub_hash = hashlib.sha256(AO_JWT_PUBLIC_KEY_PEM).hexdigest()[:16]
-             pem_decoded = AO_JWT_PUBLIC_KEY_PEM.decode('utf-8').strip()
-             lines = pem_decoded.split('\n')
-             first_line = lines[0]
-             last_line = lines[-1]
-             
-             print(f"✅ [ACCOUNTS AUTH] Active kid: {os.getenv('AO_JWT_KEY_ID', 'ao-k1')}")
-             print(f"✅ [ACCOUNTS AUTH] Public Key Fingerprint: {pub_hash}")
-             print(f"✅ [ACCOUNTS AUTH] Format: {first_line} ... {last_line}")
-         except Exception as e:
-             print(f"⚠️ [ACCOUNTS AUTH] Failed to log public key details: {e}")
-
-    if AO_JWT_PRIVATE_KEY_PEM:
-         try:
-             # Just presence check
-             # priv_hash = hashlib.sha256(AO_JWT_PRIVATE_KEY_PEM).hexdigest()[:16]
-             print(f"✅ [ACCOUNTS AUTH] Private Key Loaded (Ready to Sign)")
-         except Exception as e:
-             pass
-
+    AO_JWT_PRIVATE_KEY_PEM = load_key_strict("AO_JWT_PRIVATE_KEY_PEM", required=False, is_private=True)
+    AO_JWT_PUBLIC_KEY_PEM = load_key_strict("AO_JWT_PUBLIC_KEY_PEM", required=False, is_private=False)
+    
 except Exception as e:
     print(f"❌ [AUTH] Configuration Error: {e}")
+    # Allow startup to proceed even if keys bad? No, Auth is critical.
+    # But usually we re-raise.
     raise e
 
 AO_JWT_KEY_ID = os.getenv("AO_JWT_KEY_ID", "ao-k1")
