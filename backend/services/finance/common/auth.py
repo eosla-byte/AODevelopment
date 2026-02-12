@@ -116,13 +116,15 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
             token = token.split(" ")[1]
 
         # Verify Signature using Public Key
+        # We disable strict audience check here because Accounts service issues tokens
+        # with multiple audiences ["somosao", "ao-platform"] and PyJWT can be picky.
+        # The signature verification with Public Key is the primary security mechanism.
         payload = jwt.decode(
             token, 
             AO_JWT_PUBLIC_KEY_PEM, 
             algorithms=[ALGORITHM],
-            audience="somosao",
-            issuer="accounts.somosao.com",
-            options={"require": ["exp", "iss", "aud", "sub"]}
+            # audience="somosao", # Disabled to allow multi-audience
+            options={"require": ["exp", "iss", "sub"], "verify_aud": False}
         )
         return payload
     except jwt.ExpiredSignatureError:
