@@ -53,9 +53,13 @@ def generate_keys():
     print("\n" + "="*60 + "\n")
     
     # Save to file
-    with open("generated_keys.txt", "w", encoding="utf-8") as f:
+    # Ensure we save to backend/ directory if running from root
+    output_filename = "generated_keys_v3.txt"
+    output_path = os.path.join("backend", output_filename) if os.path.exists("backend") else output_filename
+    
+    with open(output_path, "w", encoding="utf-8") as f:
         f.write("="*60 + "\n")
-        f.write("RSA KEYS (PKCS#8) FOR RAILWAY\n")
+        f.write("RSA KEYS (PKCS#8) FOR RAILWAY [V3]\n")
         f.write("="*60 + "\n\n")
         f.write("SERVICE: ACCOUNTS\n")
         f.write("VARIABLE: AO_JWT_PRIVATE_KEY_PEM\n")
@@ -67,7 +71,7 @@ def generate_keys():
         f.write("VALUE:\n")
         f.write(pub_env + "\n")
         
-    print(f"✅ Keys also saved to: {os.path.abspath('generated_keys.txt')}")
+    print(f"✅ Keys also saved to: {os.path.abspath(output_path)}")
 
 if __name__ == "__main__":
     generate_keys()
