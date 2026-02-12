@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 import os
 import shutil
 import datetime
-from ..common.database import (
+from common.database import (
     get_collaborators, create_collaborator, get_collaborator_details, 
     update_collaborator, update_collaborator_picture, add_adjustment, 
     remove_adjustment, toggle_archive_collaborator, save_payroll_close,

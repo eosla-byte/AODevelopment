@@ -5,7 +5,7 @@ import os
 import shutil
 import datetime
 from typing import List
-from ..common.database import (
+from common.database import (
     get_expenses_monthly, add_expense_column, add_expense_card,
     copy_expense_card, delete_expense_card, delete_expense_column,
     update_expense_card_files, get_projects, get_collaborators

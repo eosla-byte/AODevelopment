@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 import os
 import uuid
 from typing import Optional
-from ..common.database import (
+from common.database import (
     get_quotations, get_quotation_by_id, create_quotation, update_quotation, delete_quotation,
     get_templates, save_template, get_projects, get_market_studies
 )

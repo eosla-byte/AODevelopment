@@ -5,7 +5,7 @@ from typing import List, Optional
 import os
 import shutil
 import datetime
-from ..common.database import (
+from common.database import (
     get_projects, create_project, get_project_details, update_project_meta,
     update_project_collaborators, get_total_collaborator_allocations,
     update_project_profit_config, add_partner_withdrawal, update_project_file_meta,
@@ -13,7 +13,7 @@ from ..common.database import (
     toggle_project_reminder, get_market_studies, add_market_study, delete_market_study,
     get_collaborators, get_project_stats_by_category
 )
-from ..common.auth import require_service
+from common.auth import require_service
 
 router = APIRouter(
     tags=["Projects"]
