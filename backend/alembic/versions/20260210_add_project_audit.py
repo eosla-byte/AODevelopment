@@ -29,10 +29,10 @@ def upgrade():
     if 'created_at' not in cols:
         op.add_column('resources_projects', sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False))
     
-    # 2. Add created_by (UUID)
+    # 2. Add created_by (String/VARCHAR)
+    # Changed from UUID to String because accounts_users.id is VARCHAR produced by Supabase/GoTrue/etc.
     if 'created_by' not in cols:
-        from sqlalchemy.dialects import postgresql
-        op.add_column('resources_projects', sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=True))
+        op.add_column('resources_projects', sa.Column('created_by', sa.String(), nullable=True))
     
     # 3. Index created_by
     if 'ix_resources_projects_created_by' not in indexes:
