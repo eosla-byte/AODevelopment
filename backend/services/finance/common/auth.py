@@ -189,36 +189,45 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
         if token.startswith("Bearer "):
             token = token.split(" ")[1]
 
-        # Verify Signature using Public Key
         # DEBUG: Print Token Header and Key details
         try:
             print(f"🕵️ [AUTH DEBUG] Token Length: {len(token)}")
-            print(f"🕵️ [AUTH DEBUG] Token Start: '{token[:20]}'")
-            print(f"🕵️ [AUTH DEBUG] Token End:   '{token[-20:]}'")
             
-            unverified_header = jwt.get_unverified_header(token)
-            print(f"🕵️ [AUTH DEBUG] Token Header: {unverified_header}")
+            # Explicit Key Loading with Cryptography to handle PKCS#1 (BEGIN RSA PUBLIC KEY) vs PKCS#8
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.backends import default_backend
             
-            # Try decoding payload without verification to ensure body is readable
-            unverified_payload = jwt.decode(token, options={"verify_signature": False})
-            print(f"🕵️ [AUTH DEBUG] Unverified Payload Sub: {unverified_payload.get('sub')}")
-            
-            print(f"🕵️ [AUTH DEBUG] Using Key ID: {AO_JWT_KEY_ID}")
-            print(f"🕵️ [AUTH DEBUG] Public Key Start: {AO_JWT_PUBLIC_KEY_PEM[:30] if AO_JWT_PUBLIC_KEY_PEM else 'NONE'}...")
-        except Exception as e:
-            print(f"🕵️ [AUTH DEBUG] Failed to inspect token details: {e}")
+            try:
+                public_key_obj = serialization.load_pem_public_key(
+                    AO_JWT_PUBLIC_KEY_PEM, 
+                    backend=default_backend()
+                )
+                print(f"✅ [AUTH DEBUG] Cryptography loaded public key successfully.")
+            except Exception as e:
+                print(f"❌ [AUTH DEBUG] Cryptography failed to load key: {e}")
+                raise e
 
-        # We disable strict audience check here because Accounts service issues tokens
-        # with multiple audiences ["somosao", "ao-platform"] and PyJWT can be picky.
-        # The signature verification with Public Key is the primary security mechanism.
-        payload = jwt.decode(
-            token, 
-            AO_JWT_PUBLIC_KEY_PEM, 
-            algorithms=[ALGORITHM],
-            # audience="somosao", # Disabled to allow multi-audience
-            options={"require": ["exp", "iss", "sub"], "verify_aud": False}
-        )
-        return payload
+            unverified_header = jwt.get_unverified_header(token)
+            # print(f"🕵️ [AUTH DEBUG] Token Header: {unverified_header}") # Reduce spam
+            
+            # Verify using the Key Object
+            payload = jwt.decode(
+                token, 
+                public_key_obj, # Pass object instead of bytes
+                algorithms=[ALGORITHM],
+                options={"require": ["exp", "iss", "sub"], "verify_aud": False}
+            )
+            return payload
+            
+        except jwt.ExpiredSignatureError:
+            print("⚠️ [AUTH] Token Expired")
+            return None
+        except jwt.InvalidTokenError as e:
+            print(f"⚠️ [AUTH] Invalid Token: {e}")
+            return None
+        except Exception as e:
+            print(f"❌ [AUTH] Unexpected Decode Error: {e}")
+            return None
     except jwt.ExpiredSignatureError:
         print("⚠️ [AUTH] Token Expired")
         return None
