@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi import FastAPI, Request, Depends, HTTPException, status, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -8,6 +8,7 @@ import uvicorn
 import os
 import sys
 import datetime
+import requests
 from typing import Optional
 
 # Path Setup
@@ -86,6 +87,62 @@ app.include_router(projects.router)
 app.include_router(hr.router)
 app.include_router(expenses.router)
 app.include_router(quotes.router)
+
+import requests
+from fastapi import Form
+
+# ... (imports)
+
+@app.post("/ao-login-auth")
+async def login_proxy(request: Request, username: str = Form(...), password: str = Form(...)):
+    """
+    Proxies login request to Accounts Service (Monolith) to get valid Cookies.
+    Finance Service cannot issue RS256 tokens itself (no Private Key).
+    """
+    # Public URL of Accounts Service
+    ACCOUNTS_URL = "https://accounts.somosao.com/auth/login"
+    
+    try:
+        # Send Form Data (as Accounts expects 'email', we map 'username' -> 'email')
+        resp = requests.post(
+            ACCOUNTS_URL, 
+            data={"email": username, "password": password}, 
+            allow_redirects=False,
+            timeout=10
+        )
+        
+        if resp.status_code == 200:
+            # Success!
+            # Accounts returns JSON: {"status": "ok", "redirect": "...", ...}
+            # We redirect user to Dashboard
+            target_url = "/projects"
+            
+            response = RedirectResponse(target_url, status_code=303)
+            
+            # Forward Cookies from Accounts Response
+            # requests.cookies is a CookieJar. We iterate usage.
+            for cookie in resp.cookies:
+                # We blindly copy values. 
+                # Note: 'domain' might need adjustment if it's strict, but .somosao.com is fine.
+                response.set_cookie(
+                    key=cookie.name,
+                    value=cookie.value,
+                    domain=cookie.domain,
+                    path=cookie.path,
+                    secure=cookie.secure,
+                    httponly=cookie.has_nonstandard_attr('HttpOnly') or True, # Default to True for auth tokens
+                    samesite='Lax' # Safe default
+                )
+            
+            return response
+        else:
+            # Failed (401, 403, etc)
+            print(f"Login Proxy Failed: {resp.status_code} - {resp.text}")
+            return RedirectResponse("/?error=invalid_credentials", status_code=303)
+            
+    except Exception as e:
+        print(f"Login Proxy System Error: {e}")
+        return RedirectResponse("/?error=system_error", status_code=303)
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
