@@ -5,4 +5,4 @@ nixPkgs = ["python311", "gcc"]
 cmds = ["python -m pip install -r requirements.txt"]
 
 [start]
-cmd = "python main.py"
+cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT"
