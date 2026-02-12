@@ -150,6 +150,39 @@ app = FastAPI(title="AO Accounts Service", lifespan=lifespan)
 def health_check():
     return {"status": "ok", "service": "accounts", "version": "v1.0"}
 
+@app.get("/debug/auth-config")
+def debug_auth_config():
+    """
+    Diagnostic endpoint to verify loaded keys and algorithms.
+    """
+    import hashlib
+    from common.auth import AO_JWT_PUBLIC_KEY_PEM, AO_JWT_PRIVATE_KEY_PEM, ALGORITHM
+    
+    pub_fp = "MISSING"
+    if AO_JWT_PUBLIC_KEY_PEM:
+        try:
+            pub_fp = hashlib.sha256(AO_JWT_PUBLIC_KEY_PEM).hexdigest()[:16]
+        except:
+            pub_fp = "ERROR"
+
+    priv_fp = "MISSING"
+    if AO_JWT_PRIVATE_KEY_PEM:
+        try:
+            # We hash the private key content itself for ID
+            priv_fp = hashlib.sha256(AO_JWT_PRIVATE_KEY_PEM).hexdigest()[:16]
+        except:
+            priv_fp = "ERROR"
+
+    return {
+        "service": "accounts",
+        "algorithm": ALGORITHM,
+        "public_key_fingerprint": pub_fp,
+        "private_key_fingerprint": priv_fp, # Should match if derived from same pair? No, private key has different bytes.
+        # But we can check if they are mathematically paired? Too complex for here.
+        # User just needs to see if "public_key_fingerprint" matches Finance's.
+        "pem_preview": AO_JWT_PUBLIC_KEY_PEM[:30].decode('utf-8') if AO_JWT_PUBLIC_KEY_PEM else None
+    }
+
 # ... (dependencies)
 def get_current_active_user(request: Request):
     # 1. Read Valid Cookie (Prioritize Unified Name)

@@ -182,6 +182,28 @@ async def logout():
 def version_check():
     return {"service": "AO Finance", "version": "v2.0-migrated"}
 
+@app.get("/debug/auth-config")
+def debug_auth_config():
+    """
+    Diagnostic endpoint to verify loaded keys and algorithms.
+    """
+    import hashlib
+    from common.auth import AO_JWT_PUBLIC_KEY_PEM, ALGORITHM
+    
+    fp = "MISSING"
+    if AO_JWT_PUBLIC_KEY_PEM:
+        try:
+            fp = hashlib.sha256(AO_JWT_PUBLIC_KEY_PEM).hexdigest()[:16]
+        except Exception as e:
+            fp = f"ERROR: {e}"
+            
+    return {
+        "service": "finance",
+        "algorithm": ALGORITHM,
+        "public_key_fingerprint": fp,
+        "pem_preview": AO_JWT_PUBLIC_KEY_PEM[:30].decode('utf-8') if AO_JWT_PUBLIC_KEY_PEM else None
+    }
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8002))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
