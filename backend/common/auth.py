@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any
 
 print("[AUTH] Loading ROOT auth.py")
 
+
 def load_key_strict(env_name, required=False):
     val = os.getenv(env_name)
     if not val:
@@ -22,11 +23,57 @@ def load_key_strict(env_name, required=False):
             raise ValueError(f"❌ [AUTH] CRITICAL ERROR: Environment variable '{env_name}' is missing.")
         return None
     
-    # Secure Log (Length only)
-    print(f"✅ [AUTH] Loaded {env_name} (Length: {len(val)})")
+    # 1. Sanitize: Remove wrapping quotes and whitespace
+    val = val.strip().strip("'").strip('"')
     
-    # Handle Newline Escaping
-    return val.strip().replace("\\n", "\n").encode('utf-8')
+    # 2. Normalize Newlines: 
+    # Handle literal escaped \n, \r\n, \r
+    val = val.replace("\\n", "\n").replace("\\r", "")
+    
+    # 3. Aggressive Normalization via Split/Join
+    # distinct lines, removing empties
+    lines = [line.strip() for line in val.split("\n") if line.strip()]
+    
+    # 4. Reconstruct PEM
+    # We support both PKCS#1 (RSA PUBLIC KEY) and PKCS#8 (PUBLIC KEY)
+    
+    clean_lines = []
+    found_header = False
+    found_footer = False
+    
+    for line in lines:
+        if "BEGIN" in line and "KEY" in line:
+            clean_lines.append(line)
+            found_header = True
+        elif "END" in line and "KEY" in line:
+            clean_lines.append(line)
+            found_footer = True
+        else:
+            clean_lines.append(line)
+            
+    if not found_header or not found_footer:
+        # Fallback
+        print(f"❌ [AUTH] Malformed PEM in {env_name}. Missing Header/Footer markers.")
+        # But let's try to proceed if content looks base64-ish?
+        # raise ValueError(f"CRITICAL: Invalid PEM structure in {env_name}")
+        
+    # Final String
+    pem_str = "\n".join(clean_lines) + "\n"
+    
+    # Secure Log (SHA256 Fingerprint)
+    import hashlib
+    try:
+         key_bytes = pem_str.encode('utf-8')
+         fp = hashlib.sha256(key_bytes).hexdigest()[:16]
+         print(f"✅ [SHARED AUTH] Loaded {env_name}")
+         print(f"   Fingerprint: {fp}")
+         print(f"   Lines: {len(clean_lines)}")
+         print(f"   First: {clean_lines[0] if clean_lines else 'EMPTY'}")
+         print(f"   Last:  {clean_lines[-1] if clean_lines else 'EMPTY'}")
+    except Exception as e:
+         print(f"⚠️ [SHARED AUTH] Failed to log key details: {e}")
+
+    return pem_str.encode('utf-8')
 
 # Load Keys
 try:
