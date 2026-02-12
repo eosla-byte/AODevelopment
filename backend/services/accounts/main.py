@@ -49,8 +49,6 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 from common.database import get_db, SessionCore 
 from common.auth import create_access_token, create_refresh_token, decode_token, AO_JWT_PUBLIC_KEY_PEM
-import common.auth
-print(f"🔍 [DIAGNOSTIC] Loaded common.auth from: {common.auth.__file__}")
 from common.auth_utils import verify_password, get_password_hash 
 import common.models as models 
 from common.models import AccountUser 
@@ -73,6 +71,9 @@ SUPER_ADMIN_EMAILS = [e.strip().lower() for e in os.getenv("AO_SUPER_ADMIN_EMAIL
 import logging
 logger = logging.getLogger("uvicorn")
 
+import common.auth
+logger.info(f"🔍 [DIAGNOSTIC] Loaded common.auth from: {common.auth.__file__}")
+
 # -----------------------------------------------------------------------------
 # ENTITLEMENTS VERIFICATION (Module Level)
 # -----------------------------------------------------------------------------
@@ -81,9 +82,11 @@ is_prod = (
     or (os.getenv("AO_ENV", "") or "").lower() == "production"
 )
 
+
 if is_prod:
-    logger.info("[ENTITLEMENTS] Production: skipping auto-migration. Verifying schema...")
+    logger.info("[ENTITLEMENTS V2 CHECK] Production: skipping auto-migration. Verifying schema...")
     try:
+
         from sqlalchemy import text
         with SessionCore() as db_check:
             db_check.execute(text("SELECT 1 FROM accounts_entitlements LIMIT 1"))

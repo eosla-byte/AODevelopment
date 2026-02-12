@@ -1,5 +1,7 @@
 [phases.setup]
 nixPkgs = ["python3", "postgresql"]
+# Force Rebuild 2026-02-12
+
 
 [phases.build]
 cmds = ["pip install -r backend/requirements.txt"]
