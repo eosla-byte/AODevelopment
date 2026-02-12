@@ -127,7 +127,8 @@ async def lifespan(app: FastAPI):
         print("✅ [STARTUP] DB table 'bim_projects' VERIFIED.")
         
         # 2. Run Legacy Fixes
-        run_db_fix()
+        # run_db_fix() # DISABLED: Moved to Alembic
+        pass
         
     except Exception as e:
         print(f"❌ [STARTUP] FATAL ERROR: {e}")
@@ -200,24 +201,10 @@ def get_current_admin(user = Depends(get_current_active_user)):
     return user
 
 # --- DB Migration Helper ---
-def run_db_fix():
-    print("🔧 [ACCOUNTS] Checking Schema Constraints...")
-    from sqlalchemy import text
-    db = SessionCore()
-    try:
-        # 1. Add last_active_org_id to accounts_users
-        try:
-            db.execute(text("ALTER TABLE accounts_users ADD COLUMN last_active_org_id VARCHAR"))
-            db.commit()
-            print("✅ [ACCOUNTS] Added 'last_active_org_id'")
-        except Exception:
-            db.rollback()
-            pass
-            
-        # 2. Add services_access to accounts_organizations if needed? 
-        # (Entitlements are in OrganisationUser or ServicePermission)
-    finally:
-        db.close()
+# --- DB Migration Helper ---
+# def run_db_fix():
+#     # DISABLED: Logic moved to Alembic interactions
+#     pass
 
 # --- Auth Helper ---
 def get_active_org_context(db, user: "AccountUser"):
