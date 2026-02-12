@@ -181,15 +181,11 @@ async def get_current_user_claims(request: Request) -> Dict[str, Any]:
     
     return payload
 
-# Import EntitlementsClient from Root Backend
+# Import EntitlementsClient from Local Common
 try:
-    from backend.common.entitlements import entitlements_client
+    from .entitlements import entitlements_client
 except ImportError:
-    # Fallback for local dev if path is weird, but usually backend is in path
-    import sys
-    import os
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../..")))
-    from backend.common.entitlements import entitlements_client
+    from common.entitlements import entitlements_client
 
 def require_service(service_slug: str):
     """
