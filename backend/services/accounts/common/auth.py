@@ -28,12 +28,39 @@ def load_key_strict(env_name, required=False):
     # Handle Newline Escaping
     return val.strip().replace("\\n", "\n").encode('utf-8')
 
+import hashlib
+
 # Load Keys
 try:
     # Strict loading for Accounts (Private) and Verification (Public)
     AO_JWT_PRIVATE_KEY_PEM = load_key_strict("AO_JWT_PRIVATE_KEY_PEM", required=False)
-    AO_JWT_PUBLIC_KEY_PEM = load_key_strict("AO_JWT_PUBLIC_KEY_PEM", required=False)
-    
+    AO_JWT_PUBLIC_KEY_PEM = load_key_strict("AO_JWT_PUBLIC_KEY_PEM", required=False) # Accounts also needs public to verify its own tokens sometimes
+
+    # LOGGING: Fingerprints (SHA256)
+    if AO_JWT_PUBLIC_KEY_PEM:
+         try:
+             # Calculate fingerprint of the Public Key
+             # If we only have private, we should ideally derive public, but let's assume valid config has both.
+             pub_hash = hashlib.sha256(AO_JWT_PUBLIC_KEY_PEM).hexdigest()[:16]
+             pem_decoded = AO_JWT_PUBLIC_KEY_PEM.decode('utf-8').strip()
+             lines = pem_decoded.split('\n')
+             first_line = lines[0]
+             last_line = lines[-1]
+             
+             print(f"✅ [ACCOUNTS AUTH] Active kid: {os.getenv('AO_JWT_KEY_ID', 'ao-k1')}")
+             print(f"✅ [ACCOUNTS AUTH] Public Key Fingerprint: {pub_hash}")
+             print(f"✅ [ACCOUNTS AUTH] Format: {first_line} ... {last_line}")
+         except Exception as e:
+             print(f"⚠️ [ACCOUNTS AUTH] Failed to log public key details: {e}")
+
+    if AO_JWT_PRIVATE_KEY_PEM:
+         try:
+             # Just presence check
+             # priv_hash = hashlib.sha256(AO_JWT_PRIVATE_KEY_PEM).hexdigest()[:16]
+             print(f"✅ [ACCOUNTS AUTH] Private Key Loaded (Ready to Sign)")
+         except Exception as e:
+             pass
+
 except Exception as e:
     print(f"❌ [AUTH] Configuration Error: {e}")
     raise e
