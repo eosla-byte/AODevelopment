@@ -58,6 +58,10 @@ async def dashboard(request: Request):
     return HTMLResponse("<h1>Finance Service - Minimal Mode</h1><p>If you see this, deployment works.</p>")
 
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "service": "finance-minimal"}
+
 @app.get("/logout")
 async def logout():
     response = RedirectResponse("/", status_code=303)
