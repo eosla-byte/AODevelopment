@@ -33,30 +33,33 @@ def load_pem_key(env_var_name, is_private=False):
     
     # 4. Reconstruct PEM
     # Ensure Header and Footer are correct
-    header_marker = "BEGIN RSA PRIVATE KEY" if is_private else "BEGIN PUBLIC KEY"
-    footer_marker = "END RSA PRIVATE KEY" if is_private else "END PUBLIC KEY"
-    
-    # Filter out potential duplicate headers if env var was pasted weirdly
-    # But usually just finding the content lines is safest.
+    # We support both PKCS#1 (RSA PUBLIC KEY) and PKCS#8 (PUBLIC KEY)
     
     clean_lines = []
     found_header = False
     found_footer = False
     
     for line in lines:
-        if header_marker in line:
-            clean_lines.append(f"-----{header_marker}-----")
+        # Flexible Header Check
+        if "BEGIN" in line and "KEY" in line:
+            clean_lines.append(line) # Use line as is
             found_header = True
-        elif footer_marker in line:
-            clean_lines.append(f"-----{footer_marker}-----")
+        elif "END" in line and "KEY" in line:
+            clean_lines.append(line)
             found_footer = True
         else:
-            # Body lines
+            # Body lines - strict alphanum check? No, just base64 chars
+            # Ideally we only take valid b64 lines, but trusting split() is usually ok
             clean_lines.append(line)
             
     if not found_header or not found_footer:
         # Fallback: validation check
-        print(f"❌ [AUTH] Malformed PEM in {env_var_name}. Missing Header/Footer markers.")
+        # Sometimes keys are pasted WITHOUT headers. We can try to guess?
+        # For now, strict on having headers involves user copy-paste correctness.
+        print(f"❌ [AUTH] Malformed PEM in {env_var_name}. Looking for BEGIN/END lines.")
+        # Attempt to auto-wrap?
+        # if len(lines) > 1 and not found_header: ...
+        
         # Fail Fast
         raise ValueError(f"CRITICAL: Invalid PEM structure in {env_var_name}")
 

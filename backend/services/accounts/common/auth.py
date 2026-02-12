@@ -39,28 +39,26 @@ def load_key_strict(env_name, required=False, is_private=False):
     lines = [line.strip() for line in val.split("\n") if line.strip()]
     
     # 4. Reconstruct PEM
-    # Ensure Header and Footer are correct
-    header_marker = "BEGIN RSA PRIVATE KEY" if is_private else "BEGIN PUBLIC KEY"
-    footer_marker = "END RSA PRIVATE KEY" if is_private else "END PUBLIC KEY"
+    # We support both PKCS#1 (RSA PUBLIC KEY) and PKCS#8 (PUBLIC KEY)
     
     clean_lines = []
     found_header = False
     found_footer = False
     
     for line in lines:
-        if header_marker in line:
-            clean_lines.append(f"-----{header_marker}-----")
+        if "BEGIN" in line and "KEY" in line:
+            clean_lines.append(line)
             found_header = True
-        elif footer_marker in line:
-            clean_lines.append(f"-----{footer_marker}-----")
+        elif "END" in line and "KEY" in line:
+            clean_lines.append(line)
             found_footer = True
         else:
-            # Body lines
             clean_lines.append(line)
             
     if not found_header or not found_footer:
-        pass # Warning logged below, but let's try to return what we have or fail?
-        # For Accounts, we might want to be strict.
+        # Fallback
+        print(f"❌ [AUTH] Malformed PEM in {env_name}. Missing Header/Footer markers.")
+        raise ValueError(f"CRITICAL: Invalid PEM structure in {env_name}")
         
     # Final String
     pem_str = "\n".join(clean_lines) + "\n"
