@@ -10,15 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '20260211_entitlements'
-down_revision = '20260210_add_project_audit' # Assuming this is the latest based on file list, if not I might need to check. 
-# actually I saw 20260210_add_org_id_to_projects.py and 20260210_add_project_audit.py. 
-# I'll guess add_project_audit is later or I should check the heads. 
-# Safe bet is to depend on the one that seems latest or just "head". 
-# But I need a specific down_revision for the file. 
-# Let's check the files again to be sure about the order or just pick one.
-# If I pick wrong, user can fix. 
-# Wait, I saw 20260210_add_project_audit.py in the list_dir output.
+revision = '20260211_add_accounts_entitlements_v3'
+down_revision = '20260210_add_project_audit'
 branch_labels = None
 depends_on = None
 

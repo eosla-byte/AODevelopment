@@ -11,8 +11,8 @@ from sqlalchemy.sql import text
 import uuid
 
 # revision identifiers, used by Alembic.
-revision = '20260212_backfill_ids'
-down_revision = '20260211_entitlements'
+revision = '20260212_backfill_accountuser_ids'
+down_revision = '20260211_add_accounts_entitlements_v3'
 branch_labels = None
 depends_on = None
 

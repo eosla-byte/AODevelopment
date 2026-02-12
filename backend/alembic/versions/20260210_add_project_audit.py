@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from sqlalchemy.sql import func
 
 # revision identifiers, used by Alembic.
-revision = '20260210_add_audit'
-down_revision = '20260210_add_org'
+revision = '20260210_add_project_audit'
+down_revision = '20260210_add_org_id_to_projects'
 branch_labels = None
 depends_on = None
 

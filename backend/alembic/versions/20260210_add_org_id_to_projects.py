@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '20260210_add_org'
+revision = '20260210_add_org_id_to_projects'
 down_revision = None
 branch_labels = None
 depends_on = None
