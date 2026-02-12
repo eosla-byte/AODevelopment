@@ -204,6 +204,62 @@ def debug_auth_config():
         "pem_preview": AO_JWT_PUBLIC_KEY_PEM[:30].decode('utf-8') if AO_JWT_PUBLIC_KEY_PEM else None
     }
 
+@app.get("/debug/verify-cookie")
+def debug_verify_cookie(request: Request):
+    """
+    Captures the cookie and attempts detailed verification logging.
+    """
+    import jwt
+    import traceback
+    from common.auth import AO_JWT_PUBLIC_KEY_PEM, ALGORITHM
+    
+    token = request.cookies.get("accounts_access_token") or request.cookies.get("access_token")
+    if not token:
+        return {"result": "MISSING_COOKIE", "details": "No token found in cookies"}
+        
+    result = {
+        "token_preview": f"{token[:15]}...{token[-15:]}",
+        "token_length": len(token),
+        "header": "FAILED_TO_PARSE",
+        "key_fingerprint": "MISSING",
+        "verification_result": "UNKNOWN",
+        "error": None
+    }
+    
+    # 1. Inspect Key
+    if AO_JWT_PUBLIC_KEY_PEM:
+        import hashlib
+        result["key_fingerprint"] = hashlib.sha256(AO_JWT_PUBLIC_KEY_PEM).hexdigest()[:16]
+        
+    # 2. Inspect Header
+    try:
+        result["header"] = jwt.get_unverified_header(token)
+    except Exception as e:
+        result["header_error"] = str(e)
+        
+    # 3. Inspect Payload (Unverified)
+    try:
+        result["unverified_payload"] = jwt.decode(token, options={"verify_signature": False})
+    except Exception as e:
+        result["payload_error"] = str(e)
+        
+    # 4. Verify Signature
+    try:
+        jwt.decode(
+            token,
+            AO_JWT_PUBLIC_KEY_PEM,
+            algorithms=[ALGORITHM],
+            options={"require": ["exp", "iss", "sub"], "verify_aud": False}
+        )
+        result["verification_result"] = "SUCCESS"
+    except Exception as e:
+        result["verification_result"] = "FAILED"
+        result["error"] = str(e)
+        result["error_type"] = type(e).__name__
+        # result["traceback"] = traceback.format_exc()
+        
+    return result
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8002))
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
