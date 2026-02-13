@@ -27,7 +27,7 @@ app = FastAPI(title="AO Finance & Operations")
 
 import logging
 logger = logging.getLogger("uvicorn")
-logger.info("[FINANCE V2 CHECK] Service Starting with V2 Codebase...")
+logger.info("[FINANCE V3.1 FINAL CHECK] Service Starting with Host-Only Cookie Logic...")
 
 
 # CORS
