@@ -118,28 +118,121 @@
         </header>
 
         <div class="flex-1 overflow-auto p-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <!-- Stats Cards -->
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                    <h3 class="text-gray-500 text-sm font-medium">Proyectos Activos</h3>
-                    <p class="text-3xl font-bold text-gray-800 mt-2">12</p>
+            <!-- Metrics Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+                <!-- Proyectos Activos -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Proyectos Activos</p>
+                        <h3 class="text-2xl font-black text-slate-800 mt-1">{{ metrics.active_projects }}</h3>
+                    </div>
+                    <div class="mt-2 text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded inline-block w-max">
+                        En curso
+                    </div>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                    <h3 class="text-gray-500 text-sm font-medium">Gastos Mes</h3>
-                    <p class="text-3xl font-bold text-red-500 mt-2">$45,200</p>
+
+                <!-- Total Cobrado (Ingresos) -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Cobrado (YTD)</p>
+                        <h3 class="text-2xl font-black text-emerald-600 mt-1">Q{{ "{:,.0f}".format(metrics.total_income)
+                            }}</h3>
+                    </div>
+                    <div class="mt-2 text-xs text-emerald-600 font-bold">
+                        Ingresos Reales
+                    </div>
                 </div>
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                    <h3 class="text-gray-500 text-sm font-medium">Empleados</h3>
-                    <p class="text-3xl font-bold text-blue-500 mt-2">24</p>
+
+                <!-- Total Gastos -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Gastos (YTD)</p>
+                        <h3 class="text-2xl font-black text-red-500 mt-1">Q{{ "{:,.0f}".format(metrics.total_expenses)
+                            }}</h3>
+                    </div>
+                    <div class="mt-2 text-xs text-red-600 font-bold">
+                        Operativos
+                    </div>
+                </div>
+
+                <!-- RRHH Pagado -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">RR.HH. (Est.)</p>
+                        <h3 class="text-2xl font-black text-indigo-600 mt-1">Q{{ "{:,.0f}".format(metrics.hr_ytd) }}
+                        </h3>
+                    </div>
+                    <div class="mt-2 text-xs text-indigo-600 font-bold">
+                        Planilla Acumulada
+                    </div>
+                </div>
+
+                <!-- Cotizaciones -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Cotizaciones</p>
+                        <h3 class="text-2xl font-black text-slate-800 mt-1">{{ metrics.total_quotes }}</h3>
+                    </div>
+                    <div class="mt-2 text-xs text-slate-500 font-bold">
+                        Enviadas
+                    </div>
+                </div>
+
+                <!-- Tasks -->
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col justify-between">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide">Tareas Sem.</p>
+                        <h3 class="text-2xl font-black text-orange-500 mt-1">{{ metrics.weekly_tasks }}</h3>
+                    </div>
+                    <div class="mt-2 text-xs text-orange-600 font-bold">
+                        Cronograma
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 min-h-[400px]">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">Actividad Reciente</h3>
-                <p class="text-gray-500">Bienvenido al nuevo sistema unificado de Operaciones AO.</p>
+            <!-- Timeline Section -->
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex flex-col h-[500px]">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-slate-800">Línea de Tiempo de Proyectos</h3>
+                    <div class="flex gap-2">
+                        <span class="flex items-center gap-1 text-xs font-medium text-slate-500"><span
+                                class="w-2 h-2 rounded-full bg-blue-500"></span> Proyectado</span>
+                        <span class="flex items-center gap-1 text-xs font-medium text-slate-500"><span
+                                class="w-2 h-2 rounded-full bg-red-500"></span> Extra</span>
+                    </div>
+                </div>
+                <div id="timeline-container"
+                    class="flex-1 w-full bg-slate-50 rounded-lg border border-slate-200 relative">
+                    <!-- Timeline rendered here -->
+                </div>
             </div>
         </div>
+
     </main>
+
+    <!-- Timeline Script -->
+    <script src="/static/js/timeline.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const events = {{ timeline_events | tojson
+        }};
+
+        try {
+            const timeline = new Timeline('timeline-container', {
+                rowHeight: 60,
+                zoomSpeed: 0.001
+            });
+
+            timeline.setEvents(events);
+
+            // Optional: Auto zoom to fit all
+            // timeline.fitToEvents(); 
+
+        } catch (e) {
+            console.error("Timeline Error:", e);
+        }
+        });
+    </script>
 
 </body>
 
