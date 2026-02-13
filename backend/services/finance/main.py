@@ -174,6 +174,10 @@ async def dashboard(request: Request):
     # 1. Check if authenticated
     token = request.cookies.get("accounts_access_token")
     if not token: token = request.cookies.get("access_token")
+
+    logger.info(f"🔍 [ROOT] Checking Auth. Cookies: {list(request.cookies.keys())} Token Found: {bool(token)}")
+    if token:
+        logger.info(f"   Token: {token[:10]}...{token[-10:]}")
     
     is_authenticated = False
     if token:
