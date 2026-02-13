@@ -27,7 +27,7 @@ app = FastAPI(title="AO Finance & Operations")
 
 import logging
 logger = logging.getLogger("uvicorn")
-logger.info("[FINANCE V3.1 FINAL CHECK] Service Starting with Host-Only Cookie Logic...")
+logger.info("[FINANCE V3.2 MIDDLEWARE FIX] Service Starting with Whitelisted Login Route...")
 
 
 # CORS
@@ -53,7 +53,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         path = request.url.path
         
         # Public Paths
-        public_paths = ["/", "/login", "/health", "/version_check", "/logout", "/favicon.ico"]
+        public_paths = ["/", "/login", "/health", "/version_check", "/logout", "/favicon.ico", "/ao-login-auth"]
         if path in public_paths or path.startswith("/static") or path.startswith("/assets") or path.startswith("/debug"):
             return await call_next(request)
             
