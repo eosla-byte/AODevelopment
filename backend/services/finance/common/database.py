@@ -334,7 +334,7 @@ def get_project_stats_by_category():
     }
 
 def update_project_meta(project_id: str, new_client: str, new_status: str, nit: str, legal_name: str, po_number: str, amount: float, emoji: str, start_date: str, duration_months: float, additional_time_months: float, paid_amount: float, square_meters: float = 0.0, category: str = "Residencial", archived: bool = False, acc_config: dict = None) -> bool:
-    db = SessionLocal()
+    db = SessionExt()
     try:
         proj = db.query(models.Project).filter(models.Project.id == project_id).first()
         if not proj: return False
