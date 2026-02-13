@@ -246,6 +246,10 @@ async def get_current_user_claims(request: Request) -> Dict[str, Any]:
     if not token:
         token = request.cookies.get("accounts_access_token")
     
+    # 2b. Host-Only Fallback
+    if not token:
+        token = request.cookies.get("finance_auth_token")
+
     # 3. Validation
     if not token:
         # print("Auth Failed: No token provided")

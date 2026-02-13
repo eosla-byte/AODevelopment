@@ -145,17 +145,30 @@ async def login_proxy(request: Request, username: str = Form(...), password: str
                 # Force Secure/SameSite=Lax for top-level navigation stability
                 # None is for iframes, but can be finicky. Lax is robust for main window.
                 
-                logger.info(f"   🍪 Setting Cookie: {cookie.name} domain={target_domain} secure=True samesite=Lax")
-                
+                # 1. Primary Shared Cookie (.somosao.com)
                 response.set_cookie(
                     key=cookie.name,
                     value=cookie.value,
                     domain=target_domain, 
-                    path="/", # Force root path
-                    secure=True, # Railway is HTTPS
+                    path="/", 
+                    secure=True, 
                     httponly=True, 
                     samesite='Lax' 
                 )
+
+                # 2. Fallback Host-Only Cookie (No Domain)
+                # This guarantees the browser stores it for finance.somosao.com even if wildcard fails
+                if cookie.name == "accounts_access_token":
+                    logger.info(f"   🍪 Setting Fallback Cookie: finance_auth_token (Host-Only)")
+                    response.set_cookie(
+                        key="finance_auth_token",
+                        value=cookie.value,
+                        # domain=None, # Defaults to Host-Only
+                        path="/",
+                        secure=True,
+                        httponly=True,
+                        samesite='Lax'
+                    )
             
             return response
         else:
@@ -173,6 +186,7 @@ async def dashboard(request: Request):
     
     # 1. Check if authenticated
     token = request.cookies.get("accounts_access_token")
+    if not token: token = request.cookies.get("finance_auth_token") # Fallback
     if not token: token = request.cookies.get("access_token")
 
     logger.info(f"🔍 [ROOT] Checking Auth. Cookies: {list(request.cookies.keys())} Token Found: {bool(token)}")
