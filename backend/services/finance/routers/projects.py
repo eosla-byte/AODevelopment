@@ -156,6 +156,16 @@ async def restore_project(project_id: str):
         )
     return RedirectResponse(f"/project/{project_id}", status_code=303)
 
+@router.post("/project/{project_id}/collaborators/update")
+async def update_collaborators_route(project_id: str, request: Request):
+    try:
+        assignments = await request.json()
+        update_project_collaborators(project_id, assignments)
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"Error updating collaborators: {e}")
+        return {"status": "error", "message": str(e)}
+
 # --- Reminders ---
 @router.post("/project/{project_id}/reminder/add")
 async def add_reminder(project_id: str, title: str = Form(...), date: str = Form(...), frequency: str = Form("Once")):
