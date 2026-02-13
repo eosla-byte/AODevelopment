@@ -67,8 +67,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
                 
-        if not token:
-            # API vs Web
+        # API vs Web
             if path.startswith("/api"):
                 return JSONResponse({"error": "Unauthorized"}, status_code=401)
             return RedirectResponse("/", status_code=303)
@@ -76,8 +75,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Verify Token
         from common.auth import decode_token
         
+        # DEBUG: Log raw token extract
+        # logger.info(f"🕵️ [MIDDLEWARE] Verifying token: {token[:10]}...{token[-10:]}")
+        print(f"🕵️ [MIDDLEWARE] Verifying token: {token[:10]}...{token[-10:]}")
+
         payload = decode_token(token)
         if not payload:
+             print("⛔ [MIDDLEWARE] Token invalid -> Redirecting")
              if path.startswith("/api"):
                 return JSONResponse({"error": "Invalid Token"}, status_code=401)
              return RedirectResponse("/", status_code=303)

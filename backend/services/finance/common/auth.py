@@ -207,11 +207,6 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
                 audience=["somosao", "ao-platform"], # Expect list match
                 options={"verify_aud": False} # CRITICAL DEBUG: Disable audience check to isolate Signature Error
             )
-            return payload
-            
-        except jwt.ExpiredSignatureError:
-            print("⚠️ [AUTH] Token Expired")
-            return None
         except jwt.InvalidTokenError as e:
             print(f"⚠️ [AUTH] Invalid Token: {e}")
             # DEEP DEBUG
@@ -219,8 +214,8 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
                 unverified = jwt.decode(token, options={"verify_signature": False})
                 print(f"   🔍 Unverified Payload: {unverified}")
                 print(f"   🔍 Unverified Header: {jwt.get_unverified_header(token)}")
-            except:
-                pass
+            except Exception as inner_e:
+                print(f"   ❌ [AUTH DEBUG] Failed to inspect unverified token: {inner_e}")
             return None
         except Exception as e:
             print(f"❌ [AUTH] Unexpected Decode Error: {e}")
