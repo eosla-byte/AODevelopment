@@ -142,10 +142,10 @@ async def login_proxy(request: Request, username: str = Form(...), password: str
                 # We ignore the domain sent by Accounts (which might be accounts.somosao.com or None)
                 target_domain = ".somosao.com"
                 
-                # Force Secure/SameSite=None for modern browser compat
-                # (Lax is safer, but None is required if we ever iframe; keeping consistent with Platform)
+                # Force Secure/SameSite=Lax for top-level navigation stability
+                # None is for iframes, but can be finicky. Lax is robust for main window.
                 
-                logger.info(f"   🍪 Setting Cookie: {cookie.name} domain={target_domain} secure=True samesite=None")
+                logger.info(f"   🍪 Setting Cookie: {cookie.name} domain={target_domain} secure=True samesite=Lax")
                 
                 response.set_cookie(
                     key=cookie.name,
@@ -154,7 +154,7 @@ async def login_proxy(request: Request, username: str = Form(...), password: str
                     path="/", # Force root path
                     secure=True, # Railway is HTTPS
                     httponly=True, 
-                    samesite='None' 
+                    samesite='Lax' 
                 )
             
             return response
