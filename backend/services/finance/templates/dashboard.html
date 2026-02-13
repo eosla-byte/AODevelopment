@@ -116,13 +116,13 @@
         <div id="timeline-container"
             class="flex-1 w-full bg-slate-50 rounded-lg border border-slate-200 relative overflow-hidden">
             <!-- Timeline rendered here -->
-            {% if not timeline_events %}
-            <div class="absolute inset-0 flex items-center justify-center text-slate-400 flex-col">
+            <div id="timeline-empty-overlay"
+                class="absolute inset-0 flex items-center justify-center text-slate-400 flex-col"
+                style="display: none;">
                 <i class="fas fa-chart-line text-4xl mb-2 opacity-20"></i>
                 <p>No hay eventos de línea de tiempo para mostrar</p>
                 <p class="text-xs">Asegúrate de que los proyectos tengan fecha de inicio.</p>
             </div>
-            {% endif %}
         </div>
     </div>
 </div>
@@ -133,28 +133,36 @@
     document.addEventListener('DOMContentLoaded', () => {
         const events = {{ timeline_events | tojson
     }};
+    const overlay = document.getElementById('timeline-empty-overlay');
+
     console.log("Timeline Events Payload:", events);
 
     if (events && events.length > 0) {
+        // Hide overlay
+        if (overlay) overlay.style.display = 'none';
+
         try {
-            const timeline = new Timeline('timeline-container', {
+            // Global Instance
+            window.timelineInstance = new Timeline('timeline-container', {
                 rowHeight: 60,
                 zoomSpeed: 0.001
             });
 
-            timeline.setEvents(events);
+            window.timelineInstance.setEvents(events);
 
-            // Force a render check after a slight delay to ensure container has size
+            // Force resize
             setTimeout(() => {
-                console.log("Triggering resize/render...");
-                timeline.handleResize();
-            }, 500);
+                console.log("Triggering explicit resize...");
+                window.timelineInstance.handleResize();
+            }, 200);
 
         } catch (e) {
             console.error("Timeline Error:", e);
+            if (overlay) overlay.style.display = 'flex';
         }
     } else {
         console.warn("No events found to render.");
+        if (overlay) overlay.style.display = 'flex';
     }
     });
 </script>

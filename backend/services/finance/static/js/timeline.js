@@ -107,15 +107,23 @@ class Timeline {
     }
 
     handleResize() {
+        if (!this.container) return;
+
         this.width = this.container.clientWidth;
         this.height = this.container.clientHeight;
 
         // Higher DPI for Canvas
         const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = this.width * dpr;
-        this.canvas.height = this.height * dpr;
+
+        // Prevent zero size errors
+        this.canvas.width = Math.max(1, this.width * dpr);
+        this.canvas.height = Math.max(1, this.height * dpr);
+
         this.canvas.style.width = `${this.width}px`;
         this.canvas.style.height = `${this.height}px`;
+
+        // Reset transform to avoid accumulation
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0);
         this.ctx.scale(dpr, dpr);
 
         this.requestRender();
@@ -136,6 +144,7 @@ class Timeline {
             };
         }).filter(e => e !== null).sort((a, b) => a.timestamp - b.timestamp);
 
+        this.fitToEvents();
         this.requestRender();
     }
 
@@ -484,39 +493,10 @@ class Timeline {
         this.requestRender();
     }
 
-    fitToEvents() {
-        if (this.events.length === 0) return;
-
-        let min = Infinity;
-        let max = -Infinity;
-
-        this.events.forEach(e => {
-            if (e.timestamp < min) min = e.timestamp;
-            if (e.timestamp > max) max = e.timestamp;
-        });
-
-        // Add 10% padding on each side
-        const range = max - min;
-        const padding = Math.max(range * 0.1, 1000 * 60 * 60 * 24 * 7); // Min 1 week padding
-
-        // If single event or very short range, center it
-        if (range === 0) {
-            const now = min;
-            this.viewport = {
-                start: now - (1000 * 60 * 60 * 24 * 30), // -30 days
-                end: now + (1000 * 60 * 60 * 24 * 30)   // +30 days
-            };
-        } else {
-            this.viewport = {
-                start: min - padding,
-                end: max + padding
-            };
-        }
-
-        this.requestRender();
-    }
-
     render() {
+        // Protect against drawing on invisible/sized-0 containers
+        if (!this.width || this.width < 5 || !this.height || this.height < 5) return;
+
         this.drawAxis();
         this.drawEvents();
     }
