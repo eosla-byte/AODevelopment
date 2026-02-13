@@ -160,11 +160,11 @@ async def login_proxy(request: Request, username: str = Form(...), password: str
             return response
         else:
             # Failed (401, 403, etc)
-            print(f"Login Proxy Failed: {resp.status_code} - {resp.text}")
+            logger.error(f"❌ [LOGIN PROXY] Failed: Status={resp.status_code} Body={resp.text[:200]}")
             return RedirectResponse("/?error=invalid_credentials", status_code=303)
             
     except Exception as e:
-        print(f"Login Proxy System Error: {e}")
+        logger.error(f"🔥 [LOGIN PROXY] System Error: {e}")
         return RedirectResponse("/?error=system_error", status_code=303)
 
 @app.get("/", response_class=HTMLResponse)
