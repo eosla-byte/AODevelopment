@@ -130,7 +130,7 @@ SCAN_CATEGORIES = {
 
 def get_projects(archived: bool = False) -> List[models.Project]:
     # Projects live in External DB (BIM/Daily), not Ops
-    db = SessionExt()
+    db = SessionOps()
     try:
         # Filter out 'Analisis' (Estimations) from standard project list
         # Filter status if it exists, otherwise get all
@@ -165,7 +165,7 @@ def update_project_profit_config(project_id: str, projected: float, real: float,
 
 def get_project_details(project_id: str) -> Optional[models.Project]:
     # Projects live in External DB
-    db = SessionExt()
+    db = SessionOps()
     try:
         proj = db.query(models.Project).filter(models.Project.id == project_id).first()
         if not proj:
@@ -195,7 +195,7 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
         db.close()
 
 def create_project(name: str, client: str = "", nit: str = "", legal_name: str = "", po_number: str = "", amount: float = 0.0, status: str = "Activo", emoji: str = "📁", custom_id: str = None, category: str = "Residencial") -> bool:
-    db = SessionExt()
+    db = SessionOps()
     try:
         new_id = custom_id if custom_id else str(uuid.uuid4())
         # Check if exists
