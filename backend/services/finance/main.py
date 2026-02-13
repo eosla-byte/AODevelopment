@@ -29,6 +29,17 @@ import logging
 logger = logging.getLogger("uvicorn")
 logger.info("[FINANCE V3.2 MIDDLEWARE FIX] Service Starting with Whitelisted Login Route...")
 
+# ENSURE TABLES EXIST IN OPS DB
+# This is required because Finance Service manages its own extension tables in db-operations (postgres-x8en)
+# and migrations might not be running against this specific DB.
+try:
+    from common.database import engine_ops, Base
+    logger.info("🔧 [STARTUP] Verifying/Creating tables in Operations DB...")
+    Base.metadata.create_all(bind=engine_ops)
+    logger.info("✅ [STARTUP] Operations DB Schema Verified.")
+except Exception as e:
+    logger.error(f"❌ [STARTUP] Failed to create tables in Ops DB: {e}")
+
 
 # CORS
 origins = ["*"]

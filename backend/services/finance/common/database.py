@@ -334,7 +334,7 @@ def get_project_stats_by_category():
     }
 
 def update_project_meta(project_id: str, new_client: str, new_status: str, nit: str, legal_name: str, po_number: str, amount: float, emoji: str, start_date: str, duration_months: float, additional_time_months: float, paid_amount: float, square_meters: float = 0.0, category: str = "Residencial", archived: bool = False, acc_config: dict = None) -> bool:
-    db = SessionExt()
+    db = SessionOps()
     try:
         proj = db.query(models.Project).filter(models.Project.id == project_id).first()
         if not proj: return False
@@ -372,7 +372,7 @@ def update_project_collaborators(project_id: str, assignments: dict) -> bool:
     Updates the assigned_collaborators map for a project.
     assignments: { collab_id: percentage_float }
     """
-    db = SessionExt()
+    db = SessionOps()
     try:
         proj = db.query(models.Project).filter(models.Project.id == project_id).first()
         if not proj: return False
@@ -393,7 +393,7 @@ def get_total_collaborator_allocations():
     """
     Returns a dict { collab_id: total_percentage } across ALL active projects.
     """
-    db = SessionExt() # Use Monolith DB for Projects
+    db = SessionOps() # Use Monolith DB for Projects
     try:
         active_projects = db.query(models.Project).filter(models.Project.status == "Activo").all()
         allocations = {}
@@ -940,7 +940,7 @@ def add_partner_withdrawal(root_path, pid, cid, amt, note):
     pass
 
 def update_project_profit_config(root_path, pid, pm, rm, partners):
-    db = SessionExt()
+    db = SessionOps()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
@@ -952,7 +952,7 @@ def update_project_profit_config(root_path, pid, pm, rm, partners):
         db.close()
 
 def update_project_file_meta(pid, cat, fname, amt, note, file_date=None):
-    db = SessionExt()
+    db = SessionOps()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
@@ -990,7 +990,7 @@ def update_project_file_meta(pid, cat, fname, amt, note, file_date=None):
         db.close()
 
 def delete_project_file_meta(pid, category, filename):
-    db = SessionExt()
+    db = SessionOps()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p and p.files_meta:
@@ -1022,7 +1022,7 @@ def delete_project_file_meta(pid, category, filename):
         db.close()
 
 def add_project_reminder(pid, title, date, freq):
-    db = SessionExt()
+    db = SessionOps()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
@@ -1041,7 +1041,7 @@ def add_project_reminder(pid, title, date, freq):
     finally: db.close()
 
 def delete_project_reminder(pid, rid):
-    db = SessionExt()
+    db = SessionOps()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
@@ -1051,7 +1051,7 @@ def delete_project_reminder(pid, rid):
     finally: db.close()
 
 def toggle_project_reminder(pid, rid):
-    db = SessionExt()
+    db = SessionOps()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
@@ -1393,14 +1393,14 @@ def get_project_collaborator_count(project_id: str) -> int:
 # -----------------------------------------------------------------------------
 
 def get_quotations() -> List[models.Quotation]:
-    db = SessionExt()
+    db = SessionOps()
     try:
         return db.query(models.Quotation).order_by(models.Quotation.created_at.desc()).all()
     finally:
         db.close()
 
 def get_quotation_by_id(quot_id: str) -> Optional[models.Quotation]:
-    db = SessionExt()
+    db = SessionOps()
     try:
         data = db.query(models.Quotation).filter(models.Quotation.id == quot_id).first()
         if data and data.content_json is None:
@@ -1410,7 +1410,7 @@ def get_quotation_by_id(quot_id: str) -> Optional[models.Quotation]:
         db.close()
 
 def create_quotation(data: dict) -> models.Quotation:
-    db = SessionExt()
+    db = SessionOps()
     try:
         new_q = models.Quotation(
             id=data.get("id"),
@@ -1429,7 +1429,7 @@ def create_quotation(data: dict) -> models.Quotation:
         db.close()
 
 def update_quotation(quot_id: str, updates: dict) -> Optional[models.Quotation]:
-    db = SessionExt()
+    db = SessionOps()
     try:
         q = db.query(models.Quotation).filter(models.Quotation.id == quot_id).first()
         if not q:
@@ -1448,7 +1448,7 @@ def update_quotation(quot_id: str, updates: dict) -> Optional[models.Quotation]:
         db.close()
 
 def delete_quotation(quot_id: str) -> bool:
-    db = SessionExt()
+    db = SessionOps()
     try:
         q = db.query(models.Quotation).filter(models.Quotation.id == quot_id).first()
         if q:
@@ -1509,7 +1509,7 @@ def save_template(name: str, content: List):
 # -----------------------------------------------------------------------------
 def get_estimations():
     # Estimations are Projects with status 'Analisis' or 'Aprobada' in EXT DB
-    db = SessionExt()
+    db = SessionOps()
     try:
         # Assuming Estimations are Projects with status 'Analisis' or 'Aprobada'
         projects = db.query(models.Project).filter(models.Project.status.in_(["Analisis", "Aprobada"])).all()
@@ -1537,7 +1537,7 @@ def get_estimations():
         db.close()
 
 def get_estimation_details(est_id: str):
-    db = SessionExt()
+    db = SessionOps()
     try:
         p = db.query(models.Project).filter(models.Project.id == est_id).first()
         if not p: return None
@@ -1560,7 +1560,7 @@ def get_estimation_details(est_id: str):
         db.close()
 
 def update_estimation_full(data: dict):
-    db = SessionExt()
+    db = SessionOps()
     try:
         est_id = data.get("id")
         if not est_id: return False
@@ -1595,7 +1595,7 @@ def update_estimation_full(data: dict):
 
 
 def create_estimation(data: dict):
-    db = SessionExt()
+    db = SessionOps()
     try:
         new_id = str(uuid.uuid4())
         
