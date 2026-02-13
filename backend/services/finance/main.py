@@ -77,8 +77,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
             auth_header = request.headers.get("Authorization")
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
+
+        # Fallback to Host-Only Cookie (finance_auth_token)
+        if not token:
+            token = request.cookies.get("finance_auth_token")
                 
         # API vs Web
+        if not token:
             if path.startswith("/api"):
                 return JSONResponse({"error": "Unauthorized"}, status_code=401)
             return RedirectResponse("/", status_code=303)
@@ -88,7 +93,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         
         # DEBUG: Log raw token extract
         # logger.info(f"🕵️ [MIDDLEWARE] Verifying token: {token[:10]}...{token[-10:]}")
-        print(f"🕵️ [MIDDLEWARE] Verifying token: {token[:10]}...{token[-10:]}")
+        # print(f"🕵️ [MIDDLEWARE] Verifying token: {token[:10]}...{token[-10:]}")
 
         payload = decode_token(token)
         if not payload:
@@ -241,7 +246,7 @@ async def logout_force():
     response = HTMLResponse(content="<h1>Logged Out</h1><p>Cookies cleared. <a href='/'>Return to Login</a></p>")
     
     domains = [None, ".somosao.com", "somosao.com", "finance.somosao.com", "www.somosao.com"]
-    cookies = ["accounts_access_token", "access_token", "accounts_refresh_token"]
+    cookies = ["accounts_access_token", "access_token", "accounts_refresh_token", "finance_auth_token"]
     
     # Aggressively delete everything
     for cookie_name in cookies:
