@@ -271,40 +271,65 @@ async def dashboard(request: Request):
     
     for p in active_projects:
         # Project Range
-        if p.start_date:
+        if getattr(p, 'start_date', None):
             try:
-                # Start
-                timeline_events.append({
-                    "id": f"start-{p.id}",
-                    "title": f"Inicio: {p.client}",
-                    "timestamp": p.start_date, # String YYYY-MM-DD
-                    "type": "milestone",
-                    "color": "#3b82f6" # Blue
-                })
+                start_val = p.start_date
+                start_dt = None
                 
-                # Projected End
-                if p.duration_months:
-                    start_dt = datetime.datetime.strptime(p.start_date, "%Y-%m-%d")
-                    end_dt = start_dt + datetime.timedelta(days=int(p.duration_months * 30))
+                # Robust Date Parsing
+                if isinstance(start_val, datetime.date) or isinstance(start_val, datetime.datetime):
+                    start_dt = start_val
+                elif isinstance(start_val, str):
+                    # Try common formats
+                    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"):
+                        try:
+                            start_dt = datetime.datetime.strptime(start_val, fmt)
+                            break
+                        except: continue
+                
+                if start_dt:
+                    # Start
                     timeline_events.append({
-                        "id": f"proj-end-{p.id}",
-                        "title": f"Fin Est.: {p.client}",
-                        "timestamp": end_dt.strftime("%Y-%m-%d"),
+                        "id": f"start-{p.id}",
+                        "title": f"Inicio: {p.client}",
+                        "timestamp": start_dt.strftime("%Y-%m-%d"), 
                         "type": "milestone",
-                        "color": "#3b82f6" 
+                        "color": "#3b82f6" # Blue
                     })
                     
-                    # Real End (Extra Time)
-                    if p.additional_time_months:
-                        real_end_dt = end_dt + datetime.timedelta(days=int(p.additional_time_months * 30))
+                    # Projected End
+                    # Handle duration which might be string or float
+                    dur = getattr(p, 'duration_months', 0)
+                    try: dur = float(dur)
+                    except: dur = 0.0
+                    
+                    if dur > 0:
+                        end_dt = start_dt + datetime.timedelta(days=int(dur * 30))
                         timeline_events.append({
-                            "id": f"real-end-{p.id}",
-                            "title": f"Fin Real: {p.client}",
-                            "timestamp": real_end_dt.strftime("%Y-%m-%d"),
+                            "id": f"proj-end-{p.id}",
+                            "title": f"Fin Est.: {p.client}",
+                            "timestamp": end_dt.strftime("%Y-%m-%d"),
                             "type": "milestone",
-                            "color": "#ef4444" # Red
+                            "color": "#3b82f6" 
                         })
-            except: pass
+                        
+                        # Real End (Extra Time)
+                        extra = getattr(p, 'additional_time_months', 0)
+                        try: extra = float(extra)
+                        except: extra = 0.0
+                        
+                        if extra > 0:
+                            real_end_dt = end_dt + datetime.timedelta(days=int(extra * 30))
+                            timeline_events.append({
+                                "id": f"real-end-{p.id}",
+                                "title": f"Fin Real: {p.client}",
+                                "timestamp": real_end_dt.strftime("%Y-%m-%d"),
+                                "type": "milestone",
+                                "color": "#ef4444" # Red
+                            })
+            except Exception as e:
+                logger.error(f"Error processing timeline for project {p.id}: {e}")
+                pass
 
         # Payments / Invoices (If we had a dedicated list, we would add them here)
         # For now, we visualize the projects themselves.
