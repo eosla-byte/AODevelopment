@@ -294,7 +294,9 @@ async def dashboard(request: Request):
                         "title": f"Inicio: {p.client}",
                         "timestamp": start_dt.isoformat(), 
                         "type": "milestone",
-                        "color": "#3b82f6" # Blue
+                        "color": "#3b82f6", # Blue
+                        "group_id": p.id,
+                        "group_name": p.client
                     })
                     
                     # Projected End
@@ -310,7 +312,9 @@ async def dashboard(request: Request):
                             "title": f"Fin Est.: {p.client}",
                             "timestamp": end_dt.isoformat(),
                             "type": "milestone",
-                            "color": "#3b82f6" 
+                            "color": "#3b82f6",
+                            "group_id": p.id,
+                            "group_name": p.client
                         })
                         
                         # Real End (Extra Time)
@@ -325,7 +329,9 @@ async def dashboard(request: Request):
                                 "title": f"Fin Real: {p.client}",
                                 "timestamp": real_end_dt.isoformat(),
                                 "type": "milestone",
-                                "color": "#ef4444" # Red
+                                "color": "#ef4444", # Red
+                                "group_id": p.id,
+                                "group_name": p.client
                             })
             except Exception as e:
                 logger.error(f"Error processing timeline for project {p.id}: {e}")
