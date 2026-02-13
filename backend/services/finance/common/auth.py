@@ -191,17 +191,21 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
 
         # DEBUG: Print Token Header and Key details
         try:
-            print(f"🕵️ [AUTH DEBUG] Token Length: {len(token)}")
-            
-            # Explicit Key Loading REMOVED. 
-            # We now trust the PKCS#8 keys are correct and PyJWT handles them natively.
+            # print(f"🕵️ [AUTH DEBUG] Token Length: {len(token)}") 
+            # Use Logger if possible, but print is standard here.
             
             # Verify using the Key Bytes directly
+            # RELAXED AUDIENCE CHECK: We allow 'somosao', 'ao-platform', or list.
+            # actually, let's allow ANY audience for now to rule it out, 
+            # OR explicitly match what Accounts issues (['somosao', 'ao-platform'])
+            
             payload = jwt.decode(
                 token, 
                 AO_JWT_PUBLIC_KEY_PEM, # Pass bytes directly
                 algorithms=[ALGORITHM],
-                options={"require": ["exp", "iss", "sub"], "verify_aud": False}
+                # options={"require": ["exp", "iss", "sub"], "verify_aud": False} # DEBUG: Disable Aud check completely
+                audience=["somosao", "ao-platform"], # Expect list match
+                options={"verify_aud": False} # CRITICAL DEBUG: Disable audience check to isolate Signature Error
             )
             return payload
             
@@ -210,20 +214,20 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
             return None
         except jwt.InvalidTokenError as e:
             print(f"⚠️ [AUTH] Invalid Token: {e}")
+            # DEEP DEBUG
+            try:
+                unverified = jwt.decode(token, options={"verify_signature": False})
+                print(f"   🔍 Unverified Payload: {unverified}")
+                print(f"   🔍 Unverified Header: {jwt.get_unverified_header(token)}")
+            except:
+                pass
             return None
         except Exception as e:
             print(f"❌ [AUTH] Unexpected Decode Error: {e}")
             return None
-    except jwt.ExpiredSignatureError:
-        print("⚠️ [AUTH] Token Expired")
-        return None
-    except jwt.InvalidTokenError as e:
-        print(f"⚠️ [AUTH] Invalid Token: {e}")
-        # DEBUG RE-RAISE to see detailed error in logs? No, print is enough usually.
-        return None
     except Exception as e:
-        print(f"❌ [AUTH] Unexpected Decode Error: {e}")
-        return None
+         print(f"❌ [AUTH] Global Decode Error: {e}")
+         return None
 
 # -----------------------------------------------------------------------------
 # FASTAPI DEPENDENCY

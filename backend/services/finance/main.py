@@ -126,13 +126,13 @@ async def login_proxy(request: Request, username: str = Form(...), password: str
             
             # Forward Cookies from Accounts Response
             # requests.cookies is a CookieJar. We iterate usage.
-            print(f"🕵️ [LOGIN PROXY] Received {len(resp.cookies)} cookies from Accounts")
+            logger.info(f"🕵️ [LOGIN PROXY] Received {len(resp.cookies)} cookies from Accounts")
             for cookie in resp.cookies:
-                print(f"   🍪 {cookie.name} len={len(cookie.value)}")
+                logger.info(f"   🍪 {cookie.name} len={len(cookie.value)}")
                 if cookie.name == "accounts_access_token":
                      parts = cookie.value.split('.')
                      if len(parts) == 3:
-                         print(f"      Signature: {parts[2]}")
+                         logger.info(f"      Signature: {parts[2]}")
                 
                 # We blindly copy values. 
                 # Note: 'domain' might need adjustment if it's strict, but .somosao.com is fine.
