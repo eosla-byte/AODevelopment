@@ -334,6 +334,7 @@ async def dashboard(request: Request):
         # Payments / Invoices (If we had a dedicated list, we would add them here)
         # For now, we visualize the projects themselves.
     
+    logger.info(f"📊 [DASHBOARD] Sending {len(timeline_events)} timeline events to frontend.")
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "metrics": {

@@ -484,6 +484,38 @@ class Timeline {
         this.requestRender();
     }
 
+    fitToEvents() {
+        if (this.events.length === 0) return;
+
+        let min = Infinity;
+        let max = -Infinity;
+
+        this.events.forEach(e => {
+            if (e.timestamp < min) min = e.timestamp;
+            if (e.timestamp > max) max = e.timestamp;
+        });
+
+        // Add 10% padding on each side
+        const range = max - min;
+        const padding = Math.max(range * 0.1, 1000 * 60 * 60 * 24 * 7); // Min 1 week padding
+
+        // If single event or very short range, center it
+        if (range === 0) {
+            const now = min;
+            this.viewport = {
+                start: now - (1000 * 60 * 60 * 24 * 30), // -30 days
+                end: now + (1000 * 60 * 60 * 24 * 30)   // +30 days
+            };
+        } else {
+            this.viewport = {
+                start: min - padding,
+                end: max + padding
+            };
+        }
+
+        this.requestRender();
+    }
+
     render() {
         this.drawAxis();
         this.drawEvents();
