@@ -175,13 +175,17 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     )
     return encoded_jwt
 
+# Logger Setup
+import logging
+logger = logging.getLogger("uvicorn")
+
 def decode_token(token: str) -> Optional[Dict[str, Any]]:
     """
     Decodes and validates a JWT using RS256 Public Key.
     Available to all services with Public Key configured.
     """
     if not AO_JWT_PUBLIC_KEY_PEM:
-        print("❌ [AUTH] Cannot verify token: Public Key not configured.")
+        logger.error("❌ [AUTH] Cannot verify token: Public Key not configured.")
         return None
         
     try:
@@ -191,37 +195,35 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
 
         # DEBUG: Print Token Header and Key details
         try:
-            # print(f"🕵️ [AUTH DEBUG] Token Length: {len(token)}") 
-            # Use Logger if possible, but print is standard here.
+            # logger.info(f"🕵️ [AUTH DEBUG] Token Length: {len(token)}") 
             
-            # Verify using the Key Bytes directly
-            # RELAXED AUDIENCE CHECK: We allow 'somosao', 'ao-platform', or list.
-            # actually, let's allow ANY audience for now to rule it out, 
-            # OR explicitly match what Accounts issues (['somosao', 'ao-platform'])
-            
+            # 1. DEEP DEBUG FIRST (Peek at payload)
+            try:
+                unverified = jwt.decode(token, options={"verify_signature": False})
+                logger.info(f"   🔍 Unverified Payload: {unverified}")
+                logger.info(f"   🔍 Unverified Header: {jwt.get_unverified_header(token)}")
+            except Exception as inner_e:
+                logger.error(f"   ❌ [AUTH DEBUG] Failed to inspect unverified token: {inner_e}")
+
+            # 2. Verify using the Key Bytes directly
             payload = jwt.decode(
                 token, 
                 AO_JWT_PUBLIC_KEY_PEM, # Pass bytes directly
                 algorithms=[ALGORITHM],
-                # options={"require": ["exp", "iss", "sub"], "verify_aud": False} # DEBUG: Disable Aud check completely
+                # options={"require": ["exp", "iss", "sub"], "verify_aud": False} 
                 audience=["somosao", "ao-platform"], # Expect list match
                 options={"verify_aud": False} # CRITICAL DEBUG: Disable audience check to isolate Signature Error
             )
+            return payload
+            
         except jwt.InvalidTokenError as e:
-            print(f"⚠️ [AUTH] Invalid Token: {e}")
-            # DEEP DEBUG
-            try:
-                unverified = jwt.decode(token, options={"verify_signature": False})
-                print(f"   🔍 Unverified Payload: {unverified}")
-                print(f"   🔍 Unverified Header: {jwt.get_unverified_header(token)}")
-            except Exception as inner_e:
-                print(f"   ❌ [AUTH DEBUG] Failed to inspect unverified token: {inner_e}")
+            logger.warning(f"⚠️ [AUTH] Invalid Token: {e}")
             return None
         except Exception as e:
-            print(f"❌ [AUTH] Unexpected Decode Error: {e}")
+            logger.error(f"❌ [AUTH] Unexpected Decode Error: {e}")
             return None
     except Exception as e:
-         print(f"❌ [AUTH] Global Decode Error: {e}")
+         logger.error(f"❌ [AUTH] Global Decode Error: {e}")
          return None
 
 # -----------------------------------------------------------------------------
