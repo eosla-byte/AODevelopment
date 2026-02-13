@@ -128,7 +128,7 @@
 </div>
 
 <!-- Timeline Script -->
-<script src="/static/js/timeline.js"></script>
+<script src="/static/js/timeline.js?v=2.2"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         const events = {{ timeline_events | tojson
@@ -143,6 +143,10 @@
 
         try {
             // Global Instance
+            if (typeof Timeline === 'undefined') {
+                throw new Error("Timeline class is not defined. Script might not have loaded.");
+            }
+
             window.timelineInstance = new Timeline('timeline-container', {
                 rowHeight: 60,
                 zoomSpeed: 0.001
@@ -158,7 +162,13 @@
 
         } catch (e) {
             console.error("Timeline Error:", e);
-            if (overlay) overlay.style.display = 'flex';
+            if (overlay) {
+                overlay.style.display = 'flex';
+                const p = document.createElement('p');
+                p.className = "text-red-500 text-xs mt-2";
+                p.innerText = "Error: " + e.message;
+                overlay.appendChild(p);
+            }
         }
     } else {
         console.warn("No events found to render.");
