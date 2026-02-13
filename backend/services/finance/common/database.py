@@ -216,7 +216,9 @@ def create_project(name: str, client: str = "", nit: str = "", legal_name: str =
         
         # Helper to set attr if exists
         def safe_set(obj, key, val):
-             if hasattr(obj, key): setattr(obj, key, val)
+             # For properties, hasattr works if defined on class
+             if hasattr(obj.__class__, key) or hasattr(obj, key): 
+                 setattr(obj, key, val)
              
         safe_set(new_proj, "client", client)
         safe_set(new_proj, "nit", nit)
@@ -226,9 +228,32 @@ def create_project(name: str, client: str = "", nit: str = "", legal_name: str =
         safe_set(new_proj, "emoji", emoji)
         safe_set(new_proj, "category", category)
         
-        db.add(new_proj)
-        db.commit()
-        return True
+        try:
+            db.add(new_proj)
+            db.commit()
+            return True
+        except Exception as e:
+            # Handle FK Violation for Organization
+            if "bim_organizations" in str(e) or "organization_id" in str(e):
+                print("⚠️ [FINANCE] Missing org_default, attempting to create...")
+                db.rollback()
+                # Create Default Org
+                try:
+                    default_org = models.BimOrganization(id="org_default", name="Organizacion Predeterminada")
+                    db.add(default_org)
+                    db.commit()
+                    
+                    # Retry Project Creation
+                    db.add(new_proj)
+                    db.commit()
+                    return True
+                except Exception as e2:
+                    print(f"🔥 [FINANCE] Failed to create org_default: {e2}")
+                    db.rollback()
+                    return False
+            else:
+                 raise e
+
     except Exception as e:
         print(f"Error create_project: {e}")
         db.rollback()

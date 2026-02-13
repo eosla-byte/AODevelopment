@@ -161,6 +161,13 @@ class Project(Base):
         s['finance']['estimation_data'] = value
         self.settings = s
 
+class BimOrganization(Base):
+    __tablename__ = 'bim_organizations'
+    
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    # We only need minimal fields for FK validation
+
 
 class Collaborator(Base):
     __tablename__ = 'resources_collaborators'
