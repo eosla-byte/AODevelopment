@@ -234,6 +234,33 @@ class Project(Base):
         s['finance']['estimation_data'] = value
         self.settings = s
 
+    @property
+    def real_profit_margin(self): return self.settings.get('finance', {}).get('real_profit_margin', 0.0)
+    @real_profit_margin.setter
+    def real_profit_margin(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['real_profit_margin'] = value
+        self.settings = s
+
+    @property
+    def projected_profit_margin(self): return self.settings.get('finance', {}).get('projected_profit_margin', 0.0)
+    @projected_profit_margin.setter
+    def projected_profit_margin(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['projected_profit_margin'] = value
+        self.settings = s
+
+    @property
+    def partners_config(self): return self.settings.get('finance', {}).get('partners_config', {})
+    @partners_config.setter
+    def partners_config(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['partners_config'] = value
+        self.settings = s
+
 class BimOrganization(Base):
     __tablename__ = 'bim_organizations'
     

@@ -176,11 +176,21 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
         # proj.reminders = [] # Should implement reminders properly later
         # proj.acc_config = {} # Property
         # proj.partners_config = {} # Logic?
-        # proj.assigned_collaborators = {} # Property
-        # proj.files_meta = {} # Property
-
-        # Numeric fields handled by properties in models.Project
-        proj.cat_totals = {}
+        # Non-Persistent / Calculated Attributes
+        proj.reminders = [] # TODO: Implement Reminders Persistence if needed
+        
+        # Calculate Category Totals from Files Meta
+        # files_meta structure: { 'Category': { 'filename': { 'amount': 100.0, ... }, ... } }
+        totals = {}
+        if proj.files_meta:
+            for cat, files in proj.files_meta.items():
+                cat_sum = 0.0
+                for fname, meta in files.items():
+                    try:
+                         cat_sum += float(meta.get('amount', 0.0))
+                    except: pass
+                totals[cat] = cat_sum
+        proj.cat_totals = totals
         
         db.expunge(proj)
         return proj
