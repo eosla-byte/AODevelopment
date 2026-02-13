@@ -144,11 +144,9 @@ def get_projects(archived: bool = False) -> List[models.Project]:
             p.files = {cat: [] for cat in SCAN_CATEGORIES.keys()}
             
             # Safeguard numeric fields
-            p.amount = 0.0
-            p.paid_amount = 0.0
-            p.duration_months = 0.0
-            p.additional_time_months = 0.0
-            p.files_meta = {}
+            # p.amount, p.paid_amount etc are properties that read from settings.
+            # Do NOT overwrite them with 0.0 or the saved data is lost in the view.
+            
             p.events = []
             
             db.expunge(p)
@@ -173,20 +171,15 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
             
         proj.files = {cat: [] for cat in SCAN_CATEGORIES.keys()}
         
-        # MOCK LEGACY ATTRIBUTES
-        proj.reminders = []
-        proj.acc_config = {}
-        proj.partners_config = {}
-        proj.assigned_collaborators = {}
-        proj.files_meta = {}
+        # MOCK LEGACY ATTRIBUTES - REMOVED
+        # We now have real properties/columns for these.
+        # proj.reminders = [] # Should implement reminders properly later
+        # proj.acc_config = {} # Property
+        # proj.partners_config = {} # Logic?
+        # proj.assigned_collaborators = {} # Property
+        # proj.files_meta = {} # Property
 
-        proj.amount = 0.0
-        proj.paid_amount = 0.0
-        proj.square_meters = 0.0
-        proj.projected_profit_margin = 0.0
-        proj.real_profit_margin = 0.0
-        proj.duration_months = 0.0
-        proj.additional_time_months = 0.0
+        # Numeric fields handled by properties in models.Project
         proj.cat_totals = {}
         
         db.expunge(proj)
