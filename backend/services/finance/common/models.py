@@ -151,6 +151,52 @@ class Project(Base):
         if 'finance' not in s: s['finance'] = {}
         s['finance']['po_number'] = value
         self.settings = s
+
+    @property
+    def amount(self): return self.settings.get('finance', {}).get('amount', 0.0)
+    @amount.setter
+    def amount(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['amount'] = value
+        self.settings = s
+
+    @property
+    def start_date(self): return self.settings.get('finance', {}).get('start_date', "")
+    @start_date.setter
+    def start_date(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['start_date'] = value
+        self.settings = s
+
+    @property
+    def duration_months(self): return self.settings.get('finance', {}).get('duration_months', 0.0)
+    @duration_months.setter
+    def duration_months(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['duration_months'] = value
+        self.settings = s
+
+    @property
+    def additional_time_months(self): return self.settings.get('finance', {}).get('additional_time_months', 0.0)
+    @additional_time_months.setter
+    def additional_time_months(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['additional_time_months'] = value
+        self.settings = s
+
+    @property
+    def square_meters(self): return self.settings.get('finance', {}).get('square_meters', 0.0)
+    @square_meters.setter
+    def square_meters(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['square_meters'] = value
+        self.settings = s
+
         
     @property
     def assigned_collaborators(self): return self.settings.get('finance', {}).get('assigned_collaborators', {})

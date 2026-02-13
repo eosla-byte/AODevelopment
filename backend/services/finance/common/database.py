@@ -939,7 +939,7 @@ def add_partner_withdrawal(root_path, pid, cid, amt, note):
     pass
 
 def update_project_profit_config(root_path, pid, pm, rm, partners):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
@@ -951,7 +951,7 @@ def update_project_profit_config(root_path, pid, pm, rm, partners):
         db.close()
 
 def update_project_file_meta(pid, cat, fname, amt, note, file_date=None):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
@@ -989,7 +989,7 @@ def update_project_file_meta(pid, cat, fname, amt, note, file_date=None):
         db.close()
 
 def delete_project_file_meta(pid, category, filename):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p and p.files_meta:
@@ -1021,7 +1021,7 @@ def delete_project_file_meta(pid, category, filename):
         db.close()
 
 def add_project_reminder(pid, title, date, freq):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
@@ -1040,7 +1040,7 @@ def add_project_reminder(pid, title, date, freq):
     finally: db.close()
 
 def delete_project_reminder(pid, rid):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
@@ -1050,7 +1050,7 @@ def delete_project_reminder(pid, rid):
     finally: db.close()
 
 def toggle_project_reminder(pid, rid):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         p = db.query(models.Project).filter(models.Project.id == pid).first()
         if p:
