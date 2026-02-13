@@ -133,12 +133,14 @@
     document.addEventListener('DOMContentLoaded', () => {
         const events = {{ timeline_events | tojson
     }};
+    const activeProjects = {{ active_projects_payload | tojson }};
     const overlay = document.getElementById('timeline-empty-overlay');
 
-    console.log("Timeline Events Payload:", events);
+    console.log("Active Projects:", activeProjects);
+    console.log("Timeline Events:", events);
 
-    if (events && events.length > 0) {
-        // Hide overlay
+    if (activeProjects && activeProjects.length > 0) {
+        // Hide overlay if we have projects (even if no events, we show empty lanes)
         if (overlay) overlay.style.display = 'none';
 
         try {
@@ -152,13 +154,30 @@
                 zoomSpeed: 0.001
             });
 
-            window.timelineInstance.setEvents(events);
+            // 1. Set Projects (Creates Lanes)
+            window.timelineInstance.setProjects(activeProjects);
+
+            // 2. Set Events (Populates Lanes)
+            if (events && events.length > 0) {
+                window.timelineInstance.setEvents(events);
+            } else {
+                // Force render even without events to show empty lanes
+                window.timelineInstance.requestRender();
+            }
 
             // Force resize
             setTimeout(() => {
                 console.log("Triggering explicit resize...");
                 window.timelineInstance.handleResize();
             }, 200);
+
+            // Tab change listener (if using Bootstrap tabs)
+            const tabEl = document.querySelector('a[data-bs-toggle="tab"]');
+            if (tabEl) {
+                tabEl.addEventListener('shown.bs.tab', () => {
+                    window.timelineInstance.handleResize();
+                });
+            }
 
         } catch (e) {
             console.error("Timeline Error:", e);
@@ -171,7 +190,7 @@
             }
         }
     } else {
-        console.warn("No events found to render.");
+        console.warn("No active projects found.");
         if (overlay) overlay.style.display = 'flex';
     }
     });
