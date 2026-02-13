@@ -356,6 +356,7 @@ def update_project_meta(project_id: str, new_client: str, new_status: str, nit: 
         if acc_config:
             proj.acc_config = acc_config
             
+        flag_modified(proj, "settings")
         db.commit()
         return True
     except Exception as e:
@@ -377,7 +378,7 @@ def update_project_collaborators(project_id: str, assignments: dict) -> bool:
         if not proj: return False
         
         proj.assigned_collaborators = assignments
-        flag_modified(proj, "assigned_collaborators")
+        flag_modified(proj, "settings")
         
         db.commit()
         return True
@@ -967,7 +968,7 @@ def update_project_file_meta(pid, cat, fname, amt, note, file_date=None):
             meta[cat][fname] = {"amount": amt, "note": note, "date": current_date}
             
             p.files_meta = meta
-            flag_modified(p, "files_meta")
+            flag_modified(p, "settings")
             
             # Recalculate persistent paid_amount for Main Dashboard
             total_paid = 0.0
@@ -1000,7 +1001,7 @@ def delete_project_file_meta(pid, category, filename):
                 del meta[category][filename]
                 
                 p.files_meta = meta
-                flag_modified(p, "files_meta")
+                flag_modified(p, "settings")
                 
                 # Recalculate persistent paid_amount
                 total_paid = 0.0
