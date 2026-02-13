@@ -45,7 +45,9 @@ PLUGIN_DB_URL = os.getenv("PLUGIN_DB_URL", os.getenv("DATABASE_URL", "sqlite:///
 
 # External DB (Daily, BIM, Portal) - Primary for Client Services
 # Note: These services ALSO need CORE_DB_URL set to authenticate users!
-EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db")).strip().replace("postgres://", "postgresql://")
+# CRITICAL FIX: Fallback to CORE_DB_URL first, because BIM tables are in the Monolith DB (postgres-trka)
+# If we fallback to OPS_DB_URL (postgres-x8en), we get "Relation does not exist".
+EXT_DB_URL = os.getenv("EXT_DB_URL", os.getenv("CORE_DB_URL", os.getenv("DATABASE_URL", "sqlite:///./aodev.db"))).strip().replace("postgres://", "postgresql://")
 
 # Helper to extract host for logging
 def get_db_host(url):
