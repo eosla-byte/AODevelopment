@@ -392,14 +392,17 @@ def get_total_collaborator_allocations():
     """
     Returns a dict { collab_id: total_percentage } across ALL active projects.
     """
-    db = SessionLocal()
+    db = SessionExt() # Use Monolith DB for Projects
     try:
         active_projects = db.query(models.Project).filter(models.Project.status == "Activo").all()
         allocations = {}
         for p in active_projects:
             # Safe Guard: Ensure we have a DICT
-            if p.assigned_collaborators and isinstance(p.assigned_collaborators, dict):
-                for cid, pct in p.assigned_collaborators.items():
+            # p.assigned_collaborators might be missing if we haven't defined it as a property yet
+            # It was likely removed from model, need to fix model too if this fails
+            assigned = getattr(p, "assigned_collaborators", {})
+            if assigned and isinstance(assigned, dict):
+                for cid, pct in assigned.items():
                     try:
                         val = float(pct)
                         allocations[cid] = allocations.get(cid, 0.0) + val

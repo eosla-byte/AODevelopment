@@ -153,6 +153,15 @@ class Project(Base):
         self.settings = s
         
     @property
+    def assigned_collaborators(self): return self.settings.get('finance', {}).get('assigned_collaborators', {})
+    @assigned_collaborators.setter
+    def assigned_collaborators(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['assigned_collaborators'] = value
+        self.settings = s
+
+    @property
     def estimation_data(self): return self.settings.get('finance', {}).get('estimation_data', {})
     @estimation_data.setter
     def estimation_data(self, value):
