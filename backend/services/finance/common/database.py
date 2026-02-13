@@ -353,8 +353,8 @@ def update_project_meta(project_id: str, new_client: str, new_status: str, nit: 
         proj.square_meters = square_meters
         proj.category = category
         proj.archived = archived
-        # if acc_config:
-        #     proj.acc_config = acc_config
+        if acc_config:
+            proj.acc_config = acc_config
             
         db.commit()
         return True
@@ -371,7 +371,7 @@ def update_project_collaborators(project_id: str, assignments: dict) -> bool:
     Updates the assigned_collaborators map for a project.
     assignments: { collab_id: percentage_float }
     """
-    db = SessionLocal()
+    db = SessionExt()
     try:
         proj = db.query(models.Project).filter(models.Project.id == project_id).first()
         if not proj: return False

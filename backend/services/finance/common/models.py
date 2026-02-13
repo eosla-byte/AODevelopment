@@ -197,6 +197,24 @@ class Project(Base):
         s['finance']['square_meters'] = value
         self.settings = s
 
+    @property
+    def acc_config(self): return self.settings.get('finance', {}).get('acc_config', {})
+    @acc_config.setter
+    def acc_config(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['acc_config'] = value
+        self.settings = s
+
+    @property
+    def files_meta(self): return self.settings.get('finance', {}).get('files_meta', {})
+    @files_meta.setter
+    def files_meta(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['files_meta'] = value
+        self.settings = s
+
         
     @property
     def assigned_collaborators(self): return self.settings.get('finance', {}).get('assigned_collaborators', {})
