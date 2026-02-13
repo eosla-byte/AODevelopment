@@ -292,7 +292,7 @@ async def dashboard(request: Request):
                     timeline_events.append({
                         "id": f"start-{p.id}",
                         "title": f"Inicio: {p.client}",
-                        "timestamp": start_dt.strftime("%Y-%m-%d"), 
+                        "timestamp": start_dt.isoformat(), 
                         "type": "milestone",
                         "color": "#3b82f6" # Blue
                     })
@@ -308,7 +308,7 @@ async def dashboard(request: Request):
                         timeline_events.append({
                             "id": f"proj-end-{p.id}",
                             "title": f"Fin Est.: {p.client}",
-                            "timestamp": end_dt.strftime("%Y-%m-%d"),
+                            "timestamp": end_dt.isoformat(),
                             "type": "milestone",
                             "color": "#3b82f6" 
                         })
@@ -323,7 +323,7 @@ async def dashboard(request: Request):
                             timeline_events.append({
                                 "id": f"real-end-{p.id}",
                                 "title": f"Fin Real: {p.client}",
-                                "timestamp": real_end_dt.strftime("%Y-%m-%d"),
+                                "timestamp": real_end_dt.isoformat(),
                                 "type": "milestone",
                                 "color": "#ef4444" # Red
                             })

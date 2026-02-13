@@ -133,7 +133,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         const events = {{ timeline_events | tojson
     }};
-    console.log("Timeline Events:", events);
+    console.log("Timeline Events Payload:", events);
 
     if (events && events.length > 0) {
         try {
@@ -144,9 +144,17 @@
 
             timeline.setEvents(events);
 
+            // Force a render check after a slight delay to ensure container has size
+            setTimeout(() => {
+                console.log("Triggering resize/render...");
+                timeline.handleResize();
+            }, 500);
+
         } catch (e) {
             console.error("Timeline Error:", e);
         }
+    } else {
+        console.warn("No events found to render.");
     }
     });
 </script>

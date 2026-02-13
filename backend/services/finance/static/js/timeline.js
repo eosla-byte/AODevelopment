@@ -122,11 +122,19 @@ class Timeline {
     }
 
     setEvents(eventsData) {
+        console.log("Timeline.setEvents received:", eventsData);
         // Expected [{id, timestamp, title, ...}]
-        this.events = eventsData.map(e => ({
-            ...e,
-            timestamp: new Date(e.timestamp).getTime()
-        })).sort((a, b) => a.timestamp - b.timestamp);
+        this.events = eventsData.map(e => {
+            const ts = new Date(e.timestamp).getTime();
+            if (isNaN(ts)) {
+                console.warn("Invalid timestamp for event:", e);
+                return null;
+            }
+            return {
+                ...e,
+                timestamp: ts
+            };
+        }).filter(e => e !== null).sort((a, b) => a.timestamp - b.timestamp);
 
         this.requestRender();
     }
