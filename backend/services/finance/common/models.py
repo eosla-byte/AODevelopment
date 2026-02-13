@@ -29,10 +29,20 @@ class Project(Base):
     # Line 41 archived exists? NO, it was commented out in common/models.py or not shown in BIM section.
     # Wait, line 348 in common/models.py showed BimProject but lines 13-65 showed Project.
     # The 'Project' at top of common/models.py mapped to 'bim_projects'.
-    # It has 'archived = Column(Boolean, default=False)' at line 41. So it exists.
+    # REQUIRED FIELDS FOR STABILITY
+    # archived = Column(Boolean, default=False) # DOES NOT EXIST IN DB
 
     # PROXY PROPERTIES for Finance Compatibility
     # These allow the app to treat 'client', 'amount' as attributes, but they store in 'settings'
+    
+    @property
+    def archived(self): return self.settings.get('finance', {}).get('archived', False)
+    @archived.setter
+    def archived(self, value):
+        s = dict(self.settings) if self.settings else {}
+        if 'finance' not in s: s['finance'] = {}
+        s['finance']['archived'] = value
+        self.settings = s
     
     @property
     def client(self): return self.settings.get('finance', {}).get('client', "")
