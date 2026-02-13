@@ -12,149 +12,161 @@
         </a>
     </div>
 
-    <!-- Main Profile Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <!-- Tabbed Interface with Alpine.js -->
+    <div x-data="{ activeTab: 'resumen' }" class="flex flex-col h-full">
 
-        <!-- Left Sidebar: Identity & Quick Actions -->
-        <div class="lg:col-span-4 space-y-6">
-            <div
-                class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center relative overflow-hidden">
-                <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+        <!-- Tab Navigation -->
+        <div class="flex border-b border-slate-200 mb-6 bg-white rounded-t-xl sticky top-0 z-20">
+            <button @click="activeTab = 'resumen'"
+                :class="{ 'border-blue-500 text-blue-600': activeTab === 'resumen', 'border-transparent text-slate-500 hover:text-slate-700': activeTab !== 'resumen' }"
+                class="px-6 py-3 font-bold text-sm border-b-2 transition-colors">
+                👤 Resumen
+            </button>
+            <button @click="activeTab = 'proyectos'"
+                :class="{ 'border-blue-500 text-blue-600': activeTab === 'proyectos', 'border-transparent text-slate-500 hover:text-slate-700': activeTab !== 'proyectos' }"
+                class="px-6 py-3 font-bold text-sm border-b-2 transition-colors">
+                📁 Proyectos
+            </button>
+            <button @click="activeTab = 'planilla'"
+                :class="{ 'border-blue-500 text-blue-600': activeTab === 'planilla', 'border-transparent text-slate-500 hover:text-slate-700': activeTab !== 'planilla' }"
+                class="px-6 py-3 font-bold text-sm border-b-2 transition-colors">
+                💰 Planilla
+            </button>
+            <button @click="activeTab = 'expediente'"
+                :class="{ 'border-blue-500 text-blue-600': activeTab === 'expediente', 'border-transparent text-slate-500 hover:text-slate-700': activeTab !== 'expediente' }"
+                class="px-6 py-3 font-bold text-sm border-b-2 transition-colors">
+                📄 Expediente
+            </button>
+            <button @click="activeTab = 'actividad'"
+                :class="{ 'border-blue-500 text-blue-600': activeTab === 'actividad', 'border-transparent text-slate-500 hover:text-slate-700': activeTab !== 'actividad' }"
+                class="px-6 py-3 font-bold text-sm border-b-2 transition-colors">
+                ⚡ Actividad
+            </button>
+        </div>
 
-                <div class="relative mt-4 mb-4 group cursor-pointer"
-                    onclick="document.getElementById('profilePicInput').click()">
-                    <div
-                        class="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-slate-200 overflow-hidden flex items-center justify-center">
-                        {% if c.profile_picture %}
-                        <img src="/hr_file/{{ c.id }}/Profile/{{ c.profile_picture }}"
-                            class="w-full h-full object-cover"
-                            onerror="this.parentElement.innerHTML='<span class=\'text-4xl text-slate-400 font-bold\'>{{ c.name[0] }}</span>'">
+        <!-- Main Profile Header (Always Visible on Top or inside Summary? detailed view implies header usually stays. Let's put header in Summary or keep it specialized. 
+             Current design has "Left Sidebar" and "Right Content". 
+             Let's Keep the "Left Sidebar" elements mostly in 'Resumen' but maybe keep the Identity Card always visible if requested.
+             For now, let's move everything into tabs to reduce clutter.) -->
+
+        <!-- TAB: RESUMEN -->
+        <div x-show="activeTab === 'resumen'" class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
+            <!-- Left: Identity -->
+            <div class="lg:col-span-4 space-y-6">
+                <div
+                    class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex flex-col items-center text-center relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+                    <!-- Profile Pic & Info (Same as before) -->
+                    <div class="relative mt-4 mb-4 group cursor-pointer"
+                        onclick="document.getElementById('profilePicInput').click()">
+                        <div
+                            class="w-32 h-32 rounded-full border-4 border-white shadow-lg bg-slate-200 overflow-hidden flex items-center justify-center">
+                            {% if c.profile_picture %}
+                            <img src="/hr_file/{{ c.id }}/Profile/{{ c.profile_picture }}"
+                                class="w-full h-full object-cover">
+                            {% else %}
+                            <span class="text-4xl text-slate-400 font-bold">{{ c.name[0] }}</span>
+                            {% endif %}
+                        </div>
+                        <div
+                            class="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <span class="text-white text-xs font-bold">Cambiar Foto</span>
+                        </div>
+                    </div>
+                    <!-- Hidden Form -->
+                    <form action="/hr/{{ c.id }}/upload_picture" method="post" enctype="multipart/form-data"
+                        class="hidden">
+                        <input type="file" id="profilePicInput" name="file" accept="image/*"
+                            onchange="this.form.submit()">
+                    </form>
+
+                    <h1 class="text-2xl font-bold text-slate-800">{{ c.name }}</h1>
+                    <p class="text-slate-500 font-medium">{{ c.role }}</p>
+                    {% if c.email %}
+                    <p class="text-xs text-slate-400 mt-1">{{ c.email }}</p>
+                    {% endif %}
+
+                    <div class="mt-4 flex gap-2 justify-center">
+                        <span class="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">ID: {{ c.id
+                            }}</span>
+                        {% if c.status == 'Activo' %}
+                        <span class="px-3 py-1 bg-green-100 text-green-600 rounded-full text-xs font-bold">Activo</span>
                         {% else %}
-                        <span class="text-4xl text-slate-400 font-bold">{{ c.name[0] }}</span>
+                        <span class="px-3 py-1 bg-red-100 text-red-600 rounded-full text-xs font-bold">Inactivo</span>
                         {% endif %}
                     </div>
-                    <div
-                        class="absolute inset-0 bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span class="text-white text-xs font-bold">Cambiar Foto</span>
+
+                    <div class="grid grid-cols-1 gap-2 w-full mt-6">
+                        <button onclick="document.getElementById('editProfileModal').classList.remove('hidden')"
+                            class="btn btn-primary w-full shadow-lg shadow-blue-200 text-xs justify-center">Editar
+                            Perfil</button>
                     </div>
                 </div>
 
-                <!-- Hidden Form for Image Upload -->
-                <form action="/hr/{{ c.id }}/upload_picture" method="post" enctype="multipart/form-data" class="hidden">
-                    <input type="file" id="profilePicInput" name="file" accept="image/*" onchange="this.form.submit()">
-                </form>
-
-                <h1 class="text-2xl font-bold text-slate-800">{{ c.name }}</h1>
-                <p class="text-slate-500 font-medium">{{ c.role }}</p>
-                {% if c.email %}
-                <p class="text-xs text-slate-400 mt-1">{{ c.email }}</p>
-                {% endif %}
-
-                <div class="mt-4 flex gap-2 justify-center">
-                    <span class="px-3 py-1 bg-slate-100 text-slate-500 rounded-full text-xs font-bold">ID: {{ c.id
-                        }}</span>
-                    {% if c.status == 'Activo' %}
-                    <span class="px-3 py-1 bg-green-100 text-green-600 rounded-full text-xs font-bold">Activo</span>
-                    {% else %}
-                    <span class="px-3 py-1 bg-red-100 text-red-600 rounded-full text-xs font-bold">Inactivo</span>
-                    {% endif %}
-                    {% if c.archived %}
-                    <span class="px-3 py-1 bg-slate-200 text-slate-600 rounded-full text-xs font-bold">Archivado</span>
-                    {% endif %}
-                </div>
-
-                <div class="grid grid-cols-2 gap-2 w-full mt-6">
-                    <button onclick="document.getElementById('editProfileModal').classList.remove('hidden')"
-                        class="btn btn-primary w-full shadow-lg shadow-blue-200 text-xs text-center justify-center">
-                        Editar Perfil
-                    </button>
-                    <!-- Link to Ledger -->
-                    <a href="/hr_file/{{ c.id }}/Payments/Libro_Salarios.xlsx"
-                        class="btn bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 w-full text-xs flex items-center justify-center gap-1">
-                        📒 Libro
-                    </a>
-                </div>
-
-                <a href="/hr/{{ c.id }}/payments"
-                    class="w-full mt-3 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-bold shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 transition-colors">
-                    💸 Registro de Pagos
-                </a>
-
-                <!-- Archive Action -->
-                <form action="/hr/{{ c.id }}/archive" method="post" class="w-full mt-2">
-                    {% if c.archived %}
-                    <input type="hidden" name="archive" value="false">
-                    <button type="submit"
-                        class="w-full text-xs text-slate-400 font-bold hover:text-blue-600 underline">Restaurar del
-                        Archivo</button>
-                    {% else %}
-                    <input type="hidden" name="archive" value="true">
-                    <button type="submit" class="w-full text-xs text-slate-300 font-bold hover:text-red-500 underline"
-                        onclick="return confirm('¿Archivar este colaborador? Se ocultará del inicio.');">Archivar /
-                        Ocultar</button>
-                    {% endif %}
-                </form>
-            </div>
-
-            <!-- Historical Stats -->
-            <div
-                class="bg-slate-800 rounded-2xl shadow-sm border border-slate-700 p-6 text-white overflow-hidden relative">
-                <div class="absolute top-0 right-0 p-4 opacity-10">
-                    <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 24 24">
-                        <path
-                            d="M16,11.78L20.24,4.45L21.97,5.45L16.74,14.5L10.23,10.75L5.46,19H22V21H2V3H4V17.54L9.5,8L16,11.78Z" />
-                    </svg>
-                </div>
-                <h3
-                    class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">
-                    Histórico ({{ "{:.1f}".format(calc.months_worked) }} meses)</h3>
-                <div class="space-y-6 relative z-10">
-                    <div>
-                        <div class="text-xs text-slate-400 mb-1">Total Percibido</div>
-                        <div class="text-2xl font-bold text-emerald-400">Q{{ "{:,.2f}".format(calc.hist_total_earned) }}
+                <!-- Historical Stats Small -->
+                <div
+                    class="bg-slate-800 rounded-2xl shadow-sm border border-slate-700 p-6 text-white overflow-hidden relative">
+                    <h3
+                        class="font-bold text-slate-400 text-xs uppercase tracking-wider mb-4 border-b border-slate-700 pb-2">
+                        Histórico ({{ "{:.1f}".format(calc.months_worked) }} meses)</h3>
+                    <div class="space-y-4">
+                        <div class="flex justify-between">
+                            <span class="text-xs text-slate-400">Total Percibido</span>
+                            <span class="text-lg font-bold text-emerald-400">Q{{
+                                "{:,.2f}".format(calc.hist_total_earned) }}</span>
                         </div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-slate-400 mb-1">Total Pasivo Acumulado</div>
-                        <div class="text-xl font-bold text-orange-400">Q{{ "{:,.2f}".format(calc.hist_liability) }}
-                        </div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-slate-400 mb-1">Aportes Patronales Totales</div>
-                        <div class="text-xl font-bold text-blue-400">Q{{ "{:,.2f}".format(calc.hist_employer_costs) }}
+                        <div class="flex justify-between">
+                            <span class="text-xs text-slate-400">Pasivo Acum.</span>
+                            <span class="text-lg font-bold text-orange-400">Q{{ "{:,.2f}".format(calc.hist_liability)
+                                }}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Documents Summary -->
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-0 overflow-hidden">
-                <div class="p-4 border-b border-slate-100 bg-slate-50 font-bold text-slate-700 text-sm">Documentación
+            <!-- Right: Quick Stats & Info -->
+            <div class="lg:col-span-8 space-y-6">
+                <!-- Quick Stats Row -->
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Salario Base</div>
+                        <div class="text-xl font-black text-slate-800">Q{{ "{:,.2f}".format(c.base_salary) }}</div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Bonificación</div>
+                        <div class="text-xl font-black text-slate-800">Q{{ "{:,.2f}".format(c.bonus_incentive) }}</div>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                        <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Total Mensual</div>
+                        <div class="text-xl font-black text-blue-600">Q{{ "{:,.2f}".format(c.base_salary +
+                            c.bonus_incentive) }}</div>
+                    </div>
                 </div>
-                <div class="divide-y divide-slate-100">
-                    <a href="#docs-profile" class="flex justify-between p-4 hover:bg-slate-50 transition-colors">
-                        <span class="text-sm text-slate-600">Identificación</span>
-                        <span class="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-bold">{{
-                            c.files.get("Profile", [])|length }}</span>
-                    </a>
-                    <a href="#docs-legal" class="flex justify-between p-4 hover:bg-slate-50 transition-colors">
-                        <span class="text-sm text-slate-600">Contratos</span>
-                        <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-bold">{{
-                            c.files.get("Legal", [])|length }}</span>
-                    </a>
-                    <a href="#docs-payments" class="flex justify-between p-4 hover:bg-slate-50 transition-colors">
-                        <span class="text-sm text-slate-600">Pagos</span>
-                        <span class="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full font-bold">{{
-                            c.files.get("Payments", [])|length }}</span>
-                    </a>
+
+                <!-- Personal Data -->
+                <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                    <h3 class="font-bold text-slate-700 text-sm mb-4">Información Personal</h3>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <span class="block text-slate-400 text-xs text-xs font-bold uppercase">Fecha de
+                                Inicio</span>
+                            <span class="text-slate-800">{{ c.start_date }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-slate-400 text-xs font-bold uppercase">Cumpleaños</span>
+                            <span class="text-slate-800">{{ c.birthday }}</span>
+                        </div>
+                        <div>
+                            <span class="block text-slate-400 text-xs font-bold uppercase">Email Corporativo</span>
+                            <span class="text-slate-800">{{ c.email if c.email else 'No asignado' }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right Content: Dashboards -->
-        <div class="lg:col-span-8 space-y-6">
-
-            <!-- Assigned Projects -->
+        <!-- TAB: PROYECTOS -->
+        <div x-show="activeTab === 'proyectos'" class="animate-fade-in">
             <div class="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="font-bold text-slate-700 text-sm uppercase tracking-wider">Proyectos Asignados</h3>
@@ -169,7 +181,7 @@
                 </div>
 
                 {% if assigned_projects %}
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {% for ap in assigned_projects %}
                     <a href="/project/{{ ap.id }}"
                         class="flex items-center justify-between p-3 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors group">
@@ -192,31 +204,14 @@
                     {% endfor %}
                 </div>
                 {% else %}
-                <div class="text-center py-8 text-slate-400 italic text-sm">
-                    No tiene proyectos asignados actualmente.
+                <div class="text-center py-8 text-slate-400 italic text-sm">No tiene proyectos asignados actualmente.
                 </div>
                 {% endif %}
             </div>
+        </div>
 
-            <!-- Quick Stats Row -->
-            <div class="grid grid-cols-3 gap-4">
-                <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                    <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Salario Base</div>
-                    <div class="text-xl font-black text-slate-800">Q{{ "{:,.2f}".format(c.base_salary) }}</div>
-                </div>
-                <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                    <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Bonificación</div>
-                    <div class="text-xl font-black text-slate-800">Q{{ "{:,.2f}".format(c.bonus_incentive) }}</div>
-                </div>
-                <div class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                    <div class="text-xs text-slate-400 font-bold uppercase tracking-wider mb-1">Fecha Inicio</div>
-                    <div class="text-xl font-black text-slate-800">{{ c.start_date if c.start_date else "--/--/----" }}
-                    </div>
-                </div>
-            </div>
-
-
-
+        <!-- TAB: PLANILLA -->
+        <div x-show="activeTab === 'planilla'" class="animate-fade-in space-y-6">
             <!-- Provisions & Employer Costs -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Provisions -->
@@ -225,8 +220,8 @@
                 {% set vacaciones = c.base_salary / 24 %}
 
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div class="p-4 border-b border-slate-100 bg-slate-50">
-                        <h3 class="font-bold text-slate-700 text-sm">Provisiones Mensuales (Pasivo)</h3>
+                    <div class="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <h3 class="font-bold text-slate-700 text-sm">Provisiones (Pasivo Laboral)</h3>
                     </div>
                     <div class="p-4 space-y-3">
                         <div class="flex justify-between text-sm text-slate-600">
@@ -243,7 +238,7 @@
                         </div>
                         <div
                             class="pt-2 mt-2 border-t border-slate-100 flex justify-between text-sm text-slate-800 font-bold">
-                            <span>Total Pasivo Mensual</span>
+                            <span>Total Mes</span>
                             <span>Q{{ "{:,.2f}".format(aguinaldo + bono14 + vacaciones) }}</span>
                         </div>
                     </div>
@@ -273,17 +268,53 @@
                         </div>
                         <div
                             class="pt-2 mt-2 border-t border-slate-100 flex justify-between text-sm text-slate-800 font-bold">
-                            <span>Total Aportes</span>
+                            <span>Total Mes</span>
                             <span>Q{{ "{:,.2f}".format(igss_patro + intecap + irtra) }}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Docs Sections (Reused Logic) -->
-            <div class="grid grid-cols-3 gap-4" id="docs-section">
+            <!-- Proyeccion de Liquido -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                <h3 class="font-bold text-slate-700 text-sm mb-4">Proyección Líquida Mensual (Empleado)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+                    <div>
+                        <p class="text-xs text-slate-400 font-bold uppercase">Ingresos</p>
+                        <p class="font-mono text-green-600">+ Salario Base: Q{{ "{:,.2f}".format(c.base_salary) }}</p>
+                        <p class="font-mono text-green-600">+ Bonificación: Q{{ "{:,.2f}".format(c.bonus_incentive) }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400 font-bold uppercase">Descuentos de Ley</p>
+                        <p class="font-mono text-red-500">- IGSS (4.83%): Q{{ "{:,.2f}".format(calc.igss_laboral) }}</p>
+                        <p class="font-mono text-red-500">- ISR (Proy): Q{{ "{:,.2f}".format(calc.isr_projection) }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-400 font-bold uppercase">A Recibir</p>
+                        <p class="text-2xl font-black text-slate-800">Q{{ "{:,.2f}".format(calc.liquid_to_receive) }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: EXPEDIENTE -->
+        <div x-show="activeTab === 'expediente'" class="animate-fade-in space-y-6">
+            <div class="flex gap-4 mb-4">
+                <a href="/hr_file/{{ c.id }}/Payments/Libro_Salarios.xlsx"
+                    class="btn bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs flex items-center justify-center gap-1">
+                    📒 Descargar Libro de Salarios
+                </a>
+                <a href="/hr/{{ c.id }}/payments"
+                    class="btn bg-indigo-600 text-white hover:bg-indigo-700 text-xs flex items-center justify-center gap-1">
+                    💸 Ver Registro de Pagos
+                </a>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="docs-section">
                 {% for cat, color in [('Profile', 'blue'), ('Legal', 'gray'), ('Payments', 'green')] %}
-                <div class="card p-0 overflow-hidden" id="docs-{{ cat|lower }}">
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div
                         class="bg-{{ color }}-50 p-4 border-b border-{{ color }}-100 flex justify-between items-center">
                         <h3 class="font-bold text-{{ color }}-800 text-sm">{{ cat }}</h3>
@@ -312,41 +343,41 @@
                     </div>
                 </div>
                 {% endfor %}
+            </div>
+        </div>
 
-                <!-- Plugin Stats Card -->
-                {% if calc.plugin_stats %}
-                <div class="card p-0 overflow-hidden col-span-1 md:col-span-3 lg:col-span-1 border-2 border-red-100">
-                    <div class="bg-red-50 p-4 border-b border-red-100 flex justify-between items-center">
-                        <h3 class="font-bold text-red-800 text-sm">AO Development Stats</h3>
-                        <span class="text-xs font-bold text-red-500 bg-red-100 px-2 py-0.5 rounded-full">Mes
-                            Actual</span>
+        <!-- TAB: ACTIVIDAD -->
+        <div x-show="activeTab === 'actividad'" class="animate-fade-in">
+            {% if calc.plugin_stats %}
+            <div class="bg-white rounded-xl shadow-sm border border-red-100 p-6">
+                <h3 class="font-bold text-red-800 text-lg mb-4">Actividad en Revit (Plugin)</h3>
+                <div class="grid grid-cols-3 gap-6 mb-6">
+                    <div class="text-center p-4 bg-red-50 rounded-xl">
+                        <span class="block text-2xl font-black text-red-600">{{ calc.plugin_stats.month_hours }}
+                            h</span>
+                        <span class="text-xs font-bold text-red-400 uppercase">Horas este Mes</span>
                     </div>
-                    <div class="p-4 bg-white min-h-[150px] flex flex-col justify-between">
-                        <div class="space-y-4">
-                            <div>
-                                <p class="text-xs text-slate-400 font-bold uppercase">Horas en Revit</p>
-                                <p class="text-2xl font-black text-slate-800">{{ calc.plugin_stats.month_hours }} hrs
-                                </p>
-                            </div>
-                            <div>
-                                <p class="text-xs text-slate-400 font-bold uppercase">Archivos Trabajados</p>
-                                <p class="text-lg font-bold text-slate-700">{{ calc.plugin_stats.files_count }}</p>
-                            </div>
-                            <div class="pt-2 border-t border-slate-100">
-                                <p class="text-[10px] text-slate-400">Vinculado a: <span
-                                        class="font-mono text-slate-600">{{ c.email }}</span></p>
-                            </div>
-                        </div>
-                        <a href="/hr/{{ c.id }}/plugin_logs"
-                            class="w-full mt-3 bg-red-600 hover:bg-red-700 text-white py-2 rounded text-xs font-bold text-center block transition-colors">
-                            Ver Base de Datos
-                        </a>
+                    <div class="text-center p-4 bg-red-50 rounded-xl">
+                        <span class="block text-2xl font-black text-red-600">{{ calc.plugin_stats.files_count }}</span>
+                        <span class="text-xs font-bold text-red-400 uppercase">Archivos Únicos</span>
+                    </div>
+                    <div class="text-center p-4 bg-red-50 rounded-xl">
+                        <span class="block text-lg font-bold text-slate-600">{{ c.email }}</span>
+                        <span class="text-xs font-bold text-slate-400 uppercase">Cuenta Vinculada</span>
                     </div>
                 </div>
-                {% endif %}
+                <a href="/hr/{{ c.id }}/plugin_logs" class="btn bg-red-600 text-white w-full text-center">Ver Logs
+                    Completos de Actividad</a>
             </div>
-
+            {% else %}
+            <div class="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <p class="text-slate-500 font-bold">No hay actividad registrada</p>
+                <p class="text-xs text-slate-400">Asegúrate de que el email {{ c.email }} coincida con el usuario del
+                    Plugin de Revit.</p>
+            </div>
+            {% endif %}
         </div>
+
     </div>
 </div>
 

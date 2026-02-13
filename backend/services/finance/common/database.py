@@ -444,14 +444,14 @@ def get_collaborator_assigned_projects(collab_id: str):
 # -----------------------------------------------------------------------------
 
 def get_collaborators() -> List[models.Collaborator]:
-    db = SessionLocal()
+    db = SessionOps()
     try:
         return db.query(models.Collaborator).filter(models.Collaborator.archived == False).all()
     finally:
         db.close()
 
 def get_collaborator_details(collab_id: str) -> Optional[models.Collaborator]:
-    db = SessionLocal()
+    db = SessionOps()
     try:
         collab = db.query(models.Collaborator).filter(models.Collaborator.id == collab_id).first()
         if not collab:
@@ -463,7 +463,7 @@ def get_collaborator_details(collab_id: str) -> Optional[models.Collaborator]:
         db.close()
 
 def create_collaborator(name: str, role: str, salary: float = 0.0, birthday: str = "", start_date: str = "") -> bool:
-    db = SessionLocal()
+    db = SessionOps()
     try:
         new_id = str(int(datetime.datetime.now().timestamp()))
         
@@ -487,6 +487,92 @@ def create_collaborator(name: str, role: str, salary: float = 0.0, birthday: str
     except Exception as e:
         print(f"Error create_collaborator: {e}")
         return False
+    finally:
+        db.close()
+
+def update_collaborator(collab_id: str, role: str = None, base_salary: float = None, bonus_incentive: float = None, birthday: str = None, start_date: str = None, status: str = None, email: str = None):
+    db = SessionOps()
+    try:
+        c = db.query(models.Collaborator).filter(models.Collaborator.id == collab_id).first()
+        if not c: return False
+        
+        if role: c.role = role
+        if base_salary is not None: c.base_salary = base_salary
+        if bonus_incentive is not None: c.bonus_incentive = bonus_incentive
+        
+        # Recalculate Total
+        c.salary = c.base_salary + c.bonus_incentive
+        
+        if birthday is not None: c.birthday = birthday
+        if start_date is not None: c.start_date = start_date
+        if status: c.status = status
+        if email is not None: c.email = email
+        
+        db.commit()
+        return True
+    except:
+        return False
+    finally:
+        db.close()
+
+def update_collaborator_picture(collab_id: str, filename: str):
+    db = SessionOps()
+    try:
+        c = db.query(models.Collaborator).filter(models.Collaborator.id == collab_id).first()
+        if c:
+            c.profile_picture = filename
+            db.commit()
+    finally:
+        db.close()
+
+def add_adjustment(collab_id: str, type: str, description: str, amount: float):
+    db = SessionOps()
+    try:
+        c = db.query(models.Collaborator).filter(models.Collaborator.id == collab_id).first()
+        if c:
+            adjs = list(c.adjustments) if c.adjustments else []
+            adjs.append({
+                "id": str(uuid.uuid4()),
+                "type": type,
+                "description": description,
+                "amount": amount,
+                "date": datetime.datetime.now().isoformat()
+            })
+            c.adjustments = adjs
+            flag_modified(c, "adjustments")
+            db.commit()
+    finally:
+        db.close()
+
+def remove_adjustment(collab_id: str, adj_id: str):
+    db = SessionOps()
+    try:
+        c = db.query(models.Collaborator).filter(models.Collaborator.id == collab_id).first()
+        if c and c.adjustments:
+            adjs = [a for a in c.adjustments if a['id'] != adj_id]
+            c.adjustments = adjs
+            flag_modified(c, "adjustments")
+            db.commit()
+    finally:
+        db.close()
+        
+def toggle_archive_collaborator(collab_id: str, archive: bool):
+    db = SessionOps()
+    try:
+        c = db.query(models.Collaborator).filter(models.Collaborator.id == collab_id).first()
+        if c:
+            c.archived = archive
+            db.commit()
+    finally:
+        db.close()
+
+def save_payroll_close(collab_id: str, new_liability: float):
+    db = SessionOps()
+    try:
+        c = db.query(models.Collaborator).filter(models.Collaborator.id == collab_id).first()
+        if c:
+            c.accumulated_liability = new_liability
+            db.commit()
     finally:
         db.close()
 
