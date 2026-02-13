@@ -339,20 +339,20 @@ def update_project_meta(project_id: str, new_client: str, new_status: str, nit: 
         proj = db.query(models.Project).filter(models.Project.id == project_id).first()
         if not proj: return False
         
-        # proj.client = new_client
+        proj.client = new_client
         proj.status = new_status
-        # proj.nit = nit
-        # proj.legal_name = legal_name
-        # proj.po_number = po_number
-        # proj.amount = amount
-        # proj.emoji = emoji
-        # proj.start_date = start_date
-        # proj.duration_months = duration_months
-        # proj.additional_time_months = additional_time_months
-        # proj.paid_amount = paid_amount
-        # proj.square_meters = square_meters
-        # proj.category = category
-        # proj.archived = archived
+        proj.nit = nit
+        proj.legal_name = legal_name
+        proj.po_number = po_number
+        proj.amount = amount
+        proj.emoji = emoji
+        proj.start_date = start_date
+        proj.duration_months = duration_months
+        proj.additional_time_months = additional_time_months
+        proj.paid_amount = paid_amount
+        proj.square_meters = square_meters
+        proj.category = category
+        proj.archived = archived
         # if acc_config:
         #     proj.acc_config = acc_config
             
