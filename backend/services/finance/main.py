@@ -217,8 +217,22 @@ async def dashboard(request: Request):
     from common.database import get_projects, get_expenses_monthly, get_quotations, get_collaborators
     
     # A. Active Projects
+    # Strict definition of active projects
+    ACTIVE_STATUSES = {'active', 'activo', 'en curso', 'en progreso', 'on going', 'ongoing'}
+    
     all_projects = get_projects()
-    active_projects = [p for p in all_projects if p.status == 'Activo']
+    active_projects = []
+    
+    for p in all_projects:
+        status_norm = str(getattr(p, 'status', '')).lower().strip()
+        if status_norm in ACTIVE_STATUSES:
+             active_projects.append(p)
+    
+    # Payload for Frontend (Swimlanes)
+    active_projects_payload = [
+        {"id": p.id, "client": p.client, "status": p.status} 
+        for p in active_projects
+    ]
     
     # B. Financials
     # Income (Total Paid Amount on Projects)
@@ -340,9 +354,10 @@ async def dashboard(request: Request):
         # Payments / Invoices (If we had a dedicated list, we would add them here)
         # For now, we visualize the projects themselves.
     
-    logger.info(f"📊 [DASHBOARD] Sending {len(timeline_events)} timeline events to frontend.")
+    logger.info(f"📊 [DASHBOARD] Sending {len(active_projects)} active projects and {len(timeline_events)} events.")
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
+        "active_projects_payload": active_projects_payload, # Inject payload
         "metrics": {
             "active_projects": len(active_projects),
             "total_income": total_income,
