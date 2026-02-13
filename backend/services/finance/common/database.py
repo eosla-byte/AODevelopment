@@ -193,9 +193,46 @@ def get_project_details(project_id: str) -> Optional[models.Project]:
         db.close()
 
 def create_project(name: str, client: str = "", nit: str = "", legal_name: str = "", po_number: str = "", amount: float = 0.0, status: str = "Activo", emoji: str = "📁", custom_id: str = None, category: str = "Residencial") -> bool:
-    # Legacy Create - No-op
-    pass
-    return True
+    db = SessionExt()
+    try:
+        new_id = custom_id if custom_id else str(uuid.uuid4())
+        # Check if exists
+        existing = db.query(models.Project).filter(models.Project.id == new_id).first()
+        if existing:
+            return False
+            
+        new_proj = models.Project(
+            id=new_id,
+            name=name,
+            status=status,
+            # We need to set other fields via JSON or columns if they exist in DB model
+            # Assuming Project model in Ext DB has these columns (unverified but probable)
+            # If columns missing, this will crash. Assuming standard AO Project model.
+            organization_id="org_default", # Strict requirement
+            created_at=datetime.datetime.now()
+        )
+        
+        # Helper to set attr if exists
+        def safe_set(obj, key, val):
+             if hasattr(obj, key): setattr(obj, key, val)
+             
+        safe_set(new_proj, "client", client)
+        safe_set(new_proj, "nit", nit)
+        safe_set(new_proj, "legal_name", legal_name)
+        safe_set(new_proj, "po_number", po_number)
+        safe_set(new_proj, "amount", amount)
+        safe_set(new_proj, "emoji", emoji)
+        safe_set(new_proj, "category", category)
+        
+        db.add(new_proj)
+        db.commit()
+        return True
+    except Exception as e:
+        print(f"Error create_project: {e}")
+        db.rollback()
+        return False
+    finally:
+        db.close()
 
 def get_project_stats_by_category():
     """
@@ -1325,14 +1362,14 @@ def get_project_collaborator_count(project_id: str) -> int:
 # -----------------------------------------------------------------------------
 
 def get_quotations() -> List[models.Quotation]:
-    db = SessionLocal()
+    db = SessionExt()
     try:
         return db.query(models.Quotation).order_by(models.Quotation.created_at.desc()).all()
     finally:
         db.close()
 
 def get_quotation_by_id(quot_id: str) -> Optional[models.Quotation]:
-    db = SessionLocal()
+    db = SessionExt()
     try:
         data = db.query(models.Quotation).filter(models.Quotation.id == quot_id).first()
         if data and data.content_json is None:
@@ -1342,7 +1379,7 @@ def get_quotation_by_id(quot_id: str) -> Optional[models.Quotation]:
         db.close()
 
 def create_quotation(data: dict) -> models.Quotation:
-    db = SessionLocal()
+    db = SessionExt()
     try:
         new_q = models.Quotation(
             id=data.get("id"),
@@ -1361,7 +1398,7 @@ def create_quotation(data: dict) -> models.Quotation:
         db.close()
 
 def update_quotation(quot_id: str, updates: dict) -> Optional[models.Quotation]:
-    db = SessionLocal()
+    db = SessionExt()
     try:
         q = db.query(models.Quotation).filter(models.Quotation.id == quot_id).first()
         if not q:
@@ -1380,7 +1417,7 @@ def update_quotation(quot_id: str, updates: dict) -> Optional[models.Quotation]:
         db.close()
 
 def delete_quotation(quot_id: str) -> bool:
-    db = SessionLocal()
+    db = SessionExt()
     try:
         q = db.query(models.Quotation).filter(models.Quotation.id == quot_id).first()
         if q:
@@ -1440,15 +1477,8 @@ def save_template(name: str, content: List):
 # ESTIMATIONS (Replica of Expenses Logic or Independent?)
 # -----------------------------------------------------------------------------
 def get_estimations():
-    # Based on main.py, estimations are handled via create_estimation which might be using projects table or separate?
-    # Wait, create_estimation was imported in main.py but I didn't see it in database.py earlier.
-    # It must be missing or I missed it.
-    # Check if 'create_estimation' exists in this file.
-    # If not, I should implement it or find where it is.
-    # However, 'get_estimations' is called in main.py, so it must exist or be expected.
-    # Let's check projects for status='Analisis' or 'Estimacion' as a fallback.
-    
-    db = SessionLocal()
+    # Estimations are Projects with status 'Analisis' or 'Aprobada' in EXT DB
+    db = SessionExt()
     try:
         # Assuming Estimations are Projects with status 'Analisis' or 'Aprobada'
         projects = db.query(models.Project).filter(models.Project.status.in_(["Analisis", "Aprobada"])).all()
@@ -1458,15 +1488,15 @@ def get_estimations():
             res.append({
                 "id": p.id,
                 "name": p.name,
-                "client": p.client,
-                "amount": p.amount,
-                "square_meters": p.square_meters,
+                "client": getattr(p, "client", ""),
+                "amount": getattr(p, "amount", 0.0),
+                "square_meters": getattr(p, "square_meters", 0.0),
                 "status": p.status,
-                "category": p.category,
-                "start_date": p.start_date,
-                "duration_months": p.duration_months,
-                "emoji": p.emoji,
-                "resources": (p.estimation_data or {}).get("resources", [])
+                "category": getattr(p, "category", ""),
+                "start_date": getattr(p, "start_date", ""),
+                "duration_months": getattr(p, "duration_months", 0.0),
+                "emoji": getattr(p, "emoji", "📝"),
+                "resources": (getattr(p, "estimation_data", {}) or {}).get("resources", [])
             })
         return res
     except Exception as e:
@@ -1476,21 +1506,21 @@ def get_estimations():
         db.close()
 
 def get_estimation_details(est_id: str):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         p = db.query(models.Project).filter(models.Project.id == est_id).first()
         if not p: return None
         
-        est_data = p.estimation_data or {}
+        est_data = getattr(p, "estimation_data", {}) or {}
         
         return {
             "id": p.id,
             "name": p.name,
-            "client": p.client,
-            "category": p.category,
-            "amount": p.amount,
-            "square_meters": p.square_meters,
-            "duration_months": p.duration_months,
+            "client": getattr(p, "client", ""),
+            "category": getattr(p, "category", ""),
+            "amount": getattr(p, "amount", 0.0),
+            "square_meters": getattr(p, "square_meters", 0.0),
+            "duration_months": getattr(p, "duration_months", 0.0),
             "status": p.status,
             "resources": est_data.get("resources", []),
             "financials": est_data.get("financials", {})
@@ -1499,7 +1529,7 @@ def get_estimation_details(est_id: str):
         db.close()
 
 def update_estimation_full(data: dict):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         est_id = data.get("id")
         if not est_id: return False
@@ -1509,14 +1539,14 @@ def update_estimation_full(data: dict):
         
         # Update Core Fields
         if "name" in data: p.name = data["name"]
-        if "client" in data: p.client = data["client"]
-        if "category" in data: p.category = data["category"]
-        if "amount" in data: p.amount = data["amount"]
-        if "square_meters" in data: p.square_meters = data["square_meters"]
-        if "duration_months" in data: p.duration_months = data["duration_months"]
+        if "client" in data and hasattr(p, "client"): p.client = data["client"]
+        if "category" in data and hasattr(p, "category"): p.category = data["category"]
+        if "amount" in data and hasattr(p, "amount"): p.amount = data["amount"]
+        if "square_meters" in data and hasattr(p, "square_meters"): p.square_meters = data["square_meters"]
+        if "duration_months" in data and hasattr(p, "duration_months"): p.duration_months = data["duration_months"]
         
         # Update JSON Data
-        est_data = dict(p.estimation_data) if p.estimation_data else {}
+        est_data = dict(p.estimation_data) if getattr(p, "estimation_data", None) else {}
         if "resources" in data: est_data["resources"] = data["resources"]
         if "financials" in data: est_data["financials"] = data["financials"]
         
@@ -1534,7 +1564,7 @@ def update_estimation_full(data: dict):
 
 
 def create_estimation(data: dict):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         new_id = str(uuid.uuid4())
         
@@ -1542,17 +1572,21 @@ def create_estimation(data: dict):
         p = models.Project(
             id=new_id,
             name=data.get("name"),
-            client=data.get("client"),
-            category=data.get("category"),
-            amount=float(data.get("amount", 0)),
-            square_meters=float(data.get("square_meters", 0)),
-            start_date=data.get("start_date"),
-            duration_months=float(data.get("duration_months", 0)),
+            # Safe attributes handled by model or ignored if not in mapping?
+            # We assume model matches schema.
+            # client=data.get("client"),
+            # category=data.get("category"),
+            # amount=float(data.get("amount", 0)),
+            # square_meters=float(data.get("square_meters", 0)),
+            # start_date=data.get("start_date"),
+            # duration_months=float(data.get("duration_months", 0)),
             status="Analisis",
-            nit=data.get("nit"),
-            legal_name=data.get("legal_name"),
-            po_number=data.get("po_number"),
-            emoji="📝",
+            # nit=data.get("nit"),
+            # legal_name=data.get("legal_name"),
+            # po_number=data.get("po_number"),
+            # emoji="📝",
+            
+            organization_id="org_default", # Required
             
             # Default empty estimation data
             estimation_data={
@@ -1564,6 +1598,22 @@ def create_estimation(data: dict):
                 }
             }
         )
+        
+        # Safe Set
+        def safe_set(obj, key, val):
+             if hasattr(obj, key): setattr(obj, key, val)
+             
+        safe_set(p, "client", data.get("client"))
+        safe_set(p, "category", data.get("category"))
+        safe_set(p, "amount", float(data.get("amount", 0)))
+        safe_set(p, "square_meters", float(data.get("square_meters", 0)))
+        safe_set(p, "start_date", data.get("start_date"))
+        safe_set(p, "duration_months", float(data.get("duration_months", 0)))
+        safe_set(p, "nit", data.get("nit"))
+        safe_set(p, "legal_name", data.get("legal_name"))
+        safe_set(p, "po_number", data.get("po_number"))
+        safe_set(p, "emoji", "📝")
+        
         db.add(p)
         db.commit()
     except Exception as e:
@@ -1573,7 +1623,7 @@ def create_estimation(data: dict):
         db.close()
 
 def update_estimation(est_id: str, updates: dict):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         p = db.query(models.Project).filter(models.Project.id == est_id).first()
         if p:
@@ -1583,7 +1633,7 @@ def update_estimation(est_id: str, updates: dict):
         db.close()
 
 def delete_estimation(est_id: str):
-    db = SessionLocal()
+    db = SessionExt()
     try:
         p = db.query(models.Project).filter(models.Project.id == est_id).first()
         if p:

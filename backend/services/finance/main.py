@@ -205,7 +205,13 @@ async def dashboard(request: Request):
         
     # 2. Not Authenticated -> Show Login
     # We use the generic login template.
+    # 2. Not Authenticated -> Show Login
+    # We use the generic login template.
     return templates.TemplateResponse("login.html", {"request": request, "service_name": "Finance & Ops"})
+
+@app.get("/dashboard")
+async def dashboard_redirect():
+    return RedirectResponse("/projects", status_code=303)
 
 
 @app.get("/health")
