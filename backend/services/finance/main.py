@@ -138,16 +138,23 @@ async def login_proxy(request: Request, username: str = Form(...), password: str
                      if len(parts) == 3:
                          logger.info(f"      Signature: {parts[2]}")
                 
-                # We blindly copy values. 
-                # Note: 'domain' might need adjustment if it's strict, but .somosao.com is fine.
+                # FORCE DOMAIN to .somosao.com to ensure shared auth works
+                # We ignore the domain sent by Accounts (which might be accounts.somosao.com or None)
+                target_domain = ".somosao.com"
+                
+                # Force Secure/SameSite=None for modern browser compat
+                # (Lax is safer, but None is required if we ever iframe; keeping consistent with Platform)
+                
+                logger.info(f"   🍪 Setting Cookie: {cookie.name} domain={target_domain} secure=True samesite=None")
+                
                 response.set_cookie(
                     key=cookie.name,
                     value=cookie.value,
-                    domain=cookie.domain,
-                    path=cookie.path,
-                    secure=cookie.secure,
-                    httponly=cookie.has_nonstandard_attr('HttpOnly') or True, # Default to True for auth tokens
-                    samesite='Lax' # Safe default
+                    domain=target_domain, 
+                    path="/", # Force root path
+                    secure=True, # Railway is HTTPS
+                    httponly=True, 
+                    samesite='None' 
                 )
             
             return response
