@@ -361,40 +361,71 @@ class Timeline {
         const fragment = document.createDocumentFragment();
 
         const axisY = this.height - 30;
-        const eventY = axisY - 20; // 20px above axis
+        // Center events vertically, but stagger them slightly
+        const BaseEventY = this.height / 2;
 
-        this.clusters.forEach(cluster => {
-            const x = this.timeToX(cluster.events[0].timestamp); // Anchor to first or average?
+        this.clusters.forEach((cluster, index) => {
+            const x = this.timeToX(cluster.events[0].timestamp);
 
             // Skip offscreen
-            if (x < -50 || x > this.width + 50) return;
+            if (x < -100 || x > this.width + 100) return;
 
+            // Stagger height to avoid label collision
+            // Alternate between middle, slightly up, slightly down
+            const stagger = (index % 3 - 1) * 40; // -40, 0, +40
+            const eventY = BaseEventY + stagger;
+
+            // 1. Connector Line (DOM or Canvas? DOM is easier for now to keep layers simple)
+            const line = document.createElement('div');
+            line.className = 'absolute bg-slate-200';
+            line.style.width = '1px';
+            line.style.left = `${x}px`;
+            line.style.top = `${eventY}px`;
+            line.style.height = `${axisY - eventY}px`; // Connect to axis
+            fragment.appendChild(line);
+
+            // 2. Event Dot (Container)
             const el = document.createElement('div');
-            el.className = 'absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-200 hover:scale-110 cursor-pointer flex items-center justify-center shadow-sm';
+            el.className = 'absolute transform -translate-x-1/2 -translate-y-1/2 transition-transform duration-200 hover:scale-110 cursor-pointer flex flex-col items-center group';
             el.style.left = `${x}px`;
             el.style.top = `${eventY}px`;
-            el.style.pointerEvents = 'auto'; // Re-enable clicks
+            el.style.pointerEvents = 'auto';
+
+            // Dot shape
+            const dot = document.createElement('div');
 
             if (cluster.events.length > 1) {
-                // Cluster Node
-                el.className += ' bg-emerald-600 text-white rounded-full font-bold text-xs border-2 border-white';
-                el.style.width = '28px';
-                el.style.height = '28px';
-                el.innerText = `${cluster.events.length}`;
+                // Cluster
+                dot.className = 'bg-emerald-600 text-white rounded-full font-bold text-xs border-4 border-white shadow-lg flex items-center justify-center z-10 box-content';
+                dot.style.width = '24px';
+                dot.style.height = '24px';
+                dot.innerText = `${cluster.events.length}`;
                 el.onclick = (e) => this.zoomToCluster(cluster, e);
                 el.title = `${cluster.events.length} eventos`;
             } else {
-                // Single Node
+                // Single
                 const evt = cluster.events[0];
-                el.className += ' bg-white border-2 border-emerald-500 rounded-full';
-                el.style.width = '14px';
-                el.style.height = '14px';
-                el.onclick = (e) => this.emitSelect(evt, e);
-                el.title = `${evt.title || 'Evento'} - ${new Date(evt.timestamp).toLocaleString()}`;
+                dot.className = 'bg-white border-4 border-emerald-500 rounded-full shadow-md z-10 box-content';
+                dot.style.width = '12px';
+                dot.style.height = '12px';
 
-                // Optional: Icon inside?
+                // Color override if evt.color exists?
+                if (evt.color) {
+                    dot.style.borderColor = evt.color;
+                    if (evt.type === 'milestone') dot.className += ' rounded-sm rotate-45'; // Diamond for milestones
+                }
+
+                el.onclick = (e) => this.emitSelect(evt, e);
+                el.title = `${evt.title || 'Evento'} - ${new Date(evt.timestamp).toLocaleDateString()}`;
+
+                // Label
+                const label = document.createElement('div');
+                label.className = 'absolute bottom-6 left-1/2 transform -translate-x-1/2 whitespace-nowrap text-slate-700 text-xs font-medium px-2 py-1 bg-white/80 rounded backdrop-blur-sm border border-slate-100 shadow-sm opacity-90 group-hover:opacity-100 group-hover:z-50';
+                label.innerText = evt.title;
+                el.appendChild(label);
             }
 
+            el.appendChild(dot);
             fragment.appendChild(el);
         });
 
