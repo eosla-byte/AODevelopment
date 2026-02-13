@@ -25,6 +25,11 @@ from routers import projects, hr, expenses, quotes
 
 app = FastAPI(title="AO Finance & Operations")
 
+import logging
+logger = logging.getLogger("uvicorn")
+logger.info("[FINANCE V2 CHECK] Service Starting with V2 Codebase...")
+
+
 # CORS
 origins = ["*"]
 app.add_middleware(
