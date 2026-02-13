@@ -56,6 +56,7 @@ def get_db_host(url):
 
 print(f"✅ [DB SETUP] Core: {'SQLite' if 'sqlite' in CORE_DB_URL else 'Postgres'} | Host: {get_db_host(CORE_DB_URL)}")
 print(f"✅ [DB SETUP] Ops: {'SQLite' if 'sqlite' in OPS_DB_URL else 'Postgres'} | Host: {get_db_host(OPS_DB_URL)}")
+print(f"✅ [DB SETUP] Ext: {'SQLite' if 'sqlite' in EXT_DB_URL else 'Postgres'} | Host: {get_db_host(EXT_DB_URL)}")
 
 # Create Engines
 engine_core = create_engine(CORE_DB_URL, connect_args={"check_same_thread": False} if "sqlite" in CORE_DB_URL else {})
@@ -126,7 +127,8 @@ SCAN_CATEGORIES = {
 # -----------------------------------------------------------------------------
 
 def get_projects(archived: bool = False) -> List[models.Project]:
-    db = SessionLocal()
+    # Projects live in External DB (BIM/Daily), not Ops
+    db = SessionExt()
     try:
         # Filter out 'Analisis' (Estimations) from standard project list
         # Filter status if it exists, otherwise get all
@@ -160,7 +162,8 @@ def update_project_profit_config(project_id: str, projected: float, real: float,
     return True
 
 def get_project_details(project_id: str) -> Optional[models.Project]:
-    db = SessionLocal()
+    # Projects live in External DB
+    db = SessionExt()
     try:
         proj = db.query(models.Project).filter(models.Project.id == project_id).first()
         if not proj:

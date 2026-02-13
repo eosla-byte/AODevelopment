@@ -120,9 +120,10 @@
                 <div class="flex items-center gap-3 px-3 py-2">
                     <div
                         class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs uppercase">
-                        {{ request.state.user.name[:2] }}</div>
+                        {{ (request.state.user.name or request.state.user.email or '?')[:2] }}</div>
                     <div class="flex-1 min-w-0">
-                        <p class="font-bold text-slate-700 text-sm truncate">{{ request.state.user.name }}</p>
+                        <p class="font-bold text-slate-700 text-sm truncate">{{ request.state.user.name or
+                            request.state.user.email }}</p>
                         <p class="text-xs text-slate-500 capitalize">{{ request.state.user.role }}</p>
                     </div>
                     <a href="/logout" title="Cerrar Sesión" class="text-slate-400 hover:text-red-500">
