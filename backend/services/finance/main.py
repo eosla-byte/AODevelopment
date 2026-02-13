@@ -198,13 +198,16 @@ async def logout_force():
     """
     response = HTMLResponse(content="<h1>Logged Out</h1><p>Cookies cleared. <a href='/'>Return to Login</a></p>")
     
-    domains = [None, ".somosao.com", "somosao.com", "finance.somosao.com"]
+    domains = [None, ".somosao.com", "somosao.com", "finance.somosao.com", "www.somosao.com"]
     cookies = ["accounts_access_token", "access_token", "accounts_refresh_token"]
     
+    # Aggressively delete everything
     for cookie_name in cookies:
         for domain in domains:
             response.delete_cookie(key=cookie_name, domain=domain, path="/")
             response.delete_cookie(key=cookie_name, domain=domain, path="/api")
+            # Also try without domain (host only)
+            response.delete_cookie(key=cookie_name, path="/")
             
     return response
 
